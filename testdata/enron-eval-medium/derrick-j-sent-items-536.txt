@@ -1,0 +1,39 @@
+Message-ID: <5576839.1075861421956.JavaMail.evans@thyme>
+Date: Thu, 1 Nov 2001 07:11:18 -0800 (PST)
+From: james.derrick@enron.com
+To: rex.rogers@enron.com
+Subject: FW: Raptor Notes
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+X-From: Derrick Jr., James </O=ENRON/OU=NA/CN=RECIPIENTS/CN=JDERRIC>
+X-To: Rogers, Rex </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rroger2>
+X-cc: 
+X-bcc: 
+X-Folder: \JDERRIC (Non-Privileged)\Derrick Jr., James\Sent Items
+X-Origin: Derrick-J
+X-FileName: JDERRIC (Non-Privileged).pst
+
+
+Rex, please provide to WC&P.  
+ -----Original Message-----
+From: 	Nordstrom, Mary  
+Sent:	Thursday, November 01, 2001 8:59 AM
+To:	Derrick Jr., James
+Subject:	FW: Raptor Notes
+
+
+
+ -----Original Message-----
+From: 	Yuan, Ding  
+Sent:	Wednesday, August 29, 2001 2:32 AM
+To:	Port, David; Schultz, Cassandra; Zipter, Rudi
+Subject:	Raptor Notes
+
+Attached is a high level quick review of the Raptor sturcture, based on my understanding of the deal and the discussion with Vince, Gordon and Rakesh last Friday.  Please let me know if I need to work on more detail issue regarding to the Raptor structure.
+
+Thanks,
+
+Ding.
+
+ 

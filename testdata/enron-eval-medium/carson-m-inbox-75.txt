@@ -1,0 +1,163 @@
+Message-ID: <1777030.1075853149830.JavaMail.evans@thyme>
+Date: Wed, 17 Oct 2001 06:41:21 -0700 (PDT)
+From: jae.black@enron.com
+To: 
+	/o=enron/ou=na/cn=recipients/cn=notesaddr/cn=a478079f-55e1f3b0-862566fa-612229@enron.com, 
+	william.abler@enron.com, anubhav.aggarwal@enron.com, 
+	diana.allen@enron.com, harry.arora@enron.com, debra.bailey@enron.com, 
+	russell.ballato@enron.com, ted.ballinger@enron.com, 
+	don.baughman@enron.com, moises.benchluch@enron.com, 
+	hicham.benjelloun@enron.com, robert.benson@enron.com, 
+	corry.bentley@enron.com, jae.black@enron.com, jay.blaine@enron.com, 
+	laurel.bolt@enron.com, j..broderick@enron.com, 
+	richard.broussard@enron.com, lisa.burnett@enron.com, 
+	f..campbell@enron.com, joe.capasso@enron.com, mike.carson@enron.com, 
+	alan.chen@enron.com, jason.choate@enron.com, kevin.cline@enron.com, 
+	dustin.collins@enron.com, keith.comeaux@enron.com, 
+	kayne.coulter@enron.com, dana.davis@enron.com, l..day@enron.com, 
+	clint.dean@enron.com, todd.decook@enron.com, gerald.emesih@enron.com, 
+	joe.errigo@enron.com, m..forney@enron.com, william.freije@enron.com, 
+	l..garcia@enron.com, gerald.gilbert@enron.com, 
+	doug.gilbert-smith@enron.com, gustavo.giron@enron.com, 
+	andrew.greer@enron.com, jaime.gualy@enron.com, 
+	claudia.guerra@enron.com, utku.gulmeden@enron.com, 
+	gautam.gupta@enron.com, amie.ha@enron.com, patrick.hanse@enron.com, 
+	juan.hernandez@enron.com, rika.imai@enron.com, 
+	david.ingram@enron.com, daniel.jenkins@enron.com, 
+	jason.kaniss@enron.com, jeff.king@enron.com, john.kinser@enron.com, 
+	carrie.larkworthy@enron.com, dean.laurent@enron.com, 
+	justin.laverell@enron.com, chris.lenartowicz@enron.com, 
+	matt.lorenz@enron.com, gretchen.lotz@enron.com, 
+	thomas.lowell@enron.com, iris.mack@enron.com, 
+	ashish.mahajan@enron.com, peter.makkai@enron.com, 
+	mauricio.marquez@enron.com, david.maskell@enron.com, 
+	tom.may@enron.com, alexander.mcelreath@enron.com, 
+	jeffrey.miller@enron.com, seung-taek.oh@enron.com, 
+	steve.olinde@enron.com, andy.pace@enron.com, juan.padron@enron.com, 
+	steve.pan@enron.com, willis.philip@enron.com, 
+	laura.podurgiel@enron.com, d..poppa@enron.com, m..presto@enron.com, 
+	joe.quenet@enron.com, punit.rawal@enron.com, 
+	andy.rodriquez@enron.com, benjamin.rogers@enron.com, 
+	bill.rust@enron.com, david.ryan@enron.com, eric.saibi@enron.com, 
+	paul.schiavone@enron.com, bryce.schneider@enron.com, 
+	michael.seely@enron.com, erik.serio@enron.com, 
+	lisa.shoemake@enron.com, erik.simpson@enron.com, 
+	robert.stalford@enron.com, joe.stepenovitch@enron.com, 
+	j..sturm@enron.com, mark.symms@enron.com, ramanarao.tamma@enron.com, 
+	d..thomas@enron.com, reese.trejo@enron.com, maria.valdes@enron.com, 
+	clayton.vernon@enron.com, steve.wang@enron.com, 
+	ryan.williams@enron.com, cory.willis@enron.com, 
+	mike.zipperer@enron.com, d..baughman@enron.com, 
+	terri.clynes@enron.com, oscar.dalton@enron.com, e..kelly@enron.com, 
+	doug.sewell@enron.com, larry.valderrama@enron.com
+Subject: FW: RTO Week -- Summary of Congestion Management Panel
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: quoted-printable
+X-From: Black, Tamara Jae </O=ENRON/OU=NA/CN=RECIPIENTS/CN=TBLACK>
+X-To: /o=ENRON/ou=NA/cn=Recipients/cn=notesaddr/cn=a478079f-55e1f3b0-862566fa-612229 </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=a478079f-55e1f3b0-862566fa-612229>, Abler, William </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Wabler>, Aggarwal, Anubhav </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Aaggarwa>, Allen, Diana </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dallen3>, Arora, Harry </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Harora>, Bailey, Debra </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dbailey2>, Ballato, Russell </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rballato>, Ballinger, Ted </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Tballing>, Baughman Jr., Don </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dbaughm>, Benchluch, Moises </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Sbenchlu>, Benjelloun, Hicham </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Hbenjell>, Benson, Robert </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rbenson>, Bentley, Corry </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Cbentle>, Black, Tamara Jae </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Tblack>, Blaine, Jay </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jblaine>, Bolt, Laurel </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lbolt>, Broderick, Paul J. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Pbroder>, Broussard, Richard </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rbroussa>, Burnett, Lisa </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lburnett>, Campbell, Larry F. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lcampbel>, Capasso, Joe </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jcapasso>, Carson, Mike </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mcarson2>, Chen, Alan </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Achen2>, Choate, Jason </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jchoate>, Cline, Kevin </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Kcline>, Collins, Dustin </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dcollin>, Comeaux, Keith </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Kcomeaux>, Coulter, Kayne </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Kcoulte>, Davis, Mark Dana </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mdavis>, Day, Smith L. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Sday>, Dean, Clint </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Cdean>, Decook, Todd </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Tdecook>, Emesih, Gerald </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Gemesih>, Errigo, Joe </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jerrigo>, Forney, John M. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jforney>, Freije, William </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Wfreije>, Garcia, Miguel L. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mgarcia6>, Gilbert, Gerald </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Ggilbe1>, Gilbert-smith, Doug </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dsmith3>, Giron, Gustavo </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Ggiron>, Greer, Andrew </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Agreer>, Gualy, Jaime </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jgualy>, Guerra, Claudia </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Cguerra2>, Gulmeden, Utku </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Ugulmede>, Gupta, Gautam </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Ggupta>, Ha, Amie </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Aha>, Hanse, Patrick </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Phanse>, Hernandez, Juan </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jhernan3>, Imai, Rika </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rimai>, Ingram, David </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dingram>, Jenkins IV, Daniel </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Djenkin2>, Kaniss, Jason </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jkaniss>, King, Jeff </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jking6>, Kinser, John </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jkinser>, Larkworthy, Carrie </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Clarkwor>, Laurent, Dean </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mlauren>, Laverell, Justin </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jlavere>, Lenartowicz, Chris </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Clenart>, Lorenz, Matt </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mlorenz>, Lotz, Gretchen </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Glotz>, Lowell, Thomas </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Tlowell>, Mack, Iris </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Imack>, Mahajan, Ashish </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Amahajan>, Makkai, Peter </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Pmakkai>, Marquez, Mauricio </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mmarque2>, Maskell, David </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dmaskell>, May, Tom </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Tmay>, McElreath, Alexander </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Amcelrea>, Miller, Jeffrey </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jmiller>, Oh, Seung-Taek </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Soh2>, Olinde Jr., Steve </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Solinde>, Pace, Andy </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Apace>, Padron, Juan </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jpadron>, Pan, Steve </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Span2>, Philip, Willis </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Wphilip>, Podurgiel, Laura </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lpodurg2>, Poppa, John D. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jpoppa>, Presto, Kevin M. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Kpresto>, Quenet, Joe </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jquenet>, Rawal, Punit </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Prawal>, Rodriquez, Andy </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Arodriqu>, Rogers, Benjamin </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Brogers>, Rust, Bill </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Brust>, Ryan, David </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dryan>, Saibi, Eric </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Esaibi>, Schiavone, Paul </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Pschiavo>, Schneider, Bryce </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Bschneid>, Seely, Michael </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Charles_Seely>, Serio, Erik </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Eserio>, Shoemake, Lisa </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lshoema>, Simpson, Erik </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Esimpso>, Stalford, Robert </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rstalfor>, Stepenovitch, Joe </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jstepeno>, Sturm, Fletcher J. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Fsturm>, Symms, Mark </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Msymms>, Tamma, Ramanarao </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rtamma>, Thomas, Paul D. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Pthomas2>, Trejo, Reese </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mtrejo>, Valdes, Maria </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mvaldes>, Vernon, Clayton </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Cvernon>, Wang, Steve </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Swang3>, Williams, Ryan </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rwillia8>, Willis, Cory </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Cwillis>, Zipperer, Mike </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mzippere>, Baughman, Edward D. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Ebaughm>, Clynes, Terri </O=ENRON/OU=NA/CN=RECIPIENTS/CN=TCLYNES>, Dalton III, Oscar </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Odalton>, Kelly, Mike E. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mkelly3>, Sewell, Doug </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dsewell>, Valderrama, Larry </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lvalder>
+X-cc: 
+X-bcc: 
+X-Folder: \MCARSON2 (Non-Privileged)\Carson, Mike\Inbox
+X-Origin: Carson-M
+X-FileName: MCARSON2 (Non-Privileged).pst
+
+=20
+-----Original Message-----
+From: Novosel, Sarah=20
+Sent: Tuesday, October 16, 2001 10:46 PM
+To: Novosel, Sarah; Presto, Kevin M.; Davis, Mark Dana; May, Tom; Will, Llo=
+yd; Lindberg, Susan; Gupta, Gautam; Misra, Narsimha; Scheuer, Janelle; Baug=
+hman, Edward D.; Herndon, Rogers
+Cc: Nicolay, Christi L.
+Subject: RE: RTO Week -- Summary of Congestion Management Panel
+
+
+
+ RTO Week
+
+Day 2 -- October 16, 2001
+
+Congestion Management and Transmission Rights
+
+The morning panel discussion was on congestion management.  The panelists w=
+ere:  Nancy Brockway, Commissioner New Hampshire PSC; Reem Fahey, Edison Mi=
+ssion; Carol Guthrie, Chevron/Texaco; Shmuel Oren, University of California=
+ - Berkley and advises Texas PUC; Andy Ott, PJM; Michael Schnitzer, NorthBr=
+idge Group.
+
+General Observations
+
+The Commissioners were again all present (Wood left mid-morning to give tes=
+timony on Capitol Hill).  Today, however, FERC Staff was much more active i=
+n the discussion and the commissioners asked very few questions.  The topic=
+s are so interrelated that many of the same issues already discussed are be=
+ing rehashed again.  This will probably continue for the rest of the week. =
+ What I have found most encouraging so far has been the widespread support =
+for some of the basic concepts, most notably the need for a real time energ=
+y market based using LMP.  Very few panelists have opposed this; at most, a=
+ couple of panelists have argued that the real time market should not be st=
+andardized -- basically conceding that PJM's system will be implemented in =
+the Northeast but urging that it not be mandated everywhere else.   =20
+
+Locational Marginal Pricing
+
+The panelists all agreed that LMP in the real time market is necessary (Sch=
+muel Oren does not oppose it).  Most of the panelists think this needs to b=
+e standardized across RTOs.  Andy Ott says the seams will remain a problem =
+and a barrier to trading if the real time market is not standardized.   Car=
+ol Guthrie does not favor standardization and urged FERC to not standardize=
+ the PJM system throughout the eastern interconnect.  She said FERC should =
+try a couple of different systems and see what works. =20
+
+FTRs versus Flowgates
+
+The panelists agreed that transmission rights should be financial, not phys=
+ical.  Schmuel conceded this point for the discussion but this may not be h=
+is preference - unclear.  Most of the panelists, including the PSC commissi=
+oner, prefer FTRs rather than flowgates.  Schmuel is a flowgate advocate.  =
+After some discussion, the panelists agreed that FTRs and flowgates could w=
+ork together, provided that the definition of flowgate is understood.  Andy=
+ Ott said flowgates could work with FTRs if the purpose of having flowgates=
+ is the same purpose of having hubs (liquidity, standard product), and if a=
+ flowgate is defined as a grouping of point-to-point rights, then FTRs and =
+flowgates can coexist.  If a flowgate is a hub for transmission rights, it'=
+s okay.  However, if flowgate is defined as a physical boundary requiring s=
+cheduling, the two cannot coexist.  Schmuel seemed to agree with this premi=
+se, although this is not his preference.  He seems to prefer only flowgates=
+ without FTRs.   Brockway seems to prefer FTRs rather than flowgates for fe=
+ar that flowgates will result in excess socialization of costs.
+
+The panelists also agreed generally that revenues generated from FTRs or fl=
+owgates should be allocated to load, but the method of allocation was not a=
+greed upon.
+
+FERC staff asked the panelists to discuss commercially significant flowgate=
+s.  Many of the panelists discussed the problem with deciding what constitu=
+tes a commercially significant flowgate, and what happens when circumstance=
+s change over time, resulting in different flowgates being commercially sig=
+nificant.  Schmuel said you could use either a system that relies only on c=
+ommercially significant flowgates or one that uses all flowgates, but if pa=
+rticipants are willing to accept a system where they are not perfectly hedg=
+ed, use of commercially significant flowgates is acceptable. =20
+
+The panelists agreed that these financial rights (either FTRs or flowgates)=
+ should be tradable in the secondary market.  The panelists disagreed on wh=
+ich instrument -- FTRs or flowgates -- are more tradable.  Andy thinks FTRs=
+ are more tradable; Schmuel thinks flowgates are more tradable.
+
+Options versus Obligations
+
+The panelists discussed the benefits of having FTRs be options but also dis=
+cussed the additional problems presented to the system operator if FTRs are=
+ only options and the FTR holder is not required to flow or pay if it does =
+not flow.  Andy Ott said options will most likely result in fewer FTRs bein=
+g allocated.  Schnitzer says the issue must be resolved up front. =20
+
+The afternoon panel was on Transmission Planning and Expansion.  Steve Walt=
+on was a panelist and will be providing a summary of the discussion shortly=
+. =20
+
+Let me know if you have any questions.
+
+Sarah

@@ -1,0 +1,72 @@
+Message-ID: <17246131.1075852726902.JavaMail.evans@thyme>
+Date: Mon, 16 Jul 2001 14:12:12 -0700 (PDT)
+From: david.forster@enron.com
+To: john.arnold@enron.com
+Subject: FW: Robotrader/Autotrader
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+X-From: Forster, David </O=ENRON/OU=NA/CN=RECIPIENTS/CN=DFORSTER>
+X-To: Arnold, John </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jarnold>
+X-cc: 
+X-bcc: 
+X-Folder: \JARNOLD (Non-Privileged)\Arnold, John\Inbox
+X-Origin: Arnold-J
+X-FileName: JARNOLD (Non-Privileged).pst
+
+John,
+
+Attached is an email which I have sent to Savita (who will not be able to attend today). It addresses the Robotrader concept. I will bring some hardcopy to hit the high points this afternoon.
+
+Dave
+
+ -----Original Message-----
+From: 	Forster, David  
+Sent:	Monday, July 16, 2001 4:06 PM
+To:	Puthigai, Savita
+Subject:	Robotrader/Autotrader
+
+Savita,
+
+Attached is the latest Robotrader spreadsheet.
+
+As you may recall, we tried several different approaches to minimizing the cost of the market running up and then down again.
+
+The solution which gave the best solution was also the simplest one.
+
+Principles as follows:
+
+- Basically an advanced Offset to Last Trade
+- Definitions
+	- Intensity: Measures the length of time between transactions as a rolling average over the last x number of transactions (the Intensity Factor)
+	- Intensity Factor: The number of transactions used in calculating the rolling average Intensity
+	- Dead Interval: The period of time in which (if nothing occurs), an event or transaction is deemed to take place.
+	- Offset Reversion Ratio: The percentage by which the Offset will be reduced if a Dead Interval passes
+	- Spread Minimum: The minimum spread which can be used.
+	- Offset Minimum: The minimum offset which may be used.
+	- Spread-Offset Minimum: The minimum amount by which the spread must exceed the offset
+	- Spread Reversion Rate: The amount in dollars by which the spread will decrease if a Dead Interval passes
+	- Position Sensitivity: The position which, if exceeded, will cause the V Factor Adjustment to increase
+	- V-Factor adjust: The amount by which the Momentum will be increased if the Position Sensitivity is exceeded.
+	- Momentum: The measure of the degree to which the market is either just buying or just selling
+	- Adjusted Momentum: A Momentum number which may be boosted, causing a larger price reaction when the Position Sensitivity is exceeded.
+	- Offset: The amount by which a bid or offer will be increased/decreased when a transaction occurs.
+	- Spread: The difference between the bid and the offer
+- General Principles and Mechanics
+	- As each Sell (Buy) occurs, the Momentum decreases (increases).
+	- The Adjusted Momentum is the same as the Momentum, unless the Position Sensitivity is exceeded.
+	- If the Position Sensitivity is exceeded, then the Adjusted Momentum is boosted by the V-Factor Adjustment
+	- The Offset is calculated by looking up the Offset value on a table for the specified Adjusted Momentum
+	- The Spread is calculated by looking up the value to boost (decrease) the Spread on a table for the Specified Intensity
+	- As the Intensity value drops, the Spread widens. As it increases, the Spread decreases.
+	- In a running market, the offset will increase quickly. If it establishes a new level, the Offset will slowly decrease
+	- If the market runs up and whipsaws back, the offset will stay large
+	- If a market range trades, the offset will trend to zero.
+	- If there are a large number of transaction in succession, the spread will widen
+	- If there are a small number of transactions in succession, the spread will tighten.
+
+ 
+
+Dave
+
+	

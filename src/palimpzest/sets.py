@@ -11,7 +11,6 @@ from palimpzest.constants import AggFunc, Cardinality
 from palimpzest.core.data.datareaders import DataReader
 from palimpzest.core.elements.filters import Filter
 from palimpzest.core.elements.groupbysig import GroupBySig
-from palimpzest.core.lib.fields import ListField, StringField
 from palimpzest.core.lib.schemas import Number, Schema
 from palimpzest.policy import construct_policy_from_kwargs
 from palimpzest.query.processor.config import QueryProcessorConfig
@@ -39,7 +38,7 @@ class Set:
         index: Collection | RAGPretrainedModel | None = None,
         search_func: Callable | None = None,
         search_attr: str | None = None,
-        output_attr: str | None = None,
+        output_attrs: list[dict] | None = None,
         k: int | None = None,  # TODO: disambiguate `k` to be something like `retrieve_k`
         limit: int | None = None,
         cardinality: Cardinality = Cardinality.ONE_TO_ONE,
@@ -57,7 +56,7 @@ class Set:
         self._index = index
         self._search_func = search_func
         self._search_attr = search_attr
-        self._output_attr = output_attr
+        self._output_attrs = output_attrs
         self._k = k
         self._limit = limit
         self._cardinality = cardinality
@@ -93,7 +92,7 @@ class Set:
             "index": None if self._index is None else self._index.__class__.__name__,
             "search_func": None if self._search_func is None else self._search_func.__name__,
             "search_attr": self._search_attr,
-            "output_attr": self._output_attr,
+            "output_attrs": None if self._output_attrs is None else str(self._output_attrs),
             "k": self._k,
         }
 
@@ -150,7 +149,7 @@ class Dataset(Set):
             index=self._index,
             search_func=self._search_func,
             search_attr=self._search_attr,
-            output_attr=self._output_attr,
+            output_attrs=self._output_attrs,
             k=self._k,
             limit=self._limit,
             cardinality=self._cardinality,
@@ -343,24 +342,21 @@ class Dataset(Set):
         self,
         index: Collection | RAGPretrainedModel,
         search_attr: str,
-        output_attr: str,
+        output_attrs: list[dict] | type[Schema],
         search_func: Callable | None = None,
-        output_attr_desc: str | None = None,
         k: int = -1,
     ) -> Dataset:
         """
-        Retrieve the top-k nearest neighbors of the value of the `search_attr` from the index and
-        stores it in the `output_attr` field.
-
-        The output schema is a union of the current schema and the `output_attr` with type ListField(StringField).
-        `search_func` is a function of type (index, query: str | list(str), k: int) -> list[str]. It should
-        implement the lookuplogic for the index and return the top-k results. The value of the `search_attr`
-        field is used as the query to lookup in the index. The results are stored in the `output_attr` field.
-        `output_attr_desc` is the description of the `output_attr` field.
+        Retrieve the top-k nearest neighbors of the value of the `search_attr` from the `index` and
+        use these results to construct the `output_attrs` field(s).
         """
-        # Output schema is a union of the current schema and the output_attr
-        attributes = {output_attr: ListField(StringField)(desc=output_attr_desc)}
-        output_schema = self.schema().union(type("Schema", (Schema,), attributes))
+        new_output_schema = None
+        if isinstance(output_attrs, list):
+            new_output_schema = self.schema.add_fields(output_attrs)
+        elif issubclass(output_attrs, Schema):
+            new_output_schema = self.schema.union(output_attrs)
+        else:
+            raise ValueError("`cols` must be a list of dictionaries or a Schema.")
 
         # TODO: revisit once we can think through abstraction(s)
         # # construct the PZIndex from the user-provided index
@@ -368,12 +364,12 @@ class Dataset(Set):
 
         return Dataset(
             source=self,
-            schema=output_schema,
+            schema=new_output_schema,
             desc="Retrieve",
             index=index,
             search_func=search_func,
             search_attr=search_attr,
-            output_attr=output_attr,
+            output_attrs=output_attrs,
             k=k,
             cache=self._cache,
         )

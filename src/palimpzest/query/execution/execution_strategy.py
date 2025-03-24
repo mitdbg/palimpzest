@@ -1,10 +1,11 @@
 import logging
 from abc import ABC, abstractmethod
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, wait
 
 import numpy as np
 from chromadb.api.models.Collection import Collection
 
+from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS
 from palimpzest.core.data.dataclasses import OperatorCostEstimates, PlanStats, RecordOpStats
 from palimpzest.core.data.datareaders import DataReader
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
@@ -15,6 +16,7 @@ from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.retrieve import RetrieveOp
 from palimpzest.query.operators.scan import ScanPhysicalOp
 from palimpzest.query.optimizer.plan import PhysicalPlan, SentinelPlan
+from palimpzest.utils.progress import PZSentinelProgressManager
 
 logger = logging.getLogger(__name__)
 
@@ -110,8 +112,15 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
         self.rng = np.random.default_rng(seed=seed)
         self.exp_name = exp_name
 
-        self.champion_output_cache = {}
-    
+        # special cache which is used for tracking the target record sets for each (source_idx, logical_op_id)
+        self.champion_output_cache: dict[int, dict[str, tuple[DataRecordSet, float]]] = {}
+
+        # general cache which maps hash(logical_op_id, phys_op_id, hash(input)) --> record_set
+        self.cache: dict[int, DataRecordSet] = {}
+
+        # progress manager used to track progress of the execution
+        self.progress_manager: PZSentinelProgressManager | None = None
+
     def _compute_quality(
             self,
             physical_op_cls: type[PhysicalOperator],
@@ -147,8 +156,10 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
                     found_match_in_target = target_record.passed_operator
                     break
 
-            # iterate through
-            return int(record.passed_operator == found_match_in_target)
+            # set quality based on whether we found a match in the target and return
+            record_set.record_op_stats[0].quality = int(record.passed_operator == found_match_in_target)
+
+            return record_set
 
         # if this is a successful convert operation
         else:
@@ -265,29 +276,33 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
     def _get_target_record_sets(
         self,
         logical_op_id: str,
-        source_idx_to_record_sets_and_ops: dict[int, list[tuple[DataRecordSet, PhysicalOperator]]],
+        source_idx_to_record_set_tuples: dict[int, list[tuple[DataRecordSet, PhysicalOperator, bool]]],
         expected_outputs: dict[int, dict] | None,
     ) -> dict[int, DataRecordSet]:
         # initialize mapping from source index to target record sets
         source_idx_to_target_record_set = {}
 
-        # if we have label(s), return the label(s)
-        if expected_outputs is not None:
-            for source_idx, record_sets_and_ops in source_idx_to_record_sets_and_ops.items():
-                # get the first generated output for this source_idx
-                base_target_record = None
-                for record_set, _ in record_sets_and_ops:
-                    if len(record_set) > 0:
-                        base_target_record = record_set[0]
-                        break
-
-                # if no operations completed successfully, break and let champion logic handle this
-                if base_target_record is None:
+        for source_idx, record_set_tuples in source_idx_to_record_set_tuples.items():
+            # get the first generated output for this source_idx
+            base_target_record = None
+            for record_set, _, _ in record_set_tuples:
+                if len(record_set) > 0:
+                    base_target_record = record_set[0]
                     break
 
-                # get the label data
-                labels = expected_outputs[source_idx]["labels"]
+            # compute availability of data
+            base_target_present = base_target_record is not None
+            labels_present = expected_outputs is not None
+            labels_for_source_present = False
+            if labels_present and source_idx in expected_outputs:
+                labels = expected_outputs[source_idx].get("labels", [])
                 labels_dict_lst = labels if isinstance(labels, list) else [labels]
+                labels_for_source_present = labels_dict_lst != [] and labels_dict_lst != [None]
+
+            # if we have a base target record and label info, use the label info to construct the target record set
+            if base_target_present and labels_for_source_present:
+                # get the field_to_score_fn                
+                field_to_score_fn = expected_outputs[source_idx].get("score_fn", {})
 
                 # construct the target record set; we force passed_operator to be True for all target records
                 target_records = []
@@ -298,19 +313,16 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
                     target_record.passed_operator = True
                     target_records.append(target_record)
 
-                source_idx_to_target_record_set[source_idx] = DataRecordSet(target_records, None)
+                source_idx_to_target_record_set[source_idx] = DataRecordSet(target_records, None, field_to_score_fn)
+                continue
 
-            return source_idx_to_target_record_set
-
-        # if we don't have a label use the maximum quality record from the union of the cache and new records
-        for source_idx, record_sets_and_ops in source_idx_to_record_sets_and_ops.items():
             # get the best computed output for this (source_idx, logical_op_id) so far (if one exists)
             champion_record_set, champion_op_quality = None, None
             if source_idx in self.champion_output_cache and logical_op_id in self.champion_output_cache[source_idx]:
                 champion_record_set, champion_op_quality = self.champion_output_cache[source_idx][logical_op_id]
 
             # get the highest quality output that we just computed
-            max_quality_record_set, max_op_quality = self._pick_champion_output(record_sets_and_ops)
+            max_quality_record_set, max_op_quality = self._pick_champion_output(record_set_tuples)
 
             # if this new output is of higher quality than our previous champion (or if we didn't have
             # a previous champion) then we update our champion record set
@@ -327,17 +339,17 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
 
         return source_idx_to_target_record_set
 
-    def _pick_champion_output(self, record_sets_and_ops: list[tuple[DataRecordSet, PhysicalOperator]]) -> tuple[DataRecordSet, float | None]:
+    def _pick_champion_output(self, record_set_tuples: list[tuple[DataRecordSet, PhysicalOperator, bool]]) -> tuple[DataRecordSet, float | None]:
         # find the operator with the highest estimated quality and return its record_set
         base_op_cost_est = OperatorCostEstimates(cardinality=1.0, cost_per_record=0.0, time_per_record=0.0, quality=1.0)
         champion_record_set, champion_quality = None, None
-        for record_set, op in record_sets_and_ops:
+        for record_set, op, _ in record_set_tuples:
             # skip failed operations
-            if len(record_set) > 0:
+            if len(record_set) == 0:
                 continue
 
             # get the estimated quality of this operator
-            est_quality = op.naive_cost_estimates(base_op_cost_est).quality
+            est_quality = op.naive_cost_estimates(base_op_cost_est).quality if self._is_llm_op(op) else 1.0
             if champion_quality is None or est_quality > champion_quality:
                 champion_record_set, champion_quality = record_set, est_quality
 
@@ -355,8 +367,8 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
 
         return all_records, all_record_op_stats
 
-    def _execute_op_set(self, op_input_pairs: list[PhysicalOperator, DataRecord | int]) -> dict[int, list[tuple[DataRecordSet, PhysicalOperator]]]:
-        def execute_op_wrapper(operator, input):
+    def _execute_op_set(self, op_input_pairs: list[tuple[PhysicalOperator, DataRecord | int]]) -> tuple[dict[int, list[tuple[DataRecordSet, PhysicalOperator, bool]]], dict[str, int]]:
+        def execute_op_wrapper(operator, input) -> tuple[DataRecordSet, PhysicalOperator, DataRecord | int]:
             record_set = operator(input)
             return record_set, operator, input
 
@@ -365,27 +377,69 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
         def get_source_idx(input):
             return input.source_idx if isinstance(input, DataRecord) else input
 
+        def get_hash(operator, input):
+            logical_op_id = operator.get_logical_op_id()
+            phys_op_id = operator.get_op_id()
+            return hash(f"{logical_op_id}{phys_op_id}{hash(input)}")
+
         # initialize mapping from source indices to output record sets
         source_idx_to_record_sets_and_ops = {get_source_idx(input): [] for _, input in op_input_pairs}
+
+        # if any operations were previously executed, read the results from the cache
+        final_op_input_pairs = []
+        for operator, input in op_input_pairs:
+            # compute hash
+            op_input_hash = get_hash(operator, input)
+
+            # get result from cache
+            if op_input_hash in self.cache:
+                source_idx = get_source_idx(input)
+                record_set, operator = self.cache[op_input_hash]
+                source_idx_to_record_sets_and_ops[source_idx].append((record_set, operator, False))
+
+            # otherwise, add to final_op_input_pairs
+            else:
+                final_op_input_pairs.append((operator, input))
+
+        # keep track of the number of llm operations
+        num_llm_ops = 0
 
         # create thread pool w/max workers and run futures over worker pool
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             # create futures
             futures = [
                 executor.submit(execute_op_wrapper, operator, input)
-                for operator, input in op_input_pairs
+                for operator, input in final_op_input_pairs
             ]
-            output_record_sets = [future.result() for future in futures]
+            output_record_sets = []
+            while len(futures) > 0:
+                done_futures, not_done_futures = wait(futures, timeout=PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS)
+                for future in done_futures:
+                    # update output record sets
+                    record_set, operator, input = future.result()
+                    output_record_sets.append((record_set, operator, input))
 
-            # compute mapping from source_idx to record sets for all operators and for champion operator
+                    # update cache
+                    op_input_hash = get_hash(operator, input)
+                    self.cache[op_input_hash] = (record_set, operator)
+
+                    # update progress manager
+                    if self._is_llm_op(operator):
+                        num_llm_ops += 1
+                        self.progress_manager.incr(operator.get_logical_op_id(), num_samples=1, total_cost=record_set.get_total_cost())
+
+                # update futures
+                futures = list(not_done_futures)
+
+            # update mapping from source_idx to record sets and operators
             for record_set, operator, input in output_record_sets:
                 # get the source_idx associated with this input record;
                 source_idx = get_source_idx(input)
 
                 # add record_set to mapping from source_idx --> record_sets
-                source_idx_to_record_sets_and_ops[source_idx].append((record_set, operator))
+                source_idx_to_record_sets_and_ops[source_idx].append((record_set, operator, True))
 
-        return source_idx_to_record_sets_and_ops
+        return source_idx_to_record_sets_and_ops, num_llm_ops
 
     def _is_llm_op(self, physical_op: PhysicalOperator) -> bool:
         is_llm_convert = isinstance(physical_op, LLMConvert)

@@ -107,7 +107,7 @@ class DataRecord:
 
 
     def __hash__(self):
-        return hash(self.to_json_str())
+        return hash(self.to_json_str(bytes_to_str=True))
 
 
     def __iter__(self):
@@ -258,16 +258,16 @@ class DataRecord:
             for record in records
         ])
 
-    def to_json_str(self, include_bytes: bool = True, project_cols: list[str] | None = None):
+    def to_json_str(self, include_bytes: bool = True, bytes_to_str: bool = False, project_cols: list[str] | None = None):
         """Return a JSON representation of this DataRecord"""
-        record_dict = self.to_dict(include_bytes, project_cols)
+        record_dict = self.to_dict(include_bytes, bytes_to_str, project_cols)
         record_dict = {
             field_name: self.schema.field_to_json(field_name, field_value)
             for field_name, field_value in record_dict.items()
         }
         return json.dumps(record_dict, indent=2)
 
-    def to_dict(self, include_bytes: bool = True, project_cols: list[str] | None = None):
+    def to_dict(self, include_bytes: bool = True, bytes_to_str: bool = False, project_cols: list[str] | None = None):
         """Return a dictionary representation of this DataRecord"""
         # TODO(chjun): In case of numpy types, the json.dumps will fail. Convert to native types.
         # Better ways to handle this.
@@ -279,8 +279,15 @@ class DataRecord:
 
         if not include_bytes:
             for k, v in dct.items():
-                if isinstance(v, bytes) or (isinstance(v, list) and len(v) > 0 and isinstance(v[0], bytes)):
+                if isinstance(v, bytes) or (isinstance(v, list) and len(v) > 0 and  any([isinstance(elt, bytes) for elt in v])):
                     dct[k] = "<bytes>"
+
+        if bytes_to_str:
+            for k, v in dct.items():
+                if isinstance(v, bytes):
+                    dct[k] = v.decode("utf-8")
+                elif isinstance(v, list) and len(v) > 0 and any([isinstance(elt, bytes) for elt in v]):
+                    dct[k] = [elt.decode("utf-8") if isinstance(elt, bytes) else elt for elt in v]
 
         return dct
 

@@ -142,6 +142,7 @@ class TestOptimizer:
             allow_rag_reduction=False,
             allow_mixtures=False,
             allow_critic=False,
+            allow_split_merge=False,
         )
         physical_plans = optimizer.optimize(plan)
         physical_plan = physical_plans[0]
@@ -255,6 +256,7 @@ class TestOptimizer:
             allow_rag_reduction=False,
             allow_mixtures=False,
             allow_critic=False,
+            allow_split_merge=False,
             optimizer_strategy=opt_strategy,
         )
         physical_plans = optimizer.optimize(real_estate_workload)
@@ -437,6 +439,7 @@ class TestParetoOptimizer:
             allow_rag_reduction=False,
             allow_mixtures=False,
             allow_critic=False,
+            allow_split_merge=False,
         )
         # run optimizer to get physical plan
         physical_plans = optimizer.optimize(workload)

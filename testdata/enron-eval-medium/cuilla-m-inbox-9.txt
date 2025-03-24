@@ -1,0 +1,32 @@
+Message-ID: <28936684.1075853095159.JavaMail.evans@thyme>
+Date: Thu, 20 Sep 2001 12:12:28 -0700 (PDT)
+From: martin.cuilla@enron.com
+To: eric.bass@enron.com, martin.cuilla@enron.com, frank.ermis@enron.com, 
+	mike.grigsby@enron.com, bryan.hull@enron.com, 
+	tori.kuykendall@enron.com, matthew.lenhart@enron.com, 
+	brad.mckay@enron.com, e.murrell@enron.com, scott.neal@enron.com, 
+	s..shively@enron.com, trading <.williams@enron.com>
+Subject: 
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+X-From: Cuilla, Martin </O=ENRON/OU=NA/CN=RECIPIENTS/CN=MCUILLA>
+X-To: Bass, Eric </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Ebass>, Cuilla, Martin </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mcuilla>, Ermis, Frank </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Fermis>, Grigsby, Mike </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mgrigsb>, Hull, Bryan </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Bhull>, Kuykendall, Tori </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Tkuyken>, Lenhart, Matthew </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mlenhar>, Mckay, Brad </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Bmckay>, Murrell, Russell E </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rmurrel>, Neal, Scott </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Sneal>, Shively, Hunter S. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Hshivel>, Williams, Jason (Trading) </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jwillia>
+X-cc: 
+X-bcc: 
+X-Folder: \MCUILLA (Non-Privileged)\Cuilla, Martin\Inbox
+X-Origin: Cuilla-M
+X-FileName: MCUILLA (Non-Privileged).pst
+
+Please enter your free agents yourself so I can approve them
+ 
+MC    Kennison           75
+ML    Glenn                35
+JW    Coles                40
+HS    Pinkston            30
+HS    Morton               25
+HS     San Diego          0
+EB    Wilkins               2
+EB    Jones                 0
+ 
+ 

@@ -1,0 +1,27 @@
+Message-ID: <13764669.1075863183918.JavaMail.evans@thyme>
+Date: Tue, 27 Nov 2001 14:44:22 -0800 (PST)
+From: john.allison@enron.com
+To: chris.abel@enron.com, john.allison@enron.com, beth.apollo@enron.com, 
+	sally.beck@enron.com, mark.frevert@enron.com, 
+	bjorn.hagelmann@enron.com, frank.hayden@enron.com, 
+	kenneth.lay@enron.com, david.patton@enron.com, david.port@enron.com, 
+	cassandra.schultz@enron.com, kenneth.thibodeaux@enron.com, 
+	cassi.wallace@enron.com, greg.whalley@enron.com, 
+	shona.wilson@enron.com
+Subject: ERV Notification:  (DPR - Concentration - 11/26/2001)
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+X-From: Allison, John </O=ENRON/OU=NA/CN=RECIPIENTS/CN=JALLISON>
+X-To: Abel, Chris </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Cabel>, Allison, John </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jallison>, Apollo, Beth </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Bapollo>, Beck, Sally </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Sbeck>, Frevert, Mark </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mfrevert>, Hagelmann, Bjorn </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Bhagelm>, Hayden, Frank </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Fhayden>, Lay, Kenneth </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Klay>, Patton, David </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dpatton>, Port, David </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dport>, Schultz, Cassandra </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Cschult>, Thibodeaux, Kenneth </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Kthibode>, Wallace, Cassi </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Cwallac3>, Whalley, Greg </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Gwhalle>, Wilson, Shona </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Swilson5>
+X-cc: 
+X-bcc: 
+X-Folder: \SBECK (Non-Privileged)\Beck, Sally\Inbox
+X-Origin: Beck-S
+X-FileName: SBECK (Non-Privileged).pst
+
+The report named: DPR - Concentration <http://erv.corp.enron.com/linkFromExcel.asp?report_cd=48&report_name=DPR+-+Concentration&category_cd=2&category_name=ENRON%20CONSOLIDATED&toc_hide=1&sTV1=2&TV1Exp=Y&current_efct_date=11/26/2001>, published as of 11/26/2001 is now available for viewing on the website.
+
+Publisher's Notes:
+
+FINAL

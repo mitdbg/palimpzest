@@ -122,6 +122,8 @@ class RAGConvert(LLMConvert):
             total_output_cost=0.0,
             cost_per_record=total_input_cost,
             llm_call_duration_secs=total_time,
+            total_llm_calls=1,
+            total_embedding_llm_calls=1,
         )
 
         return embedding, embed_stats
@@ -165,7 +167,7 @@ class RAGConvert(LLMConvert):
                 candidate[field_name] = "[" + ", ".join(candidate[field_name]) + "]"
 
             # skip this field if it is a string field and its length is less than the chunk size
-            if isinstance(field, str) and len(candidate[field_name]) < self.chunk_size:
+            if len(candidate[field_name]) < self.chunk_size:
                 continue
 
             # chunk the content

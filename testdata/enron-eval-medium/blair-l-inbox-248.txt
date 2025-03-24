@@ -1,0 +1,24 @@
+Message-ID: <457022.1075861908047.JavaMail.evans@thyme>
+Date: Thu, 8 Nov 2001 11:44:43 -0800 (PST)
+From: bert.hernandez@enron.com
+To: jan.moore@enron.com, jeanette.doll@enron.com
+Subject: DUKE INVOICES
+Cc: richard.hanagriff@enron.com, lorraine.lindberg@enron.com, 
+	lynn.blair@enron.com
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+Bcc: richard.hanagriff@enron.com, lorraine.lindberg@enron.com, 
+	lynn.blair@enron.com
+X-From: Hernandez, Bert </O=ENRON/OU=NA/CN=RECIPIENTS/CN=AHERNAN>
+X-To: Moore, Jan </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jmoore3>, Doll, Jeanette </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jdoll>
+X-cc: Hanagriff, Richard </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rhanagr>, Lindberg, Lorraine </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Llindbe>, Blair, Lynn </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lblair>
+X-bcc: 
+X-Folder: \LBLAIR (Non-Privileged)\Blair, Lynn\Inbox
+X-Origin: Blair-L
+X-FileName: LBLAIR (Non-Privileged).pst
+
+The revised invoices for Duke contracts 27291 and 27349 appear to be correct.  The attached schedule shows the estimated revenue impact and the actual revised billing for both contracts.  The invoices are going out today to the customer along with an explanation for the change.  I will strive to capture the alternate deliveries to California calculation each month and forward the data to Lorraine and Jan/Jeanette.  If you have any questions, please let me know.
+
+
+Thanks,  Bert		 

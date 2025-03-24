@@ -130,6 +130,8 @@ class ConvertOp(PhysicalOperator, ABC):
                 total_output_cost=per_record_stats.total_output_cost,
                 llm_call_duration_secs=per_record_stats.llm_call_duration_secs,
                 fn_call_duration_secs=per_record_stats.fn_call_duration_secs,
+                total_llm_calls=per_record_stats.total_llm_calls,
+                total_embedding_llm_calls=per_record_stats.total_embedding_llm_calls,
                 failed_convert=(not successful_convert),
                 image_operation=self.is_image_conversion(),
                 op_details={k: str(v) for k, v in self.get_id_params().items()},

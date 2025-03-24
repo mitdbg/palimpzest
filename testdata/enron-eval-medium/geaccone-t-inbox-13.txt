@@ -1,0 +1,67 @@
+Message-ID: <32914065.1075859040905.JavaMail.evans@thyme>
+Date: Wed, 1 Aug 2001 06:13:08 -0700 (PDT)
+From: dan.fancler@enron.com
+To: tracy.geaccone@enron.com
+Subject: FW: TW Daily Balance 07/27
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+X-From: Fancler, Dan </O=ENRON/OU=NA/CN=RECIPIENTS/CN=DFANCLE>
+X-To: Geaccone, Tracy </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Tgeacco>
+X-cc: 
+X-bcc: 
+X-Folder: \TGEACCO (Non-Privileged)\Geaccone, Tracy\Inbox
+X-Origin: Geaccone-T
+X-FileName: TGEACCO (Non-Privileged).pst
+
+Tracy, Debbie has some differences in May she hopes to settle with another schedule from Ken.
+
+Debbie will be going out August 17 for surgery, Mark Walton will be taking her place on the TW desk.
+
+Dan
+
+ -----Original Message-----
+From: 	Moseley, Debbie  
+Sent:	Wednesday, August 01, 2001 8:02 AM
+To:	Fancler, Dan
+Cc:	Powers, Ken
+Subject:	RE: TW Daily Balance 07/27
+
+
+
+Yes, May has been received.  I've tied out the fuel retained, used(slightly off,but that's probably ppa's), linepack sales, & electric fuel.
+I'm trying to tie out imbalances.  They are off.  Ken, is putting a B.O. schedule together by contract so I can tie back to the CBS summary report.  Once that's done, it good to go.
+
+ -----Original Message-----
+From: 	Fancler, Dan  
+Sent:	Tuesday, July 31, 2001 9:13 AM
+To:	Moseley, Debbie
+Subject:	FW: TW Daily Balance 07/27
+
+Debbie, have we received May/
+
+ -----Original Message-----
+From: 	Geaccone, Tracy  
+Sent:	Friday, July 27, 2001 8:54 PM
+To:	Fancler, Dan
+Subject:	FW: TW Daily Balance 07/27
+
+Have you had much luck checking May info?
+
+ -----Original Message-----
+From: 	Powers, Ken  
+Sent:	Friday, July 27, 2001 2:49 PM
+To:	Doll, Jeanette; Donoho, Lindy; Fancler, Dan; Geaccone, Tracy; Harris, Steven; Moore, Jan; Schoolcraft, Darrell; Watson, Kimberly
+Subject:	TW Daily Balance 07/27
+
+Please see attached.
+
+ << File: TW Daily Balance.pdf >> 
+
+I have added the Linepack change to the report, as we discussed in our last meeting. This information is in the last column, column "U", on the report. The cell calculates the change in linepack from the previous day. Linepack readings are taken at the end of each gas day.
+
+Please call me if you have any questions.
+
+
+Ken Powers
+(402) 398-7065

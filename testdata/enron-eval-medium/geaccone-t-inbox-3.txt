@@ -1,0 +1,45 @@
+Message-ID: <29867801.1075859040663.JavaMail.evans@thyme>
+Date: Mon, 30 Jul 2001 05:41:55 -0700 (PDT)
+From: mary.botello@enron.com
+To: tracy.geaccone@enron.com
+Subject: FW: Gross / Net Specs - 07/27/01
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+X-From: Botello, Mary </O=ENRON/OU=NA/CN=RECIPIENTS/CN=MBOTELL>
+X-To: Geaccone, Tracy </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Tgeacco>
+X-cc: 
+X-bcc: 
+X-Folder: \TGEACCO (Non-Privileged)\Geaccone, Tracy\Inbox
+X-Origin: Geaccone-T
+X-FileName: TGEACCO (Non-Privileged).pst
+
+	FYI!
+
+ -----Original Message-----
+From: 	Kumar, Karpagavalli Usha  
+Sent:	Friday, July 27, 2001 3:00 PM
+To:	Gunn, Cephus; Prendergast, Pat; Botello, Mary; Apodaca, Vera; Fox, Paul; Griffiths, David; Hsieh, Sally; Patel, Sophie; Prigmore, Patty; Smilenova, Rositza; Truong, Louie; Villasenor, Amy ; Sewell, Braden; Chan, Li N.; Keiser, John; Cohen, Robert; Lewis, Greg; Nightingale, Ron
+Cc:	Chulki, Shyam; Kulkarni, Sachin
+Subject:	Gross / Net Specs - 07/27/01 
+
+Hi All,
+
+Here's the updated spec document file dated 072701. All the changes discussed in the last meeting have been incorporated. 
+
+ 
+
+As mentioned earlier we will start working the Top section - Payroll (Salary & wages, benefits, and taxes) on 8/1/01.
+As regards the report specifications for the remaining non-payroll section of the report further review and modifications will be forthcoming based on design analysis to be done by Braden and myself.
+
+
+Please review the specs with respect to all the sections, cost elements & formulas indicated and let us have your observations.
+
+If you have any questions please let me know.
+
+Regards,
+
+Usha Kumar
+ISC Report Development
+Ph : 713-345-6190
+Page : 877-852-2193

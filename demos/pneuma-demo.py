@@ -2,16 +2,24 @@ import argparse
 import json
 import os
 
-import palimpzest as pz
 import pandas as pd
-
 from pneuma import Pneuma
+
+import palimpzest as pz
 
 question_dataset_cols = [
     {
         "name": "question",
         "type": str,
         "desc": "The question related to the contents of some table(s).",
+    }
+]
+
+relevant_tables_cols = [
+    {
+        "name": "relevant_tables",
+        "type": list[str],
+        "desc": "Most relevant tables to the `question`",
     }
 ]
 
@@ -106,8 +114,7 @@ def build_pneuma_query(pneuma: Pneuma, dataset: QuestionDataReader, k: int):
         index=pneuma,
         search_func=search_func,
         search_attr="question",
-        output_attr="relevant_tables",
-        output_attr_desc="Most relevant tables to the `question`",
+        output_attrs=relevant_tables_cols,
         k=k,
     )
     output = questions_and_relevant_files.sem_add_columns(output_cols)

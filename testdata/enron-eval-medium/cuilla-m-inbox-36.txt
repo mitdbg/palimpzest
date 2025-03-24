@@ -1,0 +1,39 @@
+Message-ID: <33030528.1075855349183.JavaMail.evans@thyme>
+Date: Wed, 28 Nov 2001 13:09:02 -0800 (PST)
+From: patrick.tucker@enron.com
+To: s..pollan@enron.com, lindsay.culotta@enron.com, e.murrell@enron.com, 
+	denver.plachy@enron.com, martin.cuilla@enron.com, 
+	geoff.storey@enron.com, virawan.yawapongsiri@enron.com, 
+	souad.mahmassani@enron.com, tom.donohoe@enron.com, 
+	kevin.ruscitti@enron.com, s..shively@enron.com, h..lewis@enron.com, 
+	c..giron@enron.com, bryant.frihart@enron.com, 
+	linda.roberts@enron.com, laura.luce@enron.com, d..hogan@enron.com, 
+	frank.vickers@enron.com, trading <.williams@enron.com>, 
+	l..mims@enron.com, james.simpson@enron.com, john.hodge@enron.com, 
+	f..keavey@enron.com, brad.mckay@enron.com, jonathan.mckay@enron.com, 
+	w..pereira@enron.com, vladi.pimenov@enron.com, andrea.ring@enron.com, 
+	leonidas.savvas@enron.com, judy.townsend@enron.com, 
+	victoria.versen@enron.com, robin.barbe@enron.com, 
+	ruth.concannon@enron.com, scott.goodell@enron.com, 
+	david.jones@enron.com, jared.kaiser@enron.com, 
+	scott.loving@enron.com, kimberly.bates@enron.com, gil.muhl@enron.com, 
+	maureen.smith@enron.com, shauywn.smith@enron.com, 
+	craig.taylor@enron.com, jim.willis@enron.com, 
+	deirdre.mccaffrey@enron.com, gregg.penman@enron.com, 
+	lisa.kinsey@enron.com, kevin.brady@enron.com, 
+	cora.pendergrass@enron.com, patrick.tucker@enron.com
+Subject: As it Was--EOL USGas Screen Capture as of about 0930
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+X-From: Tucker, Patrick </O=ENRON/OU=NA/CN=RECIPIENTS/CN=PTUCKER>
+X-To: Pollan, Sylvia S. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Spollan>, Culotta, Lindsay </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lculotta>, Murrell, Russell E </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rmurrel>, Plachy, Denver </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dplachy>, Cuilla, Martin </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mcuilla>, Storey, Geoff </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Gstorey>, Yawapongsiri, Virawan </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Vyawapon>, Mahmassani, Souad </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Smahmass>, Donohoe, Tom </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Tdonoho>, Ruscitti, Kevin </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Kruscit>, Shively, Hunter S. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Hshivel>, Lewis, Andrew H. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Alewis>, Giron, Darron C. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dgiron>, Frihart, Bryant </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Bfrihart>, Roberts, Linda </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lroberts>, Luce, Laura </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lluce>, Hogan, Irena D. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Ihogan>, Vickers, Frank </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Fvicker>, Williams, Jason (Trading) </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jwillia>, Mims, Patrice L. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Pmims>, Simpson, James </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jsimpso>, Hodge, John </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jhodge2>, Keavey, Peter F. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Pkeavey>, Mckay, Brad </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Bmckay>, Mckay, Jonathan </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jmckay1>, Pereira, Susan W. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Spereir>, Pimenov, Vladi </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Vpimenov>, Ring, Andrea </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Aring>, Savvas, Leonidas </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lsavvas>, Townsend, Judy </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jtownse>, Versen, Victoria </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Vversen>, Barbe, Robin </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rbarbe>, Concannon, Ruth </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rconcan>, Goodell, Scott </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Sgoodel>, Jones, David </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Djones8>, Kaiser, Jared </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jkaiser>, Loving, Scott </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Sloving>, Bates, Kimberly </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Kbates>, Muhl, Gil </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Gmuhl>, Smith, Maureen </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mgreena>, Smith, Shauywn </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Ssmith22>, Taylor, Craig </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jtaylo2>, Willis, Jim </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jwillis3>, McCaffrey, Deirdre </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dmccaff>, Penman, Gregg </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=a419a146-114e6c98-86256602-631a96>, Kinsey, Lisa </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lkinsey>, Brady, Kevin </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Kbrady>, Pendergrass, Cora </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Cpender>, Tucker, Patrick </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Ptucker>
+X-cc: 
+X-bcc: 
+X-Folder: \Martin_Cuilla_Jan2002_1\Cuilla, Martin\Inbox
+X-Origin: Cuilla-M
+X-FileName: mcuilla (Non-Privileged).pst
+
+For everyone who might want a copy just for the sake of posterity--
+
+ 

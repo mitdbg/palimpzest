@@ -1,0 +1,20 @@
+Message-ID: <14045304.1075852925771.JavaMail.evans@thyme>
+Date: Wed, 3 Oct 2001 09:23:21 -0700 (PDT)
+From: cam@pjm.com
+To: lcampbel@enron.com
+Subject: Your MUI password has been changed
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+X-From: CAM@pjm.com@ENRON
+X-To: lcampbel@enron.com
+X-cc: 
+X-bcc: 
+X-Folder: \LCAMPBEL (Non-Privileged)\Campbell, Larry F.\Inbox
+X-Origin: Campbell-L
+X-FileName: LCAMPBEL (Non-Privileged).pst
+
+Your password has been reset as requested.
+If you have any questions please contact your account manager(s):
+
+Paul  Broderick

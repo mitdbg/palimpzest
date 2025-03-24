@@ -1,0 +1,119 @@
+Message-ID: <15971842.1075859048349.JavaMail.evans@thyme>
+Date: Tue, 23 Oct 2001 09:51:27 -0700 (PDT)
+From: jim_barnes@pgn.com
+To: tracy.geaccone@enron.com, jessica.uhl@enron.com, hayslett.rod@enron.com
+Subject: PGE 2002 Capital Costs and IT Detail
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+X-From: Jim Barnes <Jim_Barnes@pgn.com>
+X-To: Geaccone, Tracy </O=ENRON/OU=NA/CN=RECIPIENTS/CN=TGEACCO>, Uhl, Jessica </O=ENRON/OU=NA/CN=RECIPIENTS/CN=JUHL>, Rod Hayslett <Rod_Hayslett@pgn.com>
+X-cc: 
+X-bcc: 
+X-Folder: \TGEACCO (Non-Privileged)\Geaccone, Tracy\Inbox
+X-Origin: Geaccone-T
+X-FileName: TGEACCO (Non-Privileged).pst
+
+Hello, following up our PGE Budget presentation I am forwarding you the
+following information.
+
+Jessica - the 2002 Capital Slide has been revised to be consistent with
+the NNG disclosure schedule.  The decommissioning forecast is up by $1.6
+MM, however since this is funded by the decommissioning trust it should
+not be an issue.
+
+Tracy - Do you have a time and agenda set for the Nov. 1 dry run of the
+budget presentation?  I may be sitting in for Piro so please keep me
+posted as to what the plan is.
+
+Rod - you asked for some detail on our IT capital expenditures.  The
+file IT_Teresa includes the requested detail.  Note that in our UE-115
+ratecase we were authorized to expend up to $96.8 MM for the  2000-2002
+budget years. This is a balancing account, such that if we don't expend
+the money we have to refund it to customers.  As an fyi - I've pasted in
+below the language from our UE-115 Stipulation on IT costs.
+
+
+Q.  What is the basis for the stipulation relating to issue S-45, CIS /
+IT Disallowance?
+
+A.  After a Staff review of new IT systems and their associated capital
+costs, Staff has determined PGE's capital costs for new IT systems to be
+prudent.  As a result, the Parties agreed to full recovery of PGE's IT
+investments, subject to a Staff audit.  PGE will place into base rates
+100% of the 2002 revenue requirement related to the 2000, 2001, and 2002
+capital additions for the CIS/IT capital items listed below.  The 2002
+revenue requirement included in base rates will be trued-up to the
+actual revenue requirement for the CIS/IT capital costs.  OPUC Staff
+will audit PGE's actual capital expenditures for the CIS/IT capital
+items listed below.
+
+1. Customer information system.
+2. Enterprise resources planning (ERP) system.
+3. Network meter reading (NMR) backbone and data store (excluding the
+meters).
+4. Miscellaneous capitalized information technology costs.
+
+Some of the forecasted 2000-2002 capital additions may be delayed until
+2003.  Delayed costs can also be recovered, subject to the same Staff
+audit procedures and standards.  Only those costs that are reasonable
+and prudent will be authorized for inclusion in the "actual" revenue
+requirement calculation.  Accordingly, customers will receive a refund
+for any costs PGE does not expend or costs the OPUC finds imprudent.
+
+Let me know if you have any questions.
+Jim B. 503-464-8931
+
+------------------- TEXT.htm follows -------------------
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<HTML><HEAD>
+<META http-equiv=Content-Type content="text/html; charset=iso-8859-1">
+<META content="MSHTML 5.50.4522.1800" name=GENERATOR></HEAD>
+<BODY style="MARGIN-TOP: 2px; FONT: 8pt MS Sans Serif; MARGIN-LEFT: 2px">
+<DIV><FONT size=1>Hello, f</FONT><FONT size=1>ollowing up our PGE Budget 
+presentation I am forwarding you the following information.</FONT></DIV>
+<DIV><FONT size=1></FONT>&nbsp;</DIV>
+<DIV><FONT size=1>
+<DIV>Jessica - the 2002 Capital Slide has been revised to be consistent with the 
+NNG disclosure schedule.&nbsp; The decommissioning forecast is up by $1.6 MM, 
+however since this is funded by the decommissioning trust it should not be an 
+issue.</DIV>
+<DIV>&nbsp;</DIV>
+<DIV>Tracy - Do you have a time and agenda set for the Nov. 1 dry run of the 
+budget presentation?&nbsp; I may be sitting in for Piro so please keep me posted 
+as to what the plan is.</DIV></FONT></DIV>
+<DIV><FONT size=1></FONT>&nbsp;</DIV>
+<DIV><FONT size=1>Rod - you asked for some detail on our IT capital 
+expenditures.&nbsp; The file IT_Teresa includes the requested detail.&nbsp; Note 
+that in our UE-115 ratecase we were authorized to expend up to $96.8 MM&nbsp;for 
+the &nbsp;2000-2002 budget years.&nbsp;This is a balancing account, such that if 
+we don't expend the money we have to refund it to customers.</FONT>&nbsp; As an 
+fyi - I've pasted in below the language from our UE-115 Stipulation on IT 
+costs.</DIV>
+<DIV>&nbsp;</DIV>
+<DIV>&nbsp;</DIV>
+<DIV><STRONG>Q.</STRONG>&nbsp; What is the basis for the stipulation relating to 
+issue S-45, CIS / IT Disallowance?</DIV>
+<DIV><BR><STRONG>A.</STRONG>&nbsp; After a Staff review of new IT systems and 
+their associated capital costs, Staff has determined PGE's capital costs for new 
+IT systems to be prudent.&nbsp; As a result, the Parties agreed to full recovery 
+of PGE's IT investments, subject to a Staff audit.&nbsp; PGE will place into 
+base rates 100% of the 2002 revenue requirement related to the 2000, 2001, and 
+2002 capital additions for the CIS/IT capital items listed below.&nbsp; The 2002 
+revenue requirement included in base rates will be trued-up to the actual 
+revenue requirement for the CIS/IT capital costs.&nbsp; OPUC Staff will audit 
+PGE's actual capital expenditures for the CIS/IT capital items listed 
+below.</DIV>
+<DIV><BR>1. Customer information system.<BR>2. Enterprise resources planning 
+(ERP) system.<BR>3. Network meter reading (NMR) backbone and data store 
+(excluding the meters).<BR>4. Miscellaneous capitalized information technology 
+costs.<BR></DIV>
+<DIV>Some of the forecasted 2000-2002 capital additions may be delayed until 
+2003.&nbsp; Delayed costs can also be recovered, subject to the same Staff audit 
+procedures and standards.&nbsp; Only those costs that are reasonable and prudent 
+will be authorized for inclusion in the "actual" revenue requirement 
+calculation.&nbsp; Accordingly, customers will receive a refund for any costs 
+PGE does not expend or costs the OPUC finds imprudent.</DIV>
+<DIV>&nbsp;</DIV>
+<DIV>Let me know if you have any questions.</DIV>
+<DIV>Jim B. 503-464-8931<BR></DIV></BODY></HTML>

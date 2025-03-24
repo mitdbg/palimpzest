@@ -20,6 +20,7 @@ class Model(str, Enum):
     GPT_4o_MINI = "gpt-4o-mini-2024-07-18"
     GPT_4o_MINI_V = "gpt-4o-mini-2024-07-18"
     TEXT_EMBEDDING_3_SMALL = "text-embedding-3-small"
+    CLIP_VIT_B_32 = "clip-ViT-B-32"
 
     def __repr__(self):
         return f"{self.name}"
@@ -64,6 +65,10 @@ class PromptStrategy(str, Enum):
     COT_MOA_PROPOSER_IMAGE = "chain-of-thought-mixture-of-agents-proposer-image"
     COT_MOA_AGG = "chain-of-thought-mixture-of-agents-aggregation"
 
+    # Split Convert Prompt Strategies
+    SPLIT_PROPOSER = "split-proposer"
+    SPLIT_MERGER = "split-merger"
+
     def is_image_prompt(self):
         return "image" in self.value
 
@@ -85,6 +90,11 @@ class PromptStrategy(str, Enum):
     def is_moa_aggregator_prompt(self):
         return "mixture-of-agents-aggregation" in self.value
 
+    def is_split_proposer_prompt(self):
+        return "split-proposer" in self.value
+
+    def is_split_merger_prompt(self):
+        return "split-merger" in self.value
 
 class AggFunc(str, Enum):
     COUNT = "count"
@@ -328,6 +338,15 @@ TEXT_EMBEDDING_3_SMALL_MODEL_CARD = {
     ##### Agg. Benchmark #####
     "overall": 82.0,  # NOTE: just copying GPT_4o_MINI_MODEL_CARD for now
 }
+CLIP_VIT_B_32_MODEL_CARD = {
+    ##### Cost in USD #####
+    "usd_per_input_token": 0.00,
+    "usd_per_output_token": None,
+    ##### Time #####
+    "seconds_per_output_token": 0.0098,  # NOTE: just copying TEXT_EMBEDDING_3_SMALL_MODEL_CARD for now
+    ##### Agg. Benchmark #####
+    "overall": 63.3,  # NOTE: ImageNet top-1 accuracy
+}
 
 
 MODEL_CARDS = {
@@ -340,6 +359,7 @@ MODEL_CARDS = {
     Model.GPT_4o_MINI.value: GPT_4o_MINI_MODEL_CARD,
     Model.GPT_4o_MINI_V.value: GPT_4o_MINI_V_MODEL_CARD,
     Model.TEXT_EMBEDDING_3_SMALL.value: TEXT_EMBEDDING_3_SMALL_MODEL_CARD,
+    Model.CLIP_VIT_B_32.value: CLIP_VIT_B_32_MODEL_CARD,
     ###
     # Model.GPT_3_5.value: GPT_3_5_MODEL_CARD,
     # Model.GPT_4.value: GPT_4_MODEL_CARD,

@@ -1,11 +1,15 @@
 import argparse
+import json
 import os
+import string
+from functools import partial
 
 import datasets
 import numpy as np
 import pandas as pd
 
 import palimpzest as pz
+from palimpzest.constants import Model
 from palimpzest.core.lib.fields import ListField, StringField
 
 cuad_categories = [
@@ -265,7 +269,7 @@ IOU_THRESH = 0.15
 
 #  Return the Jaccard similarity between two strings
 def get_jaccard(label, pred):
-    remove_tokens = [".", ",", ";", ":"]
+    remove_tokens = [c for c in string.punctuation if c != "/"]
     for token in remove_tokens:
         label = label.replace(token, "")
         pred = pred.replace(token, "")
@@ -342,9 +346,11 @@ def evaluate_entry(labels, preds, substr_ok):
 
 # TODO(Siva): This is a temporary fix to handle the case where the preds are empty.
 def handle_empty_preds(preds):
-    if preds is None or (
+    if preds is None or (  # noqa: SIM114
         isinstance(preds, str) and (preds == "" or preds == " " or preds == "null" or preds == "None")
     ):
+        return []
+    elif isinstance(preds, float) and np.isnan(preds):
         return []
     if not isinstance(preds, (list, np.ndarray)):
         return [preds]
@@ -361,7 +367,7 @@ def compute_precision_recall(label_df, preds_df):
     preds_df = preds_df.sort_values("contract_id").reset_index(drop=True)
 
     assert label_df.shape == preds_df.shape, (
-        f"Label and prediction dataframes have different shapes, label shape: {label_df.shape} vs preds shape{preds_df.shape}"
+        f"Label and prediction dataframes have different shapes, label shape: {label_df.shape} vs preds shape {preds_df.shape}"
     )
 
     categories = [category["Category"] for category in cuad_categories]
@@ -389,34 +395,10 @@ def compute_precision_recall(label_df, preds_df):
 
     return precision, recall
 
-
-# Score function for PZ optimizer.
-# Compare the predictions and labels for schema field.
-def score_fn(preds, labels):
-    assert isinstance(labels, list)
-    preds = handle_empty_preds(preds)
-
-    tp, fp, fn = 0, 0, 0
-
-    for category in cuad_categories:
-        substr_ok = "Parties" in category["Category"]
-        entry_tp, entry_fp, entry_fn = evaluate_entry(labels, preds, substr_ok)
-        tp += entry_tp
-        fp += entry_fp
-        fn += entry_fn
-
-    # precision = tp / (tp + fp) if tp + fp > 0 else np.nan
-    recall = tp / (tp + fn) if tp + fn > 0 else np.nan
-
-    return recall
-
-
 class CUADDataReader(pz.DataReader):
-    def __init__(self, num_contracts: int = 1, is_validation_source: bool = False):
+    def __init__(self, num_contracts: int = 1, split: str = "train"):
         self.num_contracts = num_contracts
-        self.is_validation_source = is_validation_source
-        self.dataset = datasets.load_dataset("theatticusproject/cuad-qa", trust_remote_code=True)["test"]
-        self.dataset = self.dataset.select(range(num_contracts * NUM_FIELDS_TO_EXTRACT_PER_CONTRACT))
+        self.split = split
 
         input_cols = [
             {"name": "contract_id", "type": str, "desc": "The id of the the contract to be analyzed"},
@@ -425,44 +407,91 @@ class CUADDataReader(pz.DataReader):
         ]
         super().__init__(input_cols)
 
+        # convert the dataset into a list of dictionaries where each row is for a single contract
+        include_labels = split == "train"
+        dataset = datasets.load_dataset("theatticusproject/cuad-qa")[split]
+        self.dataset = self._construct_dataset(dataset, num_contracts, include_labels)
+
+    def _construct_dataset(self, dataset, num_contracts, include_labels: bool=False):
+        # get the set of unique contract titles; to ensure the order of the contracts is
+        # preserved, we use a list rather than using python's set()
+        contract_titles = []
+        for row in dataset:
+            if row["title"] not in contract_titles:
+                contract_titles.append(row["title"])
+
+        # get the first num_contracts
+        contract_titles = contract_titles[:num_contracts]
+
+        # construct the dataset one contract at a time
+        new_dataset = []
+        for title in contract_titles:
+            # get the rows for this contract
+            contract_rows = [row for row in dataset if row["title"] == title]
+
+            # construct the contract; we get the contract_id and contract text from the first row
+            contract = {
+                "contract_id": contract_rows[0]["id"],
+                "title": title,
+                "contract": contract_rows[0]["context"],
+            }
+
+            # for train / validation data, add the labels
+            if include_labels:
+                contract = {"fields": contract}
+
+                # add the labels
+                category_names = list(map(lambda category: category["Category"], cuad_categories))
+                contract["labels"] = {category: [] for category in category_names}
+                contract["score_fn"] = {category: None for category in category_names}
+                for row in contract_rows:
+                    category_name = row["id"].split("__")[-1].split("_")[0].strip()
+                    category_name = category_name.replace(" For ", " for ")
+                    category_name = category_name.replace(" Of ", " of ")
+                    category_name = category_name.replace(" On ", " on ")
+                    category_name = category_name.replace(" Or ", " or ")
+                    category_name = category_name.replace(" To ", " to ")
+                    category_name = category_name.replace("Ip", "IP")
+                    assert category_name in category_names, f"Unknown category {category_name}"
+                    contract["labels"][category_name].extend(row["answers"]["text"])
+
+                    def score_fn(preds, labels, category_name):
+                        preds = handle_empty_preds(preds)
+                        entry_tp, _, entry_fn = evaluate_entry(labels, preds, substr_ok=True) if category_name == "Parties" else evaluate_entry(labels, preds, substr_ok=False)
+                        score = None
+                        if len(labels) > 0:  # noqa: SIM108
+                            score = entry_tp / (entry_tp + entry_fn)
+                        else:
+                            score = 1.0 if len(preds) == 0 else 0.0
+
+                        return score
+
+                    contract["score_fn"][category_name] = partial(score_fn, category_name=category_name)
+
+            # add the rows to the dataset
+            new_dataset.append(contract)
+
+        return new_dataset
+
     def __len__(self):
         return self.num_contracts
 
     def __getitem__(self, idx: int):
-        # get the content of the contract
-        id = self.dataset[idx * NUM_FIELDS_TO_EXTRACT_PER_CONTRACT]["id"]
-        title = self.dataset[idx * NUM_FIELDS_TO_EXTRACT_PER_CONTRACT]["title"]
-        contract = self.dataset[idx * NUM_FIELDS_TO_EXTRACT_PER_CONTRACT]["context"]
-
-        if not self.is_validation_source:
-            return {"contract_id": id, "title": title, "contract": contract}
-
-        item = {"fields": {}, "labels": {}, "score_fn": {}}
-        item["fields"]["contract_id"] = id
-        item["fields"]["title"] = title
-        item["fields"]["contract"] = contract
-
-        for category_idx, category in enumerate(cuad_categories):
-            item["labels"][category["Category"]] = self.dataset[
-                idx * NUM_FIELDS_TO_EXTRACT_PER_CONTRACT + category_idx
-            ]["answers"]["text"]
-            item["score_fn"][category["Category"]] = score_fn
-
-        return item
+        return self.dataset[idx]
 
     def get_label_df(self):
-        label = []
-        for idx in range(self.num_contracts):
-            id = self.dataset[idx * NUM_FIELDS_TO_EXTRACT_PER_CONTRACT]["id"]
-            title = self.dataset[idx * NUM_FIELDS_TO_EXTRACT_PER_CONTRACT]["title"]
-            contract = self.dataset[idx * NUM_FIELDS_TO_EXTRACT_PER_CONTRACT]["context"]
-            row = {"contract_id": id, "title": title, "contract": contract}
-            for category_idx, category in enumerate(cuad_categories):
-                row[category["Category"]] = self.dataset[idx * NUM_FIELDS_TO_EXTRACT_PER_CONTRACT + category_idx][
-                    "answers"
-                ]["text"]
-            label.append(row)
-        return pd.DataFrame(label)
+        full_dataset = datasets.load_dataset("theatticusproject/cuad-qa")[self.split]
+        label_dataset = self._construct_dataset(full_dataset, self.num_contracts, True)
+        final_label_dataset = []
+        for entry in label_dataset:
+            row = {}
+            row["contract_id"] = entry["fields"]["contract_id"]
+            row["title"] = entry["fields"]["title"]
+            row["contract"] = entry["fields"]["contract"]
+            row = {**row, **entry["labels"]}
+            final_label_dataset.append(row)
+
+        return pd.DataFrame(final_label_dataset)
 
 
 def parse_arguments():
@@ -470,10 +499,16 @@ def parse_arguments():
     parser.add_argument("--mode", type=str, help="one-convert or separate-converts", default="one-convert")
     parser.add_argument("--test", type=str, help="test time compute active or inactive", default="active")
     parser.add_argument(
-        "--processing_strategy",
-        default="mab_sentinel",
+        "--processing-strategy",
+        default="sentinel",
         type=str,
-        help="The engine to use. One of mab_sentinel, no_sentinel, random_sampling",
+        help="The engine to use. One of sentinel or no_sentinel",
+    )
+    parser.add_argument(
+        "--sentinel-execution-strategy",
+        default="mab",
+        type=str,
+        help="The engine to use. One of mab or random",
     )
     parser.add_argument("--verbose", default=False, action="store_true", help="Print verbose output")
     parser.add_argument(
@@ -500,20 +535,6 @@ def parse_arguments():
         type=int,
         help="Total sample budget in Random Sampling or MAB sentinel execution",
     )
-    parser.add_argument("--sample-all-ops", default=False, action="store_true", help="Sample all operators")
-    parser.add_argument("--sample-all-records", default=False, action="store_true", help="Sample all records")
-    parser.add_argument(
-        "--sample-start-idx",
-        default=None,
-        type=int,
-        help="",
-    )
-    parser.add_argument(
-        "--sample-end-idx",
-        default=None,
-        type=int,
-        help="",
-    )
     return parser.parse_args()
 
 
@@ -530,7 +551,7 @@ def build_cuad_query(dataset, mode):
             cols.append({"name": category["Category"], "type": ListField(StringField), "desc": desc})
 
         desc = "Extract the text spans (if they exist) from the contract."
-        ds = ds.sem_add_columns(cols, desc=desc)
+        ds = ds.sem_add_columns(cols, desc=desc, depends_on=["contract"])
     elif mode == "separate-converts":
         for category in cuad_categories:
             desc = (
@@ -539,6 +560,7 @@ def build_cuad_query(dataset, mode):
             ds = ds.sem_add_columns(
                 [{"name": category["Category"], "type": ListField(StringField), "desc": desc}],
                 desc=category["Description"],
+                depends_on=["contract"],
             )
 
     return ds
@@ -550,49 +572,62 @@ def main():
 
     args = parse_arguments()
 
+    # create directory for profiling data
+    os.makedirs("opt-profiling-data", exist_ok=True)
+
     # Create a data reader for the CUAD dataset
-    data_reader = CUADDataReader(is_validation_source=False, num_contracts=50)
-    val_data_reader = CUADDataReader(is_validation_source=True, num_contracts=5)
+    data_reader = CUADDataReader(split="test", num_contracts=50)
+    val_data_reader = CUADDataReader(split="train", num_contracts=25)
     print("Created data reader")
 
     # Build and run the CUAD query
     query = build_cuad_query(data_reader, args.mode)
     print("Built query; Starting query execution")
 
-    if args.test == "active":
-        allow_mixtures = True
-        allow_critic = True
-    else:
-        allow_mixtures = False
-        allow_critic = False
-
+    # if args.test == "active":
+    #     allow_mixtures = True
+    #     allow_critic = True
+    # else:
+    #     allow_mixtures = False
+    #     allow_critic = False
+    sentinel_strategy = args.sentinel_execution_strategy
     config = pz.QueryProcessorConfig(
-        verbose=args.verbose,
-        execution_strategy="parallel",
+        verbose=False,
         val_datasource=val_data_reader,
-        processing_strategy=args.processing_strategy,
-        max_workers=10,
-        allow_mixtures=allow_mixtures,
-        allow_critic=allow_critic,
+        processing_strategy="sentinel",
+        optimizer_strategy="pareto",
+        sentinel_execution_strategy=sentinel_strategy,
+        execution_strategy="parallel",
+        max_workers=20,
+        available_models=[
+            Model.GPT_4o,
+            Model.GPT_4o_V,
+            Model.GPT_4o_MINI,
+            Model.GPT_4o_MINI_V,
+            Model.DEEPSEEK,
+            Model.MIXTRAL,
+            Model.LLAMA3,
+            Model.LLAMA3_V,
+        ],
+        allow_bonded_query=True,
+        allow_code_synth=False,
+        allow_critic=True,
+        allow_mixtures=True,
+        allow_rag_reduction=True,
+        allow_token_reduction=False,
+        allow_split_merge=False,
+        progress=True,
     )
     seed = args.seed
     k = args.k
     j = args.j
     sample_budget = args.sample_budget
-    sample_all_ops = args.sample_all_ops
-    sample_all_records = args.sample_all_records
-    sample_start_idx = args.sample_start_idx
-    sample_end_idx = args.sample_end_idx
-    exp_name = f"cuad-demo-{args.mode}-k{k}-j{j}-budget{sample_budget}-seed{seed}"
+    exp_name = f"cuad-demo-no-priors-{sentinel_strategy}-k{k}-j{j}-budget{sample_budget}-seed{seed}"
     data_record_collection = query.run(
         config=config,
         k=k,
         j=j,
         sample_budget=sample_budget,
-        sample_all_ops=sample_all_ops,
-        sample_all_records=sample_all_records,
-        sample_start_idx=sample_start_idx,
-        sample_end_idx=sample_end_idx,
         seed=seed,
         exp_name=exp_name,
     )
@@ -600,11 +635,33 @@ def main():
 
     pred_df = data_record_collection.to_df()
     label_df = data_reader.get_label_df()
+    # pred_df.to_csv(f"{exp_name}-pred.csv", index=False)
+    # label_df.to_csv(f"{exp_name}-label.csv", index=False)
+    final_plan_id = list(data_record_collection.execution_stats.plan_stats.keys())[0]
+    final_plan_str = data_record_collection.execution_stats.plan_strs[final_plan_id]
 
     prec, recall = compute_precision_recall(label_df, pred_df)
-    print(f"Precision: {prec:.3f}, Recall: {recall:.3f}")
+    f1 = 2 * (prec * recall) / (prec + recall) if prec + recall > 0 else 0.0
+    stats_dict = {
+        "precision": prec,
+        "recall": recall,
+        "f1": f1,
+        "optimization_time": data_record_collection.execution_stats.optimization_time,
+        "optimization_cost": data_record_collection.execution_stats.optimization_cost,
+        "plan_execution_time": data_record_collection.execution_stats.plan_execution_time,
+        "plan_execution_cost": data_record_collection.execution_stats.plan_execution_cost,
+        "total_execution_time": data_record_collection.execution_stats.total_execution_time,
+        "total_execution_cost": data_record_collection.execution_stats.total_execution_cost,
+        "plan_str": final_plan_str,
+    }
+    with open(f"opt-profiling-data/{exp_name}-metrics.json", "w") as f:
+        json.dump(stats_dict, f)
 
-    print(f"Optimization time: {data_record_collection.execution_stats.total_optimization_time}")
+    print(f"Precision: {prec:.3f}, Recall: {recall:.3f}, F1: {f1:.3f}")
+    print(f"Optimization time: {data_record_collection.execution_stats.optimization_time}")
+    print(f"Optimization cost: {data_record_collection.execution_stats.optimization_cost}")
+    print(f"Plan Exec. time: {data_record_collection.execution_stats.plan_execution_time}")
+    print(f"Plan Exec. cost: {data_record_collection.execution_stats.plan_execution_cost}")
     print(f"Total Execution time: {data_record_collection.execution_stats.total_execution_time}")
     print(f"Total Execution Cost: {data_record_collection.execution_stats.total_execution_cost}")
 

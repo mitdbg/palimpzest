@@ -1,0 +1,20 @@
+Message-ID: <8579277.1075852202226.JavaMail.evans@thyme>
+Date: Mon, 22 Oct 2001 16:40:03 -0700 (PDT)
+From: clickathome@enron.com
+Subject: THIS IS A SURVEY - ONE QUESTION
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+X-From: ClickAtHome <clickathome@enron.com>@ENRON
+X-To: undisclosed-recipients:;@ENRON
+X-cc: 
+X-bcc: 
+X-Folder: \DFARMER (Non-Privileged)\Inbox
+X-Origin: FARMER-D
+X-FileName: DFARMER (Non-Privileged).pst
+
+TD{FONT-SIZE: 10pt; COLOR: black; BACKGROUND-COLOR: white}
+[IMAGE]	 	
+
+
+Now that you have access to the following applications without requiring VPN access...  Outlook Web Access (email and calendar) PEP XMS (Expense Reporting application)  And, COMING SOON... eHROnline (year-end) Benefits Election (Oct. 29, 2001) Electronic Pay Stubs (year-end), and Much More,  through the ClickAtHome Portal and the Internet, do you still believe you need remote access through VPN from home to Enron networks (must have a valid business reason with supervisor approval and a monthly cost)?   YES NO NOT SURE Please answer this survey from your computer at work, not via Outlook Web Access.  	

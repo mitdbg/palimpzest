@@ -32,9 +32,10 @@ class QueryProcessorConfig:
     allow_model_selection: bool = field(default=True)
     allow_code_synth: bool = field(default=False)
     allow_token_reduction: bool = field(default=False)
-    allow_rag_reduction: bool = field(default=False)
+    allow_rag_reduction: bool = field(default=True)
     allow_mixtures: bool = field(default=True)
-    allow_critic: bool = field(default=False)
+    allow_critic: bool = field(default=True)
+    allow_split_merge: bool = field(default=False)
     use_final_op_quality: bool = field(default=False)
 
     kwargs: dict = field(default_factory=dict)
@@ -62,6 +63,7 @@ class QueryProcessorConfig:
             "allow_rag_reduction": self.allow_rag_reduction,
             "allow_mixtures": self.allow_mixtures,
             "allow_critic": self.allow_critic,
+            "allow_split_merge": self.allow_split_merge,
             "use_final_op_quality": self.use_final_op_quality,
             **self.kwargs,
         }

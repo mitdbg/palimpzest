@@ -150,7 +150,7 @@ class ParallelExecutionStrategy(ExecutionStrategy):
 
 
     def execute_plan(self, plan: PhysicalPlan):
-        """Initialize the stats and the execute the plan."""
+        """Initialize the stats and execute the plan."""
         # for now, assert that the first operator in the plan is a ScanPhysicalOp
         assert isinstance(plan.operators[0], ScanPhysicalOp), "First operator in physical plan must be a ScanPhysicalOp"
         logger.info(f"Executing plan {plan.plan_id} with {self.max_workers} workers")
@@ -172,7 +172,7 @@ class ParallelExecutionStrategy(ExecutionStrategy):
         #       if we don't have the `finally:` branch, then program crashes can cause future program runs to fail
         #       because the progress manager cannot get a handle to the console 
         try:
-            # execute plan 
+            # execute plan
             output_records, plan_stats = self._execute_plan(plan, input_queues, future_queues, plan_stats)
 
         finally:

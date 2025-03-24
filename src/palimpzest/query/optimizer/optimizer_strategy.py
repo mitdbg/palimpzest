@@ -127,7 +127,6 @@ class ParetoStrategy(OptimizationStrategy):
                 plan.plan_cost.quality = plan.plan_cost.op_estimates.quality
 
         # filter pareto optimal plans for ones which satisfy policy constraint (if at least one of them does)
-        # import pdb; pdb.set_trace()
         if any([policy.constraint(plan.plan_cost) for plan in plans]):
             plans = [plan for plan in plans if policy.constraint(plan.plan_cost)]
 

@@ -1,0 +1,118 @@
+Message-ID: <11083946.1075845103295.JavaMail.evans@thyme>
+Date: Tue, 17 Apr 2001 20:30:00 -0700 (PDT)
+From: veronica.espinoza@enron.com
+To: debbie.brackett@enron.com, william.bradford@enron.com, 
+	andrew.conner@enron.com, genia.fitzgerald@enron.com, 
+	patrick.hanse@enron.com, kelly.lovvorn@enron.com, 
+	melissa.murphy@enron.com, kyle.schultz@enron.com, 
+	kim.theriot@enron.com, greg.wolfe@enron.com, 
+	christian.yoder@enron.com, winston.cheng@enron.com, 
+	paul.choi@enron.com, david.fairley@enron.com, mike.miller@enron.com, 
+	patrice.mims@enron.com, steve.neal@enron.com, 
+	kimberly.olinger@enron.com, charles.otto@enron.com, 
+	lee.papayoti@enron.com, david.parquet@enron.com, 
+	susan.pereira@enron.com, beth.perlman@enron.com, 
+	bo.petersen@enron.com, sylvia.pollan@enron.com, 
+	brent.price@enron.com, daniel.reck@enron.com, 
+	leslie.reeves@enron.com, brian.riley@enron.com, 
+	andrea.ring@enron.com, suzy.robey@enron.com, 
+	elizabeth.sager@enron.com, steve.schneider@enron.com, 
+	sara.shackleton@enron.com, jeffrey.shankman@enron.com, 
+	hunter.shively@enron.com, george.smith@enron.com, 
+	mary.smith@enron.com, jefferson.sorenson@enron.com, 
+	steven.south@enron.com, lauri.allen@enron.com, 
+	phillip.allen@enron.com, thresa.allen@enron.com, 
+	john.arnold@enron.com, berney.aucoin@enron.com, 
+	edward.baughman@enron.com, sally.beck@enron.com, bob.bowen@enron.com, 
+	sandra.brawner@enron.com, greg.brazaitis@enron.com, 
+	craig.breslau@enron.com, gary.bryan@enron.com, 
+	cary.carrabine@enron.com, brad.coleman@enron.com, 
+	robert.cotten@enron.com, tom.donohoe@enron.com, 
+	james.ducote@enron.com, michael.etringer@enron.com, 
+	david.fairley@enron.com, chris.foster@enron.com, 
+	kate.fraser@enron.com, sheila.glover@enron.com, 
+	edward.gottlob@enron.com, lance.halgren@enron.com, 
+	nicole.cortez@enron.com, greg.mcclendon@enron.com, 
+	brad.mckay@enron.com, stuart.staley@enron.com, 
+	jung-suk.suh@enron.com, colleen.sullivan@enron.com, 
+	mark.taylor@enron.com, jane.tholt@enron.com, jake.thomas@enron.com, 
+	fred.lagrasta@enron.com, janelle.scheuer@enron.com, 
+	george.gilbert@enron.com, jennifer.fraser@enron.com, 
+	paul.lucci@enron.com, lisa.mellencamp@enron.com, 
+	tana.jones@enron.com, shonnie.daniel@enron.com, 
+	barbara.gray@enron.com, steve.hooser@enron.com, 
+	peggy.banczak@enron.com, mary.cook@enron.com, shawna.flynn@enron.com, 
+	gerald.nemec@enron.com, sandi.braband@enron.com, ann.white@enron.com, 
+	robert.walker@enron.com, mary.ogden@enron.com, 
+	kimberlee.bennick@enron.com, carol.clair@enron.com, 
+	nathan.hlavaty@enron.com, melissa.graves@enron.com, 
+	susan.smith@enron.com, vance.taylor@enron.com, 
+	donald.reinhardt@enron.com, john.taylor@enron.com, 
+	dick.jenkins@enron.com, fletcher.sturm@enron.com, 
+	gary.lamphier@enron.com, geoff.storey@enron.com, 
+	keith.holst@enron.com, peter.keavey@enron.com, 
+	mike.grigsby@enron.com, adam.gross@enron.com, 
+	marc.horowitz@enron.com, andrew.lewis@enron.com, 
+	debra.perlingiere@enron.com, maureen.smith@enron.com, 
+	sarah.mulholland@enron.com, lucy.ortiz@enron.com, 
+	barend.vanderhorst@enron.com, james.barker@enron.com, 
+	matthew.fleming@enron.com, marde.driscoll@enron.com, 
+	sunil.dalal@enron.com, stacy.dickson@enron.com, 
+	linda.ewing@enron.com, eric.gillaspie@enron.com, 
+	tammi.depaolis@enron.com, joanie.ngo@enron.com, kyle.lilly@enron.com, 
+	kristen.hanson@enron.com, katherine.herrera@enron.com, 
+	linda.ewing@enron.com, kevin.bosse@enron.com, 
+	william.stuart@enron.com, isabel.resendez@enron.com, 
+	david.eubanks@enron.com, drew.hill@enron.com, 
+	sheetal.patel@enron.com, john.lavorato@enron.com, 
+	martin.o'leary@enron.com, souad.mahmassani@enron.com, 
+	john.singer@enron.com, jay.knoblauh@enron.com, brad.horn@enron.com, 
+	robert.shiring@enron.com, gregory.schockling@enron.com, 
+	dan.mccairns@enron.com, ragan.bond@enron.com, ina.rangel@enron.com, 
+	andrew.greer@enron.com, george.hope@enron.com, 
+	andrea.hauser@enron.com, lisa.gillette@enron.com, 
+	gerald.lofton@enron.com, cheryl.marshall@enron.com, 
+	jack.simunek@enron.com, candace.bywaters@enron.com, 
+	kenneth.kaase@enron.com, ron.green@enron.com, 
+	jennifer.blay@enron.com, audrey.cook@enron.com, 
+	teresa.seibel@enron.com, dennis.benevides@enron.com, 
+	tracy.ngo@enron.com, christy.sweeney@enron.com, 
+	joanne.harris@enron.com, rmservices@enron.com, 
+	matthew.fleming@enron.com, todd.lambert@enron.com, 
+	paul.tate@enron.com, marde.driscoll@enron.com, 
+	laura.arnold@enron.com, jay.blaine@enron.com, zarin.imam@enron.com, 
+	jesus.guerra@enron.com, alain.diza@enron.com, 
+	christina.bangle@enron.com, rhonda.smith@enron.com, 
+	amanda.boettcher@enron.com, tom.moran@enron.com, 
+	russell.diamond@enron.com, sherry.pendegraft@enron.com, 
+	lisa.valderrama@enron.com, tim.weithman@enron.com, 
+	c.griffin@enron.com, lester.rawson@enron.com, bob.hall@enron.com, 
+	bryce.baxter@enron.com, bernard.dahanayake@enron.com, 
+	richard.deming@enron.com, janie.aguayo@enron.com, 
+	derek.bailey@enron.com, diane.anderson@enron.com, 
+	larry.hunter@enron.com, ellen.wallumrod@enron.com, 
+	bob.bowen@enron.com, lisa.lees@enron.com, stephanie.sever@enron.com, 
+	daniel.salinas@enron.com, josephine.logan@enron.com, 
+	joni.fisher@enron.com, meredith.eggleston@enron.com, 
+	vladimir.gorny@enron.com, cindy.vachuska@enron.com, 
+	russell.diamond@enron.com, veronica.espinoza@enron.com, 
+	gregg.penman@enron.com, angelo.miroballi@enron.com, 
+	jess.hewitt@enron.com, melissa.ratnala@enron.com
+Subject: REVISED Credit Watch List--4/17/01
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+X-From: Veronica Espinoza <Veronica Espinoza/ENRON@enronXgate@ENRON>
+X-To: Debbie R Brackett <Debbie R Brackett/HOU/ECT@ECT>, William S Bradford <William S Bradford/ENRON@enronXgate>, Andrew R Conner <Andrew R Conner/ENRON@enronXgate>, Genia FitzGerald <Genia FitzGerald/HOU/ECT@ECT>, Patrick Hanse <Patrick Hanse/HOU/ECT@ECT>, Kelly Lovvorn <Kelly Lovvorn/HOU/ECT@ECT>, Melissa Ann Murphy <Melissa Ann Murphy/HOU/ECT@ECT>, Kyle Schultz <Kyle Schultz/HOU/ECT@ECT>, Kim S Theriot <Kim S Theriot/HOU/ECT@ECT>, Greg Wolfe <Greg Wolfe/HOU/ECT@ECT>, Christian Yoder <Christian Yoder/HOU/ECT@ECT>, Black@ <Black@/O==ENRON/OU==NA/CN==RECIPIENTS/CN==NOTESADDR/CN==F38F8BB9-828A7D34-86256509-536F49@EX@enronXgate>, Winston Cheng <Winston Cheng/SF/ECT@ECT>, Paul Choi <Paul Choi/SF/ECT@ECT>, David L Fairley <David L Fairley/HOU/ECT@ECT>, Mike J Miller <Mike J Miller/HOU/ECT@ECT>, Patrice L Mims <Patrice L Mims/HOU/ECT@ECT>, Steve Neal <Steve Neal/ENRON@enronXgate>, Kimberly S Olinger <Kimberly S Olinger/HOU/ECT@ECT>, Charles H Otto <Charles H Otto/HOU/ECT@ECT>, Lee L Papayoti <Lee L Papayoti/HOU/ECT@ECT>, David Parquet <David Parquet/SF/ECT@ECT>, Susan W Pereira <Susan W Pereira/HOU/ECT@ECT>, Beth Perlman <Beth Perlman/ENRON@enronXgate>, Bo Petersen <Bo Petersen/LON/ECT@ECT>, Sylvia S Pollan <Sylvia S Pollan/HOU/ECT@ECT>, Brent A Price <Brent A Price/ENRON@enronXgate>, Daniel Reck <Daniel Reck/ENRON@enronXgate>, Leslie Reeves <Leslie Reeves/HOU/ECT@ECT>, Brian M Riley <Brian M Riley/HOU/ECT@ECT>, Andrea Ring <Andrea Ring/HOU/ECT@ECT>, Suzy Robey <Suzy Robey/HOU/ECT@ECT>, Elizabeth Sager <Elizabeth Sager/HOU/ECT@ECT>, Steve HPL Schneider <Steve HPL Schneider/HOU/ECT@ECT>, Schwieger@ <Schwieger@/O==ENRON/OU==NA/CN==RECIPIENTS/CN==NOTESADDR/CN==AD755D5A-384A3FB2-8625654C-6D19FE@EX@enronXgate>, Sara Shackleton <Sara Shackleton/HOU/ECT@ECT>, Jeffrey A Shankman <Jeffrey A Shankman/ENRON@enronXgate>, Hunter S Shively <Hunter S Shively/HOU/ECT@ECT>, George Smith <George Smith/HOU/ECT@ECT>, Mary M Smith <Mary M Smith/HOU/ECT@ECT>, Jefferson D Sorenson <Jefferson D Sorenson/ENRON@enronXgate>, Steven P South <Steven P South/HOU/ECT@ECT>, Lauri A Allen <Lauri A Allen/HOU/ECT@ECT>, Phillip K Allen <Phillip K Allen/HOU/ECT@ECT>, Thresa A Allen <Thresa A Allen/HOU/ECT@ECT>, John Arnold <John Arnold/HOU/ECT@ECT>, Berney C Aucoin <Berney C Aucoin/HOU/ECT@ECT>, Edward D Baughman <Edward D Baughman/ENRON@enronXgate>, Sally Beck <Sally Beck/HOU/ECT@ECT>, Bob Bowen <Bob Bowen/HOU/ECT@ECT>, Sandra F Brawner <Sandra F Brawner/HOU/ECT@ECT>, Greg Brazaitis <Greg Brazaitis/HOU/ECT@ECT>, Craig Breslau <Craig Breslau/HOU/ECT@ECT>, Gary Bryan <Gary Bryan/HOU/ECT@ECT>, Cary M Carrabine <Cary M Carrabine/HOU/ECT@ECT>, Cash@ <Cash@/O==ENRON/OU==NA/CN==RECIPIENTS/CN==NOTESADDR/CN==751065A6-3F9B3C39-86256496-4BE6BF@EX@enronXgate>, Brad Coleman <Brad Coleman/ENRON@enronXgate>, Collins@ <Collins@/O==ENRON/OU==NA/CN==RECIPIENTS/CN==NOTESADDR/CN==6EE1D784-AF47E277-86256545-767D06@EX@enronXgate>, Robert Cotten <Robert Cotten/HOU/ECT@ECT>, Tom Donohoe <Tom Donohoe/HOU/ECT@ECT>, James I Ducote <James I Ducote/HOU/ECT@ECT>, Michael Etringer <Michael Etringer/HOU/ECT@ECT>, David L Fairley <David L Fairley/HOU/ECT@ECT>, Chris H Foster <Chris H Foster/HOU/ECT@ECT>, Kate Fraser <Kate Fraser/HOU/ECT@ECT>, Sheila Glover <Sheila Glover/HOU/ECT@ECT>, Gomez@ <Gomez@/O==ENRON/OU==NA/CN==RECIPIENTS/CN==NOTESADDR/CN==639AA4DA-624AABE9-862564E6-490408@EX@enronXgate>, Edward D Gottlob <Edward D Gottlob/HOU/ECT@ECT>, Lance Halgren <Lance Halgren/HOU/ECT@ECT>, Nicole Cortez <Nicole Cortez/DEN/ECT@Enron>, Martin@ <Martin@/O==ENRON/OU==NA/CN==RECIPIENTS/CN==NOTESADDR/CN==C937719A-A5EA0CA4-8625654C-6C7652@EX@enronXgate>, Greg McClendon <Greg McClendon/HOU/ECT@ECT>, Brad McKay <Brad McKay/HOU/ECT@ECT>, Stuart Staley <Stuart Staley/LON/ECT@ECT>, Jung-Suk Suh <Jung-Suk Suh/HOU/ECT@ECT>, Colleen Sullivan <Colleen Sullivan/HOU/ECT@ECT>, Mark Taylor <Mark Taylor/HOU/ECT@ECT>, Jane M Tholt <Jane M Tholt/HOU/ECT@ECT>, Jake Thomas <Jake Thomas/HOU/ECT@ECT>, Fred Lagrasta <Fred Lagrasta/HOU/ECT@ECT>, Janelle Scheuer <Janelle Scheuer/ENRON@enronXgate>, George N Gilbert <George N Gilbert/HOU/ECT@ECT>, Jennifer Fraser <Jennifer Fraser/ENRON@enronXgate>, Paul T Lucci <Paul T Lucci/DEN/ECT@Enron>, Graham@ <Graham@/O==ENRON/OU==NA/CN==RECIPIENTS/CN==NOTESADDR/CN==5B160532-1CBDFACE-86256714-61C37F@EX@enronXgate>, Lisa Mellencamp <Lisa Mellencamp/HOU/ECT@ECT>, Tana Jones <Tana Jones/HOU/ECT@ECT>, Shonnie Daniel <Shonnie Daniel/HOU/ECT@ECT>, Barbara N Gray <Barbara N Gray/HOU/ECT@ECT>, Steve Van Hooser <Steve Van Hooser/HOU/ECT@ECT>, Peggy Banczak <Peggy Banczak/HOU/ECT@ECT>, Mary Cook <Mary Cook/HOU/ECT@ECT>, Shawna Flynn <Shawna Flynn/HOU/ECT@ECT>, Gerald Nemec <Gerald Nemec/HOU/ECT@ECT>, Sandi M Braband <Sandi M Braband/HOU/ECT@ECT>, Ann Elizabeth White <Ann Elizabeth White/HOU/ECT@ECT>, Robert Walker <Robert Walker/HOU/ECT@ECT>, Mary Ogden <Mary Ogden/HOU/ECT@ECT>, Kimberlee A Bennick <Kimberlee A Bennick/HOU/ECT@ECT>, Carol St Clair <Carol St Clair/HOU/ECT@ECT>, Nathan L Hlavaty <Nathan L Hlavaty/HOU/ECT@ECT>, Melissa Graves <Melissa Graves/ENRON@enronXgate>, Susan Smith <Susan Smith/ENRON@enronXgate>, Vance L Taylor <Vance L Taylor/ENRON@enronXgate>, Donald P Reinhardt <Donald P Reinhardt/ENRON@enronXgate>, John Craig Taylor <John Craig Taylor/HOU/ECT@ECT>, Dick Jenkins <Dick Jenkins/HOU/ECT@ECT>, Fletcher J Sturm <Fletcher J Sturm/HOU/ECT@ECT>, Gary W Lamphier <Gary W Lamphier/HOU/ECT@ECT>, Geoff Storey <Geoff Storey/HOU/ECT@ECT>, Keith Holst <Keith Holst/HOU/ECT@ect>, Peter F Keavey <Peter F Keavey/HOU/ECT@ECT>, Mike Grigsby <Mike Grigsby/HOU/ECT@ECT>, Adam Gross <Adam Gross/HOU/ECT@ECT>, Marc Horowitz <Marc Horowitz/HOU/ECT@ECT>, Andrew H Lewis <Andrew H Lewis/HOU/ECT@ECT>, Debra Perlingiere <Debra Perlingiere/HOU/ECT@ECT>, Maureen Smith <Maureen Smith/HOU/ECT@ECT>, Sarah Mulholland <Sarah Mulholland/HOU/ECT@ECT>, Lucy Ortiz <Lucy Ortiz/HOU/ECT@ECT>, Barend VanderHorst <Barend VanderHorst/HOU/EES@EES>, James R Barker <James R Barker/HOU/EES@EES>, Matthew B Fleming <Matthew B Fleming/HOU/EES@EES>, Marde L Driscoll <Marde L Driscoll/HOU/EES@EES>, Ray@ <Ray@/O==ENRON/OU==NA/CN==RECIPIENTS/CN==NOTESADDR/CN==86ADC9FE-DAF54BF8-86256512-C1171@EX@enronXgate>, Roberts@ <Roberts@/O==ENRON/OU==NA/CN==RECIPIENTS/CN==NOTESADDR/CN==763EE7FA-75BF5464-862566A5-57888C@EX@enronXgate>, Shirley@ <Shirley@/O==ENRON/OU==NA/CN==RECIPIENTS/CN==NOTESADDR/CN==D3F1EE21-A4335106-862566AC-75E110@EX@enronXgate>, Sunil Dalal <Sunil Dalal/ENRON@enronXgate>, Stacy E Dickson <Stacy E Dickson/HOU/ECT@ECT>, Linda J Ewing <Linda J Ewing/HOU/ECT@ECT>, Eric Gillaspie <Eric Gillaspie/HOU/ECT@ECT>, Tammi DePaolis <Tammi DePaolis/Corp/Enron@ENRON>, Grass@ <Grass@/O==ENRON/OU==NA/CN==RECIPIENTS/CN==NOTESADDR/CN==BC3A3012-97AD9C76-8625685C-5EAAAD@EX@enronXgate>, Joanie H Ngo <Joanie H Ngo/HOU/ECT@ECT>, Kyle R Lilly <Kyle R Lilly/HOU/ECT@ECT>, Csikos@ <Csikos@/O==ENRON/OU==NA/CN==RECIPIENTS/CN==NOTESADDR/CN==601AC7F9-895D0163-862567A1-187BE9@EX@enronXgate>, Kristen J Hanson <Kristen J Hanson/ENRON@enronXgate>, Katherine Herrera <Katherine Herrera/Corp/Enron@ENRON>, Linda J Ewing <Linda J Ewing/HOU/ECT@ECT>, Kevin Bosse <Kevin Bosse/HOU/ECT@ECT>, William Stuart <William Stuart/HOU/ECT@ECT>, Isabel Y Resendez <Isabel Y Resendez/HOU/ECT@ECT>, David W Eubanks <David W Eubanks/HOU/ECT@ECT>, Drew Hill <Drew Hill/HOU/ECT@ECT>, Sheetal Patel <Sheetal Patel/HOU/ECT@ECT>, John J Lavorato <John J Lavorato/ENRON@enronXgate>, Martin O'Leary <Martin O'Leary/HOU/EES@EES>, Souad Mahmassani <Souad Mahmassani/Corp/Enron@ENRON>, John M Singer <John M Singer/Corp/Enron@ENRON>, Jay Knoblauh <Jay Knoblauh/HOU/ECT@ECT>, Higgins@ <Higgins@/O==ENRON/OU==NA/CN==RECIPIENTS/CN==NOTESADDR/CN==AA7ACE6D-2A73CBE8-862565E0-BB9E4@EX@enronXgate>, Brad Horn <Brad Horn/HOU/ECT@ECT>, Robert Shiring <Robert Shiring/HOU/ECT@ECT>, Gregory Schockling <Gregory Schockling/Corp/Enron@ENRON>, Dan McCairns <Dan McCairns/Corp/Enron@ENRON>, Ragan Bond <Ragan Bond/Corp/Enron@ENRON>, Ina Rangel <Ina Rangel/HOU/ECT@ECT>, Andrew Greer <Andrew Greer/ENRON@enronXgate>, George Hope <George Hope/HOU/ECT@ECT>, Diamond@ <Diamond@/O==ENRON/OU==NA/CN==RECIPIENTS/CN==NOTESADDR/CN==7BA22263-F9FDC3C5-86256560-54672D@EX@enronXgate>, Mandola@ <Mandola@/O==ENRON/OU==NA/CN==RECIPIENTS/CN==NOTESADDR/CN==BCBC586C-1D5A658C-862568CD-532EF3@EX@enronXgate>, Andrea Hauser <Andrea Hauser/NA/Enron@Enron>, Rostant@ <Rostant@/O==ENRON/OU==NA/CN==RECIPIENTS/CN==NOTESADDR/CN==8DFCADB1-88C9921-86256798-100B00@EX@enronXgate>, Lisa Gillette <Lisa Gillette/HOU/ECT@ECT>, Bucalo@ <Bucalo@/O==ENRON/OU==NA/CN==RECIPIENTS/CN==NOTESADDR/CN==796E87B9-C2B2B5C8-862567A6-5773DC@EX@enronXgate>, Hull@ <Hull@/O==ENRON/OU==NA/CN==RECIPIENTS/CN==NOTESADDR/CN==E1754B31-34413AC9-86256798-100D88@EX@enronXgate>, Kyle@ <Kyle@/O==ENRON/OU==NA/CN==RECIPIENTS/CN==NOTESADDR/CN==97746094-1B0A69C0-86256945-5803A9@EX@enronXgate>, Gerald Lofton <Gerald Lofton/HOU/ECT@ECT>, Cheryl Lantz Marshall <Cheryl Lantz Marshall/HOU/ECT@ECT>, Jack Simunek <Jack Simunek/HOU/ECT@ECT>, Candace L Bywaters <Candace L Bywaters/HOU/ECT@ECT>, Kenneth W Kaase <Kenneth W Kaase/HOU/ECT@ECT>, Ron Green <Ron Green/HPL/Enron@Enron>, Jennifer Blay <Jennifer Blay/HOU/ECT@ECT>, Audrey Cook <Audrey Cook/HOU/ECT@ECT>, Teresa Seibel <Teresa Seibel/ENRON@enronXgate>, Dennis Benevides <Dennis Benevides/HOU/EES@EES>, Tracy Ngo <Tracy Ngo/PDX/ECT@ECT>, Christy Sweeney <Christy Sweeney/HOU/ECT@ECT>, JoAnne Harris <JoAnne Harris/NA/Enron@Enron>, rmservices <rmservices@Enron>, Hamilton@ <Hamilton@/O==ENRON/OU==NA/CN==RECIPIENTS/CN==NOTESADDR/CN==EE812236-2B21A9DF-86256514-1B72F4@EX@enronXgate>, Roberts@ <Roberts@/O==ENRON/OU==NA/CN==RECIPIENTS/CN==NOTESADDR/CN==763EE7FA-75BF5464-862566A5-57888C@EX@enronXgate>, Shirley@ <Shirley@/O==ENRON/OU==NA/CN==RECIPIENTS/CN==NOTESADDR/CN==D3F1EE21-A4335106-862566AC-75E110@EX@enronXgate>, Matthew B Fleming <Matthew B Fleming/HOU/EES@EES>, Todd W Lambert <Todd W Lambert/HOU/EES@EES>, Babin@ <Babin@/O==ENRON/OU==NA/CN==RECIPIENTS/CN==NOTESADDR/CN==FB16209D-74C146BE-8625683C-70AE3A@EX@enronXgate>, Paul Tate <Paul Tate/HOU/EES@EES>, Marde L Driscoll <Marde L Driscoll/HOU/EES@EES>, Laura R Arnold <Laura R Arnold/HOU/EES@EES>, Jay Blaine <Jay Blaine/HOU/EES@EES>, Zarin Imam <Zarin Imam/HOU/EES@EES>, Jesus Guerra <Jesus Guerra/HOU/EES@EES>, Alain Diza <Alain Diza/HOU/EES@EES>, Hausinger@ <Hausinger@/O==ENRON/OU==NA/CN==RECIPIENTS/CN==NOTESADDR/CN==62831A63-18EF53E5-8625688E-711D93@EX@enronXgate>, Coates@ <Coates@/O==ENRON/OU==NA/CN==RECIPIENTS/CN==NOTESADDR/CN==196793B2-28A962D3-86256903-48AA56@EX@enronXgate>, Christina Bangle <Christina Bangle/HOU/EES@EES>, Rhonda Smith <Rhonda Smith/HOU/EES@EES>, Amanda Boettcher <Amanda Boettcher/HOU/EES@EES>, Tom Moran <Tom Moran/ENRON@enronXgate>, Russell Diamond <Russell Diamond/ENRON@enronXgate>, Sherry Pendegraft <Sherry Pendegraft/HOU/EES@EES>, Lisa Valderrama <Lisa Valderrama/HOU/ECT@ECT>, Tim Weithman <Tim Weithman/DUB/EES@EES>, C Kyle Griffin <C Kyle Griffin/HOU/EES@EES>, Lester Rawson <Lester Rawson/PDX/ECT@ECT>, Bob M Hall <Bob M Hall/ENRON@enronXgate>, Bussell@ <Bussell@/O==ENRON/OU==NA/CN==RECIPIENTS/CN==NOTESADDR/CN==4F40194C-FED4451C-86256583-98C37@EX@enronXgate>, Bryce Baxter <Bryce Baxter/HOU/ECT@ECT>, Bernard Dahanayake <Bernard Dahanayake/ENRON@enronXgate>, Richard Deming <Richard Deming/NA/Enron@Enron>, Janie Aguayo <Janie Aguayo/HOU/ECT@ECT>, Derek Bailey <Derek Bailey/Corp/Enron@ENRON>, Diane Anderson <Diane Anderson/NA/Enron@Enron>, Larry Joe Hunter <Larry Joe Hunter/HOU/ECT@ECT>, Ellen Wallumrod <Ellen Wallumrod/NA/Enron@ENRON>, Bob Bowen <Bob Bowen/HOU/ECT@ECT>, Lisa Lees <Lisa Lees/HOU/ECT@ECT>, Stephanie Sever <Stephanie Sever/HOU/ECT@ECT>, Daniel Salinas <Daniel Salinas/HOU/EES@EES>, Josephine M Logan <Josephine M Logan/DUB/EES@EES>, Joni Fisher <Joni Fisher/HOU/EES@EES>, Meredith M Eggleston <Meredith M Eggleston/HOU/EES@EES>, Vladimir Gorny <Vladimir Gorny/ENRON@enronXgate>, Cindy Vachuska <Cindy Vachuska/HOU/EES@EES>, Russell Diamond <Russell Diamond/ENRON@enronXgate>, Veronica Espinoza <Veronica Espinoza/ENRON@enronXgate>, Gregg Penman <Gregg Penman/HOU/ECT@ECT>, Angelo Miroballi <Angelo Miroballi/ENRON@enronXgate>, Jess Hewitt <Jess Hewitt/HOU/EES@EES>, Melissa K Ratnala <Melissa K Ratnala/HOU/ECT@ECT>
+X-cc: 
+X-bcc: 
+X-Folder: \Donohoe, Tom\Donohoe, Tom\Inbox
+X-Origin: DONOHOE-T
+X-FileName: Donohoe, Tom.pst
+
+Attached is a revised Credit Watch listing as of 4/17/01.   Please note that Nevada Power Company, Sierra Pacific Resources and Sierra Pacific Power Company were all placed on NO TRADES and Select Energy, Inc. was placed on Call Credit.
+If there are any personnel in your group that were not included in this distribution, please insure that they receive a copy of this report.
+To add additional people to this distribution, or if this report has been sent to you in error, please contact Veronica Espinoza at x6-6002.
+For other questions, please contact Bill Bradford at x3-3831, Russell Diamond at x5-7095, or Brant Reves at x3-9897.
+
+ 

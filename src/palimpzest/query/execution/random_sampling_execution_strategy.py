@@ -4,7 +4,6 @@ import numpy as np
 
 from palimpzest.core.data.dataclasses import SentinelPlanStats
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
-from palimpzest.policy import Policy
 from palimpzest.query.execution.execution_strategy import SentinelExecutionStrategy
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.scan import ScanPhysicalOp
@@ -22,29 +21,20 @@ class OpSet:
     2. has been sampled fewer than j times
     """
 
-    def __init__(self, op_set: list[PhysicalOperator], source_indices: list[int], k: int, j: int, seed: int, policy: Policy):
+    def __init__(self, op_set: list[PhysicalOperator], source_indices: list[int], k: int, j: int, seed: int):
         # set k and j, which are the initial number of operators in the frontier and the
         # initial number of records to sample for each frontier operator
         self.k = min(k, len(op_set))
         self.j = min(j, len(source_indices))
 
-        # store the policy that we are optimizing under
-        self.policy = policy
-
         # get order in which we will sample physical operators for this logical operator
         sample_op_indices = self._get_op_index_order(op_set, seed)
 
         # construct the set of operators
-        self.ops = [op_set[sample_idx] for sample_idx in sample_op_indices[:k]]
+        self.ops = [op_set[sample_idx] for sample_idx in sample_op_indices[:self.k]]
 
         # store the order in which we will sample the source records
         self.source_indices = source_indices
-
-        # keep track of the number of times each operator has been sampled
-        self.phys_op_id_to_num_samples = {op.get_op_id(): 0 for op in op_set}
-
-        # keep track of the number of times the logical operator has been sampled
-        self.total_num_samples = 0
 
         # set the initial inputs for this logical operator
         is_scan_op = isinstance(op_set[0], ScanPhysicalOp)
@@ -78,8 +68,6 @@ class OpSet:
         op_input_pairs = []
         for op, source_idx in op_source_idx_pairs:
             op_input_pairs.extend([(op, input_record) for input_record in self.source_idx_to_input[source_idx]])
-            self.phys_op_id_to_num_samples[op.get_op_id()] += len(op_input_pairs)
-            self.total_num_samples += len(op_input_pairs)
 
         return op_input_pairs
 
@@ -165,7 +153,7 @@ class RandomSamplingExecutionStrategy(SentinelExecutionStrategy):
                 break
 
             # run sampled operators on sampled inputs
-            source_idx_to_record_sets_and_ops = self._execute_op_set(op_input_pairs)
+            source_idx_to_record_sets_and_ops, _ = self._execute_op_set(op_input_pairs)
 
             # FUTURE TODO: have this return the highest quality record set simply based on our posterior (or prior) belief on operator quality
             # get the target record set for each source_idx
@@ -186,13 +174,6 @@ class RandomSamplingExecutionStrategy(SentinelExecutionStrategy):
 
             # update plan stats
             plan_stats.add_record_op_stats(all_record_op_stats)
-
-            # if this operator used an LLM, update the samples drawn
-            new_samples_drawn = len(op_input_pairs) if self._is_llm_op(op_set[0]) else 0
-
-            # update the progress manager
-            total_cost = sum([record_op_stats.cost_per_record for record_op_stats in all_record_op_stats])
-            self.progress_manager.incr(logical_op_id, num_samples=new_samples_drawn, total_cost=total_cost)
 
             # add records (which are not filtered) to the cache, if allowed
             self._add_records_to_cache(logical_op_id, all_records)
@@ -234,7 +215,7 @@ class RandomSamplingExecutionStrategy(SentinelExecutionStrategy):
 
         # initialize set of physical operators for each logical operator
         op_sets = {
-            logical_op_id: OpSet(op_set, source_indices, self.k, self.j, self.seed, self.policy)
+            logical_op_id: OpSet(op_set, source_indices, self.k, self.j, self.seed)
             for logical_op_id, op_set in plan
         }
 

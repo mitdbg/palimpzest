@@ -33,6 +33,7 @@ from palimpzest.query.optimizer.rules import (
     LLMConvertBondedRule,
     MixtureOfAgentsConvertRule,
     RAGConvertRule,
+    SplitConvertRule,
     TokenReducedConvertBondedRule,
 )
 from palimpzest.query.optimizer.tasks import (
@@ -93,6 +94,7 @@ class Optimizer:
         allow_rag_reduction: bool = False,
         allow_mixtures: bool = True,
         allow_critic: bool = False,
+        allow_split_merge: bool = False,
         optimizer_strategy: OptimizationStrategyType = OptimizationStrategyType.PARETO,
         use_final_op_quality: bool = False, # TODO: make this func(plan) -> final_quality
         **kwargs,
@@ -136,6 +138,7 @@ class Optimizer:
             self.allow_rag_reduction = False
             self.allow_mixtures = False
             self.allow_critic = False
+            self.allow_split_merge = False
             self.available_models = [available_models[0]]
 
         # store optimization hyperparameters
@@ -148,6 +151,7 @@ class Optimizer:
         self.allow_rag_reduction = allow_rag_reduction
         self.allow_mixtures = allow_mixtures
         self.allow_critic = allow_critic
+        self.allow_split_merge = allow_split_merge
         self.optimizer_strategy = optimizer_strategy
         self.use_final_op_quality = use_final_op_quality
 
@@ -184,6 +188,11 @@ class Optimizer:
                 rule for rule in self.implementation_rules if not issubclass(rule, CriticAndRefineConvertRule)
             ]
 
+        if not self.allow_split_merge:
+            self.implementation_rules = [
+                rule for rule in self.implementation_rules if not issubclass(rule, SplitConvertRule)
+            ]
+
         logger.info(f"Initialized Optimizer with verbose={self.verbose}")
         logger.debug(f"Initialized Optimizer with params: {self.__dict__}")
 
@@ -213,6 +222,7 @@ class Optimizer:
             allow_rag_reduction=self.allow_rag_reduction,
             allow_mixtures=self.allow_mixtures,
             allow_critic=self.allow_critic,
+            allow_split_merge=self.allow_split_merge,
             optimizer_strategy=self.optimizer_strategy,
             use_final_op_quality=self.use_final_op_quality,
         )
@@ -285,7 +295,7 @@ class Optimizer:
                 index=node._index,
                 search_func=node._search_func,
                 search_attr=node._search_attr,
-                output_attr=node._output_attr,
+                output_attrs=node._output_attrs,
                 k=node._k,
                 target_cache_id=uid,
             )

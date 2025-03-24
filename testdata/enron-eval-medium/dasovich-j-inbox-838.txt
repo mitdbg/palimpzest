@@ -1,0 +1,80 @@
+Message-ID: <8418631.1075851670822.JavaMail.evans@thyme>
+Date: Mon, 29 Oct 2001 16:54:51 -0800 (PST)
+From: jeff.dasovich@enron.com
+To: jeff.dasovich@enron.com, d..steffes@enron.com, susan.mara@enron.com, 
+	michael.tribolet@enron.com, lisa.mellencamp@enron.com, 
+	wanda.curry@enron.com, c..williams@enron.com, 
+	e-mail <'.'mike@enron.com>
+Subject: RE: Proposed SCE Negotiation Strategy
+Cc: richard.shapiro@enron.com, b..sanders@enron.com, vicki.sharp@enron.com
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+Bcc: richard.shapiro@enron.com, b..sanders@enron.com, vicki.sharp@enron.com
+X-From: Dasovich, Jeff </O=ENRON/OU=NA/CN=RECIPIENTS/CN=JDASOVIC>
+X-To: Dasovich, Jeff </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jdasovic>, Steffes, James D. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jsteffe>, Mara, Susan </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Smara>, Tribolet, Michael </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mtribole>, Mellencamp, Lisa </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lmellen>, Curry, Wanda </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Wcurry>, Williams, Robert C. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rwillia2>, 'Mike Day (E-mail)' <mday@gmssr.com>
+X-cc: Shapiro, Richard </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rshapiro>, Sanders, Richard B. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rsander>, Sharp, Vicki </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=dc350363-f761e300-862564c2-54998e>
+X-bcc: 
+X-Folder: \Dasovich, Jeff (Non-Privileged)\Dasovich, Jeff\Inbox
+X-Origin: DASOVICH-J
+X-FileName: Dasovich, Jeff (Non-Privileged).pst
+
+Couple of additional pieces of information:
+
+In conjunction with the issue paying ESPs past due PX amounts, Edison has affirmed that it will be making a proposal regarding how it wants to calculate the PX credit going forward.
+It remains unclear whether Edison will try to fold controversial issues into negotiations on getting paid past due PX credit amounts(e.g., PX credit contributed to undercollection and therefore DA customers should help pay down the undercollection; DA customers must pay for stranded DWR contracts, etc.).  
+So while Edison is making good noises about wanting to settle (which is a certainly a step in the right direction), it's still unclear whether they intend to attach terms to the deal that make the whole thing a nonstarter.
+Got a call into John Fielder to try to get answers to some of these questions.
+Will report back when (and if) we get some answers.
+
+Best,
+Jeff
+
+ -----Original Message-----
+From: 	Dasovich, Jeff  
+Sent:	Monday, October 29, 2001 5:27 PM
+To:	Steffes, James D.; Mara, Susan; Tribolet, Michael; Mellencamp, Lisa; Curry, Wanda; Williams, Robert C.; 'Mike Day (E-mail)'
+Cc:	Shapiro, Richard; Sanders, Richard B.; Sharp, Vicki
+Subject:	RE: Proposed SCE Negotiation Strategy
+
+With respect to past due PX credit amounts, Edison has told folks today that:
+
+Edison will distribute a one-pager by mid-day tomorrow laying out its proposal for how to handle payment of past due PX credit amounts.
+Edison is trying to meet individually with all ESPs prior to the Nov. 7th prehearing conference at the PUC to discuss and hopefully reach agreement with ESPs on its proposal.
+Edison hopes to make progress with the ESPs between now and the Nov. 7th prehearing conference, and if so, intends to tell the judge that the PUC should delay action on the complaints pending settlement.
+
+We'll distribute Edison's proposal as soon as we get it.
+
+Best,
+Jeff
+
+ -----Original Message-----
+From: 	Steffes, James D.  
+Sent:	Monday, October 29, 2001 8:04 AM
+To:	Dasovich, Jeff; Mara, Susan; Tribolet, Michael; Mellencamp, Lisa; Curry, Wanda; Williams, Robert C.; Mike Day (E-mail)
+Cc:	Shapiro, Richard; Sanders, Richard B.; Sharp, Vicki
+Subject:	Proposed SCE Negotiation Strategy
+
+Following last week's meeting, here is my recommendation on how to proceed with SCE.
+
+1.	Form Enron Negotiation Team
+
+	My recommendation is to use the same team we used with PG&E + Jeff Dasovich.  My understanding was that Lisa M. was the lead negotiator - I would not change this.  Jeff should only be there to make introductions.
+
+2.	Meet & Confer (10/29)
+
+	Sue Mara and Jeff Dasovich will listen and report back to everyone on what happens.  
+
+3.	Reformed Stipulation
+
+	I would propose that we take a wait and see approach to this document.  Based on Dasovich's idea to get together with SCE on Thursday, maybe let this ride.
+
+4.	Meeting
+
+	My understanding is that (Jeff D. please correct) SCE can meet with us this Thursday.  Can everyone make it that needs to be there?  Probably meet in California.  We should put the laundry list on the table.
+
+Please let me know what else we need to discuss or if anyone disagrees.
+
+Thanks,
+
+Jim

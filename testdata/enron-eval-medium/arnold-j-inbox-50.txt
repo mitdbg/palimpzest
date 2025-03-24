@@ -1,0 +1,32 @@
+Message-ID: <29209841.1075852729234.JavaMail.evans@thyme>
+Date: Sun, 28 Oct 2001 05:36:38 -0800 (PST)
+From: john.lavorato@enron.com
+To: john.arnold@enron.com
+Subject: 
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+X-From: Lavorato, John </O=ENRON/OU=NA/CN=RECIPIENTS/CN=JLAVORA>
+X-To: Arnold, John </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jarnold>
+X-cc: 
+X-bcc: 
+X-Folder: \JARNOLD (Non-Privileged)\Arnold, John\Inbox
+X-Origin: Arnold-J
+X-FileName: JARNOLD (Non-Privileged).pst
+
+current -260
+all 150
+ 
+jack +7
+minn +3
+cinci+3
+sf+2.5
+new orleans +12
+car +2.5
+dall +3
+oak +1.5
+new eng +7
+buff +7
+seattle +2.5
+wash +8
+ 
