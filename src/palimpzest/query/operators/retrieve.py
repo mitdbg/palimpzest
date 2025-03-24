@@ -222,7 +222,7 @@ class RetrieveOp(PhysicalOperator):
             query = [query]
 
         # compute input/query embedding(s) if the index is a chromadb collection
-        embeddings, gen_stats = None, GenerationStats()
+        inputs, gen_stats = None, GenerationStats()
         if isinstance(self.index, Collection):
             uses_openai_embedding_fcn = isinstance(self.index._embedding_function, OpenAIEmbeddingFunction)
             uses_sentence_transformer_embedding_fcn = isinstance(self.index._embedding_function, SentenceTransformerEmbeddingFunction)
@@ -241,11 +241,11 @@ class RetrieveOp(PhysicalOperator):
                     client = OpenAI()
                     response = client.embeddings.create(input=query, model=model_name)
                     total_input_tokens = response.usage.total_tokens
-                    embeddings = [item.embedding for item in response.data]
+                    inputs = [item.embedding for item in response.data]
 
                 elif uses_sentence_transformer_embedding_fcn:
                     model = SentenceTransformer(model_name)
-                    embeddings = model.encode(query)
+                    inputs = model.encode(query)
 
                 embed_total_time = time.time() - embed_start_time
 
@@ -266,9 +266,13 @@ class RetrieveOp(PhysicalOperator):
             except Exception:
                 query = None
 
+        # in the default case, pass string inputs rather than embeddings
+        if inputs is None:
+            inputs = query
+
         try:
-            assert embeddings is not None, "Error: embeddings is None (likely because embedding generation failed)"
-            top_results = self.search_func(self.index, embeddings, self.k)
+            assert inputs is not None, "Error: inputs is None (likely because embedding generation failed)"
+            top_results = self.search_func(self.index, inputs, self.k)
 
         except Exception:
             top_results = ["error-in-retrieve"]
