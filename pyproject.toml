@@ -58,7 +58,7 @@ dependencies = [
     "tqdm~=4.66.1",
     "transformers>=4.41.3,<4.50.0",
     "rich[jupyter]>=13.9.2",
-    "voyager==2.0.9",
+    "voyager>=2.0.9",
 ]
 classifiers=[
     "Development Status :: 4 - Beta",  # Change as appropriate
