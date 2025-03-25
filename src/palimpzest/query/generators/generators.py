@@ -267,7 +267,7 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
 
         # parse usage statistics and create the GenerationStats
         field_answers = None if fields is None else {field_name: None for field_name in fields}
-        reasoning = ''
+        reasoning = ""
         generation_stats = None
         if len(completion) > 0:
             usd_per_input_token = MODEL_CARDS[self.model_name]["usd_per_input_token"]
@@ -295,8 +295,8 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
                     print(Fore.GREEN + f"{completion_text}\n" + Style.RESET_ALL)
 
                 try:
-                    reasoning = self._parse_reasoning(completion_text, **kwargs)
-                    reasoning += f"\n\n{reasoning}" if reasoning else ""
+                    comp_reasoning = self._parse_reasoning(completion_text, **kwargs)
+                    reasoning += f"\n\n{comp_reasoning}" if comp_reasoning is not None else ""
                 except Exception as e:
                     print(f"Error parsing reasoning and answers: {e}")
 

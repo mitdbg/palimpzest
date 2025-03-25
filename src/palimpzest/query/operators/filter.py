@@ -257,5 +257,7 @@ class LLMFilter(FilterOp):
             passed_operator = "true" in field_answers["passed_operator"].lower()
         elif isinstance(field_answers["passed_operator"], bool):
             passed_operator = field_answers["passed_operator"]
+        elif isinstance(field_answers["passed_operator"], list):
+            passed_operator = any(field_answers["passed_operator"])
 
         return {"passed_operator": passed_operator}, generation_stats

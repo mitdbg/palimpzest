@@ -13,6 +13,7 @@ from palimpzest.core.lib.fields import ListField, StringField
 from palimpzest.core.lib.schemas import Number, Schema
 from palimpzest.policy import construct_policy_from_kwargs
 from palimpzest.query.processor.config import QueryProcessorConfig
+from palimpzest.utils import udfs
 from palimpzest.utils.datareader_helpers import get_local_datareader
 from palimpzest.utils.hash_helpers import hash_for_serialized_dict
 from palimpzest.utils.index_helpers import get_index_str
@@ -219,6 +220,13 @@ class Dataset(Set):
             desc=desc,
             nocache=self._nocache,
         )
+
+    def download(self):
+        """Download the dataset to the local filesystem."""
+        file_cols = [{"name": "filename", "type": str, "desc": "The name of the file"},
+            {"name": "contents", "type": bytes, "desc": "The contents of the file"}]
+
+        return self.add_columns(udf=udfs.url_to_file, cols=file_cols)
 
     def add_columns(self, udf: Callable,
                     cols: list[dict] | type[Schema],
