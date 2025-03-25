@@ -135,11 +135,6 @@ DEFAULT_PDF_PROCESSOR = "pypdf"
 # character limit for various IDs
 MAX_ID_CHARS = 10
 
-# retry LLM executions 2^x * (multiplier) for up to 10 seconds and at most 4 times
-RETRY_MULTIPLIER = 2
-RETRY_MAX_SECS = 10
-RETRY_MAX_ATTEMPTS = 1
-
 # maximum number of rows to display in a table
 MAX_ROWS = 5
 
