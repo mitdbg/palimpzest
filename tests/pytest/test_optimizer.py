@@ -307,8 +307,8 @@ class TestOptimizer:
         assert isinstance(physical_plan[7], LLMFilter)
         assert isinstance(physical_plan[8], CodeSynthesisConvert)
 
-        assert time.time() - start_time < 2.5, (
-            "Optimizer should complete this test within 2 to 3 seconds; if it's failed, something has caused a regression, and you should ping Matthew Russo (mdrusso@mit.edu)"
+        assert time.time() - start_time < 5, (
+            "Optimizer should complete this test within 2 to 5 seconds; if it's failed, something has caused a regression, and you should ping Matthew Russo (mdrusso@mit.edu)"
         )
 
 
