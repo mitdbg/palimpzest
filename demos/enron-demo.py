@@ -60,7 +60,7 @@ if __name__ == "__main__":
     print(output.to_df())
 
     # print precision and recall
-    with open("enron-eval-medium-labels.json") as f:
+    with open("testdata/enron-eval-medium-labels.json") as f:
         filename_to_labels = json.load(f)
         test_filenames = os.listdir("testdata/enron-eval-medium")[50:150]
         filename_to_labels = {k: v for k, v in filename_to_labels.items() if k in test_filenames}
