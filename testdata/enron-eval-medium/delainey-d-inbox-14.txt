@@ -1,0 +1,31 @@
+Message-ID: <2616121.1075860781470.JavaMail.evans@thyme>
+Date: Wed, 2 Jan 2002 08:05:09 -0800 (PST)
+From: daniel.brown@enron.com
+To: ojones01@attbi.com
+Subject: Outstanding Expense Reports
+Cc: dan.leff@enron.com, kalen.pieper@enron.com, david.delaney@enron.com, 
+	exec.jones@enron.com, janet.dietrich@enron.com
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+Bcc: dan.leff@enron.com, kalen.pieper@enron.com, david.delaney@enron.com, 
+	exec.jones@enron.com, janet.dietrich@enron.com
+X-From: Brown, Daniel </O=ENRON/OU=NA/CN=RECIPIENTS/CN=DBROWN4>
+X-To: 'ojones01@attbi.com'
+X-cc: Leff, Dan </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dleff>, Pieper, Kalen </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Kpieper>, Delaney, David </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Ddelaney>, Jones, Robert W.- HR Exec </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rjones2>, Dietrich, Janet </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jdietri>
+X-bcc: 
+X-Folder: \Dave_Delainey_Mar2002_1\Delaney, David\Inbox
+X-Origin: Delainey-D
+X-FileName: ddelaney (Non-Privileged).pst
+
+Deborah,
+
+I received copy of your letter dated December 18, 2001 referencing the outstanding expenses you submitted on November 26, 2001. At this time, I am looking into the matter to provide you with answers on if and when you can expect payment. My goal is to have an answer to you no later than Friday of this week.
+
+If you have questions or what like to speak with  me directly, please contact me at 713-853-3931.
+
+Sincerely,
+Daniel S. Brown
+Manager, Human Resources
+Enron Energy Services
+713-853-3931

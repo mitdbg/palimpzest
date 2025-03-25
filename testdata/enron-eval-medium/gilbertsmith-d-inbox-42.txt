@@ -1,0 +1,114 @@
+Message-ID: <25874183.1075840544874.JavaMail.evans@thyme>
+Date: Mon, 4 Feb 2002 13:05:54 -0800 (PST)
+From: neil.davies@enron.com
+To: bill.abler@enron.com, sunil.abraham@enron.com, dipak.agarwalla@enron.com, 
+	robert.allwein@enron.com, cella.amerson@enron.com, 
+	bridgette.anderson@enron.com, clinton.anderson@enron.com, 
+	diane.anderson@enron.com, evelyn.aucoin@enron.com, a..aune@enron.com, 
+	derek.bailey@enron.com, adam.bayer@enron.com, 
+	lorraine.becker@enron.com, angeles.beltri@enron.com, 
+	robert.benson@enron.com, erica.bess@enron.com, kevin.bosse@enron.com, 
+	bob.bowen@enron.com, s..bradford@enron.com, kevin.brady@enron.com, 
+	sarah.brown@enron.com, bart.burk@enron.com, 
+	toni.bustamante@enron.com, anthony.campos@enron.com, 
+	a..campos@enron.com, mike.carson@enron.com, carl.carter@enron.com, 
+	sharen.cason@enron.com, amy.cavazos@enron.com, 
+	bonnie.chang@enron.com, claudia.clark@enron.com, 
+	kevin.cline@enron.com, wes.colwell@enron.com, 
+	wendy.conwell@enron.com, edith.cross@enron.com, mike.curry@enron.com, 
+	dana.davis@enron.com, sherry.dawson@enron.com, misti.day@enron.com, 
+	jennifer.denny@enron.com, l..denton@enron.com, 
+	daniel.diamond@enron.com, w..donovan@enron.com, 
+	anne.eastwood@enron.com, susan.elledge@enron.com, 
+	kelly.ellis@enron.com, tom.engel@enron.com, darren.espey@enron.com, 
+	israel.estrada@enron.com, e..estrada@enron.com, 
+	jason.fischer@enron.com, david.forster@enron.com, 
+	dale.furrow@enron.com, clarissa.garcia@enron.com, 
+	paul.garcia@enron.com, chris.gaskill@enron.com, 
+	fraisy.george@enron.com, mercy.gil@enron.com, 
+	doug.gilbert-smith@enron.com, gustavo.giron@enron.com, 
+	scott.goodell@enron.com, griff.gray@enron.com, 
+	tracy.greene@enron.com, shannon.groenewold@enron.com, 
+	karen.gruesen@enron.com, ricardo.guerra@enron.com, 
+	stacy.hardy@enron.com, trey.hardy@enron.com, d..hare@enron.com, 
+	kim.harris@enron.com, paula.harris@enron.com, 
+	reginald.hart@enron.com, gordon.heaney@enron.com, 
+	lorie.hernandez@enron.com, mog.heu@enron.com, 
+	georgeanne.hodges@enron.com, meredith.homco@enron.com, 
+	joe.hunter@enron.com, rika.imai@enron.com, 
+	kimberly.indelicato@enron.com, tracey.irvin@enron.com, 
+	rahil.jafry@enron.com, giselle.james@enron.com, 
+	adam.johnson@enron.com, robert.johnston@enron.com, 
+	lynna.kacal@enron.com, jason.kaniss@enron.com, c..kenne@enron.com, 
+	faith.killen@enron.com, jeff.king@enron.com, lisa.kinsey@enron.com, 
+	victor.lamadrid@enron.com, lisa.lees@enron.com, 
+	edie.leschber@enron.com, jozef.lieskovsky@enron.com, 
+	martin.lin@enron.com, barbara.lo@enron.com, connie.lo@enron.com, 
+	k..longoria@enron.com, melba.lozano@enron.com, 
+	souad.mahmassani@enron.com, teresa.mandola@enron.com, 
+	mauricio.marquez@enron.com, stephanie.mcginnis@enron.com, 
+	shannon.mcpearson@enron.com, jennifer.mcquade@enron.com, 
+	kevin.meredith@enron.com, evelyn.metoyer@enron.com, 
+	jim.meyn@enron.com, m..moore@enron.com, kay.moore@enron.com, 
+	matt.motsinger@enron.com, melissa.murphy@enron.com, 
+	roderick.nelson@enron.com, dale.neuner@enron.com, 
+	brenna.neves@enron.com, justin.o'malley@enron.com, 
+	chris.ordway@enron.com, leonardo.pacheco@enron.com, 
+	biliana.pehlivanova@enron.com, cora.pendergrass@enron.com, 
+	willis.philip@enron.com, vladi.pimenov@enron.com, 
+	stephanie.piwetz@enron.com, denver.plachy@enron.com, 
+	m..presto@enron.com, chris.price@enron.com, 
+	monica.reasoner@enron.com, lindsay.renaud@enron.com, 
+	reagan.rorschach@enron.com, jennifer.rosado@enron.com, 
+	edward.sacks@enron.com, eric.saibi@enron.com, 
+	paul.schiavone@enron.com, l..schrab@enron.com, 
+	amanda.schultz@enron.com, stephanie.sever@enron.com, 
+	kal.shah@enron.com, r..shepperd@enron.com, cris.sherman@enron.com, 
+	bob.shults@enron.com, keith.simper@enron.com, 
+	max.sonnonstine@enron.com, mechelle.stevens@enron.com, 
+	j..sturm@enron.com, robert.superty@enron.com, john.suttle@enron.com, 
+	tara.sweitzer@enron.com, nera.swisher@enron.com, 
+	s..theriot@enron.com, d..thomas@enron.com, 
+	shirley.tijerina@enron.com, patrick.tucker@enron.com, 
+	larry.valderrama@enron.com, david.vandor@enron.com, 
+	hope.vargas@enron.com, chris.walker@enron.com, 
+	ellen.wallumrod@enron.com, steve.wang@enron.com, 
+	todd.warwick@enron.com, mary.weatherstone@enron.com, 
+	greg.whiting@enron.com, lloyd.will@enron.com, 
+	credit <.williams@enron.com>, ryan.williams@enron.com, 
+	jason.wolfe@enron.com, stephen.wolfe@enron.com, 
+	virawan.yawapongsiri@enron.com
+Subject: UBSW Orientation - Thursday. For those that did not attend the
+ Houstonian Sessions
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+X-From: Davies, Neil </O=ENRON/OU=NA/CN=RECIPIENTS/CN=NDAVIES>
+X-To: Abler, Bill </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Wabler>, Abraham, Sunil </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Sabraham>, Agarwalla, Dipak </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dagarwal>, Allwein, Robert </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rallwei>, Amerson, Cella </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Camerson>, Anderson, Bridgette </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Bander2>, Anderson, Clinton </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Canders>, Anderson, Diane </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Danders2>, Aucoin, Evelyn </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Eaucoin>, Aune, Stacey A. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Saune>, Bailey, Derek </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dbailey>, Bayer, Adam </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Abayer>, Becker, Lorraine </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lbecker>, Beltri, Angeles </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Abeltri>, Benson, Robert </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rbenson>, Bess, Erica </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Ebess>, Bosse, Kevin </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Kbosse>, Bowen, Bob </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Bbowen>, Bradford, William S. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Wbradfo>, Brady, Kevin </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Kbrady>, Brown, Sarah </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Sbrown6>, Burk, Bart </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Bburk>, Bustamante, Toni </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Tbustam>, Campos, Anthony </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Acampos>, Campos, Sylvia A. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Scampos>, Carson, Mike </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mcarson2>, Carter, Carl </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Ccarter4>, Cason, Sharen </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Scason>, Cavazos, Amy </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Acavazos>, Chang, Bonnie </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Bchang>, Clark, Claudia </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Cclark1>, Cline, Kevin </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Kcline>, Colwell, Wes </O=ENRON/OU=NA/CN=RECIPIENTS/CN=WCOLWEL>, Conwell, Wendy </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Wconwell>, Cross, Edith </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Ecross>, Curry, Mike </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mcurry>, Davis, Mark Dana </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mdavis>, Dawson, Sherry </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Sdawson>, Day, Misti </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mday>, Denny, Jennifer </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jdenny>, Denton, Rhonda L. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rdenton>, Diamond, Daniel </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Ddiamon>, Donovan, Terry W. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Tdonova>, Eastwood, Anne </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Aeastwoo>, Elledge, Susan </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Selledge>, Ellis, Kelly </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Kellis2>, Engel, Tom </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Tengel>, Espey, Darren </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Despey>, Estrada, Israel </O=ENRON/OU=NA/CN=RECIPIENTS/CN=IESTRADA>, Estrada, Mercedes E. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mestrad>, Fischer, Jason </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jfische2>, Forster, David </O=ENRON/OU=NA/CN=RECIPIENTS/CN=DFORSTER>, Furrow, Dale </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dfurrow>, Garcia, Clarissa </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Cgarcia>, Garcia, Paul </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Pgarcia>, Gaskill, Chris </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Cgaskill>, George, Fraisy </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Fgeorge>, Gil, Mercy </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mgil>, Gilbert-smith, Doug </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dsmith3>, Giron, Gustavo </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Ggiron>, Goodell, Scott </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Sgoodel>, Gray, Mary Griff </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mgray>, Greene, Tracy </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Twoodar>, Groenewold, Shannon </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Sgroenew>, Gruesen, Karen </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Kgruese>, Guerra, Ricardo </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rguerra>, Hardy, Stacy </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Shardy2>, Hardy, Trey </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Thardy>, Hare, Bill D. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Bhare>, Harris, Kim </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Kharris2>, Harris, Paula </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Pmarcel>, Hart, Reginald </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rhart2>, Heaney, Gordon </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Gheaney>, Hernandez, Lorie </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lhernan3>, Heu, Mog </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mheu>, Hodges, Georgeanne </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Ghodges>, Homco, Meredith </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mmitch2>, Hunter, Larry Joe </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jhunte2>, Imai, Rika </O=ENRON/OU=NA/CN=RECIPIENTS/CN=RIMAI>, Indelicato, Kimberly </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Kindelic>, Irvin, Tracey </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Tirvin>, Jafry, Rahil </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rjafry>, James, Giselle </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Gjames3>, Johnson, Adam </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Ajohnson>, Johnston, Robert </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rjohnst>, Kacal, Lynna </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lkacal>, Kaniss, Jason </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jkaniss>, Kenne, Dawn C. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dkenne>, Killen, Faith </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Fkillen>, King, Jeff </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jking6>, Kinsey, Lisa </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lkinsey>, Lamadrid, Victor </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Vlamadr>, Lees, Lisa </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Llees>, Leschber, Edie </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Eleschb>, Lieskovsky, Jozef </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jlieskov>, Lin, Martin </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mlin>, Lo, Barbara </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Blo>, Lo, Connie </O=ENRON/OU=NA/CN=RECIPIENTS/CN=CLO>, Longoria, Jennifer K. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jlongor>, Lozano, Melba </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mlozano>, Mahmassani, Souad </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Smahmass>, Mandola, Teresa </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Tmandola>, Marquez, Mauricio </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mmarque2>, Mcginnis, Stephanie </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Smcginn>, McPearson, Shannon </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Smcpears>, Mcquade, Jennifer </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jmcquad2>, Meredith, Kevin </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Kmeredi>, Metoyer, Evelyn </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Emetoyer>, Meyn, Jim </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jmeyn>, Moore, Kathy M. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Kmoore>, Moore, Mary Kay </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mmoore2>, Motsinger, Matt </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mmotsin>, Murphy, Melissa </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mmurphy>, Nelson, Roderick </O=ENRON/OU=EU/cn=Recipients/cn=rnelson>, Neuner, Dale </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dneuner>, Neves, Brenna </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Bneves>, O'Malley, Justin </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jomalley>, Ordway, Chris </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Cordway>, Pacheco, Leonardo </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lpacheco>, Pehlivanova, Biliana </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Bpehliva>, Pendergrass, Cora </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Cpender>, Philip, Willis </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Wphilip>, Pimenov, Vladi </O=ENRON/OU=NA/CN=RECIPIENTS/CN=VPIMENOV>, Piwetz, Stephanie </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Spiwetz>, Plachy, Denver </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dplachy>, Presto, Kevin M. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Kpresto>, Price, Chris </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Cprice3>, Reasoner, Monica </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mreason>, Renaud, Lindsay </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lrenaud>, Rorschach, Reagan </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rrorscha>, Rosado, Jennifer </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jrosado2>, Sacks, Edward </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Esacks>, Saibi, Eric </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Esaibi>, Schiavone, Paul </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Pschiavo>, Schrab, Mark L. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mschrab>, Schultz, Amanda </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Aschultz>, Sever, Stephanie </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Ssever>, Shah, Kal </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Kshah>, Shepperd, Tammy R. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Tsheppe>, Sherman, Cris </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Csherm2>, Shults, Bob </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rshults>, Simper, Keith </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Ksimper>, Sonnonstine, Max </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Msonnons>, Stevens, Mechelle </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Msteve1>, Sturm, Fletcher J. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Fsturm>, Superty, Robert </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rsupert>, Suttle, John </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jsuttle>, Sweitzer, Tara </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Tsweitz>, Swisher, Nera </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Nswishe>, Theriot, Kim S. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Ktherio>, Thomas, Paul D. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Pthomas2>, Tijerina, Shirley </O=ENRON/OU=NA/CN=RECIPIENTS/CN=STIJERI>, Tucker, Patrick </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Ptucker>, Valderrama, Larry </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lvalder>, Vandor, David </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dvandor>, Vargas, Hope </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Hvargas>, Walker, Chris </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Cwalker>, Wallumrod, Ellen </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Ewallumr>, Wang, Steve </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Swang3>, Warwick, Todd </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Twarwic>, Weatherstone, Mary </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mweathe>, Whiting, Greg </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Gwhitin>, Will, Lloyd </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lwill>, Williams, Jason R (Credit) </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jwilli10>, Williams, Ryan </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rwillia8>, Wolfe, Jason </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jwolfe>, Wolfe, Stephen </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Swolfe>, Yawapongsiri, Virawan </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Vyawapon>
+X-cc: 
+X-bcc: 
+X-Folder: \ExMerge - Gilbert-smith, Doug\Inbox
+X-Origin: GILBERTSMITH-D
+X-FileName: doug gilbert smith 6-25-02.PST
+
+Date: Thursday, February 7th , 2002
+
+Location:  
+
+Orientation will be split into two sessions and divided by alpha-order. Sessions will run 10am-12 pm and 2pm- 4 pm.
+
+We encourage all of you to attend your designated session as valuable information will be presented, and you will have the opportunity to get answers to your questions.
+
+You can speed things up tomorrow by filing in the attached forms - alternatively you can complete them there
+
+10am Session   Letters A- K
+
+2pm Session Letters L-Z
+
+
+
+    
+Please reply to this e-mail if you will be attending.
+
+Regards,
+Neil Davies

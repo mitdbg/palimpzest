@@ -1,0 +1,79 @@
+Message-ID: <21030745.1075861682622.JavaMail.evans@thyme>
+Date: Mon, 19 Nov 2001 06:10:42 -0800 (PST)
+From: jae.black@enron.com
+To: 
+	/o=enron/ou=na/cn=recipients/cn=notesaddr/cn=a478079f-55e1f3b0-862566fa-612229@enron.com, 
+	bill.abler@enron.com, anubhav.aggarwal@enron.com, 
+	diana.allen@enron.com, harry.arora@enron.com, debra.bailey@enron.com, 
+	russell.ballato@enron.com, ted.ballinger@enron.com, 
+	don.baughman@enron.com, d..baughman@enron.com, 
+	moises.benchluch@enron.com, hicham.benjelloun@enron.com, 
+	robert.benson@enron.com, corry.bentley@enron.com, 
+	jae.black@enron.com, jay.blaine@enron.com, laurel.bolt@enron.com, 
+	j..broderick@enron.com, richard.broussard@enron.com, 
+	lisa.burnett@enron.com, f..campbell@enron.com, joe.capasso@enron.com, 
+	mike.carson@enron.com, alan.chen@enron.com, hai.chen@enron.com, 
+	jason.choate@enron.com, kevin.cline@enron.com, 
+	terri.clynes@enron.com, dustin.collins@enron.com, 
+	keith.comeaux@enron.com, kayne.coulter@enron.com, 
+	dana.davis@enron.com, l..day@enron.com, clint.dean@enron.com, 
+	todd.decook@enron.com, gerald.emesih@enron.com, joe.errigo@enron.com, 
+	m..forney@enron.com, william.freije@enron.com, l..garcia@enron.com, 
+	gerald.gilbert@enron.com, doug.gilbert-smith@enron.com, 
+	gustavo.giron@enron.com, andrew.greer@enron.com, 
+	jaime.gualy@enron.com, claudia.guerra@enron.com, 
+	utku.gulmeden@enron.com, gautam.gupta@enron.com, amie.ha@enron.com, 
+	patrick.hanse@enron.com, rika.imai@enron.com, david.ingram@enron.com, 
+	daniel.jenkins@enron.com, jason.kaniss@enron.com, e..kelly@enron.com, 
+	jeff.king@enron.com, john.kinser@enron.com, 
+	carrie.larkworthy@enron.com, dean.laurent@enron.com, 
+	justin.laverell@enron.com, chris.lenartowicz@enron.com, 
+	matt.lorenz@enron.com, gretchen.lotz@enron.com, 
+	thomas.lowell@enron.com, iris.mack@enron.com, 
+	ashish.mahajan@enron.com, peter.makkai@enron.com, 
+	mauricio.marquez@enron.com, david.maskell@enron.com, 
+	tom.may@enron.com, alexander.mcelreath@enron.com, 
+	jeffrey.miller@enron.com, seung-taek.oh@enron.com, 
+	steve.olinde@enron.com, andy.pace@enron.com, juan.padron@enron.com, 
+	steve.pan@enron.com, willis.philip@enron.com, 
+	laura.podurgiel@enron.com, d..poppa@enron.com, m..presto@enron.com, 
+	punit.rawal@enron.com, andy.rodriquez@enron.com, 
+	benjamin.rogers@enron.com, bill.rust@enron.com, david.ryan@enron.com, 
+	eric.saibi@enron.com, paul.schiavone@enron.com, 
+	bryce.schneider@enron.com, michael.seely@enron.com, 
+	erik.serio@enron.com, lisa.shoemake@enron.com, 
+	robert.stalford@enron.com, joe.stepenovitch@enron.com, 
+	j..sturm@enron.com, john.suarez@enron.com, mark.symms@enron.com, 
+	ramanarao.tamma@enron.com, d..thomas@enron.com, 
+	reese.trejo@enron.com, maria.valdes@enron.com, 
+	clayton.vernon@enron.com, steve.wang@enron.com, 
+	ryan.williams@enron.com, cory.willis@enron.com, 
+	mike.zipperer@enron.com, lex.carroll@enron.com, 
+	oscar.dalton@enron.com, david.forster@enron.com, 
+	beau.ratliff@enron.com, larry.valderrama@enron.com
+Subject: FW: Conference Rooms
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+X-From: Black, Tamara Jae </O=ENRON/OU=NA/CN=RECIPIENTS/CN=TBLACK>
+X-To: /o=ENRON/ou=NA/cn=Recipients/cn=notesaddr/cn=a478079f-55e1f3b0-862566fa-612229 </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=a478079f-55e1f3b0-862566fa-612229>, Abler, Bill </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Wabler>, Aggarwal, Anubhav </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Aaggarwa>, Allen, Diana </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dallen3>, Arora, Harry </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Harora>, Bailey, Debra </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dbailey2>, Ballato, Russell </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rballato>, Ballinger, Ted </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Tballing>, Baughman Jr., Don </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dbaughm>, Baughman, Edward D. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Ebaughm>, Benchluch, Moises </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Sbenchlu>, Benjelloun, Hicham </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Hbenjell>, Benson, Robert </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rbenson>, Bentley, Corry </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Cbentle>, Black, Tamara Jae </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Tblack>, Blaine, Jay </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jblaine>, Bolt, Laurel </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lbolt>, Broderick, Paul J. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Pbroder>, Broussard, Richard </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rbroussa>, Burnett, Lisa </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lburnett>, Campbell, Larry F. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lcampbel>, Capasso, Joe </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jcapasso>, Carson, Mike </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mcarson2>, Chen, Alan </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Achen2>, Chen, Hai </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Hchen2>, Choate, Jason </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jchoate>, Cline, Kevin </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Kcline>, Clynes, Terri </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Tclynes>, Collins, Dustin </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dcollin>, Comeaux, Keith </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Kcomeaux>, Coulter, Kayne </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Kcoulte>, Davis, Mark Dana </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mdavis>, Day, Smith L. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Sday>, Dean, Clint </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Cdean>, Decook, Todd </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Tdecook>, Emesih, Gerald </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Gemesih>, Errigo, Joe </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jerrigo>, Forney, John M. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jforney>, Freije, William </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Wfreije>, Garcia, Miguel L. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mgarcia6>, Gilbert, Gerald </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Ggilbe1>, Gilbert-smith, Doug </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dsmith3>, Giron, Gustavo </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Ggiron>, Greer, Andrew </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Agreer>, Gualy, Jaime </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jgualy>, Guerra, Claudia </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Cguerra2>, Gulmeden, Utku </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Ugulmede>, Gupta, Gautam </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Ggupta>, Ha, Amie </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Aha>, Hanse, Patrick </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Phanse>, Imai, Rika </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rimai>, Ingram, David </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dingram>, Jenkins IV, Daniel </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Djenkin2>, Kaniss, Jason </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jkaniss>, Kelly, Mike E. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mkelly3>, King, Jeff </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jking6>, Kinser, John </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jkinser>, Larkworthy, Carrie </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Clarkwor>, Laurent, Dean </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mlauren>, Laverell, Justin </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jlavere>, Lenartowicz, Chris </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Clenart>, Lorenz, Matt </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mlorenz>, Lotz, Gretchen </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Glotz>, Lowell, Thomas </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Tlowell>, Mack, Iris </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Imack>, Mahajan, Ashish </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Amahajan>, Makkai, Peter </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Pmakkai>, Marquez, Mauricio </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mmarque2>, Maskell, David </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dmaskell>, May, Tom </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Tmay>, McElreath, Alexander </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Amcelrea>, Miller, Jeffrey </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jmiller>, Oh, Seung-Taek </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Soh2>, Olinde Jr., Steve </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Solinde>, Pace, Andy </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Apace>, Padron, Juan </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jpadron>, Pan, Steve </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Span2>, Philip, Willis </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Wphilip>, Podurgiel, Laura </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lpodurg2>, Poppa, John D. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jpoppa>, Presto, Kevin M. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Kpresto>, Rawal, Punit </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Prawal>, Rodriquez, Andy </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Arodriqu>, Rogers, Benjamin </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Brogers>, Rust, Bill </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Brust>, Ryan, David </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dryan>, Saibi, Eric </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Esaibi>, Schiavone, Paul </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Pschiavo>, Schneider, Bryce </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Bschneid>, Seely, Michael </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Charles_Seely>, Serio, Erik </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Eserio>, Shoemake, Lisa </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lshoema>, Stalford, Robert </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rstalfor>, Stepenovitch, Joe </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jstepeno>, Sturm, Fletcher J. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Fsturm>, Suarez, John </O=ENRON/OU=NA/CN=RECIPIENTS/CN=John_Suarez>, Symms, Mark </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Msymms>, Tamma, Ramanarao </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rtamma>, Thomas, Paul D. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Pthomas2>, Trejo, Reese </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mtrejo>, Valdes, Maria </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mvaldes>, Vernon, Clayton </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Cvernon>, Wang, Steve </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Swang3>, Williams, Ryan </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rwillia8>, Willis, Cory </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Cwillis>, Zipperer, Mike </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mzippere>, Carroll, Lex </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lcarroll>, Dalton III, Oscar </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Odalton>, Forster, David </O=ENRON/OU=NA/CN=RECIPIENTS/CN=DFORSTER>, Ratliff, Beau </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Bratliff>, Valderrama, Larry </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lvalder>
+X-cc: 
+X-bcc: 
+X-Folder: \JFORNEY (Non-Privileged)\Forney, John M.\Inbox
+X-Origin: Forney-J
+X-FileName: JFORNEY (Non-Privileged).pst
+
+
+
+ -----Original Message-----
+From: 	Imai, Rika  
+Sent:	Monday, November 19, 2001 8:05 AM
+To:	Black, Tamara Jae
+Subject:	FW: Conference Rooms
+
+T.J.,
+
+Can you please send out an e-mail to let all the traders, mid-market and origination know that there will be a 
+
+
+TRANSMISSION  PRESENTATION ON  Tuesday, November 20th from 3:30 to 5:30 in CONFERENCE ROOM  - ESC05990

@@ -1,0 +1,58 @@
+Message-ID: <26694222.1075863389303.JavaMail.evans@thyme>
+Date: Sun, 19 Aug 2001 19:10:09 -0700 (PDT)
+From: 40enron@enron.com
+Subject: New Dialing for Tie Lines
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+X-From: Robert Knight-@ENRON <IMCEANOTES-Robert+20Knight-+40ENRON@ENRON.com>
+X-To: All Enron Houston@ENRON <??SAll Enron Houston@ENRON>
+X-cc: 
+X-bcc: 
+X-Folder: \RBENSON (Non-Privileged)\Benson, Robert\Inbox
+X-Origin: Benson-R
+X-FileName: RBENSON (Non-Privileged).pst
+
+
+NEW DIALING INSTRUCTIONS
+ 
+To:          All Enron Houston Users
+ 
+Subject:   New Dialing Instructions
+ 
+Ref:   Tie Line Access Code Changes - Enron Houston Users
+ 
+Just a reminder, the access codes for remote locations were modified within the Enron Building phone system.  The modifications will affect users as follows:  
+                                
+1.        We have changed the first digit dialed when accessing the Tie Lines from 7 to 8.  This change will only affect Enron Building users.
+2.        The second and third digits of the London, Calgary, Omaha, and Portland tie lines have also changed.  This change will affect all users.  All other digits of existing dial strings will remain the same.  For your reference, a list of the new dial strings is identified in the table below.  
+ 
+REVISED DIAL STRINGS FOR ENRON TIE LINE NETWORK
+Users must dial 8 digits to call via Tie Lines
+ 
+
+
+Enron Location	Old String	New String	
+Beijing	7 810 XXXX	8 810 XXXX	
+Buenos Aires	7 900 XXXX	8 900 XXXX	
+Calgary	7 403 XXXX	8 283 XXXX	
+Caracas	7 58 XXXXX	8 58 XXXXX	
+Chicago	7 220 XXXX	8 220 XXXX	
+Dahbol India	7 812 XXXX	8 812 XXXX	
+Hinsdale	7 235 XXXX	8 235 XXXX	
+London	7 830 XXXXX	8 44 XXXXX	
+Monterey	7 152 2XXX	8 152 2XXX	
+New York	7 212 XXXX	8 212 XXXX	
+New York Metals	7 211 XXXX	8 211 XXXX	
+Omaha	7 87 XXXX	8 287 XXXX	
+Portland	7 834 XXXX	8 234 XXXX	
+Rio De Janiero	7 920 XXXX	8 920 XXXX	
+Sao Paulo	7 910 XXXX	8 910 XXXX	
+Sydney	7 800 XXXX	8 800 XXXX	
+Tokyo	7 860 XXXX	8 860 XXXX	
+Toronto	7 285 XXXX	8 285 XXXX	
+Washington DC (Future)	N/A	8 245 XXXX	
+
+
+ 
+* X represents an extension number

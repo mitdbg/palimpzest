@@ -1,0 +1,37 @@
+Message-ID: <26640378.1075861861301.JavaMail.evans@thyme>
+Date: Tue, 20 Nov 2001 10:58:35 -0800 (PST)
+From: maria.pavlou@enron.com
+To: lindy.donoho@enron.com, mary.darveaux@enron.com, kay.miller@enron.com
+Subject: RE: Capacity Posting Tariff Sheets
+Cc: tk.lohman@enron.com, steven.harris@enron.com, j..porter@enron.com
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+Bcc: tk.lohman@enron.com, steven.harris@enron.com, j..porter@enron.com
+X-From: Pavlou, Maria </O=ENRON/OU=NA/CN=RECIPIENTS/CN=MPAVLOU>
+X-To: Donoho, Lindy </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Ldonoho>, Darveaux, Mary </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mdarvea>, Miller, Mary Kay </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mkmiller>
+X-cc: Lohman, TK </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Tlohman>, Harris, Steven </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Sharris1>, Porter, Gregory J. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Gporter>
+X-bcc: 
+X-Folder: \LDONOHO (Non-Privileged)\Donoho, Lindy\Inbox
+X-Origin: Donoho-L
+X-FileName: LDONOHO (Non-Privileged).pst
+
+Thank you Lindy for taking a look at this and providing us with your feedback.  At this time, however, we plan to hold off on attaching the subject tariff sheets to our reply brief.  We probably will make a separate tariff filing down the road.  Maria
+
+ -----Original Message-----
+From: 	Donoho, Lindy  
+Sent:	Tuesday, November 20, 2001 12:55 PM
+To:	Darveaux, Mary; Pavlou, Maria; Miller, Mary Kay
+Cc:	Lohman, TK; Harris, Steven
+Subject:	Capacity Posting Tariff Sheets
+
+My other comments on the tariff sheets were as follows:
+
+Section 35.2
+	2nd paragraph, 3rd sentence.  Explanation of "incremental revenue".  When we talk about revenues which TW already receives from reservation charges being paid prior to the bid period.  What if we're taking bids on future capacity and we're trying to get revenue that is incremental to reservations charges we're not necessarily being paid yet?  The language is so specific.  Can we change the language to refer to revenues incremental to what TW already has contractually committed?
+
+	2nd paragraph, last sentence.  The phrase "guaranteed throughput volume service applies only in the case of a negotiated rate".  What does this mean?  TK & I were both a littles confused by this language.
+
+	4th paragraph, 4th sentence.  The phrase "the value of the index based rate bids will be calculated using the applicable published indices available on the bid deadline".  TK, is the phrase "published indices" generic enough or should we use something broader that might encompass basis quotes?  I realize it will probably have to be something that is published.
+
+

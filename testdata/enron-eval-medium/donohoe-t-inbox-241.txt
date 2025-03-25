@@ -1,0 +1,64 @@
+Message-ID: <10681814.1075859003606.JavaMail.evans@thyme>
+Date: Wed, 24 Oct 2001 06:30:00 -0700 (PDT)
+From: lisa.kinsey@enron.com
+To: tom.donohoe@enron.com, tammy.gilmore@enron.com
+Subject: FW: REGT Capacity Report October 24
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+X-From: Kinsey, Lisa </O=ENRON/OU=NA/CN=RECIPIENTS/CN=LKINSEY>
+X-To: Donohoe, Tom </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Tdonoho>, Gilmore, Tammy </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Tgilmore>
+X-cc: 
+X-bcc: 
+X-Folder: \TDONOHO (Non-Privileged)\Inbox
+X-Origin: Donohoe-T
+X-FileName: TDONOHO (Non-Privileged).pst
+
+
+
+-----Original Message-----
+From: jfogg@reliantenergy.com [mailto:jfogg@reliantenergy.com]
+Sent: Wednesday, October 24, 2001 8:20 AM
+Subject: REGT Capacity Report October 24
+
+
+For gas flow for Thursday October 25, REGT has the following IT capacity:
+
+CGT                                0
+Other Hub Delivery Points including TGT     10          Ruston Compressor
+work cuts back on IT
+Tetco Bald Knob                       75
+Texas Gas Helena                      75
+MRT Glendale                          30
+Other Line AC points                        30
+Williams Jane                         20
+Carthage Delivery                     15
+SBS injection space                   30           tomorrow in Dec out
+SBS withdrawal space                        50          available for
+withdrawal with Oct or longer payback
+Backhaul to west                      40
+
+Amber Station is flowing 323 Mdth east and Line 2 South is at 129 Mdth for
+today.  REGT has lifted its operational alert limiting West of Amber
+receipt capacity in order to give REGT some operational flexibility to
+better handle system upsets.  However, be aware that REGT is not offering
+any general interruptible transportation discounts from West of Amber to
+east delivery points.  All IT will be priced at max rate, unless of
+operational benefit to REGT.  REGT is still full along Line AD and is
+approaching full levels at its Oklahoma storage facilities.  REGT is also
+undergoing some work at its Ruston compressor station which affects storage
+ability and the ability  to transport additional IT into the PVH.
+
+Power plants burned at 140 Mdth/d and are nominated at similar levels for
+today.  Arkla is only burning around 170 Mdth/d but is expected to pick up
+with the cold front coming in over the service area tomorrow.
+
+Gas Prices     East  $2.78
+          West  $2.71
+
+REGT Fuel - currently 1.61% plus $0.0004/dth EPC - based on above
+= $0.04476/dth.  REGT fuel will drop to 1.31 % on November 1.  REGT will be
+posting available November Firm Transportation capacity sometime today.
+
+I am in the office today.  You can call me at 713-207-5183 or AOL IM me at
+JAFOGG for any rate quotes or questions.

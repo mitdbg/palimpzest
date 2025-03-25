@@ -1,24 +1,12 @@
 from __future__ import annotations
 
+import logging
 from abc import ABC, abstractmethod
-from copy import deepcopy
-from enum import Enum
 
 from palimpzest.policy import Policy
 from palimpzest.query.optimizer.plan import PhysicalPlan, SentinelPlan
 
-
-class OptimizationStrategyType(str, Enum):
-    """
-    OptimizationStrategyType determines which (set of) plan(s) the Optimizer
-    will return to the Execution layer.
-    """
-    GREEDY = "greedy"
-    CONFIDENCE_INTERVAL = "confidence-interval"
-    PARETO = "pareto" 
-    SENTINEL = "sentinel"
-    NONE = "none"
-    AUTO = "auto"
+logger = logging.getLogger(__name__)
 
 
 class OptimizationStrategy(ABC):
@@ -26,11 +14,6 @@ class OptimizationStrategy(ABC):
     def get_optimal_plans(self, groups: dict, final_group_id: int, policy: Policy, use_final_op_quality: bool) -> list[PhysicalPlan] | list[SentinelPlan]:
         """Strategy decides how to search through the groups for optimal plan(s)"""
         pass
-
-    @classmethod
-    def get_strategy(cls, strategy_type: str) -> OptimizationStrategy:
-        """Factory method to create strategy instances"""
-        return OptimizerStrategyRegistry.get_strategy(strategy_type)
 
     def normalize_final_plans(self, plans: list[PhysicalPlan]) -> list[PhysicalPlan]:
         """
@@ -47,7 +30,7 @@ class OptimizationStrategy(ABC):
         for plan in plans:
             normalized_ops = []
             for idx, op in enumerate(plan.operators):
-                op_copy = deepcopy(op)
+                op_copy = op.copy()
                 if idx == 0:
                     normalized_ops.append(op_copy)
                 else:
@@ -79,7 +62,12 @@ class GreedyStrategy(OptimizationStrategy):
         return PhysicalPlan.from_ops_and_sub_plan([best_phys_expr.operator], input_best_phys_plan, best_phys_expr.plan_cost)
 
     def get_optimal_plans(self, groups: dict, final_group_id: int, policy: Policy, use_final_op_quality: bool) -> list[PhysicalPlan]:
-        return [self._get_greedy_physical_plan(groups, final_group_id)]
+        logger.info(f"Getting greedy optimal plans for final group id: {final_group_id}")
+        plans = [self._get_greedy_physical_plan(groups, final_group_id)]
+        logger.info(f"Greedy optimal plans: {plans}")
+        logger.info(f"Done getting greedy optimal plans for final group id: {final_group_id}")
+
+        return plans
 
 
 class ParetoStrategy(OptimizationStrategy):
@@ -127,8 +115,9 @@ class ParetoStrategy(OptimizationStrategy):
                             pareto_optimal_plans.append(plan)
 
         return pareto_optimal_plans
-    
+
     def get_optimal_plans(self, groups: dict, final_group_id: int, policy: Policy, use_final_op_quality: bool) -> list[PhysicalPlan]:
+        logger.info(f"Getting pareto optimal plans for final group id: {final_group_id}")
         # compute all of the pareto optimal physical plans
         plans = self._get_candidate_pareto_physical_plans(groups, final_group_id, policy)
 
@@ -138,7 +127,6 @@ class ParetoStrategy(OptimizationStrategy):
                 plan.plan_cost.quality = plan.plan_cost.op_estimates.quality
 
         # filter pareto optimal plans for ones which satisfy policy constraint (if at least one of them does)
-        # import pdb; pdb.set_trace()
         if any([policy.constraint(plan.plan_cost) for plan in plans]):
             plans = [plan for plan in plans if policy.constraint(plan.plan_cost)]
 
@@ -148,6 +136,8 @@ class ParetoStrategy(OptimizationStrategy):
             optimal_plan = optimal_plan if policy.choose(optimal_plan.plan_cost, plan.plan_cost) else plan
 
         plans = [optimal_plan]
+        logger.info(f"Pareto optimal plans: {plans}")
+        logger.info(f"Done getting pareto optimal plans for final group id: {final_group_id}")
         return plans
     
 
@@ -177,7 +167,11 @@ class SentinelStrategy(OptimizationStrategy):
         return SentinelPlan.from_ops_and_sub_plan([phys_op_set], best_phys_subplan)
 
     def get_optimal_plans(self, groups: dict, final_group_id: int, policy: Policy, use_final_op_quality: bool) -> list[SentinelPlan]:
-        return [self._get_sentinel_plan(groups, final_group_id)]
+        logger.info(f"Getting sentinel optimal plans for final group id: {final_group_id}")
+        plans = [self._get_sentinel_plan(groups, final_group_id)]
+        logger.info(f"Sentinel optimal plans: {plans}")
+        logger.info(f"Done getting sentinel optimal plans for final group id: {final_group_id}")
+        return plans
 
 
 class NoOptimizationStrategy(GreedyStrategy):
@@ -186,76 +180,3 @@ class NoOptimizationStrategy(GreedyStrategy):
     logical transformations or optimizations. It uses the same get_optimal_plans logic as the
     GreedyOptimizationStrategy.
     """
-
-
-class ConfidenceIntervalStrategy(OptimizationStrategy):
-    def _get_confidence_interval_optimal_plans(self, groups: dict, group_id: int) -> list[PhysicalPlan]:
-        """
-        Return all physical plans whose upper bound on the primary policy metric is greater than the
-        best plan's lower bound on the primary policy metric (subject to satisfying the policy constraint).
-
-        The OptimizePhysicalExpression task guarantees that each group's `ci_best_physical_expressions`
-        maintains a list of expressions with overlapping CI's on the primary policy metric (while also
-        satisfying the policy constraint).
-
-        This function computes the cross-product of all such expressions across all groups.
-        """
-        # get all the physical expressions which could be the best for this group
-        best_phys_exprs = groups[group_id].ci_best_physical_expressions
-
-        best_plans = []
-        for phys_expr in best_phys_exprs:
-            # if this expression has no inputs (i.e. it is a BaseScan or CacheScan),
-            # create the physical plan and append it to the best_plans for this group
-            if len(phys_expr.input_group_ids) == 0:
-                plan = PhysicalPlan(operators=[phys_expr.operator], plan_cost=phys_expr.plan_cost)
-                best_plans.append(plan)
-
-            # otherwise, get the best physical plan(s) for this group's inputs
-            else:
-                # TODO: need to handle joins
-                best_phys_subplans = [PhysicalPlan(operators=[])]
-                for input_group_id in phys_expr.input_group_ids:
-                    input_best_phys_plans = self._get_confidence_interval_optimal_plans(groups, input_group_id)
-                    best_phys_subplans = [
-                        PhysicalPlan.from_ops_and_sub_plan(subplan.operators, input_subplan, subplan.plan_cost)
-                        for subplan in best_phys_subplans
-                        for input_subplan in input_best_phys_plans
-                    ]
-
-                # add this operator to best physical plan and return
-                for subplan in best_phys_subplans:
-                    plan = PhysicalPlan.from_ops_and_sub_plan([phys_expr.operator], subplan, phys_expr.plan_cost)
-                    best_plans.append(plan)
-
-        return best_plans
-
-    def get_optimal_plans(self, groups: dict, final_group_id: int, policy: Policy, use_final_op_quality: bool) -> list[PhysicalPlan]:
-        # TODO: fix this to properly handle multiple potential plans
-        raise Exception("NotImplementedError")
-        # plans = self._get_confidence_interval_optimal_plans(final_group_id)
-
-class AutoOptimizationStrategy(OptimizationStrategy):
-    def get_optimal_plans(self, groups: dict, final_group_id: int, policy: Policy, use_final_op_quality: bool) -> list[PhysicalPlan]:
-        raise NotImplementedError("Auto optimization strategy not implemented")
-
-
-class OptimizerStrategyRegistry:
-    """Registry to map strategy types to their implementations"""
-
-    _strategies: dict[str, type[OptimizationStrategy]] = {
-        OptimizationStrategyType.GREEDY.value: GreedyStrategy,
-        OptimizationStrategyType.CONFIDENCE_INTERVAL.value: ConfidenceIntervalStrategy,
-        OptimizationStrategyType.PARETO.value: ParetoStrategy,
-        OptimizationStrategyType.SENTINEL.value: SentinelStrategy,
-        OptimizationStrategyType.NONE.value: NoOptimizationStrategy,
-        OptimizationStrategyType.AUTO.value: AutoOptimizationStrategy,
-    }
-
-    @classmethod
-    def get_strategy(cls, strategy_type: str) -> OptimizationStrategy:
-        """Get strategy instance by type"""
-        strategy_class = cls._strategies.get(strategy_type)
-        if not strategy_class:
-            raise ValueError(f"Unknown optimization strategy: {strategy_type}")
-        return strategy_class()

@@ -7,6 +7,9 @@ docs/build/*
 docs/source/generated/*
 dist/*
 .vscode/*
+.chroma
+.chroma-biodex
+.chroma-mmqa
 .ragatouille
 plots/
 paper-imgs/
@@ -48,3 +51,5 @@ src/palimpzest/agents/
 .venv
 .zed
 pyrightconfig.json
+
+myenv/

@@ -1,0 +1,56 @@
+Message-ID: <21724914.1075852729045.JavaMail.evans@thyme>
+Date: Fri, 26 Oct 2001 07:30:17 -0700 (PDT)
+From: michael.gapinski@ubspainewebber.com
+To: gapinski@enron.com, michael.gapinski@ubspainewebber.com
+Subject: Email Problems
+Cc: parker@enron.com, jeff.parker@ubspainewebber.com, lynn@enron.com, 
+	james.lynn@ubspainewebber.com, herrera@enron.com, 
+	rafael.herrera@painewebber.com
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+Bcc: parker@enron.com, jeff.parker@ubspainewebber.com, lynn@enron.com, 
+	james.lynn@ubspainewebber.com, herrera@enron.com, 
+	rafael.herrera@painewebber.com
+X-From: "Gapinski, Michael" <michael.gapinski@ubspainewebber.com>@ENRON
+X-To: Gapinski, Michael <michael.gapinski@ubspainewebber.com>
+X-cc: Parker, Jeff A. <jeff.parker@ubspainewebber.com>, Lynn, James <james.lynn@ubspainewebber.com>, Herrera, Rafael J. <rafael.herrera@painewebber.com>
+X-bcc: 
+X-Folder: \JARNOLD (Non-Privileged)\Arnold, John\Inbox
+X-Origin: Arnold-J
+X-FileName: JARNOLD (Non-Privileged).pst
+
+My email system has recently developed a glitch.  It has come to my
+attention that some emails have been sent to me, but I never received them.
+When this happens, the system does not return a 'mail not delivered' message
+to the sender.  If you have sent an email to me in the last couple weeks
+expecting a response, but did not hear back from me or my office, please
+call us.  I apologize for any misunderstanding or inconvenience.  Of course,
+issues requiring a timely response are always best handled over the phone,
+and until my email system is fixed it is best to either call me or email
+Rafael (rafael.herrera@ubspainewebber.com).  Thank you for your
+understanding.
+
+> Michael Gapinski
+> Account Vice President
+> UBS PaineWebber, Inc.
+> Corporate Employee Financial Services
+> 713-654-0365
+> 800-553-3119 x365
+> Fax: 713-427-7539
+> Cell: 281-435-0295
+michael.gapinski@ubspainewebber.com
+
+******************************************************
+Notice Regarding Entry of Orders and Instructions:
+Please do not transmit orders and/or instructions
+regarding your UBSPaineWebber account(s) by e-mail.
+Orders and/or instructions transmitted by e-mail will
+not be accepted by UBSPaineWebber and UBSPaineWebber
+will not be responsible for carrying out such orders
+and/or instructions.
+
+Notice Regarding Privacy and Confidentiality:
+UBSPaineWebber reserves the right to monitor and
+review the content of all e-mail communications sent
+and/or received by its employees.

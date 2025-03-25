@@ -1,0 +1,19 @@
+Message-ID: <11879326.1075853095405.JavaMail.evans@thyme>
+Date: Thu, 18 Oct 2001 10:07:10 -0700 (PDT)
+From: martin.cuilla@enron.com
+To: martin.cuilla@enron.com
+Subject: 
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+X-From: Cuilla, Martin </O=ENRON/OU=NA/CN=RECIPIENTS/CN=MCUILLA>
+X-To: Cuilla, Martin </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mcuilla>
+X-cc: 
+X-bcc: 
+X-Folder: \MCUILLA (Non-Privileged)\Cuilla, Martin\Inbox
+X-Origin: Cuilla-M
+X-FileName: MCUILLA (Non-Privileged).pst
+
+MC    McNair                1    
+MC    Donald Hayes      1
+ 

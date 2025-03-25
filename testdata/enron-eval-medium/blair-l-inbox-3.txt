@@ -1,0 +1,37 @@
+Message-ID: <5117440.1075853079863.JavaMail.evans@thyme>
+Date: Thu, 20 Sep 2001 12:24:53 -0700 (PDT)
+From: michael.bodnar@enron.com
+To: lynn.blair@enron.com, sue.neville@enron.com, steven.january@enron.com, 
+	john.buchanan@enron.com, gerry.medeles@enron.com, 
+	terry.kowalke@enron.com, gary.spraggins@enron.com, 
+	bradley.holmes@enron.com, joe.hoang@enron.com, larry.swett@enron.com, 
+	steve.thomas@enron.com, kent.miller@enron.com, kay.threet@enron.com, 
+	reyna.cabrera@enron.com, theresa.branney@enron.com, 
+	preston.roobaert@enron.com
+Subject: Results of Meeting on Storage Allocation Changes
+Cc: doug.aschwege@enron.com, l..johnson@enron.com, jill.setera@enron.com
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+Bcc: doug.aschwege@enron.com, l..johnson@enron.com, jill.setera@enron.com
+X-From: Bodnar, Michael </O=ENRON/OU=NA/CN=RECIPIENTS/CN=MBODNAR>
+X-To: Blair, Lynn </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lblair>, Neville, Sue </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Snevill1>, January, Steven </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Sjanuary>, Buchanan, John </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jbuchan2>, Medeles, Gerry </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Gmedele>, Kowalke, Terry </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Tkowalk>, Spraggins, Gary </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Gspragg>, Holmes, Bradley </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Bholmes>, Hoang, Joe </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jhoang>, Swett, Larry </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lswett>, Thomas, Steve </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Sthomas1>, Miller, Kent </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Kmiller2>, Threet, Kay </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Kthreet>, Cabrera, Reyna </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rcabrer>, Branney, Theresa </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Tbranne>, Roobaert, Preston </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Proobaer>
+X-cc: Aschwege, Doug </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Daschwe>, Johnson, Robert L. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rjohnso3>, Setera, Jill </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jsetera>
+X-bcc: 
+X-Folder: \LBLAIR (Non-Privileged)\Blair, Lynn\Inbox
+X-Origin: Blair-L
+X-FileName: LBLAIR (Non-Privileged).pst
+
+The following summarizes the results of our meeting......If you want to discuss further, please call me.
+
+Break Field Area in 3 Regions / Allocate by point
+The decision was made to sub-divide the Field Area storage group into two regions; South of Plainview and North of Plainview, rather than 3 regions or allocating by point. If it is determined that additional divisions are necessary in the future, such changes can be made at that time. Changes  to CAS are required. I have discussed the changes with Bob Johnson and Doug Aschwege and have learned that the changes are not difficult to make and could be made in a couple days. 
+Gary Spraggins and I will determine which deferred delivery points are in these new field regions and then provide the information to Bob and Doug. 
+ 
+Question:  Should this change be implemented immediately or should it wait until the beginning of the withdrawal season?
+ 
+Change from 'net zero' approach / Provide minimum level of activity
+The decision was made to table this concern for now. The scheduled activity that drives the allocation process does not guarantee physical pipeline operations. In most cases, the flexibility provided by the Cunningham Field allows Gas Control to adjust operations to maintain the required minimum level of injections/withdrawals into Redfield and Lyons. Further analysis is required. Steve Thomas, Larry Swett and I will continue to monitor the system conditions/operations that effect physical storage to determine if and what additional changes maybe warranted. 
+
+Send "Notice" when final scheduled number exceeds operational capacity
+The IT group will modify the scheduling cycle to add a procedure where the final net scheduled storage quantity is compared to the operational capacity set for storage. If the final scheduled quantity exceeds operational capacity, I will receive a notification via e-mail. The purpose here is to monitor occurrences to determine the magnitude of the problem. I will get with Gerry Medeles to finalize the matter.

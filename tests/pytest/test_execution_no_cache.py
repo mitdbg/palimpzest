@@ -1,26 +1,23 @@
-import time
-
 import pytest
 
 from palimpzest.policy import MaxQuality
+from palimpzest.query.execution.parallel_execution_strategy import (
+    ParallelExecutionStrategy,
+)
+from palimpzest.query.execution.single_threaded_execution_strategy import SequentialSingleThreadExecutionStrategy
 from palimpzest.query.operators.code_synthesis_convert import CodeSynthesisConvert
 from palimpzest.query.operators.convert import LLMConvertBonded
 from palimpzest.query.operators.filter import LLMFilter
 from palimpzest.query.operators.rag_convert import RAGConvert
-from palimpzest.query.optimizer.cost_model import CostModel
-from palimpzest.query.optimizer.optimizer import Optimizer
 from palimpzest.query.processor.config import QueryProcessorConfig
-from palimpzest.query.processor.nosentinel_processor import (
-    NoSentinelPipelinedParallelProcessor,
-    NoSentinelSequentialSingleThreadProcessor,
-)
+from palimpzest.query.processor.query_processor_factory import QueryProcessorFactory
 
 
 @pytest.mark.parametrize(
-    argnames=("query_processor",),
+    argnames=("execution_strategy",),
     argvalues=[
-        pytest.param(NoSentinelSequentialSingleThreadProcessor, id="seq-single-thread"),
-        pytest.param(NoSentinelPipelinedParallelProcessor, id="parallel"),
+        pytest.param(SequentialSingleThreadExecutionStrategy, id="seq-single-thread"),
+        pytest.param(ParallelExecutionStrategy, id="parallel"),
     ]
 )
 class TestParallelExecutionNoCache:
@@ -72,19 +69,14 @@ class TestParallelExecutionNoCache:
         ],
         indirect=True,
     )
-    def test_execute_full_plan(self, mocker, query_processor, datareader, physical_plan, expected_records, side_effect):
+    def test_execute_full_plan(self, mocker, execution_strategy, datareader, physical_plan, expected_records, side_effect):
         """
         This test executes the given
         """
-        start_time = time.time()
-
         # NOTE: supplying datareader in place of dataset is a bit of a band-aid but it works
         # create processor
-        processor = query_processor(
-            dataset=datareader,
-            config=QueryProcessorConfig(),
-            optimizer=Optimizer(policy=MaxQuality(), cost_model=CostModel()),
-        )
+        config = QueryProcessorConfig(processing_strategy="no_sentinel", policy=MaxQuality())
+        processor = QueryProcessorFactory.create_processor(datareader, config)
 
         # mock out calls to generators used by the plans which parameterize this test
         mocker.patch.object(LLMFilter, "filter", side_effect=side_effect)
@@ -93,8 +85,7 @@ class TestParallelExecutionNoCache:
         mocker.patch.object(RAGConvert, "convert", side_effect=side_effect)
 
         # execute the plan
-        output_records, plan_stats = processor.execute_plan(physical_plan)
-        plan_stats.finalize(time.time() - start_time)        
+        output_records, plan_stats = processor.execution_strategy.execute_plan(physical_plan)     
 
         # check that we get the expected set of output records
         def get_id(record):

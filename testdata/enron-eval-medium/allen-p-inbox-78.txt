@@ -1,0 +1,102 @@
+Message-ID: <26175277.1075863149462.JavaMail.evans@thyme>
+Date: Fri, 16 Nov 2001 10:07:13 -0800 (PST)
+From: greg.whalley@enron.com
+To: k..allen@enron.com
+Subject: RE:
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: quoted-printable
+X-From: Whalley, Greg </O=ENRON/OU=NA/CN=RECIPIENTS/CN=GWHALLE>
+X-To: Allen, Phillip K. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Pallen>
+X-cc: 
+X-bcc: 
+X-Folder: \PALLEN (Non-Privileged)\Allen, Phillip K.\Inbox
+X-Origin: Allen-P
+X-FileName: PALLEN (Non-Privileged).pst
+
+Wow!  this looks complicated.  let me get some help on this and get back to=
+ you
+
+
+
+ -----Original Message-----
+From: =09Allen, Phillip K. =20
+Sent:=09Friday, November 16, 2001 8:38 AM
+To:=09Whalley, Greg; Lavorato, John
+Subject:=09FW:=20
+
+
+Greg,
+
+After making an election in October to receive a full distribution of my de=
+ferral account under Section 6.3 of the plan, a disagreement has arisen reg=
+arding the Phantom Stock Account. =20
+
+Section 6.3 states that a participant may elect to receive a single sum dis=
+tribution of all of the participant's deferral accounts subject to a 10% pe=
+nalty.  This provision is stated to be notwithstanding any other provision =
+of the plan.  It also states that the account balance shall be determined a=
+s of the last day of the month preceding the date on which the committee re=
+ceives the written request of the participant.  In my case this would be as=
+ of September 30th.  I read this paragraph to indicate a cash payout of 90%=
+ of the value of all deferrals as on September 30, 2001.  The plan administ=
+rators, however, interpret this paragraph differently.  Their reading yield=
+s a cash payout of 90% of the value for deferrals other than the Phantom St=
+ock Account, which they believe should be paid with 90% of  Enron Corp. sha=
+res in the account as of September 30, 2001.  Their justification is that i=
+n several places throughout the plan document and brochures it is stated th=
+at the distributions of the Phantom Stock Account shall be made in shares o=
+f Enron Corp. common stock.
+
+There are two reason that I do not agree with their interpretation.  First,=
+  section 6.3 begins with "notwithstanding any other provision of the Plan.=
+"  This indicates that any other payout methodologies described in other se=
+ctions of the plan which deal with normal distribution at termination do no=
+t apply.  Second, the language in section 6.3 stating "a single sum distrib=
+ution of all of the Participant's deferral accounts" indicates that one pay=
+ment will be made not a cash payment separate from a share distribution.
+
+The interpretation of the administrators goes beyond section 6.3.  If that =
+is the case then section 7.1 should apply.  This section does provide for t=
+he Phantom Stock Account to be paid in shares.  However, it states "The val=
+ue of the shares, and resulting payment amount, will be based on the closin=
+g price of Enron Corp. common stock on the January 1 before the date of pay=
+ment, and such payment shall be made in shares of Enron Corp common stock".=
+  This would result in approximately 8.3 shares to be distributed for every=
+ share in the account on January 1, 2001.  Although this would be the most =
+beneficial to the participants due to the decline of the value of Enron Cor=
+p. common stock from $83 to $10 per share,  this methodology goes beyond se=
+ction 6.3.
+
+The calculations below illustrate the difference in the value and method of=
+ distribution under each of the three interpretations:
+
+
+
+
+Section 6.3=09=09Plan Administrators=09=09Section 7.1
+
+Number of shares=09=096,600=09shares=09=096,600=09shares=09=09=096,600 shar=
+es
+Relative share price=09=09$27.23=09=09=09=09=09=09=09$83.13
+Phantom Stock Value=09=09$179,718=09=09=09=09=09=09$548,658
+10% Penalty=09=09=09-17,972=09=09=09 -600=09=09=09=09-54,866
+Value to be distributed=09=09$161,746=09=096,000 shares=09=09=09$493,792
+Current stock price=09=09=09=09=09=09=09=09=09$10
+Distribution=09=09=09$161,746=09=096,000 shares=09=09=0949,379 shares
+
+I believe my interpretation under section 6.3 is correct and fair.  If the =
+administrators insist on distributing shares instead of cash then section 7=
+.1 should apply.  The current interpretation of the plan administrators is =
+a hybrid between the two sections resulting in the lowest possible payout. =
+ =20
+
+In addition to myself, Tom Martin, Scott Neal, and Don Black are facing the=
+ same issue.  I would appreciate your review and consideration of this matt=
+er.
+
+Sincerely,
+
+
+Phillip Allen   =20
+=09=09=09=09=09=09=09=09=09=09

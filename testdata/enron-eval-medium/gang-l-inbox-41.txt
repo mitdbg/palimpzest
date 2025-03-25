@@ -1,0 +1,59 @@
+Message-ID: <15290601.1075840484956.JavaMail.evans@thyme>
+Date: Mon, 3 Jun 2002 15:04:35 -0700 (PDT)
+From: steven.luong@enron.com
+To: lisa.gang@enron.com
+Subject: RE: MID C Question
+Cc: doug.sewell@enron.com
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+Bcc: doug.sewell@enron.com
+X-From: Luong, Steven </O=ENRON/OU=NA/CN=RECIPIENTS/CN=SLUONG3>
+X-To: Gang, Lisa </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lgang>
+X-cc: Sewell, Doug </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dsewell>
+X-bcc: 
+X-Folder: \ExMerge - Gang, Lisa\Inbox
+X-Origin: GANG-L
+X-FileName: lisa gang 6-25-02.pst
+
+Thanks Lisa.  Is the $2 a fixed rate for every month or does it vary.  Also, do we buy that daily, monthly, or longer term than that?  Are there ever any problems with availability of the transmission (history of curtailments)?  Finally, what do we do with the extra power on the days Air Products doesn't take it (I think I remember the deal being for every day but Tuesdays and Wed or something strange like that)?  I know that is a lot of questions... Thanks for your help.
+
+Steve
+
+ -----Original Message-----
+From: 	Sewell, Doug  
+Sent:	Monday, June 03, 2002 4:52 PM
+To:	Luong, Steven
+Subject:	FW: MID C Question
+
+here you go
+ -----Original Message-----
+From: 	Gang, Lisa  
+Sent:	Monday, June 03, 2002 4:37 PM
+To:	Sewell, Doug
+Subject:	FW: MID C Question
+
+
+I purchase Snohomish Transmission to deliver power from MID C to Montana sys. The Transmission cost is $2.00 per mw. This cost is added in addition to the power price at MID C. The Air Products deal is at MID C.  We fill this position by purchasing at MID C.  I hope this helps. 
+
+
+Lisa     
+ -----Original Message-----
+From: 	Luong, Steven  
+Sent:	Monday, June 03, 2002 12:16 PM
+To:	Gang, Lisa
+Cc:	Irani, Eric
+Subject:	MID C Question
+
+Hi Lisa,
+
+I am working on a Hedging Activity Report that will be sent to E&Y on a weekly basis.  I think Mo is out of the office so I heard that you might be the right person to ask for help.  For the first week, I am using a spreadsheet that Mo sent where he bought some July power at MID C.  It looks like the MID C power along with our NW Del length makes us flat for July at MID C and Montana System Border as well.  My questions are:
+
+How does power flow between MID C and the other delivery points (like Montana)?
+Do we incur a transmission cost on top of what he bought the power for?
+We are actually a little long (960 MWh) b/c of the Air Products deal that is a little unique ... what happens to this length?
+
+If it's easier to explain over the phone, please give me a call at 713-853-4748.  Thanks for your help.
+
+Steve 
+     

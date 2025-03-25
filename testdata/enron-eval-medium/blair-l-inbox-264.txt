@@ -1,0 +1,19 @@
+Message-ID: <6749353.1075861908432.JavaMail.evans@thyme>
+Date: Thu, 15 Nov 2001 14:26:58 -0800 (PST)
+From: sheila.nacey@enron.com
+To: shelley.corman@enron.com, lynn.blair@enron.com
+Subject: Weekend duty
+Cc: fran.fagan@enron.com
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+Bcc: fran.fagan@enron.com
+X-From: Nacey, Sheila </O=ENRON/OU=NA/CN=RECIPIENTS/CN=SNACEY>
+X-To: Corman, Shelley </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Scorman>, Blair, Lynn </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lblair>
+X-cc: Fagan, Fran </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Ffagan>
+X-bcc: 
+X-Folder: \LBLAIR (Non-Privileged)\Blair, Lynn\Inbox
+X-Origin: Blair-L
+X-FileName: LBLAIR (Non-Privileged).pst
+
+Shelley & Lynn,   Fran has advised me there are no legal problems with schedulers working a weekend shift from 7 am to 10 pm for one weekend day, the other scheduler will take the other day.  Each will be given a two days of comp time as they are today for their two 8 hour shifts. Fran does have a concern of fatigue in the later hours, just a we do.  There are only two team members that are interested in this schedule, so we'll give it a try and let you know how it goes.  Sheila

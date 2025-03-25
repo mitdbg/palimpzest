@@ -1,0 +1,20 @@
+Message-ID: <15129118.1075840358928.JavaMail.evans@thyme>
+Date: Mon, 7 Jan 2002 07:52:39 -0800 (PST)
+From: kerry.roper@enron.com
+To: kevin.may@enron.com
+Subject: Cash Payments For Tomorrow
+Cc: s..galvan@enron.com, greg.piper@enron.com, sally.beck@enron.com
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+Bcc: s..galvan@enron.com, greg.piper@enron.com, sally.beck@enron.com
+X-From: Roper, Kerry </O=ENRON/OU=NA/CN=RECIPIENTS/CN=KROPER>
+X-To: May, Kevin </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Kmay>
+X-cc: Galvan, Michael S. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mgalvan>, Piper, Greg </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Gpiper>, Beck, Sally </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Sbeck>
+X-bcc: 
+X-Folder: \sbeck\Inbox
+X-Origin: BECK-S
+X-FileName: sally beck 1-28-02.pst
+
+Assuming today's payments get processed, the attached are payments for tomorrow.
+ 

@@ -1,0 +1,41 @@
+Message-ID: <19594411.1075854469329.JavaMail.evans@thyme>
+Date: Wed, 20 Sep 2000 02:29:00 -0700 (PDT)
+From: david.delainey@enron.com
+To: joseph.deffner@enron.com, david.gorte@enron.com, ozzie.pagan@enron.com
+Subject: AIG Fund
+Cc: andrew.fastow@enron.com, rick.buy@enron.com, larry.izzo@enron.com
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+Bcc: andrew.fastow@enron.com, rick.buy@enron.com, larry.izzo@enron.com
+X-From: David W Delainey
+X-To: Joseph Deffner, David Gorte, Ozzie Pagan
+X-cc: Andrew S Fastow, Rick Buy, Larry L Izzo
+X-bcc: 
+X-Folder: \David_Delainey_Dec2000\Notes Folders\Sent
+X-Origin: Delainey-D
+X-FileName: ddelain.nsf
+
+Guys, I would like to add the following commentary to the DASH which will 
+better reflect my thinking around this investment.  The current text suggests 
+that there is significant strategic advantage for ENA to be a participant in 
+the fund.  I do not think that is the case; however, I do see some merits in 
+the investment based on the needs of Enron's Global Finance group.  I would 
+suggest toning down the strategic advantages and add the following:
+
+ It is unlikely that given the funds target returns that the it will be an 
+effective permanent monetization vehicle for ENA's strategic and merchant   
+investments; however, Enron Global Finance believes that the investment is 
+important for the following reasons:
+  a) provides an additional "Friend of Enron" to facilitate short to medium 
+term balance sheet and regulatory solution to highly structured    commodity 
+and capital transactions in the wholesale group;
+  b) provides alternative sources of short term capital liquidity and
+  c) by further developing the relationship with AIG provides collateral 
+benefits for Enron's overall Global Finance capability and business.
+
+ENA would have a requirement that this investments be hedged through Raptor 
+and be managed by the Enron Global Finance Group.
+
+Regards
+Delainey

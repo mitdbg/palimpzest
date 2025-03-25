@@ -1,0 +1,136 @@
+Message-ID: <176751.1075861100942.JavaMail.evans@thyme>
+Date: Fri, 22 Feb 2002 10:52:24 -0800 (PST)
+From: steve.klimesh@enron.com
+To: steve.klimesh@enron.com, amelia.alder@enron.com, e..anderson@enron.com, 
+	team.andrews@enron.com, team.artesia@enron.com, ben.asante@enron.com, 
+	arnie.bailey@enron.com, robert.baker@enron.com, bob.bandel@enron.com, 
+	larry.bertholf@enron.com, team.big-lake@enron.com, 
+	lynn.blair@enron.com, ronnie.brickman@enron.com, 
+	john.buchanan@enron.com, team.carlsbad@enron.com, 
+	scott.clark@enron.com, lawrence.clayton@enron.com, 
+	steve.comstock@enron.com, shelley.corman@enron.com, 
+	willie.cowart@enron.com, larry.craddock@enron.com, 
+	david.daigle@enron.com, mary'.'darveaux@enron.com, 
+	laverne.dietz@enron.com, rick.dietz@enron.com, 
+	vern.dittberner@enron.com, donald.doerr@enron.com, 
+	ken.eble@enron.com, bill.egger@enron.com, team.eunice@enron.com, 
+	dan.fancler@enron.com, team.flagstaff@enron.com, 
+	jodie.floyd@enron.com, bill.foresman@enron.com, 
+	lawrence.foutz@enron.com, david.gaines@enron.com, 
+	melinda.gallishaw@enron.com, team.gallup@enron.com, 
+	dana.gibbs@enron.com, tom.gilbert@enron.com, ray.gokey@enron.com, 
+	rockie.gottsponer@enron.com, charlie.graham@enron.com, 
+	lynn.greenlee@enron.com, jeff.greider@enron.com, 
+	dean.hallowell@enron.com, don.hawkins@enron.com, 
+	jackie.hewett@enron.com, randy.howard@enron.com, 
+	steve.january@enron.com, team.kermit@enron.com, 
+	tim'.'kissner@enron.com, george.kneisley@enron.com, 
+	terry.kowalke@enron.com, judy.kudym@enron.com, 
+	bobbie.lachapelle@enron.com, kim.ladish@enron.com, 
+	team.laguna@enron.com, doug.larson@enron.com, randy.lebeau@enron.com, 
+	joy.lewis@enron.com, rick.loveless@enron.com, 
+	sigrid.macpherson@enron.com, terry.maier@enron.com, 
+	greg.mall@enron.com, rr.mcgillivray@enron.com, 
+	verlene.metzler@enron.com, dave.miller@enron.com, 
+	kay'.'miller@enron.com, steve.misner@enron.com, 
+	team.monahans@enron.com, alliece.morris@enron.com, 
+	debbie.moseley@enron.com, team.mountainair@enron.com, 
+	dan.mowrer@enron.com, john.nelson@enron.com, mike.nelson@enron.com, 
+	david.noyes@enron.com, dave.odneal@enron.com, 
+	team.panhandle@enron.com, team.panhandle-p2@enron.com, 
+	team.platteville@enron.com, brian.poock@enron.com, 
+	bob.powell@enron.com, dan.pribble@enron.com, john.ragsdale@enron.com, 
+	dale.ratliff@enron.com, ray.reed@enron.com, randy.rice@enron.com, 
+	tom.rice@enron.com, ruben.rios@enron.com, david.roensch@enron.com, 
+	team.roswell@enron.com, team.san-juan@enron.com, 
+	team.san-juan-laplata@enron.com, team.spraberry@enron.com, 
+	ld.stephens@enron.com, ellis.stern@enron.com, 
+	charlie.thompson@enron.com, wally.tippin@enron.com, 
+	rick.valles@enron.com, michael.wagoner@enron.com, mel.webb@enron.com, 
+	jeff.whippo@enron.com, tim.whorton@enron.com, 
+	sammy.williams@enron.com, walt.williams@enron.com, 
+	byron.wood@enron.com
+Subject: RE: NNG UAF meeting
+Cc: phil.lowry@enron.com, velvet.sugarek@enron.com
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: quoted-printable
+Bcc: phil.lowry@enron.com, velvet.sugarek@enron.com
+X-From: Klimesh, Steve </O=ENRON/OU=NA/CN=RECIPIENTS/CN=SKLIMES>
+X-To: Klimesh, Steve </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Sklimes>, Alder, Amelia </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Aalder>, Anderson, Gary E. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Ganders>, Andrews, Team </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=b1ec03d1-7f46ef68-8625675a-529e0a>, Artesia, Team </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=5c24caf0-d62c9ccc-8625673d-745698>, Asante, Ben </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Basante>, Bailey, Arnie </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Abailey>, Baker, Robert </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=e8e796b8-b8308ffd-8625673e-59ddb8>, Bandel, Bob </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Bbandel>, Bertholf, Larry </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=479a0c8e-7cb8a67f-8625672f-5f7b89>, Big-Lake, Team </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=cf3fc249-3f6d65f8-86256759-6a9bf2>, Blair, Lynn </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lblair>, Brickman, Ronnie </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rbrickm>, Buchanan, John </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jbuchan2>, Carlsbad, Team </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=a7b6fafb-c8acbbaf-86256752-4f1d15>, Clark, Scott </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Sclark4>, Clayton, Lawrence </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=6584d47d-9523779c-86256944-575386>, Comstock, Steve </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=48ce3e19-580b3ed3-8625660a-492f19>, Corman, Shelley </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Scorman>, Cowart, Willie </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Wcowart>, Craddock, Larry </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lcraddo>, Daigle, David </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=523fa377-73dc0a54-862568e0-602c09>, 'Darveaux, Mary' <mary.darveaux@dynegy.com>, Dietz, Laverne </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=d76be4d7-c4bae546-862566c7-791e01>, Dietz, Rick </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rdietz>, Dittberner, Vern </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=cf9b50aa-ee4f2462-862567c4-680b3c>, Doerr, Donald </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=f948a217-6b8b92d0-862566a4-619f95>, Eble, Ken </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Keble>, Egger, Bill </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=d1be8028-52f0c030-86256736-6f0221>, Eunice, Team </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=3de8a949-3f9f4dc0-86256752-4f11b5>, Fancler, Dan </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dfancle>, Flagstaff, Team </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=9bf966a9-3c697f6a-86256754-721d54>, Floyd, Jodie </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jfloyd>, Foresman, Bill </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=e9402c84-5f904752-86256735-70bb0f>, Foutz, Lawrence </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=934376c0-4b95de48-862569ab-76f3dc>, Gaines, David </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dgaines>, Gallishaw, Melinda </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mgallis>, Gallup, Team </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=19dc8c2c-3157e1c0-86256743-823ec6>, Gibbs, Dana </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=fcb4caec-de7fea13-8625672f-5e716e>, Gilbert, Tom </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Tgilber>, Gokey, Ray </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=a87cf3db-d3fcdcee-8625672f-7fa052>, Gottsponer, Rockie </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=a7cb02f7-d2d61da2-862567a9-4d0fe1>, Graham, Charlie </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Cgraham1>, Greenlee, Lynn </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=b0c0ea13-e9e5a597-862567c5-52bc8a>, Greider, Jeff </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=392a0dca-cde203f-86256969-6ac235>, Hallowell, Dean </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=979b56e5-7dbedad0-86256760-562325>, Hawkins, Don </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dhawkin>, Hewett, Jackie </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jhewett>, Howard, Randy </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rhoward2>, January, Steve </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Sjanuary>, Kermit, Team </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=20f2b848-b6221328-8625674d-63ae6d>, 'Kissner, Tim' <Tim.Kissner@dynegy.com>, Kneisley, George </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Gkneisl>, Kowalke, Terry </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Tkowalk>, Kudym, Judy </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jkudym>, Lachapelle, Bobbie </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Blachap>, Ladish, Kim </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Kladish>, Laguna, Team </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=f5285311-9580c50c-86256745-406e>, Larson, Doug </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=fa7830df-673db8cb-8625678a-6cc4c6>, Lebeau, Randy </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rlebeau>, Lewis, Joy </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=efc70875-dc91c31a-86256738-7a8c46>, Loveless, Rick </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=b16f0ff0-ad7eb24f-86256992-610863>, Macpherson, Sigrid </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Smacphe>, Maier, Terry </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=77a56852-e7211b4a-862566d7-70d973>, Mall, Greg </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=56be54d4-fcb7036c-86256730-5ffabb>, McGillivray, RR </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rmcgill>, Metzler, Verlene </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Vmetzle>, Miller, Dave </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=8c81da82-8cb6f9c1-8625672f-55a205>, 'Miller, Mary Kay' <Mary.Kay.Miller@dynegy.com>, Misner, Steve </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=dc90bd85-14279b56-862566c2-625cdc>, Monahans, Team </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=aafaa78e-d3116971-8625674c-75a28b>, Morris, Alliece </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Amorris3>, Moseley, Debbie </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dmosele2>, Mountainair, Team </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=8fd0d3bf-45d2bce0-86256747-52d685>, Mowrer, Dan </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dmowrer>, Nelson, John </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Gwaddr/cn=HQ1.EM2.John Nelson>, Nelson, Mike </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mnelson>, Noyes, David </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dnoyes>, Odneal, Dave </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dodneal>, Panhandle, Team </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=82873c8e-b4bbd4ce-86256754-56c414>, Panhandle-P2, Team </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=42150764-95d19867-8625675c-4fc43b>, Platteville, Team </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=ad82d876-1ca46758-86256752-67a7df>, Poock, Brian </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Bpoock>, Powell, Bob </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=1139de5e-c11b07de-86256732-638f4a>, Pribble, Dan </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dpribbl>, Ragsdale, John </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=b57287b7-192d30f9-8625673e-6224fc>, Ratliff, Dale </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dratlif>, Reed, Ray </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=f7ed5e5c-962f1675-86256ab5-67ecb0>, Rice, Randy </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rrice2>, Rice, Tom </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Trice4>, Rios, Ruben </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=9c3034b2-5fac3211-86256744-5b6b07>, Roensch, David </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=68f10420-593507c0-86256744-5ee2d3>, Roswell, Team </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=9d256f4d-7e3aeaac-8625673d-5ba0d3>, San-Juan, Team </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=21560c05-6fdcfa13-86256745-4aaf>, San-Juan-LaPlata, Team </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=23c3b46b-d3225e7c-86256745-5468a7>, Spraberry, Team </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=a9846c50-c3056d94-86256759-71844c>, Stephens, LD </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lstephe>, Stern, Ellis </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Estern>, Thompson, Charlie </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Cthomps3>, Tippin, Wally </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Wtippin>, Valles, Rick </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=c9c66f47-7a94b2db-862567b0-1d81d>, Wagoner, Michael </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mwagone>, Webb, Mel </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=9ac57bd9-b19dbbf-8625672f-7eb11e>, Whippo, Jeff </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jwhippo>, Whorton, Tim </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=de564c4a-bf49c5cc-862567bc-4f99af>, Williams, Sammy </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=4169b738-d40a686d-8625675a-592b19>, Williams, Walt </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=fd19e369-442d4a0b-86256730-4fad74>, Wood, Byron </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=4aefe74c-a00ec259-8625674c-4ba2a8>
+X-cc: Lowry, Phil </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Plowry2>, Sugarek, Velvet </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Vsugare>
+X-bcc: 
+X-Folder: \Shelley_Corman_Mar2002\Corman, Shelley\Inbox\Measurement
+X-Origin: Corman-S
+X-FileName: scorman (Non-Privileged).pst
+
+Excuse me please.  The meeting is on the 27th - Which is WEDNESDAY, not tue=
+sday
+
+ -----Original Message-----
+From: =09Klimesh, Steve =20
+Sent:=09Friday, February 22, 2002 12:42 PM
+To:=09Alder, Amelia; Anderson, Gary E.; Andrews, Team; Artesia, Team; Asant=
+e, Ben; Bailey, Arnie; Baker, Robert; Bandel, Bob; Bertholf, Larry; Big-Lak=
+e, Team; Blair, Lynn; Brickman, Ronnie; Buchanan, John; Carlsbad, Team; Cla=
+rk, Scott; Clayton, Lawrence; Comstock, Steve; Corman, Shelley; Cowart, Wil=
+lie; Craddock, Larry; Daigle, David; Darveaux, Mary; Dietz, Laverne; Dietz,=
+ Rick; Dittberner, Vern; Doerr, Donald; Eble, Ken; Egger, Bill; Eunice, Tea=
+m; Fancler, Dan; Flagstaff, Team; Floyd, Jodie; Foresman, Bill; Foutz, Lawr=
+ence; Gaines, David; Gallishaw, Melinda; Gallup, Team; Gibbs, Dana; Gilbert=
+, Tom; Gokey, Ray; Gottsponer, Rockie; Graham, Charlie; Greenlee, Lynn; Gre=
+ider, Jeff; Hallowell, Dean; Hawkins, Don; Hewett, Jackie; Howard, Randy; J=
+anuary, Steve; Kermit, Team; Kissner, Tim; Kneisley, George; Kowalke, Terry=
+; Kudym, Judy; Lachapelle, Bobbie; Ladish, Kim; Laguna, Team; Larson, Doug;=
+ Lebeau, Randy; Lewis, Joy; Loveless, Rick; Macpherson, Sigrid; Maier, Terr=
+y; Mall, Greg; McGillivray, RR; Metzler, Verlene; Miller, Dave; Miller, Mar=
+y Kay; Misner, Steve; Monahans, Team; Morris, Alliece; Moseley, Debbie; Mou=
+ntainair, Team; Mowrer, Dan; Nelson, John; Nelson, Mike; Noyes, David; Odne=
+al, Dave; Panhandle, Team; Panhandle-P2, Team; Platteville, Team; Poock, Br=
+ian; Powell, Bob; Pribble, Dan; Ragsdale, John; Ratliff, Dale; Reed, Ray; R=
+ice, Randy; Rice, Tom; Rios, Ruben; Roensch, David; Roswell, Team; San-Juan=
+, Team; San-Juan-LaPlata, Team; Spraberry, Team; Stephens, LD; Stern, Ellis=
+; Thompson, Charlie; Tippin, Wally; Valles, Rick; Wagoner, Michael; Webb, M=
+el; Whippo, Jeff; Whorton, Tim; Williams, Sammy; Williams, Walt; Wood, Byro=
+n
+Cc:=09Lowry, Phil; Klimesh, Steve; Sugarek, Velvet
+Subject:=09NNG UAF meeting
+
+
+On Tuesday, 02/27/02, at 1:30 PM we will convene a UAF meeting to discuss t=
+he current UAF results for NNG.
+
+Attached are several documents.  Please print and bring these with you to t=
+he meeting.
+
+ << File: UAF_NNG Only 02_27_02 agenda.doc >> =09This is the agenda for the=
+ meeting.  Please review and note if you are being requested to provide an =
+update.
+
+
+ << File: NNG Recap - Jan 2002-MMBtu only.xls >> =09This file contains the =
+2001 and 2002 PHYSICAL results.  Please note the sheet entitled "NNG 2001 &=
+ 2002 DTH Comparison".  As you can see, the results for the past several mo=
+nths have been less than satisfactory. =20
+
+=09Oct 2001=09(724,672  MMBtu)  loss or .65%
+=09Nov 2001=09(352,858  MMBtu)  loss or .33%
+=09Dec 2001=09(869,987  MMBtu)  loss or .69%
+=09Jan 2002=09(827,225  MMBtu)  loss or .61%
+
+We will spend some time discussing these results. GMS and the Measurement S=
+pecialists (along with the Regional UAF teams) will be asked for an update =
+on what review efforts have  taken place to date in an effort to identify t=
+he reasons for the losses, and a report on the efforts that are on-going or=
+ anticipated.  Timelines and completion dates will be expected.  We will al=
+so be developing some review actions and initiatives for the future.  Pleas=
+e be prepared to provide an update if your name is on the agenda.
+
+  << File: Documentation of meter test_inspections March 2002.xls >>   This=
+ document, and its intended use,  will be discussed in the meeting
+
+ << File: Matrix Consensus Opinion on Accountability_Responsibility.doc >> =
+ I am providing this document as a reminder of the accountabilities and res=
+ponsibly we agreed to late in 2000.  Obviously we are all in  this together=
+ - BUT, someone must take the lead to ensure what needs to be done, gets do=
+ne.  Hence this matrix.

@@ -1,0 +1,427 @@
+Message-ID: <300661.1075853095557.JavaMail.evans@thyme>
+Date: Fri, 26 Oct 2001 13:53:57 -0700 (PDT)
+From: announce-list@clearchannel.com
+To: mcuilla@enron.com
+Subject: Southwest Region Concert Update
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+X-From: Announcements CC.com <announce-list@clearchannel.com>
+X-To: mcuilla@enron.com
+X-cc: 
+X-bcc: 
+X-Folder: \MCUILLA (Non-Privileged)\Cuilla, Martin\Inbox
+X-Origin: Cuilla-M
+X-FileName: MCUILLA (Non-Privileged).pst
+
+<HTML>
+<!--Sorry, it looks like you are having problems viewing this HTML email.
+
+<a href="http://www.cc.com/ECRM_preShowInBrowser?campaignId=682&mbrId=2181525">To view this email correctly, please click here</a> 
+
+Or paste this http://www.cc.com/ECRM_preShowInBrowser?campaignId=682&mbrId=2181525 into your web browser.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//-->
+<HEAD>
+<TITLE>Clear Channel Entertainment</TITLE>
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+
+<!--template font styles (not css)
+
+section header - SIZE="+1" COLOR="#333366" FACE="verdana, helvetica, arial, sans-serif"
+artist/event title - SIZE="1" color="black" FACE="verdana, helvetica, arial, sans-serif" bold
+body text - SIZE="1" COLOR="black" FACE="verdana, helvetica, arial, sans-serif"
+presenting sponsor - size="-2" COLOR="black" FACE="verdana, helvetica, arial, sans-serif" italic
+
+-->
+
+</HEAD>
+<BODY TEXT="#000000" LINK="#FF0000" ALINK="#FF0000" VLINK="#FF0000">
+<FONT SIZE="-2" FACE="verdana, helvetica, arial, sans-serif">
+If you cannot view this email correctly, please <a href="http://www.cc.com/ECRM_preShowInBrowser?campaignId=682&mbrId=2181525">click here</a>.</FONT>
+<TABLE WIDTH="599" BORDER="0" CELLPADDING="0" CELLSPACING="0" VALIGN="top" BGCOLOR="#FFFFFF">
+	<TR>
+		<TD><IMG SRC="http://209.208.252.77/newsletter/images/leftPiece.gif" WIDTH="8" HEIGHT="58" BORDER="0"></TD>
+		<TD><!--this link is localized - need zipcode--><A HREF="http://cc.com/index.asp?zipcode=" TARGET="_new"><IMG SRC="http://209.208.252.77/newsletter/images/header.gif" ALT="CC.com - Your Source For LIVE Entertainment" WIDTH="582" HEIGHT="58" BORDER="0"></A></TD>
+		<TD><IMG SRC="http://209.208.252.77/newsletter/images/rightPiece.gif" WIDTH="9" HEIGHT="58" BORDER="0"></TD>
+	</TR>
+	<TR BGCOLOR="#FF9933">
+		<TD COLSPAN="3" VALIGN="middle" ALIGN="center"><TABLE HEIGHT="20" BORDER="0" CELLPADDING="0" CELLSPACING="0">
+	<TR>
+		<TD><!--this link is localized - need zipcode-->
+			<A HREF="http://cc.com/event.asp?zipcode=" TARGET="_new"><IMG SRC="http://209.208.252.77/newsletter/images/local_events.gif" WIDTH="69" HEIGHT="10" ALT="Local Events" BORDER="0"></A></TD>
+		<TD>
+			<IMG SRC="http://209.208.252.77/newsletter/images/dot.gif" WIDTH="11" HEIGHT="10" BORDER="0"></TD>
+		<TD><!--this link is localized - need zipcode-->
+			<A HREF="http://cc.com/artistsontour.asp?zipcode=" TARGET="_new"><IMG SRC="http://209.208.252.77/newsletter/images/event_search.gif" WIDTH="74" HEIGHT="10" ALT="Event Search" BORDER="0"></A></TD>
+		<TD>
+			<IMG SRC="http://209.208.252.77/newsletter/images/dot.gif" WIDTH="11" HEIGHT="10" BORDER="0"></TD>
+		<TD><!--this link is localized - need zipcode-->
+			<A HREF="http://cc.com/local_venues.asp?zipcode=" TARGET="_new"><IMG SRC="http://209.208.252.77/newsletter/images/local_venues.gif" WIDTH="77" HEIGHT="10" ALT="Local Venues" BORDER="0"></A></TD>
+		<TD>
+			<IMG SRC="http://209.208.252.77/newsletter/images/dot.gif" WIDTH="11" HEIGHT="10" BORDER="0"></TD>
+		<TD>
+			<A HREF="http://cc.com/features.asp" TARGET="_new"><IMG SRC="http://209.208.252.77/newsletter/images/inside_scoop.gif" WIDTH="72" HEIGHT="10" ALT="Inside Scoop" BORDER="0"></A></TD>
+		<TD>
+			<IMG SRC="http://209.208.252.77/newsletter/images/dot.gif" WIDTH="11" HEIGHT="10" BORDER="0"></TD>
+		<TD>
+			<A HREF="http://promo.cc.com/webcasts" TARGET="_new"><IMG SRC="http://209.208.252.77/newsletter/images/webcasts.gif" WIDTH="56" HEIGHT="10" ALT="Webcast" BORDER="0"></A></TD>
+		<TD>
+			<IMG SRC="http://209.208.252.77/newsletter/images/dot.gif" WIDTH="10" HEIGHT="10" BORD="0"></TD>
+		<TD>
+			<A HREF="http://sfxmotorsports.com" TARGET="_new"><IMG SRC="http://209.208.252.77/newsletter/images/motor_sports.gif" WIDTH="75" HEIGHT="10" ALT="Motorsports" BORDER="0"></A></TD>
+		<TD>
+			<IMG SRC="http://209.208.252.77/newsletter/images/dot.gif" WIDTH="11" HEIGHT="10" BORDER="0"></TD>
+		<TD>
+			<A HREF="http://broadwayseries.com" TARGET="_new"><IMG SRC="http://209.208.252.77/newsletter/images/broadway_series.gif" WIDTH="94" HEIGHT="10" ALT="Broadway Series" BORDER="0"></A></TD>
+	</TR>
+</TABLE></TD>
+	</TR>
+	<TR>
+		<TD COLSPAN="3"><IMG SRC="http://209.208.252.77/newsletter/images/spacer.gif" WIDTH="1" HEIGHT="10"></TD>
+	</TR>
+	<TR>
+		<TD>&nbsp</TD>
+		<TD>
+<!--start content-->
+		<TABLE WIDTH="100%" BORDER="0" CELLPADDING="0" CELLSPACING="0" VALIGN="top" ALIGN="left">
+	<TR>
+		<TD ALIGN="left"  VALIGN="top"><HTML>
+<HEAD>
+<TITLE>Clear Channel Entertainment | Southwest Region Concert Update</TITLE>
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+</HEAD>
+<BODY BGCOLOR="#FFFFFF" text="black" link="red" alink="#666666" vlink="#FF6600">
+<TABLE WIDTH="580" BORDER="0" CELLPADDING="0" CELLSPACING="0" valign="top">
+	<TR>
+		<TD><FONT SIZE="1" FACE="verdana, helvetica, arial, sans-serif" color="red"><B>Clear Channel Entertainment | <a href="http://cc.com/event.asp?zipcode=77002">Southwest</a> Concert Update</B></FONT></TD>
+	</TR>
+	<TR>
+		<TD><IMG src="http://promo.cc.com/mail/images/spacer.gif" WIDTH="1" HEIGHT="10"></TD>
+	</TR>
+	<TR>
+		<TD><!--start first column of contents-->
+			<TABLE WIDTH="350" BORDER="0" CELLPADDING="0" CELLSPACING="0" valign="top" align="left">
+				<TR>
+					<TD colspan="2"><FONT SIZE="3" FACE="verdana, helvetica, arial, sans-serif" color="#333366"><B>Just Added!</B></FONT></TD>
+				</TR>
+				<TR>
+					<TD colspan="2" bgcolor="#666666"><IMG src="http://promo.cc.com/mail/images/spacer.gif" WIDTH="1" HEIGHT="1"></TD>
+				</TR>
+				<TR>
+					<TD align="left" WIDTH="110" valign="top"><!--<A HREF="http://cc.com/detail.asp?eventID=31585" TARGET="_self"><IMG SRC="http://promo.cc.com/mail/images/p.o.d.-sm.jpg" ALT="P.O.D." WIDTH="100" HEIGHT="75" border="0"></A>--></TD>
+					<TD align="left" WIDTH="340"><FONT SIZE="1" FACE="verdana, helvetica, arial, sans-serif"><B>Atmosphere featuring Mr. Dibbs</B><BR>
+					Engine Room<br>Houston, TX<br>Sunday, November 11 at 9 PM<br>
+					<A href="http://cc.com/detail.asp?eventID=31585" TARGET="_self">On Sale Thursday, October 25 at 10 AM</A></FONT></TD>
+				</TR>
+				<TR>
+					<TD colspan="2"><IMG src="http://promo.cc.com/mail/images/spacer.gif" WIDTH="1" HEIGHT="5"></TD>
+				</TR>
+				<TR>
+					<TD colspan="2" bgcolor="#666666"><IMG src="http://promo.cc.com/mail/images/spacer.gif" WIDTH="1" HEIGHT="1"></TD>
+				</TR>
+				<TR>
+					<TD align="left" WIDTH="110"><!--<A HREF="http://cc.com/detail.asp?eventID=31551" TARGET="_self"><IMG SRC="http://promo.cc.com/mail/images/peteyorn-sm.jpg" ALT="Pete Yorn" WIDTH="100" HEIGHT="75" border="0"></A>--></TD>
+					<TD align="left" WIDTH="340"><FONT SIZE="1" FACE="verdana, helvetica, arial, sans-serif"><B>Genitorturers</B><BR>
+					Engine Room<br>Houston, TX<br>Thursday, November 15 at 9 PM<br>
+					<A href="http://cc.com/detail.asp?eventID=31551" TARGET="_self">On Sale Thursday, October 25 at 10 AM</A><br><br></FONT></TD>
+				</TR>
+				<TR>
+					<TD colspan="2" bgcolor="#666666"><IMG src="http://promo.cc.com/mail/images/spacer.gif" WIDTH="1" HEIGHT="1"></TD>
+				</TR>
+				<TR>
+					<TD align="left" WIDTH="110" valign="top"><A HREF="http://cc.com/detail.asp?eventID=31348" TARGET="_self"><IMG SRC="http://promo.cc.com/mail/images/delasoul-sm.jpg" ALT="De La Soul" WIDTH="100" HEIGHT="75" border="0"></A></TD>
+					<TD align="left" WIDTH="340"><FONT SIZE="1" FACE="verdana, helvetica, arial, sans-serif"><B>De La Soul</B><BR>
+					Numbers<br>Houston, TX<br>Friday, November 16 at 9 PM<br>
+					<A href="http://cc.com/detail.asp?eventID=31348" TARGET="_self">On Sale Thursday, October 25 at 10 AM</A></FONT></TD>
+				</TR>
+				<TR>
+					<TD colspan="2" bgcolor="#666666"><IMG src="http://promo.cc.com/mail/images/spacer.gif" WIDTH="1" HEIGHT="1"></TD>
+				</TR>
+				<TR>
+					<TD align="left" WIDTH="110" valign="top"><A HREF="http://cc.com/detail.asp?eventID=31583" TARGET="_self"><IMG SRC="http://promo.cc.com/mail/images/lisaloeb-sm.jpg" ALT="Lisa Loeb" WIDTH="100" HEIGHT="75" border="0"></A></TD>
+					<TD align="left" WIDTH="340"><FONT SIZE="1" FACE="verdana, helvetica, arial, sans-serif"><B>Lisa Loeb</B><BR>
+					Engine Room<br>Houston, TX<br>Sunday, November 18 at 9 PM<br>
+					<A href="http://cc.com/detail.asp?eventID=31583" TARGET="_self">On Sale Thursday, October 25 at 10 AM</A></FONT></TD>
+				</TR>
+				<TR>
+					<TD colspan="2" bgcolor="#666666"><IMG src="http://promo.cc.com/mail/images/spacer.gif" WIDTH="1" HEIGHT="1"></TD>
+				</TR>
+				<TR>
+					<TD align="left" WIDTH="110" valign="top"><A HREF="http://cc.com/detail.asp?eventID=31549" TARGET="_self"><IMG SRC="http://promo.cc.com/mail/images/weezer-sm.jpg" ALT="Weezer" WIDTH="100" HEIGHT="75" border="0"></A></TD>
+					<TD align="left" WIDTH="340"><FONT SIZE="1" FACE="verdana, helvetica, arial, sans-serif"><B>Weezer</B><BR>
+					Freeman Coliseum<br>San Antonio, TX<br>Monday, November 26 at 7:30PM<br>
+					<A href="http://cc.com/detail.asp?eventID=31549" TARGET="_self">On Sale Saturday, October 27 at 10 AM</A></FONT></TD>
+				</TR>
+				<TR>
+					<TD colspan="2" bgcolor="#666666"><IMG src="http://promo.cc.com/mail/images/spacer.gif" WIDTH="1" HEIGHT="1"></TD>
+				</TR>
+				<TR>
+					<TD align="left" WIDTH="110" valign="top"><A HREF="http://cc.com/detail.asp?eventID=31346" TARGET="_self"><IMG SRC="http://promo.cc.com/mail/images/nataliemerchant-sm.jpg" ALT="Natalie Merchant" WIDTH="100" HEIGHT="75" border="0"></A></TD>
+					<TD align="left" WIDTH="340"><FONT SIZE="1" FACE="verdana, helvetica, arial, sans-serif"><B>Natalie Merchant</B><BR>
+					Austin Music Hall<br>Austin, TX<br>Wednesday, December 5 at 8 PM<br>
+					<A href="http://cc.com/detail.asp?eventID=31346" TARGET="_self">On Sale Friday, October 26 at 10 AM</A><br><br>
+					Aerial Theater at Bayou Place<br>Houston, TX<br>Thursday, December 6 at 8 PM<br>
+					<A href="http://cc.com/detail.asp?eventID=31361" TARGET="_self">On Sale Saturday, October 27 at 10 AM</A><br><br></FONT></TD>
+				</TR>
+				<TR>
+					<TD colspan="2" bgcolor="#666666"><IMG src="http://promo.cc.com/mail/images/spacer.gif" WIDTH="1" HEIGHT="1"></TD>
+				</TR>
+			<!--THIS WEEKS SHOWS--> 
+				<TR>
+					<TD colspan="2"><FONT SIZE="3" FACE="verdana, helvetica, arial, sans-serif" color="#333366"><B>This Week&#39;s Shows!</B></FONT></TD>
+				</TR>
+				<TR>
+					<TD colspan="2" bgcolor="#666666"><IMG src="http://promo.cc.com/mail/images/spacer.gif" WIDTH="1" HEIGHT="1"></TD>
+				</TR>
+				<TR>
+					<TD align="left" WIDTH="110" valign="top"><A HREF="http://cc.com/detail.asp?eventID=27784" TARGET="_self"><IMG SRC="http://promo.cc.com/mail/images/kennychesney-sm.jpg" ALT="Kenny Chesney" WIDTH="100" HEIGHT="75" border="0"></A></TD>
+					<TD align="left" WIDTH="340"><FONT SIZE="1" FACE="verdana, helvetica, arial, sans-serif"><B>Kenny Chesney</B><BR>
+					Reed Arena<br>College Station, TX<br>Thursday, October 25<br>
+					<A href="http://cc.com/detail.asp?eventID=27784" TARGET="_self">On sale now!</A><br><br>
+					The Backyard<br>Austin, TX<br>Saturday, October 27 at 7 PM<br>
+					<A href="http://cc.com/detail.asp?eventID=27698" TARGET="_self">On sale now!</A><br><br></FONT></TD>
+				</TR>
+				<TR>
+					<TD colspan="2"><IMG src="http://promo.cc.com/mail/images/spacer.gif" WIDTH="1" HEIGHT="5"></TD>
+				</TR>
+				<TR>
+					<TD colspan="2" bgcolor="#666666"><IMG src="http://promo.cc.com/mail/images/spacer.gif" WIDTH="1" HEIGHT="1"></TD>
+				</TR>
+				<TR>
+					<TD colspan="2" bgcolor="#666666"><IMG src="http://promo.cc.com/mail/images/spacer.gif" WIDTH="1" HEIGHT="1"></TD>
+				</TR>
+				<TR>
+					<TD align="left" WIDTH="110" valign="top"><A HREF="http://cc.com/detail.asp?eventID=27435" TARGET="_self"><IMG SRC="http://promo.cc.com/mail/images/311-sm.jpg" ALT="311" WIDTH="100" HEIGHT="75" border="0"></A></TD>
+					<TD align="left" WIDTH="340"><FONT SIZE="1" FACE="verdana, helvetica, arial, sans-serif"><B>311</B><BR>
+					Aerial Theater at Bayou Place<br>Houston, TX<br>Thursday, October 25 at 7:30PM<br>
+					<A href="http://cc.com/detail.asp?eventID=27435" TARGET="_self">On sale now!</A></FONT></TD>
+				</TR>
+				<TR>
+					<TD colspan="2"><IMG src="http://promo.cc.com/mail/images/spacer.gif" WIDTH="1" HEIGHT="5"></TD>
+				</TR>
+				<TR>
+					<TD colspan="2" bgcolor="#666666"><IMG src="http://promo.cc.com/mail/images/spacer.gif" WIDTH="1" HEIGHT="1"></TD>
+				</TR>
+				<TR>
+					<TD align="left" WIDTH="110" valign="top"><A HREF="http://cc.com/detail.asp?eventID=28775" TARGET="_self"><IMG SRC="http://promo.cc.com/mail/images/tool-sm.jpg" ALT="Tool" WIDTH="100" HEIGHT="75" border="0"></A></TD>
+					<TD align="left" WIDTH="340"><FONT SIZE="1" FACE="verdana, helvetica, arial, sans-serif"><B>Tool</B><BR>
+					Verizon Wireless Amphitheater - San Antonio<br>Selma, TX<br>Thursday, October 25 at 7:30PM<br>
+					<A href="http://cc.com/detail.asp?eventID=28775" TARGET="_self">On sale now!</A></FONT></TD>
+				</TR>
+				<TR>
+					<TD colspan="2"><IMG src="http://promo.cc.com/mail/images/spacer.gif" WIDTH="1" HEIGHT="5"></TD>
+				</TR>
+				<TR>
+					<TD colspan="2" bgcolor="#666666"><IMG src="http://promo.cc.com/mail/images/spacer.gif" WIDTH="1" HEIGHT="1"></TD>
+				</TR>
+				<TR>
+					<TD align="left" WIDTH="110" valign="top"><A HREF="http://cc.com/detail.asp?eventID=29997" TARGET="_self"><IMG SRC="http://promo.cc.com/mail/images/buttholesurfers-sm.jpg" ALT="Butthole Surfers" WIDTH="100" HEIGHT="75" border="0"></A></TD>
+					<TD align="left" WIDTH="340"><FONT SIZE="1" FACE="verdana, helvetica, arial, sans-serif">Bud Light Concert Series<br><B>Butthole Surfers</B><BR>
+					Sunshine Theatre<br>Albuquerque, NM<br>Friday, October 26 at 8 PM<br>
+					<A href="http://cc.com/detail.asp?eventID=29997" TARGET="_self">On sale now!</A></FONT></TD>
+				</TR>
+				<TR>
+					<TD colspan="2"><IMG src="http://promo.cc.com/mail/images/spacer.gif" WIDTH="1" HEIGHT="5"></TD>
+				</TR>
+				<TR>
+					<TD colspan="2" bgcolor="#666666"><IMG src="http://promo.cc.com/mail/images/spacer.gif" WIDTH="1" HEIGHT="1"></TD>
+				</TR>
+				<TR>
+					<TD align="left" WIDTH="110" valign="top"><A HREF="http://cc.com/detail.asp?eventID=29774" TARGET="_self"><!--<IMG SRC="http://promo.cc.com/mail/images/buttholesurfers-sm.jpg" ALT="Butthole Surfers" WIDTH="100" HEIGHT="75" border="0"></A>--></TD>
+					<TD align="left" WIDTH="340"><FONT SIZE="1" FACE="verdana, helvetica, arial, sans-serif"><B>Blue October</B><BR>
+					Engine Room<br>Houston, TX<br>Friday, October 26 at 9 PM<br>
+					<A href="http://cc.com/detail.asp?eventID=29774" TARGET="_self">On sale now!</A></FONT></TD>
+				</TR>
+				<TR>
+					<TD colspan="2"><IMG src="http://promo.cc.com/mail/images/spacer.gif" WIDTH="1" HEIGHT="5"></TD>
+				</TR>
+				<TR>
+					<TD colspan="2" bgcolor="#666666"><IMG src="http://promo.cc.com/mail/images/spacer.gif" WIDTH="1" HEIGHT="1"></TD>
+				</TR>
+				<TR>
+					<TD align="left" WIDTH="110" valign="top"><A HREF="http://cc.com/detail.asp?eventID=26389" TARGET="_self"><IMG SRC="http://promo.cc.com/mail/images/jaguares-sm.jpg" ALT="Jaguares" WIDTH="100" HEIGHT="75" border="0"></A></TD>
+					<TD align="left" WIDTH="340"><FONT SIZE="1" FACE="verdana, helvetica, arial, sans-serif">Cardenas Fernandez & Associates Presents<br><B>Jaguares</B><BR>
+					International Ballroom - Houston<br>Houston, TX<br>Saturday, October 27 at 8 PM<br>
+					<A href="http://cc.com/detail.asp?eventID=26389" TARGET="_self">On sale now!</A></FONT></TD>
+				</TR>
+				<TR>
+					<TD colspan="2"><IMG src="http://promo.cc.com/mail/images/spacer.gif" WIDTH="1" HEIGHT="5"></TD>
+				</TR>
+				<TR>
+					<TD colspan="2"><IMG src="http://promo.cc.com/mail/images/spacer.gif" WIDTH="1" HEIGHT="20"></TD>
+				</TR>
+			</TABLE>
+		<!--end first column of contents-->
+		<!--start second column of contents-->
+			<TABLE WIDTH="215" BORDER="0" CELLPADDING="0" CELLSPACING="0" valign="top" align="right">
+				<TR>
+					<TD><FONT SIZE="3" FACE="verdana, helvetica, arial, sans-serif" color="#333366"><B>Upcoming Shows!</B></FONT></TD>
+				</TR>
+				<TR>
+					<TD bgcolor="#666666"><IMG src="http://promo.cc.com/mail/images/spacer.gif" WIDTH="1" HEIGHT="1"></TD>
+				</TR>
+				<TR>
+					<TD><FONT SIZE="-2" color="black" FACE="verdana, helvetica, arial, sans-serif">click on the artist or date to get tickets or for more info</FONT><IMG src="http://promo.cc.com/mail/images/spacer.gif" WIDTH="1" HEIGHT="5"></TD>
+				</TR>
+				<TR>
+					<TD bgcolor="#666666"><IMG src="http://promo.cc.com/mail/images/spacer.gif" WIDTH="1" HEIGHT="1"></TD>
+				</TR>
+				<TR>
+					<TD><IMG src="http://promo.cc.com/mail/images/spacer.gif" WIDTH="1" HEIGHT="5"></TD>
+				</TR>
+				<TR>
+					<TD align="left"><FONT SIZE="1" FACE="verdana, helvetica, arial, sans-serif">
+					<B><A HREF="http://cc.com/detail.asp?eventID=29017" TARGET="_self">Tool</A></B><br>with Tricky<br>
+					Woodlands Pavilion - Woodlands, TX<br><A HREF="http://cc.com/detail.asp?eventID=29017" TARGET="_self">Sunday, October 28 at 8 PM</A><BR><BR>
+					<B><A HREF="http://cc.com/detail.asp?eventID=26754" TARGET="_self">Mike Watt</A></B><br>Engine Room - Houston, TX<br>
+					<A HREF="http://cc.com/detail.asp?eventID=26754" TARGET="_self">Sunday, October 28 at 9 PM</A><BR><BR>
+					Bud Light Concert Series<br><B><A HREF="http://cc.com/detail.asp?eventID=29764" TARGET="_self">Gregg Allman & Friends</A></B><br>
+					Sunshine Theatre - Albuquerque, NM<br>
+					<A HREF="http://cc.com/detail.asp?eventID=29764" TARGET="_self">Tuesday, October 30 at 7:30PM</A><BR><BR>
+					<B><A HREF="http://cc.com/detail.asp?eventID=27955" TARGET="_self">Tori Amos</A></B><br>
+					with Rufus Wainwright<br>
+					Aerial Theater at Bayou Place - Houston, TX<br>
+					<A HREF="http://cc.com/detail.asp?eventID=27955" TARGET="_self">Wednesday, October 31 at 8 PM</A><BR><BR>
+					<B><A HREF="http://cc.com/detail.asp?eventID=31154" TARGET="_self">Terrorfest 2001</A></B><br>
+					Engine Room - Houston, TX<br>
+					<A HREF="http://cc.com/detail.asp?eventID=31154" TARGET="_self">Wednesday, October 31 at 9 PM</A><BR><BR>
+					94 rock Presents<br>Bud Light Concert Series<br><B><A HREF="http://cc.com/detail.asp?eventID=30601" TARGET="_self">A Night of Merry Mayhem with Ozzy Osbourne and Rob Zombie</A></B><br>
+					Tingley Coliseum - Albuquerque, NM<br>
+					<A HREF="http://cc.com/detail.asp?eventID=30601" TARGET="_self">Thursday, November 1 at 6:30PM</A><BR><BR>
+					<B><A HREF="http://cc.com/detail.asp?eventID=29585" TARGET="_self">Live</A></B><br>Bronco Bowl - Dallas, TX<br>
+					<A HREF="http://cc.com/detail.asp?eventID=29585" TARGET="_self">Thursday, November 1 at 7:30PM</A><BR><BR>
+					<B><A HREF="http://cc.com/detail.asp?eventID=30175" TARGET="_self">Jo Dee Messina</A></B><br>
+					Kansas Expocentre - Topeka, KS<br>
+					<A HREF="http://cc.com/detail.asp?eventID=30175" TARGET="_self">Thursday, November 1 at 7:30PM</A><BR><BR>
+					<B><A HREF="http://cc.com/detail.asp?eventID=28943" TARGET="_self">D-12</A></B><br>
+					Numbers - Houston, TX<br><A HREF="http://cc.com/detail.asp?eventID=28943" TARGET="_self">Thursday, November 1 at 9 PM</A><BR><BR>
+					<B><A HREF="http://cc.com/detail.asp?eventID=30333" TARGET="_self">The Damned</A></B><br>
+					Engine Room - Houston, TX<br><A HREF="http://cc.com/detail.asp?eventID=30333" TARGET="_self">Thursday, November 1 at 9 PM</A><BR><BR>
+					<B><A HREF="http://cc.com/detail.asp?eventID=28172" TARGET="_self">Tori Amos</A></B><br>
+					Bass Concert Hall - Austin, TX<br><A HREF="http://cc.com/detail.asp?eventID=28172" TARGET="_self">Friday, November 2 at 8 PM</A><BR><BR>
+					<B><A HREF="http://cc.com/detail.asp?eventID=31153" TARGET="_self">Supersuckers</A></B><br>
+					Engine Room - Houston, TX<br><A HREF="http://cc.com/detail.asp?eventID=31153" TARGET="_self">Friday, November 2 at 9 PM</A><BR><BR>
+					<B><A HREF="http://cc.com/detail.asp?eventID=29320" TARGET="_self">KZEPs Great Harley Giveaway</A></B><br>
+					Verizon Wireless Amphitheater - San Antonio - Selma, TX<br><A HREF="http://cc.com/detail.asp?eventID=29320" TARGET="_self">Saturday, November 3 at 6:30PM</A><BR><BR>
+					<B><A HREF="http://cc.com/detail.asp?eventID=30770" TARGET="_self">A Night of Merry Mayhem with Ozzy Osbourne and Rob Zombie</A></B><br>
+					UTEP - El Paso, TX<br><A HREF="http://cc.com/detail.asp?eventID=30770" TARGET="_self">Saturday, November 3 at 7:30PM</A><BR>
+					and<br>New Orleans Arena - New Orleans, LA<br><A HREF="http://cc.com/detail.asp?eventID=30765" TARGET="_self">Wednesday, November 7 at 6:30PM</A><BR><BR></FONT></TD>
+				</TR>
+			</TABLE>
+		<!--end second column of contents-->
+		<!--end contents-->
+		</TD>
+	</TR>
+	<tr>
+		<td><img src="http://promo.cc.com/mail/images/spacer.gif" width="1" height="10"></td>
+	</tr>
+	<tr>
+		<td align="center" bgcolor="#666666"><img src="http://promo.cc.com/mail/images/spacer.gif" width="1" height="1"></td>
+	</tr>
+	<TR>
+		<TD><IMG src="http://promo.cc.com/mail/images/spacer.gif" WIDTH="1" HEIGHT="10"></TD>
+	</TR>
+	<tr>
+		<td><br><a href="http://www.clearchannel.com/community/donation.php"><img src="http://promo.cc.com/mail/images/relief_fund.jpg" alt="Relief Fund" width="558" height="50" border="0"></a><BR>
+		<font size="2" face="verdana, helvetica, arial, sans-serif">If you would like to make a donation to the ClearChannel.Com Relief Fund please click <a href="http://www.clearchannel.com/community/donation.php">here</a>.<BR><BR></font></td>
+	</tr>
+	<tr>
+		<td><img src="http://promo.cc.com/mail/images/spacer.gif" width="1" height="10"></td>
+	</tr>
+	<tr>
+		<td align="center"><font size="1" face="verdana, helvetica, arial, sans-serif">All dates, acts, and ticket prices are subject to change without notice. 
+		A service charge is added to each ticket price. All events are rain or shine.<br></font></td>
+	</tr>
+</table>
+</BODY>
+</HTML>
+
+
+
+
+
+
+
+</TD>
+	</TR>
+	<TR>
+		<TD><IMG SRC="http://209.208.252.77/newsletter/images/spacer.gif" WIDTH="1" HEIGHT="5"></TD>
+	</TR>
+	<TR>
+		<TD BGCOLOR="#666666"><IMG SRC="http://209.208.252.77/newsletter/images/spacer.gif" WIDTH="1" HEIGHT="1"></TD>
+	</TR>
+	<TR>
+		<TD><IMG SRC="http://209.208.252.77/newsletter/images/spacer.gif" WIDTH="1" HEIGHT="5"></TD>
+	</TR>
+
+</TABLE>
+
+<!--end contents-->
+
+</TD><TD>&nbsp</TD></TR>
+	<TR>
+		<TD>&nbsp</TD>
+		<TD width="100%" align="center">
+		<IMG SRC="http://209.208.252.77/newsletter/images/spacer.gif" WIDTH="5" HEIGHT="5">
+		<IMG SRC="http://209.208.252.77/newsletter/images/spacer.gif" WIDTH="5" HEIGHT="5">
+		<IMG SRC="http://209.208.252.77/newsletter/images/spacer.gif" WIDTH="5" HEIGHT="5">
+		<IMG SRC="http://209.208.252.77/newsletter/images/spacer.gif" WIDTH="5" HEIGHT="5">
+	  <IMG SRC="http://209.208.252.77/newsletter/images/spacer.gif" WIDTH="5" HEIGHT="5">
+		<IMG SRC="http://209.208.252.77/newsletter/images/spacer.gif" WIDTH="5" HEIGHT="5">
+		<IMG SRC="http://209.208.252.77/newsletter/images/spacer.gif" WIDTH="5" HEIGHT="5">
+		<IMG SRC="http://209.208.252.77/newsletter/images/spacer.gif" WIDTH="5" HEIGHT="5">
+		</TD>
+		<TD>&nbsp</TD>
+	</TR>
+	<TR>
+		<TD>&nbsp</TD>
+		<TD HEIGHT="5" VALIGN="middle"><IMG SRC="http://209.208.252.77/newsletter/images/spacer.gif" WIDTH="1" HEIGHT="2"></TD>
+		<TD>&nbsp</TD>
+	</TR>
+		<TR><TD><IMG SRC="http://209.208.252.77/newsletter/images/spacer.gif" WIDTH="1" HEIGHT="1"></TD>
+		<TD HEIGHT="1" VALIGN="middle" BGCOLOR="#666666"><IMG SRC="http://209.208.252.77/newsletter/images/spacer.gif" WIDTH="1" HEIGHT="1"></TD><TD><IMG SRC="http://209.208.252.77/newsletter/images/spacer.gif" WIDTH="1" HEIGHT="1"></TD>
+	</TR>
+	<TR><TD>&nbsp</TD>
+		<TD><FONT SIZE="-2" FACE="verdana, helvetica, arial, sans-serif" COLOR="#000000"><BR>&nbsp<br>You have received this email because you subscribed to our mailing list.  If you wish to remove your name from this list, <a href="http://ccmailer.4mda.net/servlet/CC_Unsubscribe?emid=30c5ea82d58d82de9960e90603b4ff70|2181525&campaignId=682&clientType=MEMBER">click here</a>.<BR>&nbsp<br><a href="http://www.cc.com">Visit the Homepage</a><BR><img src="http://209.208.252.11/servlet/ECRM_MailTracker?memberId=2181525&messageId=6477&clientType=MEMBER"></FONT></TD><TD>&nbsp</TD>
+	</TR><TR>
+		<TD COLSPAN="3"><IMG SRC="http://209.208.252.77/newsletter/images/spacer.gif" WIDTH="1" HEIGHT="10"></TD>
+	</TR>
+	<TR><TD COLSPAN="3" ALIGN="center" VALIGN="middle" HEIGHT="30" BGCOLOR="#333366"><FONT SIZE="-2" FACE="verdana, helvetica, arial, sans-serif" COLOR="#ffffff">&copy; 2001 Clear Channel Interactive. All rights reserved.</FONT></TD>
+	</TR>
+</TABLE>
+</BODY>
+</HTML>

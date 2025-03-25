@@ -1,0 +1,30 @@
+Message-ID: <28494001.1075863386800.JavaMail.evans@thyme>
+Date: Wed, 19 Sep 2001 08:25:57 -0700 (PDT)
+From: 40enron@enron.com
+Subject: Update to Virus Protection Software #2
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+X-From: Enron Global Technology@ENRON <IMCEANOTES-Enron+20Global+20Technology+40ENRON@ENRON.com>
+X-To: All Enron Employees N America@ENRON <??SAll Enron Employees N America@ENRON>
+X-cc: 
+X-bcc: 
+X-Folder: \RBENSON (Non-Privileged)\Benson, Robert\Inbox
+X-Origin: Benson-R
+X-FileName: RBENSON (Non-Privileged).pst
+
+Everyone,
+
+As we stated earlier, this particular virus that is on the internet is causing a lot of issues for Corporations.  As a result, the companies who write anti-virus software are continuously updating their software.  As of this morning, another update has been made available to us.  This update does a better job of protecting your PC than the update we received last night.
+
+At this time, it is extremely important that you again go through one of the procedures listed below to get the latest update.  
+
+1.  Logout of the network and log back in or
+
+2.  Click on START>PROGRAMS>ACCESSORIES>Norton AntiVirus Corporate Edition and then click the Live Update button.  This will pop up a screen where you will have to click the "Next" button and then a "Finish" button.  - If you are an EES user, this option is not available to you.  Please use option 1.
+
+The proper version of the update pattern you need is:   (9/18/2001, version 30918BL) - You may need to restart the Norton Anti-Virus client if you want to visually insure that you have the latest update.
+
+If you have questions or concerns, please direct them to your Resolution Center.
+
+Enron Global Technology

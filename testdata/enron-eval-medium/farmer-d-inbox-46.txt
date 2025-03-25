@@ -1,0 +1,24 @@
+Message-ID: <29783244.1075852202132.JavaMail.evans@thyme>
+Date: Mon, 29 Oct 2001 08:33:15 -0800 (PST)
+From: elena.chilkina@enron.com
+To: j..farmer@enron.com
+Subject: WAHA
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+X-From: Chilkina, Elena </O=ENRON/OU=NA/CN=RECIPIENTS/CN=ECHILKIN>
+X-To: Farmer, Daren J. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dfarmer>
+X-cc: 
+X-bcc: 
+X-Folder: \DFARMER (Non-Privileged)\Inbox
+X-Origin: FARMER-D
+X-FileName: DFARMER (Non-Privileged).pst
+
+ 
+
+Daren:
+
+Joe provided financial premium for WAHA as <$.095> for the shorter period and <$.085> for the longer term. Could you please provide me with an estimate of physical premium.
+
+Thanks,
+Elena

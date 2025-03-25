@@ -1,0 +1,113 @@
+Message-ID: <29303475.1075840484981.JavaMail.evans@thyme>
+Date: Mon, 3 Jun 2002 11:41:57 -0700 (PDT)
+From: elsie.lew@enron.com
+To: jennifer.thome@enron.com
+Subject: RE: BPA Dec. 01, DMS #12593
+Cc: lisa.gang@enron.com
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+Bcc: lisa.gang@enron.com
+X-From: Lew, Elsie </O=ENRON/OU=NA/CN=RECIPIENTS/CN=ELEW>
+X-To: Thome, Jennifer </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jthome>
+X-cc: Gang, Lisa </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lgang>
+X-bcc: 
+X-Folder: \ExMerge - Gang, Lisa\Inbox
+X-Origin: GANG-L
+X-FileName: lisa gang 6-25-02.pst
+
+Jennifer,
+Yes, I do believe you have the correct understanding.  The ttls you have tie to the dms impact. Let me know if you have any questions.
+
+Thanks,
+Elsie
+
+
+ -----Original Message-----
+From: 	Thome, Jennifer  
+Sent:	Thursday, May 30, 2002 6:15 PM
+To:	Lew, Elsie
+Cc:	Gang, Lisa
+Subject:	BPA Dec. 01, DMS #12593
+
+Elsie:
+
+Sorry, in looking over this again with Lisa, we want to be sure that we understand the request correctly.  
+
+See attached for my understanding of what you are requesting and please confirm.
+
+I looked at this from the perspective of each entire deal.  For each, I took the total price and volume of the deal and subtracted/added the MWs you specified and then calculated the revised value of each deal.  
+
+Is this a correct understanding of the changes needed and their impact?
+
+Thanks, Jenny
+
+ << File: 12593 - BPA.xls >> 
+
+ -----Original Message-----
+From: 	Lew, Elsie  
+Sent:	Thursday, May 30, 2002 8:05 AM
+To:	Thome, Jennifer
+Subject:	RE: to portland for bpa.xls
+
+Hey Jennifer,
+	Did you have any more questions related to this?
+Thanks,
+Elsie
+713-853-6757
+
+ -----Original Message-----
+From: 	Thome, Jennifer  
+Sent:	Wednesday, May 22, 2002 4:08 PM
+To:	Lew, Elsie
+Subject:	RE: to portland for bpa.xls
+
+Got it, thanks.
+
+ -----Original Message-----
+From: 	Lew, Elsie  
+Sent:	Wednesday, May 22, 2002 2:02 PM
+To:	Thome, Jennifer
+Subject:	RE: to portland for bpa.xls
+
+Jennifer,,,,,I updated the dms....in the comment section this is for 2 deals...the difference between enpwer mw and revised mw will be 8150 mw (12600mw revised to 4450mw)...the spreadsheet is the detail for the changes needed and not totals for the deals.  
+
+Thanks,
+Elsie
+
+
+ -----Original Message-----
+From: 	Thome, Jennifer  
+Sent:	Wednesday, May 22, 2002 3:56 PM
+To:	Lew, Elsie
+Subject:	RE: to portland for bpa.xls
+
+Elsie:
+
+Thanks for the welcome!
+
+Already I have a quick question - in the attached spreadsheet, the disputed MW columns seem to add up to 12600 and 4450.  In reading the DMS, I would expect them to add up to 14600 and 5600 (or 12600 and 3600, if I only include the referrenced deal, #12593). Am I missing something?
+
+Jenny
+
+ -----Original Message-----
+From: 	Lew, Elsie  
+Sent:	Wednesday, May 22, 2002 1:36 PM
+To:	Thome, Jennifer
+Subject:	FW: to portland for bpa.xls
+
+....and welcome aboard!
+
+
+ -----Original Message-----
+From: 	Lew, Elsie  
+Sent:	Wednesday, May 22, 2002 3:34 PM
+To:	Thome, Jennifer; Thompson, Virginia
+Cc:	Grace, Rebecca M.
+Subject:	to portland for bpa.xls
+
+ << File: to portland for bpa.xls >> 
+Hello,,,,,this is the support of the chgs needed for dms request 12593.  If you have questions or need additional info, I'm at 713-853-6757.
+
+Thanks,
+Elsie

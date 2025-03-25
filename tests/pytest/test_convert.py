@@ -10,7 +10,7 @@ import pytest
 # sys.path.append("./tests/refactor-tests/")
 from palimpzest.constants import Model, PromptStrategy
 from palimpzest.core.lib.schemas import File, TextFile
-from palimpzest.query.operators.convert import LLMConvertBonded, LLMConvertConventional
+from palimpzest.query.operators.convert import LLMConvertBonded
 from palimpzest.query.operators.scan import MarshalAndScanDataOp
 
 if not os.environ.get("OPENAI_API_KEY"):
@@ -23,7 +23,6 @@ if not os.environ.get("OPENAI_API_KEY"):
     argnames=("convert_op", "side_effect"),
     argvalues=[
         pytest.param(LLMConvertBonded, "enron-convert", id="bonded-llm-convert"),
-        pytest.param(LLMConvertConventional, "enron-convert", id="conventional-llm-convert"),
     ],
     indirect=["side_effect"],
 )
@@ -39,7 +38,6 @@ def test_convert(mocker, convert_op, side_effect, email_schema, enron_eval_tiny)
 
     # mock out calls to generators used by the plans which parameterize this test
     mocker.patch.object(LLMConvertBonded, "convert", side_effect=side_effect)
-    mocker.patch.object(LLMConvertConventional, "convert", side_effect=side_effect)
 
     # run scan and convert operators
     source_idx = 0
