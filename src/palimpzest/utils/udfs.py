@@ -12,6 +12,10 @@ import requests
 from palimpzest.constants import MAX_ROWS
 
 
+def file_to_xml(candidate:dict):
+    """Function to extract the xml of a given webpage"""
+    return {"xml":[...], "sections":[...]}
+
 def url_to_file(candidate: dict):
     """Function used to convert a DataRecord instance of URL to a File DataRecord."""
 
