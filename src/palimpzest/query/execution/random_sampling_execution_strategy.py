@@ -218,6 +218,7 @@ class RandomSamplingExecutionStrategy(SentinelExecutionStrategy):
             logical_op_id: OpSet(op_set, source_indices, self.k, self.j, self.seed)
             for logical_op_id, op_set in plan
         }
+        import pdb; pdb.set_trace()
 
         # initialize and start the progress manager
         self.progress_manager = create_progress_manager(plan, sample_budget=self.sample_budget, progress=self.progress)
