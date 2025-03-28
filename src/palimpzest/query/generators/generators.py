@@ -17,17 +17,12 @@ from typing import Any, Generic, TypeVar
 from colorama import Fore, Style
 from openai import OpenAI
 from openai.types.chat.chat_completion import ChatCompletion
-
-# from tenacity import retry, stop_after_attempt, wait_exponential
 from together import Together
 from together.types.chat_completions import ChatCompletionResponse
 
 from palimpzest.constants import (
     MODEL_CARDS,
     APIClient,
-    # RETRY_MAX_ATTEMPTS,
-    # RETRY_MAX_SECS,
-    # RETRY_MULTIPLIER,
     Cardinality,
     Model,
     PromptStrategy,

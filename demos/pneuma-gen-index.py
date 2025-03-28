@@ -52,8 +52,8 @@ def download_questions():
         print("Questions already downloaded")
         return
 
-    URL = "https://docs.google.com/uc?export=download"
-    FILE_ID = "1vdddvHeHdNgAquceBEO4dK-LMyLUtPv1"
+    URL = "https://docs.google.com/uc?export=download"  # noqa: N806
+    FILE_ID = "1vdddvHeHdNgAquceBEO4dK-LMyLUtPv1"  # noqa: N806
 
     session = requests.Session()
     response = session.get(URL, params={"id": FILE_ID}, stream=True)
@@ -70,7 +70,7 @@ def download_questions():
             if chunk:
                 f.write(chunk)
 
-    print(f"Questions downloaded")
+    print("Questions downloaded")
 
 
 def main():

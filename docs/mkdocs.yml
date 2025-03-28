@@ -35,7 +35,6 @@ nav:
         - CriticAndRefineConvert: api/operators/convert/critique-and-refine-convert.md
         - MixtureOfAgentsConvert: api/operators/convert/mixture-of-agents-convert.md
         - RAGConvert: api/operators/convert/rag-convert.md
-        - TokenReducedConvert: api/operators/convert/token-reduction-convert.md
       - Filter:
         - Base: api/operators/filter/filter.md
         - LLMFilter: api/operators/filter/llm-filter.md
