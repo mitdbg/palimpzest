@@ -1,132 +1,67 @@
 import palimpzest as pz
-from palimpzest.constants import Cardinality
 from palimpzest.core.elements.records import DataRecord 
-from palimpzest.core.lib.schemas import RawJSONObject, TextFile
-from palimpzest.core.lib.fields import Field 
-from palimpzest.agents.debugger_agent import DebuggerAgent
-from palimpzest.agents.code_editor_agent import CodeEditorAgent
+from palimpzest.core.lib.schemas import RawJSONObject, TextFile, Schema
+from palimpzest.core.lib.fields import Field, StringField 
+# from palimpzest.query.agents.debugger_agent import DebuggerAgent
+# from palimpzest.query.agents.code_editor_agent import CodeEditorAgent
 from palimpzest.query.processor.config import QueryProcessorConfig
-from datetime import datetime
 
 import json
+import os
 import re
 
-class GithubIssue(TextFile):
+class GithubIssue(Schema):
     """Represents a github issue containing a problem statement and the relevant issue code pertaining to the issue."""
 
-    instance_id = Field(
+    instance_id = StringField(
         desc="The instance_id",
     )
-    problem_statement = Field(
+    problem_statement = StringField(
         desc="A text description of the github issue which can be found within the problem statement field of the provided json object. It may also include helpful exchanges between developers relating to the issue.",
     )
-    relevant_issue_code = Field(
-        desc="The relevant code pertaining to the issue. Code across multiple files may be included where the start and end of each file is indicated by 'start of' and 'end of' statemnts. ",
-    )
-    base_commit = Field(
+    base_commit = StringField(
         desc="This is the commit that the code is based on.",
     )
-  
-class CodeFix(GithubIssue):
-    new_code = Field(
-        desc="You are an expert software engineer. You are provided the relevant issue code and a problem statement describing an issue to fix in the code. Your task is to return the entire modified version of the provided code after addressing the problem, while keeping the structure and any necessary comments intact. This includes preserving the line numbers and the start and end file boundary markings ([start of <filename>]). Make sure to also return every file that was provided, even those that were not modified.", 
-    )
-    change_description = Field(
-        desc="A description of the code change made. Be specific and use line numbers.", 
-    )
 
-class SimplifiedCodeFix(RawJSONObject):
-    change_description = Field(
-        desc="A description of the code change made. Be specific and use line numbers.", 
-    )
-    instance_id = Field(
-        desc="The instance_id",
-    )
-    relevant_issue_code = Field(
-        desc="The relevant code pertaining to the issue. Code across multiple files may be included where the start and end of each file is indicated by 'start of' and 'end of' statemnts. ",
-    )
-    code_fix = Field(
-        desc="You are an expert software engineer. You are provided the relevant issue code and a problem statement describing an issue to fix in the code. Your task is to return the entire modified version of the provided code after addressing the problem, while keeping the structure and any necessary comments intact. This includes preserving the line numbers and the start and end file boundary markings ([start of <filename>]). Make sure to also return every file that was provided, even those that were not modified.", 
-    )
 
-class GithubCodePatch(RawJSONObject):
-    model_patch = Field(
-        desc="You are a version control assistant tasked with generating a GitHub code patch (diff format) to represent changes between two versions of code: the relevant issue code and the code fix. Each file in the code is enclosed within boundaries marked by [start of <filename>] and [end of <filename>], with line numbers provided. A description of the change will also be provided for context. Analyze the differences between the two versions and produce a patch that correctly reflects the modifications. Ignore any changes in formatting and excessive new lines. For reference, here is an example of a GitHub patch format: diff --git a/example.py b/example.py --- a/example.py +++ b/example.py @@ -1,3 +1,3 @@ -print('Hello, world!') +print('Hello, Python!') print('This is line 2.') print('This is line 3.') Use this format to generate the required patch.",
-    )
+class GithubIssueDataReader(pz.DataReader):
+    def __init__(self, path):
+        super().__init__(GithubIssue)
+        self.path = path
+        self.filepaths = [
+            os.path.join(path, filename)
+            for filename in sorted(os.listdir(path))
+            if os.path.isfile(os.path.join(path, filename))
+        ]
 
-    instance_id = Field(
-        desc="The instance id",
-    )
+    def __len__(self):
+        return len(self.filepaths)
 
-def parse_files(input_string):
-    """
-    Parses a single input string containing multiple files marked with
-    `[start of ...]` and `[end of ...]`.
+    def __getitem__(self, idx: int):
+        # get instance
+        instance_filepath = self.filepaths[idx]
+        with open(instance_filepath) as f:
+            contents = f.read()
 
-    Args:
-        input_string (str): Input string with all the code.
+        data = json.loads(contents)
 
-    Returns:
-        dict: A dictionary where keys are file names and values are file content.
-    """
-    file_pattern = re.compile(r'\[start of (.+?)\](.*?)\[end of \1\]', re.DOTALL)
-    matches = file_pattern.findall(input_string)
-    files = {match[0].strip(): match[1].strip() for match in matches}
-    return files
+        github_issue = {}
+        github_issue['instance_id'] = data['instance_id']
+        github_issue['problem_statement'] = data['problem_statement']
+        github_issue['base_commit'] = data['base_commit']
 
-def extract_relevant_fields(candidate: DataRecord):
-    data = json.loads(candidate['contents'])
+        return github_issue
 
-    github_issue = {}
-
-    github_issue 
-    github_issue['instance_id'] = data['instance_id']
-    github_issue['problem_statement'] = data['problem_statement']
-    github_issue['base_commit'] = data['base_commit']
-
-    # Regular expression to extract content between <code> and <code/>
-    pattern = r"<code>(.*?)</code>"
-
-    # Search for the content
-    match = re.search(pattern, candidate['contents'])
-
-    if match:
-        extracted_content = match.group(1)
-    else: 
-        extracted_content = ""
-        print("Relevant code not found")
-    
-    github_issue['relevant_issue_code'] = extracted_content
-    github_issue['contents'] = ''
-    github_issue['filename'] = data['instance_id']
-
-    return github_issue
-
-def remove_irrelevant_fields(candidate: DataRecord):
-    # code_fix = DataRecord(schema=SimplifiedCodeFix)
-    code_fix = {}
-    code_fix['instance_id'] = candidate['instance_id']
-    code_fix['relevant_issue_code'] = candidate['relevant_issue_code']
-    code_fix['code_fix'] = candidate['new_code'] 
-    # code_fix.contents = ""
-    # code_fix.problem_statement = ""
-    code_fix['change_description'] = candidate['change_description']
-    # code_fix.filename = data['instance_id']
-
-    return code_fix 
-
-def buildSweBenchPlan(dataset):
-
-    # Create agents
-    debugger_agent = DebuggerAgent()
-    code_editor_agent = CodeEditorAgent()
+def buildSweBenchPlan(path):
+    # create instance of data reader
+    datareader = GithubIssueDataReader(path)
 
     # Create dataset
-    github_issues = pz.Dataset(dataset, schema=GithubIssue, udf=extract_relevant_fields)
+    github_issues = pz.Dataset(datareader)
 
     # Process GitHub Issues
-    code_plans = debugger_agent(github_issues)
-    code_patches = code_editor_agent(code_plans)
+    code_plans = github_issues.add_agent(agent_name="debugger")
+    code_patches = code_plans.add_agent(agent_name="code_editor") 
 
     return code_patches
 
@@ -150,7 +85,7 @@ def dump_records(filename, records, values, all_values=False):
         json.dump(dict_list, file, indent=4)
 
 if __name__ == "__main__":
-    plan = buildSweBenchPlan("swe-bench-oracle")
+    plan = buildSweBenchPlan("/Users/jasonli/Documents/GitHub/palimpzest/testdata/swe-bench-oracle-lite")
 
     # execute pz plan
     config = QueryProcessorConfig(
@@ -163,4 +98,4 @@ if __name__ == "__main__":
 
     # Output Records into json file
     # filename = f'output_{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.json' 
-    # dump_records(filename, data_record_collection, values=['instance_id', 'model_patch']) 
+    #dump_records(filename, data_record_collection, values=['instance_id', 'model_patch']) 

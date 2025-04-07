@@ -1,4 +1,7 @@
 from palimpzest.query.optimizer.rules import (
+	AgentRule as _AgentRule,
+)
+from palimpzest.query.optimizer.rules import (
     AggregateRule as _AggregateRule,
 )
 from palimpzest.query.optimizer.rules import (
@@ -63,6 +66,7 @@ from palimpzest.query.optimizer.rules import (
 )
 
 ALL_RULES = [
+	_AgentRule,
     _AggregateRule,
     _BasicSubstitutionRule,
     _CodeSynthesisConvertRule,

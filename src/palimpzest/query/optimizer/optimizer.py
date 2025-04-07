@@ -16,6 +16,7 @@ from palimpzest.query.operators.logical import (
     LogicalOperator,
     Project,
     RetrieveScan,
+    Agent
 )
 from palimpzest.query.optimizer import (
     IMPLEMENTATION_RULES,
@@ -294,6 +295,12 @@ class Optimizer:
                 output_attr=node._output_attr,
                 k=node._k,
                 target_cache_id=uid
+            )
+        elif node._agent_name is not None:
+            op = Agent(
+                input_schema=input_schema, 
+                output_schema=output_schema,
+                agent_name=node._agent_name,
             )
         elif output_schema != input_schema:
             op = ConvertScan(

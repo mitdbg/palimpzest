@@ -36,6 +36,7 @@ class Set:
         group_by: GroupBySig | None = None,
         project_cols: list[str] | None = None,
         index=None,  # TODO(Siva): Abstract Index and add a type here and elsewhere
+        agent_name: str | None = None,
         search_func: Callable | None = None,
         search_attr: str | None = None,
         output_attr: str | None = None,
@@ -54,6 +55,7 @@ class Set:
         self._group_by = group_by
         self._project_cols = None if project_cols is None else sorted(project_cols)
         self._index = index
+        self._agent_name = agent_name
         self._search_func = search_func
         self._search_attr = search_attr
         self._output_attr = output_attr
@@ -161,7 +163,36 @@ class Dataset(Set):
             depends_on=depends_on,
             nocache=self._nocache,
         )
-    
+
+    def add_agent(self, agent_name: str) -> Dataset:
+        """ Applies an agent to the dataset. """
+        # TODO: generalize this
+        new_output_schema = None
+        if agent_name == "debugger":
+            cols = [
+                {"name": "bug_report", "desc": "A report containing information about the cause of the bug in the code base and how it can be fixed.", "type": str},
+            ]
+        elif agent_name == "code_editor":
+            cols = [
+                {"name": "model_patch", "desc": "A GitHub code patch representing how the github repository of interest must be modified to implement the provided bug fix.", "type": str},
+                {"name": "model_name_or_path", "desc": "The name of the system generating the code patch.", "type": str},
+            ]
+        else:
+            raise ValueError(f"Agent {agent_name} not supported.")
+
+        # create new schema
+        new_output_schema = self.schema.add_fields(cols)
+
+        # TO DO: Maybe we have to remove fields
+
+        # Selects the agent given the name 
+        return Dataset(
+            source=self,
+            udf=None,
+            schema=new_output_schema,
+            agent_name=agent_name, 
+        )
+
     def sem_filter(
         self,
         _filter: str,

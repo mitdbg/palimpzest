@@ -1,29 +1,15 @@
-from palimpzest.agents.base_agent import BaseAgent
-from palimpzest.core.lib.fields import Field 
-from palimpzest.core.lib.schemas import RawJSONObject
-from palimpzest.sets import Dataset
-from palimpzest.constants import Cardinality
+from palimpzest.agents.base_agent import BaseAgentOp
 from palimpzest.core.elements.records import DataRecord
-from palimpzest.core.lib.schemas import Schema
+from palimpzest.agents.react import ReAct 
 from palimpzest.agents import utils
 from palimpzest.agents.debugger_agent import LOGGER
+from palimpzest.core.data.dataclasses import GenerationStats
 import json
 import dspy
+import time 
 from datetime import datetime
 from dspy import Tool
 
-PARAMS = {
-    "MAX_ITERS": 20, 
-    "VERIFY_LOOPS": 2,
-}
-
-class GithubCodePatch(Schema):
-    model_patch = Field(
-        desc="You are a version control assistant tasked with generating a GitHub code patch (diff format) to represent changes between two versions of code: the relevant issue code and the code fix. Each file in the code is enclosed within boundaries marked by [start of <filename>] and [end of <filename>], with line numbers provided. A description of the change will also be provided for context. Analyze the differences between the two versions and produce a patch that correctly reflects the modifications. Ignore any changes in formatting and excessive new lines. For reference, here is an example of a GitHub patch format: diff --git a/example.py b/example.py --- a/example.py +++ b/example.py @@ -1,3 +1,3 @@ -print('Hello, world!') +print('Hello, Python!') print('This is line 2.') print('This is line 3.') Use this format to generate the required patch.",
-    )
-    instance_id = Field(
-        desc="The instance id",
-    )
 
 class PatchGeneration(dspy.Signature):
     """
@@ -39,21 +25,14 @@ class PatchGeneration(dspy.Signature):
     code_patch: str = dspy.OutputField(desc="A GitHub code patch representing how the github repository of interest must be modified to implement the provided bug fix.")
 
 
-class CodeEditorAgent(BaseAgent):
+class CodeEditorAgentOp(BaseAgentOp):
 
-    def __init__(self):
+    def __init__(self, max_iters: int , *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.max_iters = max_iters
         self.output_dir = f'output_{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.json' 
 
-    def __call__(self, data: Dataset) -> Dataset:
-      """ Generates a solution plan for the Dataset """
-      return Dataset(
-          source=data,
-          schema=GithubCodePatch,
-          udf=self.generate_patch,
-          cardinality=Cardinality.ONE_TO_ONE,
-      )
-  
-    def generate_patch(self, candidate: DataRecord) -> dict: 
+    def run_agent(self, candidate: DataRecord) -> dict: 
         # Let the agent navigate the code base with the same tools and provide the bug fix plan
 
         print(f'\n =============== CODE EDITOR AGENT START for {candidate["instance_id"]} ===============')
@@ -61,21 +40,21 @@ class CodeEditorAgent(BaseAgent):
         patch = {
             'instance_id': candidate['instance_id'],
             'model_name_or_path': 'palimpzest',
-            # 'problem_statement': candidate['problem_statement'],
-            # 'relevant_issue_code': candidate['relevant_issue_code'],
         }
 
-        react = dspy.ReAct(
+        react = ReAct(
             PatchGeneration, 
             tools=[
-                Tool(BaseAgent.get_classes_and_methods),
-                Tool(BaseAgent.get_file_content),
-                Tool(BaseAgent.extract_method), 
-                Tool(BaseAgent.search_keyword),
-                Tool(CodeEditorAgent.create_patch),
+                Tool(BaseAgentOp.get_classes_and_methods),
+                Tool(BaseAgentOp.get_file_content),
+                Tool(BaseAgentOp.extract_method), 
+                Tool(BaseAgentOp.search_keyword),
+                Tool(CodeEditorAgentOp.create_patch),
             ],
-            max_iters=PARAMS['MAX_ITERS'],
+            max_iters=self.max_iters,
         )
+
+        start_time = time.time()
 
         result = react(
             instance_id=candidate['instance_id'],
@@ -83,25 +62,37 @@ class CodeEditorAgent(BaseAgent):
             problem_statement=candidate['problem_statement'], 
         )
 
-        pretty_trajectory = json.dumps(result.toDict(), indent=4)
-
-        if BaseAgent.LOGGING_ENABLED:
-            LOGGER.info(f'Code Editor Trajectory {patch["instance_id"]}: {pretty_trajectory}')
-
         # TO DO: Implement patch/code verification
         # May want to clean patch (new lines, extra tokens, etc)
         patch['model_patch'] = result.code_patch
 
         cumulative_cost = utils.compute_cost_from_history(dspy.settings.lm.history)
 
-        # Save patch 
+        # Construct generation stats
+        # TODO: Compute number of input and output tokens for a single react run
+        generation_stats = GenerationStats(
+            model_name=str(dspy.settings.lm.model),
+            llm_call_duration_secs=time.time() - start_time, 
+            # total_input_tokens=input_tokens,
+            # total_output_tokens=output_tokens,
+            # total_input_cost=input_tokens * usd_per_input_token,
+            # total_output_cost=output_tokens * usd_per_output_token,
+            # cost_per_record=input_tokens * usd_per_input_token + output_tokens * usd_per_output_token,
+        )
+
+        # Save patch result 
         utils.add_patch_to_output_dir(self.output_dir, patch)
-        if BaseAgent.PRINTING_ENABLED: 
+
+        if BaseAgentOp.LOGGING_ENABLED:
+            pretty_trajectory = json.dumps(result.toDict(), indent=4)
+            LOGGER.info(f'Code Editor Trajectory {patch["instance_id"]}: {pretty_trajectory}')
+
+        if BaseAgentOp.PRINTING_ENABLED: 
             print(f'Completed Patch Generation for {candidate["instance_id"]} \n')
             print(f'Code Agent Cumulative Cost: {cumulative_cost} \n')
             print(f'Number of prompts: {len(dspy.settings.lm.history)} \n')
 
-        return patch
+        return patch, generation_stats
 
     def clean_patch(patch: str) -> str:
         # TO DO: Implement patch cleaning 
@@ -141,7 +132,7 @@ class CodeEditorAgent(BaseAgent):
 
         indent_size = int(indent_size)
 
-        if BaseAgent.PRINTING_ENABLED:
+        if BaseAgentOp.PRINTING_ENABLED:
             print(f'create_patch')
 
         patch_lines = []
@@ -172,5 +163,9 @@ class CodeEditorAgent(BaseAgent):
                             patch_lines.append(content)
                 
                 return "\n".join(patch_lines)
+    
+    def get_fields_to_generate(self, candidate: DataRecord) -> list[str]:
+        candidate_field_names = candidate.get_field_names()
+        return candidate_field_names + ['model_patch', 'model_name_or_path']
 
 

@@ -8,7 +8,7 @@ import json
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
 import pygit2
-import re
+import tiktoken
 
 # TO DO: Generalize to other repos 
 # TEMP_VARS = {
@@ -24,6 +24,13 @@ MODEL_RATES = {
         "output_rate": 10, 
     },
 }
+
+def count_tokens(content: str) -> int: 
+    encoding = tiktoken.encoding_for_model("gpt-4")  # or "gpt-3.5-turbo", etc.
+    tokens = encoding.encode(content)
+    num_tokens = len(tokens)
+    return num_tokens
+
 
 def add_line_numbers(code_str, start_line_no=1):
     """

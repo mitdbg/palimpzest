@@ -18,7 +18,10 @@ from palimpzest.query.operators.logical import (
     LimitScan,
     Project,
     RetrieveScan,
+    Agent
 )
+from palimpzest.agents.debugger_agent import DebuggerAgentOp 
+from palimpzest.agents.code_editor_agent import CodeEditorAgentOp
 from palimpzest.query.operators.mixture_of_agents_convert import MixtureOfAgentsConvert
 from palimpzest.query.operators.project import ProjectOp
 from palimpzest.query.operators.rag_convert import RAGConvert
@@ -203,6 +206,54 @@ class ImplementationRule(Rule):
 
     pass
 
+class AgentRule(ImplementationRule):
+    """ 
+    Base class for agent rules which convert a logical expression to an agent expression.
+    """
+
+    max_iters = [5, 10, 15, 20]
+
+    @classmethod
+    def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
+        return isinstance(logical_expression.operator, Agent) and logical_expression.operator.agent_name is not None
+    
+    @classmethod
+    def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
+        logical_op = logical_expression.operator
+
+        physical_expressions = []
+        for max_iter in cls.max_iters: 
+            # get initial set of parameters for physical op
+            op_kwargs = logical_op.get_logical_op_params()
+            op_kwargs.update(
+                {
+                    "verbose": physical_op_params["verbose"],
+                    "logical_op_id": logical_op.get_logical_op_id(),
+                    "logical_op_name": logical_op.logical_op_name(),
+                    "max_iters": max_iter,
+                }
+            )
+            
+            # construct multi-expression
+            if logical_op.agent_name == "debugger":
+                op = DebuggerAgentOp(**op_kwargs)
+            elif logical_op.agent_name == "code_editor":
+                op = CodeEditorAgentOp(**op_kwargs)
+            else: 
+                raise ValueError(f"Unknown agent name: {logical_op.agent_name}")
+
+            expression = PhysicalExpression(
+                operator=op,
+                input_group_ids=logical_expression.input_group_ids,
+                input_fields=logical_expression.input_fields,
+                depends_on_field_names=logical_expression.depends_on_field_names,
+                generated_fields=logical_expression.generated_fields,
+                group_id=logical_expression.group_id,
+            )
+
+            physical_expressions.append(expression)
+
+        return set(physical_expressions)
 
 class NonLLMConvertRule(ImplementationRule):
     """

@@ -1,8 +1,22 @@
 
 import palimpzest.agents.utils as utils
+from typing import Any
+from palimpzest.core.elements.records import DataRecord, DataRecordSet
+from palimpzest.core.data.dataclasses import GenerationStats, RecordOpStats
+from palimpzest.query.operators.physical import PhysicalOperator
+from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.query.generators.generators import get_api_key
+from palimpzest.core.data.dataclasses import GenerationStats, OperatorCostEstimates 
+from palimpzest.agents.constants import DEBUGGER_NAIVE_EST_NUM_INPUT_TOKENS_PER_ITER, CODE_EDITOR_NAIVE_EST_NUM_OUTPUT_TOKENS_PER_ITER
+from palimpzest.constants import MODEL_CARDS
+import tiktoken
+from abc import ABC, abstractmethod
+import time
 import dspy
 import ast
+
+# TYPE DEFINITIONS
+FieldName = str
 
 LOGGER = utils.setup_logger()
 
@@ -15,28 +29,168 @@ GLOBAL_CONTEXT = {
     "model": dspy.LM('openai/gpt-4o', api_key=openai_key),
 }
 
-
-class BaseAgent:
+class BaseAgentOp(PhysicalOperator):
     # instance_id -> {"base_commit": <str>, "owner": <str>, "repo": <str>}
     instance_params = {}
     PRINTING_ENABLED = True 
-    LOGGING_ENABLED = True
+    LOGGING_ENABLED = False
 
+    def __init__(
+        self,
+        agent_name: str = None, 
+        *args, **kwargs
+    ):
+        super().__init__(*args, **kwargs)
+        self.agent_name = agent_name
+        self.model_name = "gpt-4o-2024-08-06"
+
+    def get_id_params(self):
+        id_params = super().get_id_params()
+        id_params = {"agent_name": self.agent_name, 
+                     "max_iters": self.max_iters, 
+                     **id_params
+                    }
+
+        return id_params
+
+    def get_op_params(self):
+        op_params = super().get_op_params()
+        op_params = {"agent_name": self.agent_name, 
+                     "max_iters": self.max_iters, 
+                     **op_params
+                    }
+
+        return op_params
+
+    @abstractmethod
+    def run_agent(self, candidate: DataRecord) -> dict:
+        """
+        This abstract method will be implemented by subclasses of BaseAgent to process the input DataRecord
+        through an agentic workflow and return the results.
+        """
+        pass
+
+    def __call__(self, candidate: DataRecord) -> DataRecordSet:
+        start_time = time.time()
+
+        # Get fields the agent will generate
+        fields_to_generate = self.get_fields_to_generate(candidate)
+
+        field_answers, generation_stats = self.run_agent(candidate)
+
+        # transform the mapping from fields to answers into a (list of) DataRecord(s)
+        dr = self._create_data_record_from_field_answers(field_answers, candidate)
+
+        record_set = self._create_record_set(
+            record=dr,
+            fields=fields_to_generate,
+            generation_stats=generation_stats,
+            total_time=time.time() - start_time,
+        )
+
+        return record_set
+
+    def _create_data_record_from_field_answers(
+        self,
+        field_answers: dict[FieldName, list[Any]],
+        candidate: DataRecord,
+    ) -> DataRecord:
+        """
+        Given a mapping from each field to its (list of) generated value(s), we construct the corresponding
+        list of output DataRecords.
+        """
+
+        # initialize record with the correct output schema, and parent record
+        dr = DataRecord.from_parent(self.output_schema, parent_record=candidate)
+
+        # copy all fields from the input record
+        # NOTE: this means that records processed by PZ agents will inherit all pre-computed fields
+        #       in an incremental fashion; this is a design choice which may be revisited in the future
+        for field in candidate.get_field_names():
+            setattr(dr, field, getattr(candidate, field))
+
+        # get input field names and output field names
+        input_fields = self.input_schema.field_names()
+        output_fields = self.output_schema.field_names()
+
+        # parse newly generated fields from the field_answers dictionary for this field; if the list
+        # of generated values is shorter than the number of records, we fill in with None
+        for field in output_fields:
+            if field not in input_fields:
+                value = field_answers[field]
+                setattr(dr, field, value)
+            
+        return dr
+
+    
+    @abstractmethod
+    def get_fields_to_generate(self, candidate):
+        """
+        This abstract method will be implemented by subclasses of BaseAgent to return the fields that the agent will generate.
+        """
+        pass
+    
+    def _create_record_set(
+        self,
+        record: DataRecord,
+        fields: list[str],
+        generation_stats: GenerationStats,
+        total_time: float,
+    ) -> DataRecordSet:
+        """
+        Construct list of RecordOpStats objects (one for each DataRecord).
+        """
+        # amortize the generation stats across all generated records
+        per_record_stats = generation_stats 
+        time_per_record = total_time 
+
+        # create the RecordOpStats objects for each output record
+        record_op_stats_lst = RecordOpStats(
+            record_id=record.id,
+            record_parent_id=record.parent_id,
+            record_source_idx=record.source_idx,
+            record_state=record.to_dict(include_bytes=False),
+            op_id=self.get_op_id(),
+            logical_op_id=self.logical_op_id,
+            op_name=self.op_name(),
+            time_per_record=time_per_record,
+            cost_per_record=per_record_stats.cost_per_record,
+            model_name=self.get_model_name(),
+            answer={field_name: getattr(record, field_name) for field_name in fields},
+            input_fields=self.input_schema.field_names(),
+            generated_fields=fields,
+            total_input_tokens=per_record_stats.total_input_tokens,
+            total_output_tokens=per_record_stats.total_output_tokens,
+            total_input_cost=per_record_stats.total_input_cost,
+            total_output_cost=per_record_stats.total_output_cost,
+            llm_call_duration_secs=per_record_stats.llm_call_duration_secs,
+            fn_call_duration_secs=per_record_stats.fn_call_duration_secs,
+            op_details={k: str(v) for k, v in self.get_id_params().items()},
+        )
+
+        # create and return the DataRecordSet
+        return DataRecordSet([record], record_op_stats_lst)
+
+    
     @staticmethod
     def get_file_content(file_name: str, include_line_numbers: bool, instance_id: str) -> str:
         """
-        Returns the content of an entire file. 
+        Returns the content of an entire file, up to a set max line limit. 
         Only use this when the entire content of a file is required as it may return many tokens.
         Only set include_line_numbers to True if being used to generate a patch. 
         """
-        if BaseAgent.PRINTING_ENABLED:
+        if BaseAgentOp.PRINTING_ENABLED:
             print(f'get_file_content {file_name}')
 
-        base_commit = BaseAgent.instance_params[instance_id]["base_commit"]
-        owner = BaseAgent.instance_params[instance_id]["owner"]
-        repo = BaseAgent.instance_params[instance_id]["repo"]
+        base_commit = BaseAgentOp.instance_params[instance_id]["base_commit"]
+        owner = BaseAgentOp.instance_params[instance_id]["owner"]
+        repo = BaseAgentOp.instance_params[instance_id]["repo"]
         content = utils.fetch_github_code(file_name, owner, repo, base_commit)
-        return utils.add_line_numbers(content) if include_line_numbers else content
+
+        print(f'Number of tokens: {utils.count_tokens(content)}')
+
+        content = utils.add_line_numbers(content) if include_line_numbers else content 
+        return content
 
     @staticmethod
     def search_keyword(repo_name : str, keyword: str, instance_id: str) -> str:
@@ -46,12 +200,12 @@ class BaseAgent:
         If searching for a function or class definition, it may be useful to prefix the keyword with "def " or "class ".
         """
 
-        if BaseAgent.PRINTING_ENABLED:
+        if BaseAgentOp.PRINTING_ENABLED:
             print(f'search_keyword {keyword}')
 
         local_repo_path = utils.download_repo(repo_name)
 
-        base_commit = BaseAgent.instance_params[instance_id]["base_commit"]
+        base_commit = BaseAgentOp.instance_params[instance_id]["base_commit"]
         matching_files = utils.search_keyword(local_repo_path, base_commit, keyword)
 
         return matching_files
@@ -74,14 +228,14 @@ class BaseAgent:
         Only set include_line_numbers to True if being used to generate a patch.
         """
 
-        if BaseAgent.PRINTING_ENABLED:
+        if BaseAgentOp.PRINTING_ENABLED:
             print(f'extract_method {function_name} from {file_name}')
 
         try:
             # Parse the source code into an AST
-            base_commit = BaseAgent.instance_params[instance_id]["base_commit"]
-            owner = BaseAgent.instance_params[instance_id]["owner"]
-            repo = BaseAgent.instance_params[instance_id]["repo"]
+            base_commit = BaseAgentOp.instance_params[instance_id]["base_commit"]
+            owner = BaseAgentOp.instance_params[instance_id]["owner"]
+            repo = BaseAgentOp.instance_params[instance_id]["repo"]
             content = utils.fetch_github_code(file_name, owner, repo, base_commit)
             tree = ast.parse(content)
         except SyntaxError as e:
@@ -127,7 +281,7 @@ class BaseAgent:
         }
         """
 
-        if BaseAgent.PRINTING_ENABLED:
+        if BaseAgentOp.PRINTING_ENABLED:
             print(f'get_class_and_methods for {file_name}')
 
         # relevant_issue_code = GLOBAL_CONTEXT["relevant_issue_code"]
@@ -139,12 +293,41 @@ class BaseAgent:
         #     code = match.group(2).strip()
         # else: 
 
-        base_commit = BaseAgent.instance_params[instance_id]["base_commit"]
-        owner = BaseAgent.instance_params[instance_id]["owner"]
-        repo = BaseAgent.instance_params[instance_id]["repo"]
+        base_commit = BaseAgentOp.instance_params[instance_id]["base_commit"]
+        owner = BaseAgentOp.instance_params[instance_id]["owner"]
+        repo = BaseAgentOp.instance_params[instance_id]["repo"]
         code = utils.fetch_github_code(file_name, owner, repo, base_commit)
         if not code: 
             return "That file is not found in the relevant issue code, please try another file"
 
         code_structure = utils.extract_structure(code)
         return code_structure 
+    
+    def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
+        est_input_tokens_per_iter = DEBUGGER_NAIVE_EST_NUM_INPUT_TOKENS_PER_ITER
+        est_num_output_tokens_per_iter = CODE_EDITOR_NAIVE_EST_NUM_OUTPUT_TOKENS_PER_ITER
+        est_num_iters = self.max_iters if self.max_iters <= 10 else self.max_iters * 0.7
+
+        # Compute cardinality
+        cardinality = source_op_cost_estimates.cardinality
+
+        # Compute time per record
+        model_conversion_time_per_record = est_num_iters * MODEL_CARDS[self.model_name]["seconds_per_output_token"] * est_num_output_tokens_per_iter
+
+        # Compute cost per record
+        # TODO: Doesn't always go to max_iters - can make better
+        model_conversion_usd_per_record = est_num_iters * (
+            MODEL_CARDS[self.model_name]["usd_per_input_token"] * est_input_tokens_per_iter
+            + MODEL_CARDS[self.model_name]["usd_per_output_token"] * est_num_output_tokens_per_iter
+        )
+
+        # Compute quality
+        # TODO: This needs to be refined 
+        quality = 0.8 if self.max_iters >= 10 else 0.8 * (self.max_iters / 10) 
+
+        return OperatorCostEstimates(
+            cardinality=cardinality,
+            time_per_record=model_conversion_time_per_record,
+            cost_per_record=model_conversion_usd_per_record,
+            quality=quality,
+        )

@@ -111,6 +111,28 @@ class Agent(LogicalOperator):
     Agent is a logical operator that applies an agentic workflow to the input set and yields a single result.
     """
 
+    def __init__(self, agent_name, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.agent_name = agent_name
+
+    def get_logical_id_params(self):
+        logical_id_params = super().get_logical_id_params()
+
+        # TO DO: add max_iters
+        logical_id_params = {"agent_name": self.agent_name, **logical_id_params}
+
+        return logical_id_params
+
+    def get_logical_op_params(self) -> dict:
+        logical_op_params = super().get_logical_op_params()
+        logical_op_params = {
+            "agent_name": self.agent_name,
+            **logical_op_params,
+        }
+
+        return logical_op_params
+
+
 class Aggregate(LogicalOperator):
     """
     Aggregate is a logical operator that applies an aggregation to the input set and yields a single result.

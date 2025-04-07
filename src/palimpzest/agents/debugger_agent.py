@@ -1,35 +1,16 @@
 
-from palimpzest.agents.base_agent import BaseAgent, GLOBAL_CONTEXT
-from palimpzest.sets import Dataset
-from palimpzest.constants import Cardinality
+from palimpzest.agents.base_agent import BaseAgentOp, GLOBAL_CONTEXT
+from palimpzest.agents.react import ReAct 
 from palimpzest.core.elements.records import DataRecord
-from palimpzest.core.lib.fields import Field 
-from palimpzest.core.lib.schemas import RawJSONObject
-from palimpzest.core.lib.schemas import Schema
+from palimpzest.core.data.dataclasses import GenerationStats  
 import palimpzest.agents.utils as utils
+import time
 import json
 import dspy
 from dspy import Tool
 import re
 
-PARAMS = {
-    "MAX_ITERS": 20, 
-    "VERIFY_LOOPS": 2,
-}
-
 LOGGER = utils.setup_logger()
-
-class FixPlan(Schema):
-    """ Defines a plan for fixing a code issue """
-    bug_report = Field(
-        desc="A report on the cause of the bug and how it can be fixed, including the problem statement and relevant code",
-    )
-    instance_id = Field(
-        desc="The instance_id",
-    )
-    problem_statement = Field(
-        desc="A text description of the github issue which can be found within the problem statement field of the provided json object. It may also include helpful exchanges between developers relating to the issue.",
-    )
 
 class DebugGeneration(dspy.Signature): 
     """ 
@@ -41,18 +22,13 @@ class DebugGeneration(dspy.Signature):
     instance_id: str = dspy.InputField(desc="An execution identifier used as an argument for tools")
     fix_report: str = dspy.OutputField(desc="A report detailing the cause of the bug and how it can be fixed, referencing to exact line numbers and files.")
 
-class DebuggerAgent(BaseAgent): 
+class DebuggerAgentOp(BaseAgentOp): 
 
-    def __call__(self, data: Dataset) -> Dataset:
-        """ Generates a solution plan for the Dataset """
-        return Dataset(
-            source=data,
-            schema=FixPlan,
-            udf=self.generate_debug_plan,
-            cardinality=Cardinality.ONE_TO_ONE,
-        )
+    def __init__(self, max_iters: int , *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.max_iters = max_iters
   
-    def generate_debug_plan(self, candidate: DataRecord) -> dict:
+    def run_agent(self, candidate: DataRecord) -> dict:
         print(f'=============== DEBUGGER AGENT START for {candidate["instance_id"]} ===============')
 
         dspy.configure(lm=GLOBAL_CONTEXT['model'])
@@ -66,49 +42,64 @@ class DebuggerAgent(BaseAgent):
             'problem_statement': problem_statement,
         }
 
-        # Set instance values
+        # Set instance values in class instance_params
         pattern = r'^(?P<owner>[^_]+)__(?P<repo>.+)-\d+$'
         match = re.match(pattern, candidate['instance_id'])
         if match:
             owner = match.group('owner')
             repo = match.group('repo')
 
-        BaseAgent.instance_params[candidate['instance_id']] = {
+        BaseAgentOp.instance_params[candidate['instance_id']] = {
             "base_commit": candidate['base_commit'],
             "owner": owner, 
             "repo": repo,
         }
 
-        print(f'Instance Params: {BaseAgent.instance_params[candidate["instance_id"]]}')
-
         # TO DO: Maybe we can try this a few times and generate a few theories to combine at the end
         # Provide the next iteration, the tools used and the output in order to guide further investigation
+        # Error handling 
 
-        # Error handling and incremental write
-
-        react = dspy.ReAct(
+        react = ReAct(
             DebugGeneration, 
             tools=[
-                Tool(BaseAgent.get_classes_and_methods),
-                Tool(BaseAgent.get_file_content),
-                Tool(BaseAgent.extract_method), 
-                Tool(BaseAgent.search_keyword),
+                Tool(BaseAgentOp.get_classes_and_methods),
+                Tool(BaseAgentOp.get_file_content),
+                Tool(BaseAgentOp.extract_method), 
+                Tool(BaseAgentOp.search_keyword),
                 # TO DO: implement get_class() tool (?)
             ],
-            max_iters=PARAMS['MAX_ITERS'],
+            max_iters=self.max_iters,
         )
 
+        start_time = time.time()
         result = react(instance_id=candidate['instance_id'], problem_statement=problem_statement) 
-
         plan['bug_report'] = result.fix_report
 
-        pretty_trajectory = json.dumps(result.toDict(), indent=4)
+        # Construct generation stats
+        # TODO: Compute number of input and output tokens for a single react run
+        generation_stats = GenerationStats(
+            model_name=str(dspy.settings.lm.model),
+            llm_call_duration_secs=time.time() - start_time, 
+            # total_input_tokens=input_tokens,
+            # total_output_tokens=output_tokens,
+            # total_input_cost=input_tokens * usd_per_input_token,
+            # total_output_cost=output_tokens * usd_per_output_token,
+            # cost_per_record=input_tokens * usd_per_input_token + output_tokens * usd_per_output_token,
+        )
 
-        if BaseAgent.LOGGING_ENABLED:
+        # Logging and printing 
+        if BaseAgentOp.LOGGING_ENABLED:
+            pretty_trajectory = json.dumps(result.toDict(), indent=4)
             LOGGER.info(f'Debugger Trajectory {plan["instance_id"]}: {pretty_trajectory}')
             
-        if BaseAgent.PRINTING_ENABLED:
+        if BaseAgentOp.PRINTING_ENABLED:
             cumulative_cost = utils.compute_cost_from_history(dspy.settings.lm.history)
             print(f'Debugger Agent Cumulative Cost: {cumulative_cost}')
 
-        return plan 
+        return plan, generation_stats
+
+    def get_fields_to_generate(self, candidate: DataRecord) -> list[str]:
+        candidate_field_names = candidate.get_field_names()
+        return candidate_field_names + ["bug_report"]
+        
+    
