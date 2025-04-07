@@ -336,7 +336,7 @@ TEXT_EMBEDDING_3_SMALL_MODEL_CARD = {
 MUSILINGO_LONG_MODEL_CARD = {
     ##### Cost in USD #####
     "usd_per_input_token": 0,
-    "usd_per_output_token": None,
+    "usd_per_output_token": 0,
     ##### Time #####
     "seconds_per_output_token": 0.02,  
     ##### Agg. Benchmark #####
@@ -346,7 +346,7 @@ MUSILINGO_LONG_MODEL_CARD = {
 MUSILINGO_SHORT_MODEL_CARD = {
     ##### Cost in USD #####
     "usd_per_input_token": 0,
-    "usd_per_output_token": None,
+    "usd_per_output_token": 0,
     ##### Time #####
     "seconds_per_output_token": 0.018,  
     ##### Agg. Benchmark #####
@@ -356,7 +356,7 @@ MUSILINGO_SHORT_MODEL_CARD = {
 MUSILINGO_QA_MODEL_CARD = {
     ##### Cost in USD #####
     "usd_per_input_token": 0,
-    "usd_per_output_token": None,
+    "usd_per_output_token": 0,
     ##### Time #####
     "seconds_per_output_token": 0.018,  
     ##### Agg. Benchmark #####
@@ -366,7 +366,7 @@ MUSILINGO_QA_MODEL_CARD = {
 MERT_MODEL_CARD = {
     ##### Cost in USD #####
     "usd_per_input_token": 0,
-    "usd_per_output_token": None,
+    "usd_per_output_token": 0,
     ##### Time #####
     "seconds_per_output_token": 0.00098,  
     ##### Agg. Benchmark #####

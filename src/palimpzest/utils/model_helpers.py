@@ -19,7 +19,7 @@ def get_audio2text_models() -> list[Model]:
     '''
     Return the set of audio2text models which the system has access to
     '''
-    models=[Model.MUSILINGO_LONG, Model.MUSILINGO_SHORT, Model.MUSILINGO_QA]
+    models=[Model.MUSILINGO_LONG, Model.MUSILINGO_SHORT]
     return models
 def get_audio_embedding_models() -> list[Model]:
     '''
@@ -72,7 +72,7 @@ VISION_MODEL_PRIORITY = [
 AUDIO2TEXT_MODEL_PRIORITY=[
     Model.MUSILINGO_LONG,
     Model.MUSILINGO_SHORT,
-    Model.MUSILINGO_QA
+    
 ]
 
 AUDIO_EMBEDDING_MODEL_PRIORITY=[

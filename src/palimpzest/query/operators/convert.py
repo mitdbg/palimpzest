@@ -3,6 +3,7 @@ from __future__ import annotations
 import time
 from abc import ABC, abstractmethod
 from typing import Callable
+import pdb
 
 from palimpzest.constants import (
     MODEL_CARDS,
@@ -64,6 +65,8 @@ class ConvertOp(PhysicalOperator, ABC):
         # have different lengths of generated values, so we take the maximum length of any field's values
         # to be the number of records generated
         n_records = max([len(lst) for lst in field_answers.values()])
+       
+        #pdb.set_trace()
         successful_convert = n_records > 0
 
         drs = []
@@ -80,16 +83,19 @@ class ConvertOp(PhysicalOperator, ABC):
             # get input field names and output field names
             input_fields = self.input_schema.field_names()
             output_fields = self.output_schema.field_names()
-
+            print(f'convert.py:{output_fields}')
+        
             # parse newly generated fields from the field_answers dictionary for this field; if the list
             # of generated values is shorter than the number of records, we fill in with None
             for field in output_fields:
+                print(f'convert.py, field:{field}')
                 if field not in input_fields:
                     value = field_answers[field][idx] if idx < len(field_answers[field]) else None
                     setattr(dr, field, value)
 
             # append data record to list of output data records
             drs.append(dr)
+        
 
         return drs, successful_convert
 

@@ -344,6 +344,7 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
         return field_answers
 
     def __call__(self, candidate: DataRecord, fields: dict[str, Field] | None, json_output: bool=True, **kwargs) -> GenerationOutput:
+        print('WRONG CALL:generators.py')
         """Take the input record (`candidate`), generate the output `fields`, and return the generated output."""
         client = self._get_client_or_model()
         logger.debug(f"Generating for candidate {candidate} with fields {fields}")
@@ -454,24 +455,30 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
         return field_answers, reasoning, generation_stats, messages
 
 class Music2TextGenerator(BaseGenerator[str | list[str], str]):
-    def __init__(self, model, prompt_strategy, cardinality = Cardinality.ONE_TO_ONE, verbose = False, system_role = "system"):
+    def __init__(self, model, prompt_strategy, cardinality = Cardinality.ONE_TO_ONE, verbose = False, system_role = "system",device='cpu'):
         super().__init__(model, prompt_strategy, cardinality, verbose, system_role)
+        
+        self.device=device
         self.musilingo_model= AutoModel.from_pretrained(self.model_name, trust_remote_code=True)
-        self.musilingo_model.to('cpu')
+        self.musilingo_model.to(self.device)
         self.musilingo_model.eval()
+        
 
     def __call__(self, candidate: DataRecord, fields: dict[str, Field] | None, json_output: bool=True, **kwargs) -> GenerationOutput:
+        print('RIGHT CALL:generators.py')
         song_id=candidate["song_id"]
         audio_content=candidate['audio_content']
         prompt='Give me a detailed description of the song, including its genre, instruments, mood/theme, bpm, and what occasion this song would be played at'
         
        
         
-        stopping = StoppingCriteriaList([StoppingCriteriaSub([torch.tensor([835]).cuda(),
-                                  torch.tensor([2277, 29937]).to('cpu')])])
-        response=self.get_musilingo_pred(self.musilingo_model,prompt,audio_content, stopping,length_penalty=100, temperature=0.1)
+        stopping = StoppingCriteriaList([StoppingCriteriaSub([torch.tensor([835]).to(self.device),
+                                  torch.tensor([2277, 29937]).to(self.device)])])
+        response=self.get_musilingo_pred(self.musilingo_model.model,prompt,audio_content, stopping,length_penalty=100, temperature=0.1)
         #should be only one field name
-        field_answers = {field_name: response for field_name in fields}
+        
+        field_answers = {field_name: [response] for field_name in fields}
+        
         reasoning=''
         messages=[]
         generation_stats=GenerationStats()
@@ -502,7 +509,7 @@ class Music2TextGenerator(BaseGenerator[str | list[str], str]):
         pass
 
 
-    def get_musilingo_pred(model, text, audio, stopping, length_penalty=1, temperature=0.1,
+    def get_musilingo_pred(self,model, text, audio, stopping, length_penalty=1, temperature=0.1,
         max_new_tokens=300, num_beams=1, min_length=1, top_p=0.5, repetition_penalty=1.0):
 
         # see https://huggingface.co/m-a-p/MusiLingo-musicqa-v1 for load_audio function definition
@@ -518,7 +525,7 @@ class Music2TextGenerator(BaseGenerator[str | list[str], str]):
         batch_size = audio_embeds.shape[0]
         bos = torch.ones([batch_size, 1],
                         dtype=torch.long,
-                        device=torch.device('cuda')) * model.llama_tokenizer.bos_token_id
+                        device=torch.device(self.device)) * model.llama_tokenizer.bos_token_id
         bos_embeds = model.llama_model.model.embed_tokens(bos)
         # atts_bos = atts_audio[:, :1]
         inputs_embeds = torch.cat([bos_embeds, audio_embeds], dim=1)

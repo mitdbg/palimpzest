@@ -40,6 +40,8 @@ class MixtureOfAgentsConvert(LLMConvert):
             generator_factory(model, self.proposer_prompt_strategy, self.cardinality, self.verbose)
             for model in proposer_models
         ]
+        print(f'MIXTURE OF AGENET MODELS {self.proposer_models}')
+        print(f'MIXTURE OF AGENET GENERATOR {self.proposer_generators}')
         self.aggregator_generator = generator_factory(aggregator_model, self.aggregator_prompt_strategy, self.cardinality, self.verbose)
 
     def __str__(self):

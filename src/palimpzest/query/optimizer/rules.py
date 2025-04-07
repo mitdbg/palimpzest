@@ -345,14 +345,12 @@ class LLMConvertBondedRule(ImplementationRule):
             second_criteria=is_audio2text and model not in audio2text_models
             third_criteria=not is_image_conversion and not is_audio2text and model not in text_models
             fourth_criteria= model == Model.LLAMA3_V and (num_image_fields > 1 or list_image_field)
-            print(f'rules.py, model: {model.value}')
-            print(f'audio2text flag {is_audio2text}')
-            print(f'first_{first_criteria}')
-            print(f'second{second_criteria}')
-            print(f'third{third_criteria}')
-            print(f'fourth{fourth_criteria}')
+            
+           
             if first_criteria or second_criteria or third_criteria or fourth_criteria:
+                
                 continue
+            
             '''
 
             #OLD VERSION
@@ -631,7 +629,15 @@ class MixtureOfAgentsConvertRule(ImplementationRule):
     @classmethod
     def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
         logical_op = logical_expression.operator
-        is_match = isinstance(logical_op, ConvertScan) and logical_op.udf is None
+        is_audio2text=any (
+            [
+                field.is_audio_field
+                for field_name,field in logical_expression.input_fields.items()
+                if field_name.split(".")[-1] in logical_expression.depends_on_field_names
+            ]
+        )
+        is_match = isinstance(logical_op, ConvertScan) and not is_audio2text and logical_op.udf is None
+        
         logger.debug(f"MixtureOfAgentsConvertRule matches_pattern: {is_match} for {logical_expression}")
         return is_match
 
