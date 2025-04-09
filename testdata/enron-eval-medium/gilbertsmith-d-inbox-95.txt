@@ -1,0 +1,39 @@
+Message-ID: <17234978.1075840546534.JavaMail.evans@thyme>
+Date: Wed, 30 Jan 2002 06:41:15 -0800 (PST)
+From: d..steffes@enron.com
+To: doug.gilbert-smith@enron.com, l..day@enron.com, elizabeth.sager@enron.com, 
+	david.portz@enron.com
+Subject: UBS Sign-Off on ERCOT Docs
+Cc: lloyd.will@enron.com, m..presto@enron.com, debra.bailey@enron.com, 
+	e..haedicke@enron.com
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+Bcc: lloyd.will@enron.com, m..presto@enron.com, debra.bailey@enron.com, 
+	e..haedicke@enron.com
+X-From: Steffes, James D. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=JSTEFFE>
+X-To: Gilbert-smith, Doug </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dsmith3>, Day, Smith L. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Sday>, Sager, Elizabeth </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Esager>, Portz, David </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dportz>
+X-cc: Will, Lloyd </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lwill>, Presto, Kevin M. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Kpresto>, Bailey, Debra </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dbailey2>, Haedicke, Mark E. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mhaedic>
+X-bcc: 
+X-Folder: \ExMerge - Gilbert-smith, Doug\Inbox
+X-Origin: GILBERTSMITH-D
+X-FileName: doug gilbert smith 6-25-02.PST
+
+UBS Legal and UBS Credit is heading to Houston this Thursday and Friday.  I have asked that ERCOT matters get 1 hour to discuss the necessary contracts that UBS will need to sign to participate in the ERCOT market.
+
+Basically, my understanding is the following --
+
+1.	PUCT Registration Form for Power Marketer
+2.	ERCOT ISO Information
+	QSE
+	LSE
+	Wholesale Enabling Agreement
+	Other
+3.	APX Agreement?
+4.	Other
+
+Given the list of issues, this assumes that UBSW Energy will not be selling electricity at retail.  If we need this for Day 1, we would have to get an additional license from the PUCT.
+
+Thanks,
+
+Jim

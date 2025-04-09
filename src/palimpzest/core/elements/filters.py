@@ -16,7 +16,10 @@ class Filter:
         self.filter_fn = filter_fn
 
     def serialize(self) -> dict[str, Any]:
-        return {"filter_condition": self.filter_condition, "filter_fn": self.filter_fn.__name__}
+        return {
+            "filter_condition": self.filter_condition,
+            "filter_fn": self.filter_fn.__name__ if self.filter_fn is not None else None,
+        }
 
     def get_filter_str(self) -> str:
         return self.filter_condition if self.filter_condition is not None else self.filter_fn.__name__

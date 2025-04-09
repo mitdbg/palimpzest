@@ -1,0 +1,22 @@
+Message-ID: <28566081.1075861338071.JavaMail.evans@thyme>
+Date: Wed, 7 Nov 2001 05:43:19 -0800 (PST)
+From: ryan.o'rourke@enron.com
+To: k..allen@enron.com, randy.bhatia@enron.com, frank.ermis@enron.com, 
+	mike.grigsby@enron.com, keith.holst@enron.com, kam.keiser@enron.com, 
+	tori.kuykendall@enron.com, matthew.lenhart@enron.com, 
+	ryan.o'rourke@enron.com, jay.reitmeyer@enron.com, p..south@enron.com, 
+	m..tholt@enron.com, ashley.worthing@enron.com, 
+	biliana.pehlivanova@enron.com, monte.jones@enron.com
+Subject: TRV Notification:  (West VaR - 11/07/2001)
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+X-From: O'Rourke, Ryan </O=ENRON/OU=NA/CN=RECIPIENTS/CN=ROROURKE>
+X-To: Allen, Phillip K. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Pallen>, Bhatia, Randy </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rbhatia>, Ermis, Frank </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Fermis>, 'cfrank2@enron.com', Gay, Randall L. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rgay>, Grigsby, Mike </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mgrigsb>, Holst, Keith </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Kholst>, Keiser, Kam </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Kkeiser>, Kuykendall, Tori </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Tkuyken>, Lenhart, Matthew </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mlenhar>, O'Rourke, Ryan </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rorourke>, Reitmeyer, Jay </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jreitme>, South, Steven P. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Ssouth>, Tholt, Jane M. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jtholt>, Worthing, Ashley </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Aworthin>, Pehlivanova, Biliana </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Bpehliva>, Jones, Monte </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mjones7>
+X-cc: 
+X-bcc: 
+X-Folder: \FERMIS (Non-Privileged)\Ermis, Frank\Inbox
+X-Origin: Ermis-F
+X-FileName: FERMIS (Non-Privileged).pst
+
+The report named: West VaR <http://trv.corp.enron.com/linkFromExcel.asp?report_cd=36&report_name=West+VaR&category_cd=2&category_name=WEST&toc_hide=1&sTV1=2&TV1Exp=Y&current_efct_date=11/07/2001>, published as of 11/07/2001 is now available for viewing on the website.

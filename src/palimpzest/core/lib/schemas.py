@@ -350,6 +350,10 @@ class File(Schema):
     filename = StringField(desc="The UNIX-style name of the file")
     contents = BytesField(desc="The contents of the file")
 
+class TextFile(Schema):
+    """A text file is a File that contains only text. No binary data."""
+    filename = StringField(desc="The UNIX-style name of the file")
+    contents = StringField(desc="The contents of the file")
 
 class Number(Schema):
     """Just a number. Often used for aggregates"""
@@ -419,9 +423,6 @@ class PDFFile(File):
     # This class is currently very impoverished. It needs a lot more fields before it can correctly represent a PDF.
     text_contents = StringField(desc="The text-only contents of the PDF")
 
-
-class TextFile(File):
-    """A text file is a File that contains only text. No binary data."""
 
 list_of_numbers = ListField(NumericField)
 class XLSFile(File):

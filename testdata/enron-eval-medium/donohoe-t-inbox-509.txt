@@ -1,0 +1,65 @@
+Message-ID: <7854072.1075862402111.JavaMail.evans@thyme>
+Date: Mon, 26 Nov 2001 07:03:21 -0800 (PST)
+From: lisa.kinsey@enron.com
+To: tom.donohoe@enron.com, tammy.gilmore@enron.com
+Subject: FW: REGT Capacity Report Monday Nov 26
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+X-From: Kinsey, Lisa </O=ENRON/OU=NA/CN=RECIPIENTS/CN=LKINSEY>
+X-To: Donohoe, Tom </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Tdonoho>, Gilmore, Tammy </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Tgilmore>
+X-cc: 
+X-bcc: 
+X-Folder: \TDONOHO (Non-Privileged)\Donohoe, Tom\Inbox
+X-Origin: Donohoe-T
+X-FileName: TDONOHO (Non-Privileged).pst
+
+
+
+-----Original Message-----
+From: jfogg@reliantenergy.com [mailto:jfogg@reliantenergy.com]
+Sent: Monday, November 26, 2001 8:15 AM
+Subject: REGT Capacity Report Monday Nov 26
+
+
+Welcome back.   Hope everyone had a good and safe Thanksgiving.  For gas
+flow for Tuesday,November 27, REGT has the following IT capacity:
+
+CGT                                0          CGT back on line at 326
+Other Hub Delivery Points including TGT     10
+Tetco Bald Knob                       15           TETCO pressures have
+been up and down, limiting IT.
+Texas Gas Helena                      85
+MRT Glendale                          15
+Other Line AC points                        15
+Williams Jane                         10
+Carthage Delivery                     10
+SBS injection space                   75
+SBS withdrawal space                        50
+Backhaul to west                      50
+
+REGT is still having problems with several compressors including Malvern
+#1, Ada, Round Mountain and Chandler stations.   Amber Station is flowing
+295 Mdth east and Line 2 South is at 99 Mdth for today.  Be aware that REGT
+is not offering any general interruptible transportation discounts from
+West of Amber to east delivery points.  All IT will be priced at max rate,
+unless of operational benefit to REGT.  REGT is still full along Line AD
+and is approaching full levels at its Oklahoma storage facilities.
+
+Power plants only burned about 30 to 35 Mdth/d over the past few days.  I
+have not seen any Arkla report for the weekend but the weather was mild.
+Look for a pickup  with the colder weather hitting the system through
+Wednesday but it may be just a quick hitting front
+
+Gas Prices     East  $1.70
+          West  $1.615
+
+ REGT Fuel - currently 1.31% plus $0.0014/dth EPC - based on above
+= $0.0237/dth
+
+I am in the office today.  You can call me at 713-207-5183 or AOL IM me at
+JAFOGG for any rate quotes or questions.
+
+Thanks
+
+JAF

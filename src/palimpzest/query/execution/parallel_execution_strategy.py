@@ -88,27 +88,13 @@ class ParallelExecutionStrategy(ExecutionStrategy):
         
         return output_records
 
-    def execute_plan(self, plan: PhysicalPlan):
-        """Initialize the stats and the execute the plan."""
-        # for now, assert that the first operator in the plan is a ScanPhysicalOp
-        assert isinstance(plan.operators[0], ScanPhysicalOp), "First operator in physical plan must be a ScanPhysicalOp"
-        logger.info(f"Executing plan {plan.plan_id} with {self.max_workers} workers")
-        logger.info(f"Plan Details: {plan}")
-
-        # initialize progress manager
-        self.progress_manager = create_progress_manager(plan, self.num_samples, self.progress)
-
-        # initialize plan stats
-        plan_stats = PlanStats.from_plan(plan)
-        plan_stats.start()
-
-        # initialize input queues and future queues for each operation
-        input_queues = self._create_input_queues(plan)
-        future_queues = {op.get_op_id(): [] for op in plan.operators}
-
-        # start the progress manager
-        self.progress_manager.start()
-
+    def _execute_plan(
+            self,
+            plan: PhysicalPlan,
+            input_queues: dict[str, list],
+            future_queues: dict[str, list],
+            plan_stats: PlanStats,
+        ) -> tuple[list[DataRecord], PlanStats]:
         # process all of the input records using a thread pool
         output_records = []
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
@@ -160,8 +146,38 @@ class ParallelExecutionStrategy(ExecutionStrategy):
         # finalize plan stats
         plan_stats.finish()
 
-        # finish progress tracking
-        self.progress_manager.finish()
+        return output_records, plan_stats
+
+
+    def execute_plan(self, plan: PhysicalPlan):
+        """Initialize the stats and execute the plan."""
+        # for now, assert that the first operator in the plan is a ScanPhysicalOp
+        assert isinstance(plan.operators[0], ScanPhysicalOp), "First operator in physical plan must be a ScanPhysicalOp"
+        logger.info(f"Executing plan {plan.plan_id} with {self.max_workers} workers")
+        logger.info(f"Plan Details: {plan}")
+
+        # initialize plan stats
+        plan_stats = PlanStats.from_plan(plan)
+        plan_stats.start()
+
+        # initialize input queues and future queues for each operation
+        input_queues = self._create_input_queues(plan)
+        future_queues = {op.get_op_id(): [] for op in plan.operators}
+
+        # initialize and start the progress manager
+        self.progress_manager = create_progress_manager(plan, num_samples=self.num_samples, progress=self.progress)
+        self.progress_manager.start()
+
+        # NOTE: we must handle progress manager outside of _exeecute_plan to ensure that it is shut down correctly;
+        #       if we don't have the `finally:` branch, then program crashes can cause future program runs to fail
+        #       because the progress manager cannot get a handle to the console 
+        try:
+            # execute plan
+            output_records, plan_stats = self._execute_plan(plan, input_queues, future_queues, plan_stats)
+
+        finally:
+            # finish progress tracking
+            self.progress_manager.finish()
 
         logger.info(f"Done executing plan: {plan.plan_id}")
         logger.debug(f"Plan stats: (plan_cost={plan_stats.total_plan_cost}, plan_time={plan_stats.total_plan_time})")

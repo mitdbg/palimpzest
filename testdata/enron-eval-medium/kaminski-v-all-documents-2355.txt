@@ -1,0 +1,45 @@
+Message-ID: <7753111.1075856239143.JavaMail.evans@thyme>
+Date: Wed, 3 Jan 2001 01:38:00 -0800 (PST)
+From: ron.baker@enron.com
+To: vince.kaminski@enron.com, stinson.gibner@enron.com
+Subject: Raptor Position Reports for 12/28/00
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+X-From: Ron Baker
+X-To: Vince J Kaminski, Stinson Gibner
+X-cc: 
+X-bcc: 
+X-Folder: \Vincent_Kaminski_Jun2001_1\Notes Folders\All documents
+X-Origin: Kaminski-V
+X-FileName: vkamins.nsf
+
+Attached are the latest available Daily Position Report files for the 4 
+Raptor vehicles which include spreadsheets detailing what is hedged within 
+each vehicle.  One thing that I forgot to mention in our meeting yesterday is 
+that there is considerable indecision as to whether or not Raptor 4 will be 
+included in the cross-guarantees, so we will need to have a value with or 
+without Raptor 4.  I will send a follow-up e-mail with the latest drafts 
+available for the cross guarantees.  Let me know as questions arise.  Thanks 
+again.
+Ron
+
+
+----- Forwarded by Ron Baker/Corp/Enron on 01/03/2001 09:25 AM -----
+
+	Gordon McKillop
+	12/29/2000 12:26 PM
+		 
+		 To: Ben F Glisan/HOU/ECT@ECT, Andrew S Fastow/HOU/ECT@ECT, Richard 
+Causey/Corp/Enron@ENRON, Rick Buy/HOU/ECT@ECT, Greg Whalley/HOU/ECT@ECT
+		 cc: Barry Schnapper/Corp/Enron@Enron, Andrea V Reed/HOU/ECT@ECT, Ryan 
+Siurek/Corp/Enron@ENRON, Kevin D Jordan/Corp/Enron@ENRON, Michael 
+Kopper/HOU/ECT@ECT, Chris Loehr/HOU/ECT@ECT, Anne Yaeger/HOU/ECT@ECT, Rodney 
+Faldyn/Corp/Enron@Enron, Ron Baker/Corp/Enron@ENRON, 
+amy.flores@ljminvestments.com, L'Sheryl Hudson/HOU/ECT@ECT, Wes 
+Colwell/HOU/ECT@ECT, Kevin Howard/Enron Communications@Enron Communications, 
+David Port/Market Risk/Corp/Enron@ENRON, Jordan Mintz/HOU/ECT@ECT, Maria 
+LeBeau/HOU/ECT@ECT, Michael S Galvan/HOU/ECT@ECT, David Maxwell/HOU/ECT@ECT, 
+Susie Ayala/HOU/ECT@ECT, Hope Vargas/HOU/ECT@ECT, Bob Butts/GPGFIN/Enron@ENRON
+		 Subject: Raptor Position Reports for 12/28/00
+

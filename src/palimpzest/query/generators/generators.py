@@ -20,17 +20,12 @@ import torch
 from colorama import Fore, Style
 from openai import OpenAI
 from openai.types.chat.chat_completion import ChatCompletion
-
-# from tenacity import retry, stop_after_attempt, wait_exponential
 from together import Together
 from together.types.chat_completions import ChatCompletionResponse
 
 from palimpzest.constants import (
     MODEL_CARDS,
     APIClient,
-    # RETRY_MAX_ATTEMPTS,
-    # RETRY_MAX_SECS,
-    # RETRY_MULTIPLIER,
     Cardinality,
     Model,
     PromptStrategy,
@@ -224,6 +219,8 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
             # extract json from the answer text
             field_answers = get_json_from_answer(answer_text, self.model, self.cardinality)
 
+            # TODO: wrap non-list outputs in a list if expected output is a list
+
             # common error: if the output is a singleton list which contains a list, but the expected field type
             # is a list of strings, or a list of floats, i.e. not a list of lists; then extract the inner list
             for field, field_type in fields.items():
@@ -377,11 +374,12 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
         # and can only account for the time spent performing the failed generation
         except Exception as e:
             logger.error(f"Error generating completion: {e}")
-            print(f"Error generating completion: {e}")
             field_answers = {field_name: None for field_name in fields}
             reasoning = None
             generation_stats = GenerationStats(
-                model_name=self.model_name, llm_call_duration_secs=time.time() - start_time
+                model_name=self.model_name,
+                llm_call_duration_secs=time.time() - start_time,
+                total_llm_calls=1,
             )
 
             return field_answers, reasoning, generation_stats, messages
@@ -408,6 +406,7 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
                 total_input_cost=input_tokens * usd_per_input_token,
                 total_output_cost=output_tokens * usd_per_output_token,
                 cost_per_record=input_tokens * usd_per_input_token + output_tokens * usd_per_output_token,
+                total_llm_calls=1,
                 # "system_prompt": system_prompt,
                 # "prompt": prompt,
                 # "usage": usage,

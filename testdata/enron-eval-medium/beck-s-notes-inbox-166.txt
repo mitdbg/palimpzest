@@ -1,0 +1,64 @@
+Message-ID: <19314318.1075855886691.JavaMail.evans@thyme>
+Date: Tue, 14 Nov 2000 05:45:00 -0800 (PST)
+From: shona.wilson@enron.com
+To: david.maxwell@enron.com
+Subject: Re: Enron Raptor I P&L Reversal
+Cc: chris.abel@enron.com, michael.benien@enron.com, michael.galvan@enron.com, 
+	andrea.reed@enron.com, mark.lindsey@enron.com, sally.beck@enron.com, 
+	maria.lebeau@enron.com, l'sheryl.hudson@enron.com, 
+	ted.murphy@enron.com, david.port@enron.com, wes.colwell@enron.com, 
+	daniel.falcone@enron.com
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+Bcc: chris.abel@enron.com, michael.benien@enron.com, michael.galvan@enron.com, 
+	andrea.reed@enron.com, mark.lindsey@enron.com, sally.beck@enron.com, 
+	maria.lebeau@enron.com, l'sheryl.hudson@enron.com, 
+	ted.murphy@enron.com, david.port@enron.com, wes.colwell@enron.com, 
+	daniel.falcone@enron.com
+X-From: Shona Wilson
+X-To: David Maxwell
+X-cc: Chris Abel, Michael Benien, Michael S Galvan, Andrea V Reed, Mark E Lindsey, Sally Beck, Maria LeBeau, L'Sheryl Hudson, Ted Murphy, David Port, Wes Colwell, Daniel Falcone
+X-bcc: 
+X-Folder: \Sally_Beck_Dec2000\Notes Folders\Notes inbox
+X-Origin: Beck-S
+X-FileName: sbeck.nsf
+
+The change to the DPR will occur on the 14th, not on the 13th as previously 
+communicated.
+
+Best regards
+
+Shona Wilson
+X39123
+
+
+   
+	
+	
+	From:  David Maxwell @ ECT                           11/13/2000 03:24 PM
+	
+
+To: Chris Abel/HOU/ECT@ECT, Michael Benien/Corp/Enron@ENRON
+cc: Shona Wilson/NA/Enron@Enron, Michael S Galvan/HOU/ECT@ECT, Andrea V 
+Reed/HOU/ECT@ECT, Mark E Lindsey/GPGFIN/Enron@ENRON, Sally Beck/HOU/ECT@ECT, 
+Maria LeBeau/HOU/ECT@ECT, L'Sheryl Hudson/HOU/ECT@ECT, Ted 
+Murphy/HOU/ECT@ECT, David Port/Market Risk/Corp/Enron@ENRON 
+
+Subject: Enron Raptor I P&L Reversal
+
+ On the 11/13/00 MPR, we will be offsetting $163,337,947 of YTD P&L loss 
+associated with the Raptor I hedge.  This P&L has been accumulating since 
+Project Raptor was created using 8/3/00 asset balances.  On the MPR, we have 
+been showing the daily marking of the Raptor assets to the screen but have 
+not been showing the corresponding hedge offset.  The amounts have been 
+flashed by ENA with the hedge offset included.
+
+ This change will show up on the 11/13/00 DPR.
+
+ If you have any questions regarding this matter, please contact either Susie 
+Ayala at x3-0524 or myself at x3-6983 by 10:00 a.m. on Tuesday, 11/14/00.
+
+ Thank you,
+ David Maxwell
+

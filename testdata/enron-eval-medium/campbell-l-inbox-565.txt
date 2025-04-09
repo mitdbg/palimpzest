@@ -1,0 +1,42 @@
+Message-ID: <27080371.1075852930536.JavaMail.evans@thyme>
+Date: Fri, 19 Oct 2001 07:08:04 -0700 (PDT)
+From: susan.lindberg@enron.com
+To: jeff.ader@enron.com, mark.bernstein@enron.com, j..broderick@enron.com, 
+	michael.brown@enron.com, lisa.burnett@enron.com, 
+	f..campbell@enron.com, dana.davis@enron.com, chris.dorland@enron.com, 
+	tom.dutta@enron.com, howard.fromer@enron.com, 
+	gerald.gilbert@enron.com, joe.gordon@enron.com, 
+	david.guillaume@enron.com, gautam.gupta@enron.com, 
+	tom.hoatson@enron.com, palmer.letzerich@enron.com, 
+	john.llodra@enron.com, posey.martinez@enron.com, tom.may@enron.com, 
+	jeffrey.miller@enron.com, narsimha.misra@enron.com, 
+	juan.padron@enron.com, stephen.plauche@enron.com, 
+	joe.quenet@enron.com, janelle.scheuer@enron.com, 
+	robert.stalford@enron.com, joe.stepenovitch@enron.com, 
+	n..stewart@enron.com, d..thomas@enron.com, george.wood@enron.com, 
+	c..aucoin@enron.com, don.black@enron.com, dale.furrow@enron.com, 
+	rogers.herndon@enron.com, harry.kingerski@enron.com
+Subject: Calpine vs. ISO New England (EL01-124)
+Cc: donna.fulton@enron.com, l..nicolay@enron.com, sarah.novosel@enron.com, 
+	d..steffes@enron.com
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+Bcc: donna.fulton@enron.com, l..nicolay@enron.com, sarah.novosel@enron.com, 
+	d..steffes@enron.com
+X-From: Lindberg, Susan </O=ENRON/OU=NA/CN=RECIPIENTS/CN=SLINDBER>
+X-To: Ader, Jeff </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=d5962049-d79f431e-86256a08-720861>, Bernstein, Mark </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=d90fa768-f952aad0-86256a08-733380>, Broderick, Paul J. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Pbroder>, Brown, Michael </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Notesaddr/cn=ce167939-9da7dba0-86256735-71dc87>, Burnett, Lisa </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lburnett>, Campbell, Larry F. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lcampbel>, Davis, Mark Dana </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mdavis>, Dorland, Chris </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Cdorlan>, Dutta, Tom </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Tdutta>, Fromer, Howard </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Hfromer>, Gilbert, Gerald </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Ggilbe1>, Gordon, Joe </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jgordon>, Guillaume, David </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dguillau>, Gupta, Gautam </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Ggupta>, Hoatson, Tom </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Thoatson>, Letzerich, Palmer </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Wletzeri>, Llodra, John </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jllodra>, Martinez, Posey </O=ENRON/OU=NA/CN=RECIPIENTS/CN=EU/CN=RECIPIENTS/CN=PMARTI2>, May, Tom </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Tmay>, Miller, Jeffrey </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jmiller>, Misra, Narsimha </O=ENRON/OU=NA/CN=RECIPIENTS/CN=NMISRA>, Padron, Juan </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jpadron>, Plauche, Stephen </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Splauch>, Quenet, Joe </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jquenet>, Scheuer, Janelle </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jscheue>, Stalford, Robert </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rstalfor>, Stepenovitch, Joe </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jstepeno>, Stewart, Jennifer N. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jstewart>, Thomas, Paul D. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Pthomas2>, Wood, George </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Gwood>, Aucoin, Berney C.  </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Baucoin>, Black, Don </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dblack>, Furrow, Dale </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dfurrow>, Herndon, Rogers </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rherndo>, Kingerski, Harry </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Hkingers>
+X-cc: Fulton, Donna </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dfulton>, Nicolay, Christi L. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Cnicola>, Novosel, Sarah </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Snovose>, Steffes, James D. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jsteffe>
+X-bcc: 
+X-Folder: \LCAMPBEL (Non-Privileged)\Campbell, Larry F.\Inbox
+X-Origin: Campbell-L
+X-FileName: LCAMPBEL (Non-Privileged).pst
+
+Calpine Eastern Corporation, Mirant Americas Energy Marketing, L.P., Mirant New
+England, LLC, Mirant Kendall, LLC, and Mirant Canal, LLC filed a complaint against ISO New England
+with respect to its unilateral modification of Market Rule 5 and Appendix 5-C of the
+New England Power Pool (NEPOOL) FERC Electric Rate Schedule No. 6, through which ISO-NE has excluded external energy contracts from its calculation of the Energy Clearing Price since September 1, 2001.
+Interventions in this proceeding are due this week; please let me know immediately whether we have a specific interest.  In any event, I will circulate an update of any FERC action on the complaint.
+
+Susan Lindberg
+713.853.0596

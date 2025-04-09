@@ -45,7 +45,7 @@ if __name__ == "__main__":
     print("Done generating embeddings.")
 
     # initialize chroma client
-    chroma_client = chromadb.PersistentClient(".chroma")
+    chroma_client = chromadb.PersistentClient(".chroma-biodex")
 
     # initialize embedding function
     openai_ef = embedding_functions.OpenAIEmbeddingFunction(

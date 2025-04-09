@@ -2,23 +2,11 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from enum import Enum
 
 from palimpzest.policy import Policy
 from palimpzest.query.optimizer.plan import PhysicalPlan, SentinelPlan
 
 logger = logging.getLogger(__name__)
-
-class OptimizationStrategyType(str, Enum):
-    """
-    OptimizationStrategyType determines which (set of) plan(s) the Optimizer
-    will return to the Execution layer.
-    """
-    GREEDY = "greedy"
-    PARETO = "pareto" 
-    SENTINEL = "sentinel"
-    NONE = "none"
-    AUTO = "auto"
 
 
 class OptimizationStrategy(ABC):
@@ -26,11 +14,6 @@ class OptimizationStrategy(ABC):
     def get_optimal_plans(self, groups: dict, final_group_id: int, policy: Policy, use_final_op_quality: bool) -> list[PhysicalPlan] | list[SentinelPlan]:
         """Strategy decides how to search through the groups for optimal plan(s)"""
         pass
-
-    @classmethod
-    def get_strategy(cls, strategy_type: str) -> OptimizationStrategy:
-        """Factory method to create strategy instances"""
-        return OptimizerStrategyRegistry.get_strategy(strategy_type)
 
     def normalize_final_plans(self, plans: list[PhysicalPlan]) -> list[PhysicalPlan]:
         """
@@ -83,7 +66,7 @@ class GreedyStrategy(OptimizationStrategy):
         plans = [self._get_greedy_physical_plan(groups, final_group_id)]
         logger.info(f"Greedy optimal plans: {plans}")
         logger.info(f"Done getting greedy optimal plans for final group id: {final_group_id}")
-        
+
         return plans
 
 
@@ -132,7 +115,7 @@ class ParetoStrategy(OptimizationStrategy):
                             pareto_optimal_plans.append(plan)
 
         return pareto_optimal_plans
-    
+
     def get_optimal_plans(self, groups: dict, final_group_id: int, policy: Policy, use_final_op_quality: bool) -> list[PhysicalPlan]:
         logger.info(f"Getting pareto optimal plans for final group id: {final_group_id}")
         # compute all of the pareto optimal physical plans
@@ -144,7 +127,6 @@ class ParetoStrategy(OptimizationStrategy):
                 plan.plan_cost.quality = plan.plan_cost.op_estimates.quality
 
         # filter pareto optimal plans for ones which satisfy policy constraint (if at least one of them does)
-        # import pdb; pdb.set_trace()
         if any([policy.constraint(plan.plan_cost) for plan in plans]):
             plans = [plan for plan in plans if policy.constraint(plan.plan_cost)]
 
@@ -198,27 +180,3 @@ class NoOptimizationStrategy(GreedyStrategy):
     logical transformations or optimizations. It uses the same get_optimal_plans logic as the
     GreedyOptimizationStrategy.
     """
-
-class AutoOptimizationStrategy(OptimizationStrategy):
-    def get_optimal_plans(self, groups: dict, final_group_id: int, policy: Policy, use_final_op_quality: bool) -> list[PhysicalPlan]:
-        raise NotImplementedError("Auto optimization strategy not implemented")
-
-
-class OptimizerStrategyRegistry:
-    """Registry to map strategy types to their implementations"""
-
-    _strategies: dict[str, type[OptimizationStrategy]] = {
-        OptimizationStrategyType.GREEDY.value: GreedyStrategy,
-        OptimizationStrategyType.PARETO.value: ParetoStrategy,
-        OptimizationStrategyType.SENTINEL.value: SentinelStrategy,
-        OptimizationStrategyType.NONE.value: NoOptimizationStrategy,
-        OptimizationStrategyType.AUTO.value: AutoOptimizationStrategy,
-    }
-
-    @classmethod
-    def get_strategy(cls, strategy_type: str) -> OptimizationStrategy:
-        """Get strategy instance by type"""
-        strategy_class = cls._strategies.get(strategy_type)
-        if not strategy_class:
-            raise ValueError(f"Unknown optimization strategy: {strategy_type}")
-        return strategy_class()

@@ -24,10 +24,7 @@ from palimpzest.query.optimizer import (
     TRANSFORMATION_RULES,
 )
 from palimpzest.query.optimizer.cost_model import CostModel
-from palimpzest.query.optimizer.optimizer_strategy import (
-    OptimizationStrategyType,
-    OptimizerStrategyRegistry,
-)
+from palimpzest.query.optimizer.optimizer_strategy_type import OptimizationStrategyType
 from palimpzest.query.optimizer.plan import PhysicalPlan
 from palimpzest.query.optimizer.primitives import Group, LogicalExpression
 from palimpzest.query.optimizer.rules import (
@@ -36,6 +33,7 @@ from palimpzest.query.optimizer.rules import (
     LLMConvertBondedRule,
     MixtureOfAgentsConvertRule,
     RAGConvertRule,
+    SplitConvertRule,
     TokenReducedConvertBondedRule,
 )
 from palimpzest.query.optimizer.tasks import (
@@ -87,21 +85,21 @@ class Optimizer:
         self,
         policy: Policy,
         cost_model: CostModel,
+        available_models: list[Model],
         cache: bool = False,
         verbose: bool = False,
-        available_models: list[Model] | None = None,
         allow_bonded_query: bool = True,
         allow_code_synth: bool = False,
         allow_token_reduction: bool = False,
         allow_rag_reduction: bool = False,
         allow_mixtures: bool = True,
         allow_critic: bool = False,
-        optimization_strategy_type: OptimizationStrategyType = OptimizationStrategyType.PARETO,
-        use_final_op_quality: bool = False,  # TODO: make this func(plan) -> final_quality
+        allow_split_merge: bool = False,
+        optimizer_strategy: OptimizationStrategyType = OptimizationStrategyType.PARETO,
+        use_final_op_quality: bool = False, # TODO: make this func(plan) -> final_quality
+        **kwargs,
     ):
         # store the policy
-        if available_models is None or len(available_models) == 0:
-            available_models = []
         self.policy = policy
 
         # store the cost model
@@ -123,21 +121,24 @@ class Optimizer:
         self.implementation_rules = IMPLEMENTATION_RULES
         self.transformation_rules = TRANSFORMATION_RULES
 
-        self.strategy = OptimizerStrategyRegistry.get_strategy(optimization_strategy_type.value)
+        # get the strategy class associated with the optimizer strategy
+        optimizer_strategy_cls = optimizer_strategy.value
+        self.strategy = optimizer_strategy_cls()
 
-        # if we are doing SENTINEL / NONE optimization; remove transformation rules
-        if optimization_strategy_type in [OptimizationStrategyType.SENTINEL, OptimizationStrategyType.NONE]:
+        # remove transformation rules for optimization strategies which do not require them
+        if optimizer_strategy.no_transformation():
             self.transformation_rules = []
 
         # if we are not performing optimization, set available models to be single model
         # and remove all optimizations (except for bonded queries)
-        if optimization_strategy_type == OptimizationStrategyType.NONE:
+        if optimizer_strategy == OptimizationStrategyType.NONE:
             self.allow_bonded_query = True
             self.allow_code_synth = False
             self.allow_token_reduction = False
             self.allow_rag_reduction = False
             self.allow_mixtures = False
             self.allow_critic = False
+            self.allow_split_merge = False
             self.available_models = [available_models[0]]
 
         # store optimization hyperparameters
@@ -150,7 +151,8 @@ class Optimizer:
         self.allow_rag_reduction = allow_rag_reduction
         self.allow_mixtures = allow_mixtures
         self.allow_critic = allow_critic
-        self.optimization_strategy_type = optimization_strategy_type
+        self.allow_split_merge = allow_split_merge
+        self.optimizer_strategy = optimizer_strategy
         self.use_final_op_quality = use_final_op_quality
 
         # prune implementation rules based on boolean flags
@@ -186,6 +188,11 @@ class Optimizer:
                 rule for rule in self.implementation_rules if not issubclass(rule, CriticAndRefineConvertRule)
             ]
 
+        if not self.allow_split_merge:
+            self.implementation_rules = [
+                rule for rule in self.implementation_rules if not issubclass(rule, SplitConvertRule)
+            ]
+
         logger.info(f"Initialized Optimizer with verbose={self.verbose}")
         logger.debug(f"Initialized Optimizer with params: {self.__dict__}")
 
@@ -215,14 +222,16 @@ class Optimizer:
             allow_rag_reduction=self.allow_rag_reduction,
             allow_mixtures=self.allow_mixtures,
             allow_critic=self.allow_critic,
-            optimization_strategy_type=self.optimization_strategy_type,
+            allow_split_merge=self.allow_split_merge,
+            optimizer_strategy=self.optimizer_strategy,
             use_final_op_quality=self.use_final_op_quality,
         )
         return optimizer
 
-    def update_strategy(self, optimizer_strategy_type: OptimizationStrategyType):
-        self.optimization_strategy_type = optimizer_strategy_type
-        self.strategy = OptimizerStrategyRegistry.get_strategy(optimizer_strategy_type.value)
+    def update_strategy(self, optimizer_strategy: OptimizationStrategyType):
+        self.optimizer_strategy = optimizer_strategy
+        optimizer_strategy_cls = optimizer_strategy.value
+        self.strategy = optimizer_strategy_cls()
 
     def construct_group_tree(self, dataset_nodes: list[Set]) -> tuple[list[int], dict[str, Field], dict[str, set[str]]]:
         # get node, output_schema, and input_schema (if applicable)
@@ -286,7 +295,7 @@ class Optimizer:
                 index=node._index,
                 search_func=node._search_func,
                 search_attr=node._search_attr,
-                output_attr=node._output_attr,
+                output_attrs=node._output_attrs,
                 k=node._k,
                 target_cache_id=uid,
             )
@@ -470,14 +479,14 @@ class Optimizer:
                     self.groups, self.expressions, context=context, **self.get_physical_op_params()
                 )
             elif isinstance(task, OptimizePhysicalExpression):
-                context = {"optimization_strategy_type": self.optimization_strategy_type}
+                context = {"optimizer_strategy": self.optimizer_strategy}
                 new_tasks = task.perform(self.cost_model, self.groups, self.policy, context=context)
 
             self.tasks_stack.extend(new_tasks)
 
         logger.debug(f"Done searching optimization space for group_id: {group_id}")
 
-    def optimize(self, query_plan: Dataset, policy: Policy | None = None) -> list[PhysicalPlan]:
+    def optimize(self, query_plan: Dataset) -> list[PhysicalPlan]:
         """
         The optimize function takes in an initial query plan and searches the space of
         logical and physical plans in order to cost and produce a (near) optimal physical plan.
@@ -494,4 +503,4 @@ class Optimizer:
         self.search_optimization_space(final_group_id)
         logger.info(f"Getting optimal plans for final group id: {final_group_id}")
 
-        return self.strategy.get_optimal_plans(self.groups, final_group_id, policy, self.use_final_op_quality)
+        return self.strategy.get_optimal_plans(self.groups, final_group_id, self.policy, self.use_final_op_quality)

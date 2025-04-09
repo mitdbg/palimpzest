@@ -24,7 +24,7 @@ class Model(str, Enum):
     MUSILINGO_SHORT="m-a-p/MusiLingo-short-v1"
     MUSILINGO_QA="m-a-p/MusiLingo-musicqa-v1"
     MERT="m-a-p/MERT-v1-330M"
-    
+    CLIP_VIT_B_32 = "clip-ViT-B-32"
 
     def __repr__(self):
         return f"{self.name}"
@@ -69,6 +69,10 @@ class PromptStrategy(str, Enum):
     COT_MOA_PROPOSER_IMAGE = "chain-of-thought-mixture-of-agents-proposer-image"
     COT_MOA_AGG = "chain-of-thought-mixture-of-agents-aggregation"
 
+    # Split Convert Prompt Strategies
+    SPLIT_PROPOSER = "split-proposer"
+    SPLIT_MERGER = "split-merger"
+
     def is_image_prompt(self):
         return "image" in self.value
 
@@ -90,6 +94,11 @@ class PromptStrategy(str, Enum):
     def is_moa_aggregator_prompt(self):
         return "mixture-of-agents-aggregation" in self.value
 
+    def is_split_proposer_prompt(self):
+        return "split-proposer" in self.value
+
+    def is_split_merger_prompt(self):
+        return "split-merger" in self.value
 
 class AggFunc(str, Enum):
     COUNT = "count"
@@ -129,11 +138,6 @@ DEFAULT_PDF_PROCESSOR = "pypdf"
 
 # character limit for various IDs
 MAX_ID_CHARS = 10
-
-# retry LLM executions 2^x * (multiplier) for up to 10 seconds and at most 4 times
-RETRY_MULTIPLIER = 2
-RETRY_MAX_SECS = 10
-RETRY_MAX_ATTEMPTS = 1
 
 # maximum number of rows to display in a table
 MAX_ROWS = 5
@@ -340,7 +344,16 @@ MUSILINGO_LONG_MODEL_CARD = {
     ##### Time #####
     "seconds_per_output_token": 0.02,  
     ##### Agg. Benchmark #####
-    "overall": 75,  
+    "overall": 75,
+}
+CLIP_VIT_B_32_MODEL_CARD = {
+    ##### Cost in USD #####
+    "usd_per_input_token": 0.00,
+    "usd_per_output_token": None,
+    ##### Time #####
+    "seconds_per_output_token": 0.0098,  # NOTE: just copying TEXT_EMBEDDING_3_SMALL_MODEL_CARD for now
+    ##### Agg. Benchmark #####
+    "overall": 63.3,  # NOTE: ImageNet top-1 accuracy
 }
 
 MUSILINGO_SHORT_MODEL_CARD = {
@@ -386,7 +399,8 @@ MODEL_CARDS = {
     Model.MUSILINGO_LONG.value: MUSILINGO_LONG_MODEL_CARD,
     Model.MUSILINGO_SHORT.value: MUSILINGO_SHORT_MODEL_CARD,
     Model.MUSILINGO_QA.value:MUSILINGO_QA_MODEL_CARD,
-    Model.MERT.value:MERT_MODEL_CARD
+    Model.MERT.value:MERT_MODEL_CARD,
+    Model.CLIP_VIT_B_32.value: CLIP_VIT_B_32_MODEL_CARD,
     ###
     # Model.GPT_3_5.value: GPT_3_5_MODEL_CARD,
     # Model.GPT_4.value: GPT_4_MODEL_CARD,

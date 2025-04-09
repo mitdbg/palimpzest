@@ -3,7 +3,6 @@ import time
 
 from palimpzest.core.data.dataclasses import PlanStats
 from palimpzest.core.elements.records import DataRecordCollection
-from palimpzest.policy import Policy
 from palimpzest.query.operators.aggregate import AggregateOp
 from palimpzest.query.operators.filter import FilterOp
 from palimpzest.query.operators.limit import LimitScanOp
@@ -48,7 +47,7 @@ class StreamingQueryProcessor(QueryProcessor):
     def plan_stats(self, plan_stats: PlanStats):
         self._plan_stats = plan_stats
 
-    def generate_plan(self, dataset: Dataset, policy: Policy):
+    def generate_plan(self, dataset: Dataset):
         # self.clear_cached_examples()
         start_time = time.time()
 
@@ -60,7 +59,7 @@ class StreamingQueryProcessor(QueryProcessor):
         # TODO: Do we need to re-initialize the optimizer here? 
         # Effectively always use the optimal strategy   
         optimizer = self.optimizer.deepcopy_clean()
-        plans = optimizer.optimize(dataset, policy)
+        plans = optimizer.optimize(dataset)
         self.plan = plans[0]
         self.plan_stats = PlanStats.from_plan(self.plan)
         self.plan_stats.start()
@@ -73,7 +72,7 @@ class StreamingQueryProcessor(QueryProcessor):
         logger.info("Executing StreamingQueryProcessor")
         # Always delete cache
         if not self.plan_generated:
-            self.generate_plan(self.dataset, self.policy)
+            self.generate_plan(self.dataset)
 
         # if dry_run:
         #     yield [], self.plan, self.plan_stats

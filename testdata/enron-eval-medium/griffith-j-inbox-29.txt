@@ -1,0 +1,62 @@
+Message-ID: <12493860.1075855221373.JavaMail.evans@thyme>
+Date: Mon, 31 Dec 2001 04:53:15 -0800 (PST)
+From: carrfuturesenergy@carrfut.com
+To: smollner@carrfut.com
+Subject: Daily Charts 12/31
+Mime-Version: 1.0
+Content-Type: text/plain; charset=ANSI_X3.4-1968
+Content-Transfer-Encoding: 7bit
+X-From: CarrFuturesEnergy@carrfut.com@ENRON
+X-To: smollner@carrfut.com
+X-cc: 
+X-bcc: 
+X-Folder: \John_Griffith_Jan2002_1\Griffith, John\Inbox
+X-Origin: Griffith-J
+X-FileName: jgriffit (Non-Privileged).pst
+
+The information contained herein is based on sources that we believe to be
+reliable, but we do not represent that it is accurate or complete.  Nothing
+contained herein should be considered as an offer to sell or a solicitation
+of an offer to buy any financial instruments discussed herein.  Any
+opinions expressed herein are solely those of the author.  As such, they
+may differ in material respects from those of, or expressed or published by
+on behalf of Carr Futures or its officers, directors, employees or
+affiliates.  ? 2001 Carr Futures
+
+
+The charts are now available on the web by clicking on the hot link(s)
+contained in this email. If for any reason you are unable to receive the
+charts via the web, please contact me via email and I will email the charts
+to you as attachments.
+
+
+Crude     http://www.carrfut.com/research/Energy1/crude02.pdf
+Natural Gas     http://www.carrfut.com/research/Energy1/ngas02.pdf
+Distillate     http://www.carrfut.com/research/Energy1/hoil02.pdf
+Unleaded     http://www.carrfut.com/research/Energy1/unlded02.pdf
+
+Feb. WTI/Brent Spread
+http://www.carrfut.com/research/Energy1/clg-qog.pdf
+Feb Heat Crack     http://www.carrfut.com/research/Energy1/heatcrack.pdf
+Feb Gas Crack     http://www.carrfut.com/research/Energy1/gascrack.pdf
+Feb Gas/Heat Spread     http://www.carrfut.com/research/Energy1/hug-hog.pdf
+June Gas/Heat Spread
+http://www.carrfut.com/research/Energy1/HUM-HOM.pdf
+March Gas/Heat Spread
+http://www.carrfut.com/research/Energy1/HUH-HOH.pdf
+Feb/May Unlead Spread
+http://www.carrfut.com/research/Energy1/HUG-HUK.pdf
+Feb/July Crude oil Spread
+http://www.carrfut.com/research/Energy1/CLG-CLN.pdf
+
+Nat Gas Strip Matrix
+http://www.carrfut.com/research/Energy1/StripmatrixNG02.pdf
+Nat Gas Spread Matrix
+http://www.carrfut.com/research/Energy1/SpreadmatrixNG02.pdf
+
+Crude and Products Spread Matrix
+http://www.carrfut.com/research/Energy1/SpreadmatrixCL02.pdf
+
+Scott Mollner Recommendation
+http://www.carrfut.com/research/Energy1/recom12-31-01.pdf
+

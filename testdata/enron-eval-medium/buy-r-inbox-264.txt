@@ -1,0 +1,118 @@
+Message-ID: <25252797.1075840386169.JavaMail.evans@thyme>
+Date: Thu, 13 Dec 2001 12:59:33 -0800 (PST)
+From: kgarland@sterlinggrp.net
+To: e-mail <.akarin@enron.com>, e-mail <.andreas@enron.com>, 
+	e-mail <.andrew@enron.com>, e-mail <.andy@enron.com>, 
+	e-mail <.babs@enron.com>, e-mail <.barbara@enron.com>, 
+	e-mail <.bob@enron.com>, e-mail <.bob@enron.com>, 
+	e-mail <.brian@enron.com>, e-mail <.brian@enron.com>, 
+	e-mail <.bryan@enron.com>, e-mail <.cario@enron.com>, 
+	e-mail <.charles@enron.com>, e-mail <.charles@enron.com>, 
+	e-mail <.chris@enron.com>, e-mail <.chris@enron.com>, 
+	e-mail <.christopher@enron.com>, e-mail <.clay@enron.com>, 
+	e-mail <.clayton@enron.com>, e-mail <.cliff@enron.com>, 
+	e-mail <.david@enron.com>, e-mail <.david@enron.com>, 
+	e-mail <.david@enron.com>, e-mail <.david@enron.com>, 
+	e-mail <.david@enron.com>, e-mail <.david@enron.com>, 
+	e-mail <.david@enron.com>, e-mail <.david@enron.com>, 
+	e-mail <.david@enron.com>, e-mail <.dennis@enron.com>, 
+	e-mail <.derek@enron.com>, e-mail <.don@enron.com>, 
+	e-mail <.donald@enron.com>, e-mail <.doug@enron.com>, 
+	e-mail <.douglas@enron.com>, e-mail <.ed@enron.com>, 
+	e-mail <.edward@enron.com>, e-mail <.elizabeth@enron.com>, 
+	e-mail <.eric@enron.com>, e-mail <.frank@enron.com>, 
+	e-mail <.gary@enron.com>, e-mail <.gary@enron.com>, 
+	e-mail <.gerry@enron.com>, e-mail <.gregory@enron.com>, 
+	e-mail <.h.@enron.com>, e-mail <.herbert@enron.com>, 
+	e-mail <.howard@enron.com>, e-mail <.howard@enron.com>, 
+	e-mail <.ian@enron.com>, e-mail <.ian@enron.com>, 
+	e-mail <.j.@enron.com>, e-mail <.j.@enron.com>, 
+	e-mail <.james@enron.com>, e-mail <.james@enron.com>, 
+	e-mail <.james@enron.com>, e-mail <.james@enron.com>, 
+	e-mail <.james@enron.com>, e-mail <.james@enron.com>, 
+	e-mail <.jamie@enron.com>, e-mail <.jeff@enron.com>, 
+	e-mail <.jeffrey@enron.com>, e-mail <.jeffrey@enron.com>, 
+	e-mail <.joel@enron.com>, e-mail <.john@enron.com>, 
+	e-mail <.john@enron.com>, e-mail <.john@enron.com>, 
+	e-mail <.john@enron.com>, e-mail <.jon@enron.com>, 
+	e-mail <.jonathan@enron.com>, e-mail <.jonathan@enron.com>, 
+	e-mail <.joseph@enron.com>, e-mail <.karsten@enron.com>, 
+	e-mail <.kenneth@enron.com>, e-mail <.kevin@enron.com>, 
+	e-mail <.kurt@enron.com>, e-mail <.larry@enron.com>, 
+	e-mail <.laurence@enron.com>, e-mail <.laurence@enron.com>, 
+	e-mail <.les@enron.com>, e-mail <.linda@enron.com>, 
+	e-mail <.lloyd@enron.com>, e-mail <.lydon@enron.com>, 
+	e-mail <.lynda@enron.com>, e-mail <.marcus@enron.com>, 
+	e-mail <.martin@enron.com>, e-mail <.mary@enron.com>, 
+	e-mail <.matthew@enron.com>, e-mail <.michael@enron.com>, 
+	e-mail <.michael@enron.com>, e-mail <.michael@enron.com>, 
+	e-mail <.michael@enron.com>, e-mail <.michael@enron.com>, 
+	e-mail <.michael@enron.com>, e-mail <.michael@enron.com>, 
+	e-mail <.michael@enron.com>, e-mail <.michael@enron.com>, 
+	e-mail <.michael@enron.com>, e-mail <.mitchell@enron.com>, 
+	e-mail <.osmar@enron.com>, e-mail <.pat@enron.com>, 
+	e-mail <.paul@enron.com>, e-mail <.paul@enron.com>, 
+	e-mail <.paul@enron.com>, e-mail <.paul@enron.com>, 
+	e-mail <.paul@enron.com>, e-mail <.peter@enron.com>, 
+	e-mail <.peter@enron.com>, e-mail <.phil@enron.com>, 
+	e-mail <.philip@enron.com>, e-mail <.reagan@enron.com>, 
+	e-mail <.robert@enron.com>, e-mail <.robert@enron.com>, 
+	e-mail <.robert@enron.com>, e-mail <.robert@enron.com>, 
+	e-mail <.robert@enron.com>, e-mail <.ron@enron.com>, 
+	e-mail <.ronald@enron.com>, e-mail <.ronnie@enron.com>, 
+	e-mail <.schuyler@enron.com>, e-mail <.scott@enron.com>, 
+	e-mail <.scott@enron.com>, e-mail <.scott@enron.com>, 
+	e-mail <.scott@enron.com>, e-mail <.simon@enron.com>, 
+	e-mail <.stan@enron.com>, e-mail <.stephen@enron.com>, 
+	e-mail <.stephen@enron.com>, e-mail <.steven@enron.com>, 
+	e-mail <.steven@enron.com>, e-mail <.steven@enron.com>, 
+	e-mail <.stewart@enron.com>, e-mail <.suzanne@enron.com>, 
+	e-mail <.suzie@enron.com>, e-mail <.tim@enron.com>, 
+	e-mail <.timothy@enron.com>, e-mail <.tom@enron.com>, 
+	e-mail <.uzi@enron.com>, e-mail <.vincent@enron.com>, 
+	e-mail <.william@enron.com>, e-mail <.william@enron.com>, 
+	e-mail <.william@enron.com>, nezi.marvin@enron.com, 
+	greg.whalley@enron.com, jeff.donahue@enron.com, 
+	richard.lydecker@enron.com, s..muller@enron.com, 
+	gil.melman@enron.com, mitch.taylor@enron.com, mark.gandy@enron.com, 
+	mark.frevert@enron.com
+Subject: Kevin Garland Joins The Sterling Group
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+X-From: Kevin Garland <KGarland@STERLINGGRP.net>
+X-To: Akarin Gaw (E-mail) <agaw@gilbertglobal.com>, Andreas L. Lazar (E-mail) <alazar@allenco.com>, Andrew Decker (E-mail) <adecker@bear.com>, Andy Harris (E-mail) <andy.harris@mail.sprint.com>, Babs Noelle (E-mail) <babs@noelleandco.com>, Barbara Paige (E-mail) <bjpaige@aol.com>, Bob Davis (E-mail) <bob.davis@storageprovider.com>, Bob Stearns (E-mail) <bob.stearns@sternhillpartners.com>, Brian K. Brownie (E-mail) <bbrownie@melton-melton.com>, Brian McPeek (E-mail) <brian_McPeek@mckinsey.com>, Bryan Fisher (E-mail) <bryan_fisher@mckinsey.com>, Cario Bronzini (E-mail) <bronzini@brera.com>, Charles (Chad) Greaves (E-mail) <cgreaves@recruitingsoftware.com>, Charles Prioleau (E-mail) <charles.prioleau@painewebber.com>, Chris DePuy (E-mail) <chris.depuy@owmancapital.com>, Chris Younger (E-mail) <chris.younger@northwestern.com>, Christopher Asplundh (E-mail) <chris@asplundh.com>, Clay Cummins (E-mail) <cummins@irby.com>, Clayton A. Clark (E-mail) <clark@clarkdepew.com>, Cliff McFarland (E-mail) <cmcfarland@mcfarlandgrossman.com>, David Andrews (E-mail) <andrews@gryphon-inv.com>, David B. Aronoff (E-mail) <daronoff@greylock.com>, David Blitzer (E-mail) <blitzer@blackstone.com>, David C. Hull (E-mail) <dhull@centennial.com>, David Campbell (E-mail) <david_campbell@mckinsey.com>, David Castelblanco (E-mail) <david.castelblanco@gs.com>, David Runnels (E-mail) <drunnels@andrews-kurth.com>, David Stonehill (E-mail) <stonehill@blackstone.com>, David W. Chamblee (E-mail) <dchamblee@mcfarlandgrossman.com>, Dennis E. Murphree (E-mail) <dennism@murphyco.com>, Derek Lemke-von Ammon (E-mail) <dlemke@tweisel.com>, Don Sturm (E-mail) <abell@sturmgroup.com>, Donald Kendall (E-mail) <dkendall@k2cap.com>, Doug Fordyce (E-mail) <doug.fordyce@csfb.com>, Douglas Leyendecker (E-mail) <doug@leyendecker.com>, Ed Olkkola (E-mail) <edo@ausven.com>, Edward W. Scott (E-mail) <escott@bakercapital.com>, Elizabeth A. Evans (E-mail) <liz.evans@northwestern.com>, Eric Bunting (E-mail) <ebunting@gilbertglobal.com>, Frank L. Schiff (E-mail) <frank.schiff@db.com>, Gary Ciuba (E-mail) <gciuba@stephens.com>, Gary Remy (E-mail) <gary@databb.net>, Gerry Cardinale (E-mail) <gerry.cardinale@gs.com>, Gregory Black (E-mail) <gblack@warburgpincus.com>, H. Skip McGee (E-mail) <hmcgee@lehman.com>, Herbert Williamson (E-mail) <hwilliamson@ppchouston.com>, Howard Hoffen (E-mail) <howard.hoffen@morganstanley.com>, Howard Newman (E-mail) <hnewman@warburgpincus.com>, Ian D. Highet (E-mail) <ihighet@cvcltd.com>, Ian Shapiro (E-mail) <ian@gfienergy.com>, J. Kenyon Hayward (E-mail) <kenh@vspan.com>, J. Peter Beckett (E-mail) <pbeckett@bear.com>, James Burgoyne (E-mail) <james.burgoyne@gecapital.com>, James E. Gayle (E-mail) <jgayle@hanovermeasurement.com>, James G. Christian (E-mail) <jameschristian@tac-ams.com>, James Haddox (E-mail) <jhaddox@quantaservices.com>, James P. McGinnis (E-mail) <mcginnij@ms.com>, James Rogers (E-mail) <james.cv.rogers@ssmb.com>, Jamie Welch (E-mail) <jamie.welch@csfb.com>, Jeff Fox (E-mail) <jeffrey.fox@altell.com>, Jeffrey Harris (E-mail) <jharris@warburgpincus.com>, Jeffrey Holzschuh (E-mail) <jeffrey.holzschuh@morganstanley.com>, Joel G. Ramin (E-mail) <ramin@blackstone.com>, John Colson (E-mail) <jcolson@quantaservices.com>, John Kane (E-mail) <kane@telseon.com>, John Macintosh (E-mail) <jmacintosh@warburgpincus.com>, John Wilkerson (E-mail) <john.wilkerson@mckinsey.com>, Jon Pope (E-mail) <jpope30@yahoo.com>, Jonathan E. Gross (E-mail) <jonathan_gross@mckinsey.com>, Jonathan Farber (E-mail) <jf@lrpartners.com>, Joseph Dempsey (E-mail) <joseph.dempsey@capmark.funb.com>, Karsten H. Lampka (E-mail) <klampka@tweisel.com>, Kenneth W. Slutsky (E-mail) <sepulveda@mindspring.com>, Kevin R. Compton (E-mail) <kcompton@kpcb.com>, Kurt N. Simon (E-mail) <ksimon@exchange.ml.com>, Larry Guffey (E-mail) <guffey@blackstone.com>, Laurence J. Nath (E-mail) <laurence.nath@csfb.com>, Laurence M Band (E-mail) <lband@lehman.com>, Les Bek (E-mail) <michael.bloom@barcap.com>, Linda Wills (E-mail) <willsl@wemed.com>, Lloyd Campbell (E-mail) <lcampbell@ny.rothinc.com>, Lydon A. Taylor (E-mail) <ltaylor@h-s.com>, Lynda Villarreal (E-mail) <lynda.villarreal@db.com>, Marcus Watts (E-mail) <mwatts@lockeliddell.com>, Martin E. Chavez (E-mail) <martin.chavez@gs.com>, Mary Derivaux Bass (E-mail) <mbass@spencerstuart.com>, Matthew S. Kabaker (E-mail) <kabaker@blackstone.com>, Michael B. Gordon (E-mail) <mgordon@meritechcapital.com>, Michael C. Blaney (E-mail) <mblaney@andrews-kurth.com>, Michael C. Hoffman (E-mail) <michael.hoffman@msdw.com>, Michael Darby (E-mail) <mdarby@battery.com>, Michael F. Bennet (E-mail) <michaelbennet@tac-denver.com>, Michael Green (E-mail) <michael.green@trs.state.tx.us>, Michael J. McGhan (E-mail) <mmcghan@hanover.com>, Michael Johnson (E-mail) <mike.johnson@csfb.com>, Michael Naylor (E-mail) <michael@nmhsearch.com>, Michael S. Chadwick (E-mail) <mike.chadwick@smmhou.com>, Mitchell Blutt (E-mail) <mitchell.blutt@chase.com>, Osmar Abib (E-mail) <osmar.abib@csfb.com>, Pat McLochlin (E-mail) <pat.mclochlin@painewebber.com>, Paul Bishop (E-mail) <pbishop@lockeliddell.com>, Paul F. Cambridge (E-mail) <paul.f.cambridge@db.com>, Paul McDermott (E-mail) <paul.mcdermott@rbcap.com>, Paul P. Hsi (E-mail) <hsi_paul@jpmorgan.com>, Paul W. Hobby (E-mail) <phobby@genesis-park.com>, Peter Baines (E-mail) <peter.baines@adventventures.com>, Peter Veruki (E-mail) <veruki@rice.edu>, Phil Dougall (E-mail) <pdougall@lehman.com>, Philip A. Tuttle (E-mail) <ptuttle@davistuttle.com>, Reagan Dixon (E-mail) <reagan.davis@storageprovider.com>, Robert Albrecht (E-mail) <bob@albrechtai.com>, Robert B. Nolan (E-mail) <robert.nolan@bmonesbittburns.com>, Robert Hardy (E-mail) <general@cornerv.com>, Robert Porter (E-mail) <bob@daedaluscapitalgroup.com>, Robert Winborne (E-mail) <rw@brookwoodassociates.com>, Ron Hulme (E-mail) <ron_hulme@mckinsey.com>, Ronald Astin (E-mail) <rastin@velaw.com>, Ronnie Cameron (E-mail) <rcameron@mountaire.com>, Schuyler M. Tilney (E-mail) <schuyler_tilney@ml.com>, Scott A. Gieselman (E-mail) <scott.gielselman@gs.com>, Scott Milius (E-mail) <milius@gryphon-inv.com>, Scott Sheffield (E-mail) <sheffields@pioneernrc.com>, Scott Wulfe (E-mail) <swulfe@velaw.com>, Simon Lee (E-mail) <slee@bakercapital.com>, Stan P. Hanks (E-mail) <stan@networkmercenaries.com>, Stephen A. Berenson (E-mail) <berenson_stephen@jpmorgan.com>, Stephen Trauber (E-mail) <stephen.trauber@morganstanley.com>, Steven J. Gilbert (E-mail) <sgilbert@gilbertglobal.com>, Steven Kotler (E-mail) <skotler@gilbertglobal.com>, Steven Meyer (E-mail) <smeyer@bear.com>, Stewart K. P. Gross (E-mail) <sgross@warburgpincus.com>, Suzanne Nimocks (E-mail) <suzanne_nimocks@mckinsey.com>, Suzie MacCagnan (E-mail) <suzanna_maccagnan@painewebber.com>, Tim Schigel (E-mail) <tim@bcvc.com>, Timothy Dove (E-mail) <dovet@pioneernrc.com>, Tom Formolo (E-mail) <tformolo@chsonline.com>, Uzi Halevy (E-mail) <uhalevy@yahoo.com>, Vincent Foster (E-mail) <vfoster@quantaservices.com>, William G. Christie (E-mail) <bill.christie@owen.vanderbilt.edu>, William Goldberg (E-mail) <billgoldberg@msn.com>, William Kriegel (E-mail) <williamk@kroadv.com>, Marvin, Michele Nezi </O=ENRON/OU=NA/CN=RECIPIENTS/CN=MMARVIN>, Whalley, Greg </O=ENRON/OU=NA/CN=RECIPIENTS/CN=GWHALLE>, Donahue, Jeff </O=ENRON/OU=NA/CN=RECIPIENTS/CN=JDONAHU>, Lydecker Jr., Richard </O=ENRON/OU=NA/CN=RECIPIENTS/CN=RLYDECK>, 'rich.dimichele@enron.com', Fallon, Jim </O=ENRON/OU=NA/CN=RECIPIENTS/CN=JFALLON>, Muller, Mark S. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=MMULLER>, 'dave.delainey@enron.com', Buy, Rick </O=ENRON/OU=NA/CN=RECIPIENTS/CN=RBUY>, Melman, Gil </O=ENRON/OU=NA/CN=RECIPIENTS/CN=GMELMAN2>, 'jeff.mcmahon@enron.com', Mcconnell, Mike </O=ENRON/OU=NA/CN=RECIPIENTS/CN=MMCCON1>, Taylor, Mitch </O=ENRON/OU=NA/CN=RECIPIENTS/CN=MTAYLO2>, 'tim.detmerring@enron.com', Thompson, John (London) </O=ENRON/OU=EU/CN=RECIPIENTS/CN=JTHOMPSO>, 'kelly.boots@enron.com', DeSpain, Tim </O=ENRON/OU=NA/CN=RECIPIENTS/CN=TDESPAI>, Gandy, Mark </O=ENRON/OU=NA/CN=RECIPIENTS/CN=MGANDY>, Frevert, Mark </O=ENRON/OU=NA/CN=RECIPIENTS/CN=MFREVERT>, 'ken.lay@enron.com', 'richard.buy@enron.com', 'janet.deitrich@enron.com', 'ksgarland@alltel.net', 'randy.petersen@enron.com', Marsden, Andrew </O=ENRON/OU=EU/CN=RECIPIENTS/CN=AMARSDEN>
+X-cc: 
+X-bcc: 
+X-Folder: \rbuy\Inbox
+X-Origin: BUY-R
+X-FileName: richard buy 1-30-02..pst
+
+
+
+Announcement
+
+Kevin Garland has joined the Sterling Group as a Principal.  Kevin spent the
+last 7 years at Enron, where he most recently was Managing Director in
+charge of Enron's private equity business.  
+
+Since its founding in 1982, Sterling has focused on making equity
+investments in LBO transactions and other acquisition-related financings,
+primarily in industrial operating businesses.  Sterling has sponsored the
+buyouts of 26 companies and 20 add-on acquisitions for a total transaction
+value of $6.0 billion.
+
+Kevin joins the other Principals of Sterling:  Frank Hevrdejs, William
+Oehmig, Hunter Nelson, and John Hawkins, who have a combined 50 years at the
+firm.
+
+Contact Information:
+
+Kevin Garland
+Principal
+The Sterling Group
+Eight Greenway Plaza
+Houston, Texas  77046
+Work Phone:  713-877-8257
+Cell Phone:  713-598-1653
+kgarland@sterlinggrp.net

@@ -1,0 +1,80 @@
+Message-ID: <31345597.1075856239072.JavaMail.evans@thyme>
+Date: Wed, 3 Jan 2001 01:49:00 -0800 (PST)
+From: ron.baker@enron.com
+To: vince.kaminski@enron.com, stinson.gibner@enron.com
+Subject: RE: Cross-Guarantees
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+X-From: Ron Baker
+X-To: Vince J Kaminski, Stinson Gibner
+X-cc: 
+X-bcc: 
+X-Folder: \Vincent_Kaminski_Jun2001_1\Notes Folders\All documents
+X-Origin: Kaminski-V
+X-FileName: vkamins.nsf
+
+Attached are the latest drafts of 3 of the Cross-Guarantee agreements.  I 
+have the other nine as well, in case you need them.  The agreements are 
+basically identical with one exception.  The debt to Enron in Raptor 3 
+(approx. $259MM) is excluded from the Guarantees.  You may also note that 
+this debt is not represented on the DPRs which I sent earlier.  This is 
+because the formation of Raptor 3 was a failed FAS 125 transaction, therefore 
+we did not get sale treatment and can't recognize the debt in looking at 
+credit capacity.  Let me know if you have questions or if you need the other 
+nine guarantees.  Thanks,
+Ron
+
+
+
+----- Forwarded by Ron Baker/Corp/Enron on 01/03/2001 09:40 AM -----
+
+	"Kornreich, Craig" <ckornreich@velaw.com>
+	12/18/2000 04:55 PM
+		 
+		 To: "Curry, Alicia" <acurry@velaw.com>, "Mintz, Jordan (Enron)" 
+<jordan.mintz@enron.com>, "'joel.ephross@enron.com'" <joel.ephross@enron.com>
+		 cc: "'kevin.d.jordan@enron.com'" <kevin.d.jordan@enron.com>, 
+"'george.mckean@enron.com'" <george.mckean@enron.com>, 
+"'ryan.siurek@enron.com'" <ryan.siurek@enron.com>, "Patel Trushar (Enron)" 
+<trushar.patel@enron.com>, "Tiller, AnnMarie (Enron)" 
+<annmarie.tiller@enron.com>, "'brent.vasconcellos@enron.com'" 
+<brent.vasconcellos@enron.com>, "'ron.baker@enron.com'" 
+<ron.baker@enron.com>, "'clint.walden@enron.com'" <clint.walden@enron.com>, 
+"'alan.quaintance@enron.com'" <alan.quaintance@enron.com>, "Spradling, Mark" 
+<MSpradling@velaw.com>, "Halbert, Elaine" <ehalbert@velaw.com>
+		 Subject: RE: Cross-Guarantees
+
+
+Attached please find drafts of the 3 remaining Raptor Guaranty Agreements
+(i.e., those where Pronghorn is the beneficiary).
+
+Regards,
+
+Craig S. Kornreich
+Vinson & Elkins L.L.P.
+2300 First City Tower
+1001 Fannin Street
+Houston, TX 77002
+Ph (713) 758-4816
+Fax (713) 615-5862
+E-mail: ckornreich@velaw.com
+
+
+
+
+          ++++++CONFIDENTIALITY NOTICE+++++
+The information in this email may be confidential and/or privileged.  This
+email is intended to be reviewed by only the individual or organization
+named above.  If you are not the intended recipient or an authorized
+representative of the intended recipient, you are hereby notified that any
+review, dissemination or copying of this email and its attachments, if any,
+or the information contained herein is prohibited.  If you have received
+this email in error, please immediately notify the sender by return email
+and delete this email from your system.  Thank You
+
+
+
+ - Talon (I) ifo Pronghorn (III) Cross-Guarantee.DOC
+ - Timberwolf (II) ifo Pronghorn (III) Cross-Guarantee (v.2).DOC
+ - Bobcat (IV) ifo Pronghorn (III) Cross-Guarantee.DOC

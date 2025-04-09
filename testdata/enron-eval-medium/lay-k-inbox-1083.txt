@@ -1,0 +1,27 @@
+Message-ID: <9103751.1075860846333.JavaMail.evans@thyme>
+Date: Wed, 16 Jan 2002 13:38:37 -0800 (PST)
+From: enron_update@concureworkplace.com
+To: kenneth.lay@enron.com
+Subject: <<Concur Expense Document>> - December Business Expenses
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+X-From: enron_update@concureworkplace.com@ENRON
+X-To: Lay, Kenneth </O=ENRON/OU=NA/CN=RECIPIENTS/CN=KLAY>
+X-cc: 
+X-bcc: 
+X-Folder: \Kenneth_Lay_Mar2002\Lay, Kenneth\Inbox
+X-Origin: Lay-K
+X-FileName: klay (Non-Privileged).pst
+
+The following expense report is ready for approval:
+
+Employee Name: Stanley C. Horton
+Status last changed by: Stanley C. Horton
+Expense Report Name: December Business Expenses
+Report Total: $795.85
+Amount Due Employee: $795.85
+
+
+To approve this expense report, click on the following link for Concur Expense.
+http://expensexms.enron.com

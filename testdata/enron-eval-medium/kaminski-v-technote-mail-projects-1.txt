@@ -1,0 +1,18 @@
+Message-ID: <14027521.1075840777691.JavaMail.evans@thyme>
+Date: Fri, 11 May 2001 07:14:03 -0700 (PDT)
+From: ron.baker@enron.com
+To: j..kaminski@enron.com, stinson.gibner@enron.com, rakesh.bharati@enron.com
+Subject: Valuation Methodology
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+X-From: Baker, Ron </O=ENRON/OU=NA/CN=RECIPIENTS/CN=RBAKER3>
+X-To: Kaminski, Vince J. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Vkamins>, Gibner, Stinson </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Sgibner>, Bharati, Rakesh </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rbharati>
+X-cc: 
+X-bcc: 
+X-Folder: \vkamins\c:\technote\mail\Projects
+X-Origin: KAMINSKI-V
+X-FileName: vincent kaminski 1-30-02.pst
+
+We've had a request from AA to provide them with some sort of write-up or documentation from our research group on the valuation methodology used on the contingent issuance instrument for 18 million shares that was a part of the Raptor transaction completed at the end of March.  Apparently, this request has come from AA's expert in this area (I believe that his name is Dechundra, or something like that.  I've probably destroyed the spelling on that.  You guys are probably very familiar with him.)  Anyway, is there such documentation that we can provide them easily?  If so, let me know so that we can try to get AA finished with their review of the transaction.  In talking to our contacts at AA, I believe that their expert will be wanting to talk to you after he reviews the methodology documentation.  Thanks,
+Ron

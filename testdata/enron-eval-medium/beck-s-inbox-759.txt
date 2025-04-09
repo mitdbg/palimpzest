@@ -1,0 +1,74 @@
+Message-ID: <5556134.1075862314288.JavaMail.evans@thyme>
+Date: Mon, 26 Nov 2001 16:41:34 -0800 (PST)
+From: allan.sommer@enron.com
+To: mark.pickering@enron.com, sally.beck@enron.com, greg.piper@enron.com
+Subject: SAP Outages
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+X-From: Sommer, Allan </O=ENRON/OU=NA/CN=RECIPIENTS/CN=ASOMMER>
+X-To: Pickering, Mark </O=ENRON/OU=NA/CN=RECIPIENTS/CN=MPICKER>, Beck, Sally </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Sbeck>, Piper, Greg </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Gpiper>
+X-cc: 
+X-bcc: 
+X-Folder: \SBECK (Non-Privileged)\Beck, Sally\Inbox
+X-Origin: Beck-S
+X-FileName: SBECK (Non-Privileged).pst
+
+Normally, these scheduled SAP outages are planned with the major user bases via a communication released 3 weeks in advance and subsequently approved.  The notice you received today was a reminder notice.  This outage is due to our quarterly production build schedule for SAP upgrades to the HR environment ("hotpacks").  
+
+We rescheduled this weekends outage earlier today after consultation with HR and the tentative and future date will be mid-January.  At this point no additional outages are planned for the remainder of the year.
+
+The revised (cancelled) notification will go out tomorrow.
+
+Allan Sommer
+Enron ISC
+713-345-5291 work
+713-503-5089 cell
+877-711-4760 or 8777114760@skytel.com
+
+
+
+
+SAP System Outage Notification
+-------------------------------------------------------------
+SYSTEM OUTAGE NOTIFICATION 
+-------------------------------------------------------------
+FOR: SPR5DB00 - BBP 2.0 Production
+Date & Time of Outage: 
+Outage Commences: November 30, 2001 at 06:00 PM CST
+Outage Ends: December 2, 2001 at 05:00 PM CST
+Outage Abstract: System will be unavailable for Production Build Activities
+Outage Description: System will be unavailable for Production Build Activities
+Outage Implication: No access during outage
+Contact: 713-345-7282
+Contact:	Contact Information:	
+Basis On-Call	713-345-7282	
+ISC Customer Care	713-345-4727	
+-------------------------------------------------------------
+SYSTEM OUTAGE NOTIFICATION 
+-------------------------------------------------------------
+FOR: PR2 - HR Production
+Date & Time of Outage: 
+Outage Commences: November 30, 2001 at 06:00 PM CST
+Outage Ends: December 2, 2001 at 05:00 PM CST
+Outage Abstract: System will be unavailable for Production Build Activities
+Outage Description: System will be unavailable for Production Build Activities
+Outage Implication: No access during outage
+Contact: 713-345-7282
+Contact:	Contact Information:	
+Basis On-Call	713-345-7282	
+ISC Customer Care	713-345-4727	
+-------------------------------------------------------------
+SYSTEM OUTAGE NOTIFICATION 
+-------------------------------------------------------------
+FOR: PR1 - Apollo Production
+Date & Time of Outage: 
+Outage Commences: November 30, 2001 at 06:00 PM CST
+Outage Ends: December 2, 2001 at 05:00 PM CST
+Outage Abstract: System will be unavailable for Production Build Activities
+Outage Description: System will be unavailable for Production Build Activities
+Outage Implication: No access during outage
+Contact: 713-345-7282
+Contact:	Contact Information:	
+Basis On-Call	713-345-7282	
+ISC Customer Care	713-345-4727	
