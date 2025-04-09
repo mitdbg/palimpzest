@@ -88,7 +88,7 @@ class CityRating(Schema):
 
 def weather_api(city): # should work
     api_key = os.getenv("WEATHER_STACK_KEY")  # Replace with your actual API key
-    base_url = "https://api.weatherstack.com/current?access_key={" + api_key + "}"
+    base_url = "https://api.weatherstack.com/current?access_key=" + api_key + ""
 
     params = {
         # "access_key": api_key,
@@ -150,13 +150,9 @@ def hotel_api(city): #should work
         url = f"https://api.content.tripadvisor.com/api/v1/location/search?key={key}&searchQuery={city.split()[0]}%20{city.split()[1]}&language=en"
     else:
         url = f"https://api.content.tripadvisor.com/api/v1/location/search?key={key}&searchQuery={city}&language=en"
+        #works
+        
 
-
-
-
-   
-
-    temp = "https://api.content.tripadvisor.com/api/v1/location/search?language=en"
 
 
     headers = {"accept": "application/json"}
@@ -168,21 +164,31 @@ def hotel_api(city): #should work
 
 def reviews_api(city): #should work
      #not sure if it works
+    """Fetches Tripadvisor reviews for a given city."""
+    
+    # Retrieve API key from environment variables
     key = os.getenv("TRIP_ADVISORY_KEY")
+    
+    if not key:
+        return "Error: Missing API Key. Set TRIP_ADVISORY_KEY in environment variables."
+    
+    # Get city ID from the dictionary (ensure tripadvisor_location_ids is defined)
     city_id = tripadvisor_location_ids.get(city)
+    
+    if not city_id:
+        return f"Error: City '{city}' not found in tripadvisor_location_ids."
+
+    # Correct API endpoint format
     url = f"https://api.content.tripadvisor.com/api/v1/location/{city_id}/reviews?key={key}&language=en"
 
+    headers = {"Accept": "application/json"}
 
-    
-
-
-
-
-    headers = {"accept": "application/json"}
-
-    response = requests.get(url, headers=headers)
-
-    return response.text
+    try:
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()  # Raise an error for bad responses (4xx, 5xx)
+        return response.json()  # Return parsed JSON response
+    except requests.exceptions.RequestException as e:
+        return f"API request failed: {e}"
 
 class CityDataReader(pz.DataReader):
     def __init__(self, potential_cities):
@@ -217,7 +223,10 @@ class CityDataReader(pz.DataReader):
 
 
 def is_good_vacation (active_ds):
-    return active_ds['rating'] >= 1.0
+    # print(active_ds)
+    if active_ds is None or active_ds['rating'] is None:
+        return False
+    return active_ds['rating'] >= 7.5
 
 if __name__ == "__main__":
     ##MY CODE BEGINS
