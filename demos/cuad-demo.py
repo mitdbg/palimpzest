@@ -396,9 +396,10 @@ def compute_precision_recall(label_df, preds_df):
     return precision, recall
 
 class CUADDataReader(pz.DataReader):
-    def __init__(self, num_contracts: int = 1, split: str = "train"):
+    def __init__(self, num_contracts: int = 1, split: str = "train", seed: int=42):
         self.num_contracts = num_contracts
         self.split = split
+        self.seed = seed
 
         input_cols = [
             {"name": "contract_id", "type": str, "desc": "The id of the the contract to be analyzed"},
@@ -410,15 +411,20 @@ class CUADDataReader(pz.DataReader):
         # convert the dataset into a list of dictionaries where each row is for a single contract
         include_labels = split == "train"
         dataset = datasets.load_dataset("theatticusproject/cuad-qa")[split]
-        self.dataset = self._construct_dataset(dataset, num_contracts, include_labels)
+        self.dataset = self._construct_dataset(dataset, num_contracts, seed, include_labels)
 
-    def _construct_dataset(self, dataset, num_contracts, include_labels: bool=False):
+
+    def _construct_dataset(self, dataset, num_contracts, seed: int=42, include_labels: bool=False):
         # get the set of unique contract titles; to ensure the order of the contracts is
         # preserved, we use a list rather than using python's set()
         contract_titles = []
         for row in dataset:
             if row["title"] not in contract_titles:
                 contract_titles.append(row["title"])
+
+        # shuffle the contracts for the given seed
+        rng = np.random.default_rng(seed=seed)
+        rng.shuffle(contract_titles)
 
         # get the first num_contracts
         contract_titles = contract_titles[:num_contracts]
@@ -481,7 +487,7 @@ class CUADDataReader(pz.DataReader):
 
     def get_label_df(self):
         full_dataset = datasets.load_dataset("theatticusproject/cuad-qa")[self.split]
-        label_dataset = self._construct_dataset(full_dataset, self.num_contracts, True)
+        label_dataset = self._construct_dataset(full_dataset, self.num_contracts, self.seed, True)
         final_label_dataset = []
         for entry in label_dataset:
             row = {}
@@ -535,6 +541,12 @@ def parse_arguments():
         type=int,
         help="Total sample budget in Random Sampling or MAB sentinel execution",
     )
+    parser.add_argument(
+        "--exp-name",
+        default=None,
+        type=str,
+        help="The experiment name.",
+    )
     return parser.parse_args()
 
 
@@ -576,7 +588,7 @@ def main():
     os.makedirs("opt-profiling-data", exist_ok=True)
 
     # Create a data reader for the CUAD dataset
-    data_reader = CUADDataReader(split="test", num_contracts=50)
+    data_reader = CUADDataReader(split="test", num_contracts=100)
     val_data_reader = CUADDataReader(split="train", num_contracts=25)
     print("Created data reader")
 
@@ -598,16 +610,17 @@ def main():
         optimizer_strategy="pareto",
         sentinel_execution_strategy=sentinel_strategy,
         execution_strategy="parallel",
-        max_workers=20,
+        max_workers=64,
         available_models=[
-            Model.GPT_4o,
-            Model.GPT_4o_V,
+            # Model.GPT_4o,
             Model.GPT_4o_MINI,
-            Model.GPT_4o_MINI_V,
-            Model.DEEPSEEK,
+            Model.LLAMA3_2_3B,
+            Model.LLAMA3_1_8B,
+            Model.LLAMA3_3_70B,
+            Model.LLAMA3_2_90B_V,
             Model.MIXTRAL,
-            Model.LLAMA3,
-            Model.LLAMA3_V,
+            # Model.DEEPSEEK_V3,
+            Model.DEEPSEEK_R1_DISTILL_QWEN_1_5B,
         ],
         allow_bonded_query=True,
         allow_code_synth=False,
@@ -622,7 +635,12 @@ def main():
     k = args.k
     j = args.j
     sample_budget = args.sample_budget
-    exp_name = f"cuad-demo-no-priors-{sentinel_strategy}-k{k}-j{j}-budget{sample_budget}-seed{seed}"
+    exp_name = (
+        f"cuad-final-{sentinel_strategy}-k{k}-j{j}-budget{sample_budget}-seed{seed}"
+        if args.exp_name is None
+        else args.exp_name
+    )
+    print(f"EXPERIMENT NAME: {exp_name}")
     data_record_collection = query.run(
         config=config,
         k=k,
@@ -632,6 +650,11 @@ def main():
         exp_name=exp_name,
     )
     print("Query execution completed")
+
+    # save statistics
+    execution_stats_dict = data_record_collection.execution_stats.to_json()
+    with open(f"opt-profiling-data/{exp_name}-stats.json", "w") as f:
+        json.dump(execution_stats_dict, f)
 
     pred_df = data_record_collection.to_df()
     label_df = data_reader.get_label_df()

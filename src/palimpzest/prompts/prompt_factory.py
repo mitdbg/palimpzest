@@ -155,7 +155,7 @@ class PromptFactory:
         # TODO: this does not work for image prompts
         # TODO: this ignores the size of the `orignal_messages` in critique and refine prompts
         # cut down on context based on window length
-        if self.model in [Model.LLAMA3, Model.MIXTRAL]:
+        if self.model.is_llama_model() or self.model.is_mixtral_model():
             total_context_len = len(json.dumps(context, indent=2))
 
             # sort fields by length and progressively strip from the longest field until it is short enough;

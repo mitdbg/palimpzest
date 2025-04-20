@@ -9,10 +9,18 @@ def get_vision_models() -> list[Model]:
     """
     models = []
     if os.getenv("OPENAI_API_KEY") is not None:
-        models.extend([Model.GPT_4o_V, Model.GPT_4o_MINI_V])
+        openai_vision_models = [
+            model for model in Model
+            if model.is_openai_model() and model.is_vision_model()
+        ]
+        models.extend(openai_vision_models)
 
     if os.getenv("TOGETHER_API_KEY") is not None:
-        models.extend([Model.LLAMA3_V])
+        together_vision_models = [
+            model for model in Model
+            if model.is_together_model() and model.is_vision_model()
+        ]
+        models.extend(together_vision_models)
 
     return models
 
@@ -23,10 +31,16 @@ def get_models(include_vision: bool = False) -> list[Model]:
     """
     models = []
     if os.getenv("OPENAI_API_KEY") is not None:
-        models.extend([Model.GPT_4o, Model.GPT_4o_MINI])
+        openai_models = [model for model in Model if model.is_openai_model()]
+        models.extend(openai_models)
 
     if os.getenv("TOGETHER_API_KEY") is not None:
-        models.extend([Model.LLAMA3, Model.MIXTRAL, Model.DEEPSEEK])
+        together_models = [model for model in Model if model.is_together_model()]
+        if not include_vision:
+            together_models = [
+                model for model in together_models if not model.is_vision_model()
+            ]
+        models.extend(together_models)
 
     if include_vision:
         vision_models = get_vision_models()
@@ -38,15 +52,15 @@ def get_models(include_vision: bool = False) -> list[Model]:
 TEXT_MODEL_PRIORITY = [
     Model.GPT_4o,
     Model.GPT_4o_MINI,
-    Model.LLAMA3,
+    Model.LLAMA3_3_70B,
     Model.MIXTRAL,
-    Model.DEEPSEEK,
+    Model.DEEPSEEK_V3,
 ]
 
 VISION_MODEL_PRIORITY = [
-    Model.GPT_4o_V,
-    Model.GPT_4o_MINI_V,
-    Model.LLAMA3_V,
+    Model.GPT_4o,
+    Model.GPT_4o_MINI,
+    Model.LLAMA3_2_90B_V,
 ]
 def get_champion_model(available_models, vision=False):
     # Select appropriate priority list based on task

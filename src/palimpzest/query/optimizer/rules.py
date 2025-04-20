@@ -2,7 +2,7 @@ import logging
 from copy import deepcopy
 from itertools import combinations
 
-from palimpzest.constants import AggFunc, Cardinality, Model, PromptStrategy
+from palimpzest.constants import AggFunc, Cardinality, PromptStrategy
 from palimpzest.query.operators.aggregate import ApplyGroupByOp, AverageAggregateOp, CountAggregateOp
 from palimpzest.query.operators.code_synthesis_convert import CodeSynthesisConvertSingle
 from palimpzest.query.operators.convert import LLMConvertBonded, NonLLMConvert
@@ -286,9 +286,6 @@ class LLMConvertBondedRule(ImplementationRule):
             }
         )
 
-        # NOTE: when comparing pz.Model(s), equality is determined by the string (i.e. pz.Model.value)
-        #       thus, Model.GPT_4o and Model.GPT_4o_V map to the same value; this allows us to use set logic
-        #
         # identify models which can be used strictly for text or strictly for images
         vision_models = set(get_vision_models())
         text_models = set(get_models())
@@ -323,10 +320,10 @@ class LLMConvertBondedRule(ImplementationRule):
             # skip this model if:
             # 1. this is a pure vision model and we're not doing an image conversion, or
             # 2. this is a pure text model and we're doing an image conversion, or
-            # 3. this is a vision model hosted by Together (i.e. LLAMA3_V) and there is more than one image field
+            # 3. this is a vision model hosted by Together (i.e. LLAMA3 vision) and there is more than one image field
             first_criteria = model in pure_vision_models and not is_image_conversion
             second_criteria = model in pure_text_models and is_image_conversion
-            third_criteria = model == Model.LLAMA3_V and (num_image_fields > 1 or list_image_field)
+            third_criteria = model.is_llama_model() and model.is_vision_model() and (num_image_fields > 1 or list_image_field)
             if first_criteria or second_criteria or third_criteria:
                 continue
 
@@ -389,9 +386,6 @@ class TokenReducedConvertBondedRule(ImplementationRule):
             }
         )
 
-        # NOTE: when comparing pz.Model(s), equality is determined by the string (i.e. pz.Model.value)
-        #       thus, Model.GPT_4o and Model.GPT_4o_V map to the same value; this allows us to use set logic
-        #
         # identify models which can be used strictly for text or strictly for images
         vision_models = set(get_vision_models())
         text_models = set(get_models())
@@ -541,9 +535,6 @@ class RAGConvertRule(ImplementationRule):
             }
         )
 
-        # NOTE: when comparing pz.Model(s), equality is determined by the string (i.e. pz.Model.value)
-        #       thus, Model.GPT_4o and Model.GPT_4o_V map to the same value; this allows us to use set logic
-        #
         # identify models which can be used strictly for text or strictly for images
         vision_models = set(get_vision_models())
         text_models = set(get_models())
@@ -612,9 +603,6 @@ class MixtureOfAgentsConvertRule(ImplementationRule):
             }
         )
 
-        # NOTE: when comparing pz.Model(s), equality is determined by the string (i.e. pz.Model.value)
-        #       thus, Model.GPT_4o and Model.GPT_4o_V map to the same value; this allows us to use set logic
-        #
         # identify models which can be used strictly for text or strictly for images
         vision_models = set(get_vision_models())
         text_models = set(get_models())
@@ -636,7 +624,7 @@ class MixtureOfAgentsConvertRule(ImplementationRule):
         )
         proposer_model_set, is_image_conversion = text_models, False
         if num_image_fields > 1 or list_image_field:
-            proposer_model_set = [model for model in vision_models if model != Model.LLAMA3_V]
+            proposer_model_set = [model for model in vision_models if not model.is_llama_model()]
             is_image_conversion = True
         elif num_image_fields == 1:
             proposer_model_set = vision_models
@@ -712,9 +700,6 @@ class CriticAndRefineConvertRule(ImplementationRule):
             }
         )
 
-        # NOTE: when comparing pz.Model(s), equality is determined by the string (i.e. pz.Model.value)
-        #       thus, Model.GPT_4o and Model.GPT_4o_V map to the same value; this allows us to use set logic
-        #
         # identify models which can be used strictly for text or strictly for images
         vision_models = set(get_vision_models())
         text_models = set(get_models())
@@ -750,10 +735,10 @@ class CriticAndRefineConvertRule(ImplementationRule):
             # skip this model if:
             # 1. this is a pure vision model and we're not doing an image conversion, or
             # 2. this is a pure text model and we're doing an image conversion, or
-            # 3. this is a vision model hosted by Together (i.e. LLAMA3_V) and there is more than one image field
+            # 3. this is a vision model hosted by Together (i.e. LLAMA3 vision) and there is more than one image field
             first_criteria = model in pure_vision_models and not is_image_conversion
             second_criteria = model in pure_text_models and is_image_conversion
-            third_criteria = model == Model.LLAMA3_V and (num_image_fields > 1 or list_image_field)
+            third_criteria = model.is_llama_model() and model.is_vision_model() and (num_image_fields > 1 or list_image_field)
             if first_criteria or second_criteria or third_criteria:
                 continue
 
@@ -826,9 +811,6 @@ class SplitConvertRule(ImplementationRule):
             }
         )
 
-        # NOTE: when comparing pz.Model(s), equality is determined by the string (i.e. pz.Model.value)
-        #       thus, Model.GPT_4o and Model.GPT_4o_V map to the same value; this allows us to use set logic
-        #
         # identify models which can be used strictly for text or strictly for images
         vision_models = set(get_vision_models())
         text_models = set(get_models())
@@ -987,9 +969,6 @@ class LLMFilterRule(ImplementationRule):
             }
         )
 
-        # NOTE: when comparing pz.Model(s), equality is determined by the string (i.e. pz.Model.value)
-        #       thus, Model.GPT_4o and Model.GPT_4o_V map to the same value; this allows us to use set logic
-        #
         # identify models which can be used strictly for text or strictly for images
         vision_models = set(get_vision_models())
         text_models = set(get_models())
@@ -1024,10 +1003,10 @@ class LLMFilterRule(ImplementationRule):
             # skip this model if:
             # 1. this is a pure vision model and we're not doing an image filter, or
             # 2. this is a pure text model and we're doing an image filter, or
-            # 3. this is a vision model hosted by Together (i.e. LLAMA3_V) and there is more than one image field
+            # 3. this is a vision model hosted by Together (i.e. LLAMA3 vision) and there is more than one image field
             first_criteria = model in pure_vision_models and not is_image_filter
             second_criteria = model in pure_text_models and is_image_filter
-            third_criteria = model == Model.LLAMA3_V and (num_image_fields > 1 or list_image_field)
+            third_criteria = model.is_llama_model() and model.is_vision_model() and (num_image_fields > 1 or list_image_field)
             if first_criteria or second_criteria or third_criteria:
                 continue
 

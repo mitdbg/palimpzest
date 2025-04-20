@@ -10,21 +10,69 @@ class Model(str, Enum):
     which requires invoking an LLM. It does NOT specify whether the model need be executed
     remotely or locally (if applicable).
     """
-    # LLAMA3 = "meta-llama/Llama-3-8b-chat-hf"
-    LLAMA3 = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
-    LLAMA3_V = "meta-llama/Llama-3.2-90B-Vision-Instruct-Turbo"
+    LLAMA3_2_3B = "meta-llama/Llama-3.2-3B-Instruct-Turbo"
+    LLAMA3_1_8B = "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo"
+    LLAMA3_3_70B = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+    LLAMA3_2_90B_V = "meta-llama/Llama-3.2-90B-Vision-Instruct-Turbo"
     MIXTRAL = "mistralai/Mixtral-8x7B-Instruct-v0.1"
-    DEEPSEEK = "deepseek-ai/DeepSeek-V3"
+    DEEPSEEK_V3 = "deepseek-ai/DeepSeek-V3"
+    DEEPSEEK_R1_DISTILL_QWEN_1_5B = "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"
     GPT_4o = "gpt-4o-2024-08-06"
-    GPT_4o_V = "gpt-4o-2024-08-06"
     GPT_4o_MINI = "gpt-4o-mini-2024-07-18"
-    GPT_4o_MINI_V = "gpt-4o-mini-2024-07-18"
+    o1 = "o1-2024-12-17"
     TEXT_EMBEDDING_3_SMALL = "text-embedding-3-small"
     CLIP_VIT_B_32 = "clip-ViT-B-32"
 
     def __repr__(self):
         return f"{self.name}"
 
+    def is_deepseek_model(self):
+        return "deepseek" in self.value.lower()
+
+    def is_llama_model(self):
+        return "llama" in self.value.lower()
+
+    def is_mixtral_model(self):
+        return "mixtral" in self.value.lower()
+
+    def is_clip_model(self):
+        return "clip" in self.value.lower()
+
+    def is_together_model(self):
+        is_llama_model = self.is_llama_model()
+        is_mixtral_model = self.is_mixtral_model()
+        is_deepseek_model = self.is_deepseek_model()
+        is_clip_model = self.is_clip_model()
+        return is_llama_model or is_mixtral_model or is_deepseek_model or is_clip_model
+
+    def is_gpt_4o_model(self):
+        return "gpt-4o" in self.value.lower()
+
+    def is_o1_model(self):
+        return "o1" in self.value.lower()
+
+    def is_text_embedding_model(self):
+        return "text-embedding" in self.value.lower()
+
+    def is_openai_model(self):
+        is_gpt4_model = self.is_gpt_4o_model()
+        is_o1_model = self.is_o1_model()
+        is_text_embedding_model = self.is_text_embedding_model()
+        return is_gpt4_model or is_o1_model or is_text_embedding_model
+
+    def is_vision_model(self):
+        vision_models = [
+            "meta-llama/Llama-3.2-90B-Vision-Instruct-Turbo",
+            "gpt-4o-2024-08-06",
+            "gpt-4o-mini-2024-07-18",
+            "o1-2024-12-17",
+        ]
+        return self.value in vision_models
+
+    def is_embedding_model(self):
+        is_clip_model = self.is_clip_model()
+        is_text_embedding_model = self.is_text_embedding_model()
+        return is_clip_model or is_text_embedding_model
 
 class APIClient(str, Enum):
     """
@@ -220,17 +268,28 @@ LOG_LLM_OUTPUT = False
 # values more precisely:
 # - https://artificialanalysis.ai/models/llama-3-1-instruct-8b
 #
-# LLAMA3_8B_MODEL_CARD = {
-#     ##### Cost in USD #####
-#     "usd_per_input_token": 0.18 / 1E6,
-#     "usd_per_output_token": 0.18 / 1E6,
-#     ##### Time #####
-#     "seconds_per_output_token": 0.0061,
-#     ##### Agg. Benchmark #####
-#     "overall": 71.0,
-#     ##### Code #####
-#     "code": 64.0,
-# }
+LLAMA3_2_3B_INSTRUCT_MODEL_CARD = {
+    ##### Cost in USD #####
+    "usd_per_input_token": 0.06 / 1e6,
+    "usd_per_output_token": 0.06 / 1e6,
+    ##### Time #####
+    "seconds_per_output_token": 0.0064,
+    ##### Agg. Benchmark #####
+    "overall": 63.4,
+    ##### Code #####
+    "code": 0.0,
+}
+LLAMA3_1_8B_INSTRUCT_MODEL_CARD = {
+    ##### Cost in USD #####
+    "usd_per_input_token": 0.18 / 1e6,
+    "usd_per_output_token": 0.18 / 1e6,
+    ##### Time #####
+    "seconds_per_output_token": 0.0059,
+    ##### Agg. Benchmark #####
+    "overall": 69.4,
+    ##### Code #####
+    "code": 72.6,
+}
 LLAMA3_3_70B_INSTRUCT_MODEL_CARD = {
     ##### Cost in USD #####
     "usd_per_input_token": 0.88 / 1e6,
@@ -242,15 +301,6 @@ LLAMA3_3_70B_INSTRUCT_MODEL_CARD = {
     ##### Code #####
     "code": 88.4,
 }
-# LLAMA3_2_11B_V_MODEL_CARD = {
-#     ##### Cost in USD #####
-#     "usd_per_input_token": 0.18 / 1E6,
-#     "usd_per_output_token": 0.18 / 1E6,
-#     ##### Time #####
-#     "seconds_per_output_token": 0.0061,
-#     ##### Agg. Benchmark #####
-#     "overall": 71.0,
-# }
 LLAMA3_2_90B_V_MODEL_CARD = {
     ##### Cost in USD #####
     "usd_per_input_token": 1.2 / 1e6,
@@ -282,7 +332,19 @@ DEEPSEEK_V3_MODEL_CARD = {
     ##### Code #####
     "code": 92.0,
 }
+DEEPSEEK_R1_DISTILL_QWEN_1_5B_MODEL_CARD = {
+    ##### Cost in USD #####
+    "usd_per_input_token": 0.18 / 1E6,
+    "usd_per_output_token": 0.18 / 1E6,
+    ##### Time #####
+    "seconds_per_output_token": 0.0026,
+    ##### Agg. Benchmark #####
+    "overall": 0.0,
+    ##### Code #####
+    "code": 0.0,
+}
 GPT_4o_MODEL_CARD = {
+    # NOTE: it is unclear if the same ($ / token) costs can be applied for vision, or if we have to calculate this ourselves
     ##### Cost in USD #####
     "usd_per_input_token": 2.5 / 1e6,
     "usd_per_output_token": 10.0 / 1e6,
@@ -293,17 +355,8 @@ GPT_4o_MODEL_CARD = {
     ##### Code #####
     "code": 90.0,
 }
-GPT_4o_V_MODEL_CARD = {
-    # NOTE: it is unclear if the same ($ / token) costs can be applied, or if we have to calculate this ourselves
-    ##### Cost in USD #####
-    "usd_per_input_token": 2.5 / 1e6,
-    "usd_per_output_token": 10.0 / 1e6,
-    ##### Time #####
-    "seconds_per_output_token": 0.0079,
-    ##### Agg. Benchmark #####
-    "overall": 89.0,
-}
 GPT_4o_MINI_MODEL_CARD = {
+    # NOTE: it is unclear if the same ($ / token) costs can be applied for vision, or if we have to calculate this ourselves
     ##### Cost in USD #####
     "usd_per_input_token": 0.15 / 1e6,
     "usd_per_output_token": 0.6 / 1e6,
@@ -314,15 +367,17 @@ GPT_4o_MINI_MODEL_CARD = {
     ##### Code #####
     "code": 86.0,
 }
-GPT_4o_MINI_V_MODEL_CARD = {
-    # NOTE: it is unclear if the same ($ / token) costs can be applied, or if we have to calculate this ourselves
+o1_MODEL_CARD = {  # noqa: N816
+    # NOTE: it is unclear if the same ($ / token) costs can be applied for vision, or if we have to calculate this ourselves
     ##### Cost in USD #####
-    "usd_per_input_token": 0.15 / 1e6,
-    "usd_per_output_token": 0.6 / 1e6,
+    "usd_per_input_token": 15 / 1e6,
+    "usd_per_output_token": 60 / 1e6,
     ##### Time #####
-    "seconds_per_output_token": 0.0098,
+    "seconds_per_output_token": 0.0110,
     ##### Agg. Benchmark #####
-    "overall": 82.0,
+    "overall": 92.3,
+    ##### Code #####
+    "code": 92.3, # NOTE: just copying MMLU score for now
 }
 TEXT_EMBEDDING_3_SMALL_MODEL_CARD = {
     ##### Cost in USD #####
@@ -345,22 +400,18 @@ CLIP_VIT_B_32_MODEL_CARD = {
 
 
 MODEL_CARDS = {
-    Model.LLAMA3.value: LLAMA3_3_70B_INSTRUCT_MODEL_CARD,
-    Model.LLAMA3_V.value: LLAMA3_2_90B_V_MODEL_CARD,
-    Model.DEEPSEEK.value: DEEPSEEK_V3_MODEL_CARD,
+    Model.LLAMA3_2_3B.value: LLAMA3_2_3B_INSTRUCT_MODEL_CARD,
+    Model.LLAMA3_1_8B.value: LLAMA3_1_8B_INSTRUCT_MODEL_CARD,
+    Model.LLAMA3_3_70B.value: LLAMA3_3_70B_INSTRUCT_MODEL_CARD,
+    Model.LLAMA3_2_90B_V.value: LLAMA3_2_90B_V_MODEL_CARD,
+    Model.DEEPSEEK_V3.value: DEEPSEEK_V3_MODEL_CARD,
+    Model.DEEPSEEK_R1_DISTILL_QWEN_1_5B.value: DEEPSEEK_R1_DISTILL_QWEN_1_5B_MODEL_CARD,
     Model.MIXTRAL.value: MIXTRAL_8X_7B_MODEL_CARD,
     Model.GPT_4o.value: GPT_4o_MODEL_CARD,
-    Model.GPT_4o_V.value: GPT_4o_V_MODEL_CARD,
     Model.GPT_4o_MINI.value: GPT_4o_MINI_MODEL_CARD,
-    Model.GPT_4o_MINI_V.value: GPT_4o_MINI_V_MODEL_CARD,
+    Model.o1.value: o1_MODEL_CARD,
     Model.TEXT_EMBEDDING_3_SMALL.value: TEXT_EMBEDDING_3_SMALL_MODEL_CARD,
     Model.CLIP_VIT_B_32.value: CLIP_VIT_B_32_MODEL_CARD,
-    ###
-    # Model.GPT_3_5.value: GPT_3_5_MODEL_CARD,
-    # Model.GPT_4.value: GPT_4_MODEL_CARD,
-    # Model.GPT_4V.value: GPT_4V_MODEL_CARD,
-    # Model.GEMINI_1.value: GEMINI_1_MODEL_CARD,
-    # Model.GEMINI_1V.value: GEMINI_1V_MODEL_CARD,
 }
 
 

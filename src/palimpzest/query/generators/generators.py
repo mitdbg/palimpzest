@@ -49,10 +49,10 @@ def generator_factory(
     """
     Factory function to return the correct generator based on the model, strategy, and cardinality.
     """
-    if model in [Model.GPT_4o, Model.GPT_4o_MINI, Model.GPT_4o_V, Model.GPT_4o_MINI_V]:
+    if model.is_openai_model():
         return OpenAIGenerator(model, prompt_strategy, cardinality, verbose)
 
-    elif model in [Model.MIXTRAL, Model.LLAMA3, Model.LLAMA3_V, Model.DEEPSEEK]:
+    elif model.is_together_model():
         return TogetherGenerator(model, prompt_strategy, cardinality, verbose)
 
     raise Exception(f"Unsupported model: {model}")
@@ -467,7 +467,7 @@ class OpenAIGenerator(BaseGenerator[str | list[str], str]):
         verbose: bool = False,
     ):
         # assert that model is an OpenAI model
-        assert model in [Model.GPT_4o, Model.GPT_4o_MINI, Model.GPT_4o_V, Model.GPT_4o_MINI_V]
+        assert model.is_openai_model()
         super().__init__(model, prompt_strategy, cardinality, verbose, "developer")
 
     def _get_client_or_model(self, **kwargs) -> OpenAI:
@@ -511,7 +511,7 @@ class TogetherGenerator(BaseGenerator[str | list[str], str]):
         verbose: bool = False,
     ):
         # assert that model is a model offered by Together
-        assert model in [Model.MIXTRAL, Model.LLAMA3, Model.LLAMA3_V, Model.DEEPSEEK]
+        assert model.is_together_model()
         super().__init__(model, prompt_strategy, cardinality, verbose, "system")
 
     def _generate_payload(self, messages: list[dict], **kwargs) -> dict:
@@ -528,7 +528,7 @@ class TogetherGenerator(BaseGenerator[str | list[str], str]):
         For LLAMA3, the payload needs to be in a {"role": <role>, "content": <content>} format.
         """
         # for other models, use our standard payload generation
-        if self.model != Model.LLAMA3:
+        if not self.model.is_llama_model():
             return super()._generate_payload(messages, **kwargs)
 
         # get basic parameters

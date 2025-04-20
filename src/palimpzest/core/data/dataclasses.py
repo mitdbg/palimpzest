@@ -5,6 +5,8 @@ from abc import abstractmethod
 from dataclasses import dataclass, field, fields
 from typing import Any
 
+import numpy as np
+
 
 @dataclass
 class GenerationStats:
@@ -684,8 +686,21 @@ class ExecutionStats:
             else:
                 raise TypeError(f"Cannot add {type(plan_stats)} to ExecutionStats")
 
+    def clean_json(self, stats: dict):
+        """
+        Convert np.int64 and np.float64 to int and float for all values in stats.
+        """
+        for key, value in stats.items():
+            if isinstance(value, dict):
+                stats[key] = self.clean_json(value)
+            elif isinstance(value, np.int64):
+                stats[key] = int(value)
+            elif isinstance(value, np.float64):
+                stats[key] = float(value)
+        return stats
+
     def to_json(self):
-        return {
+        stats = {
             "execution_id": self.execution_id,
             "sentinel_plan_stats": {
                 plan_id: plan_stats.to_json() for plan_id, plan_stats in self.sentinel_plan_stats.items()
@@ -700,6 +715,8 @@ class ExecutionStats:
             "sentinel_plan_strs": self.sentinel_plan_strs,
             "plan_strs": self.plan_strs,
         }
+        stats = self.clean_json(stats)
+        return stats
 
 
 @dataclass

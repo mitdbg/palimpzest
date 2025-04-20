@@ -405,6 +405,7 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
         num_llm_ops = 0
 
         # create thread pool w/max workers and run futures over worker pool
+        import pdb; pdb.set_trace()
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             # create futures
             futures = [

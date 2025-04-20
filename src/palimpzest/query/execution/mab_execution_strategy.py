@@ -510,7 +510,6 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
             logical_op_id: OpFrontier(op_set, shuffled_source_indices, self.k, self.j, self.seed, self.policy)
             for logical_op_id, op_set in plan
         }
-        import pdb; pdb.set_trace()
 
         # initialize and start the progress manager
         self.progress_manager = create_progress_manager(plan, sample_budget=self.sample_budget, progress=self.progress)
