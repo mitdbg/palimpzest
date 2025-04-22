@@ -1,7 +1,7 @@
 [
-    {
-        "instance_id": "astropy__astropy-13306",
-        "model_patch": "diff --git a/astropy/table/operations.py b/astropy/table/operations.py --- a/astropy/table/operations.py +++ b/astropy/table/operations.py @@ -651,7 +651,7 @@  def vstack(tables, join_type='outer', col_name_map=None, metadata_conflicts='warn'):      # Ensure all tables are of the same type      if not all(isinstance(table, Table) for table in tables):          raise TypeError('All inputs must be Table instances')   -    # Check for structured arrays and handle them appropriately +    # Check for structured arrays and handle them appropriately      dtypes = [table.dtype for table in tables]      if any(dt.names for dt in dtypes):  # Check if any dtype is structured          # Handle structured array stacking logic          # Ensure that the structured arrays are compatible          common_dtype = np.find_common_type(dtypes)          for table in tables:              if table.dtype != common_dtype:                  table = table.astype(common_dtype)        # Proceed with stacking      out = np.empty((sum(len(table) for table in tables),), dtype=common_dtype)      idx = 0      for table in tables:          out[idx:idx + len(table)] = table          idx += len(table)      return out ",
-        "model_name_or_path": "palimpzest"
-    }
+  {
+    "instance_id": "astropy__astropy-13745",
+    "model_patch": "diff --git a/astropy/coordinates/angles.py b/astropy/coordinates/angles.py\n--- a/astropy/coordinates/angles.py\n+++ b/astropy/coordinates/angles.py\n@@ -587,7 +587,7 @@ def _validate_angles(self, angles=None):\n         if angles.unit is u.deg:\n             limit = 90\n         elif angles.unit is u.rad:\n-             limit = 0.5 * np.pi\n+             limit = self.dtype.type(0.5 * np.pi)\n         else:\n             limit = u.degree.to(angles.unit, 90.0)\n",
+    "model_name_or_path": "palimpzest"
+  }
 ]

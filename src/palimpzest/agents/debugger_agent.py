@@ -3,6 +3,7 @@ from palimpzest.agents.base_agent import BaseAgentOp, GLOBAL_CONTEXT
 from palimpzest.agents.react import ReAct 
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.data.dataclasses import GenerationStats  
+import palimpzest.constants as constants 
 import palimpzest.agents.utils as utils
 import time
 import json
@@ -66,7 +67,6 @@ class DebuggerAgentOp(BaseAgentOp):
                 Tool(BaseAgentOp.get_file_content),
                 Tool(BaseAgentOp.extract_method), 
                 Tool(BaseAgentOp.search_keyword),
-                # TO DO: implement get_class() tool (?)
             ],
             max_iters=self.max_iters,
         )
@@ -76,15 +76,21 @@ class DebuggerAgentOp(BaseAgentOp):
         plan['bug_report'] = result.fix_report
 
         # Construct generation stats
-        # TODO: Compute number of input and output tokens for a single react run
+        input_tokens = react.get_total_input_tokens()
+        output_tokens = react.get_total_output_tokens()
+
+        # TODO: Modify based on which model is used
+        usd_per_input_token = constants.GPT_4o_MODEL_CARD['usd_per_input_token']
+        usd_per_output_token = constants.GPT_4o_MODEL_CARD['usd_per_output_token']
+
         generation_stats = GenerationStats(
             model_name=str(dspy.settings.lm.model),
             llm_call_duration_secs=time.time() - start_time, 
-            # total_input_tokens=input_tokens,
-            # total_output_tokens=output_tokens,
-            # total_input_cost=input_tokens * usd_per_input_token,
-            # total_output_cost=output_tokens * usd_per_output_token,
-            # cost_per_record=input_tokens * usd_per_input_token + output_tokens * usd_per_output_token,
+            total_input_tokens=input_tokens,
+            total_output_tokens=output_tokens,
+            total_input_cost=input_tokens * usd_per_input_token,
+            total_output_cost=output_tokens * usd_per_output_token,
+            cost_per_record=input_tokens * usd_per_input_token + output_tokens * usd_per_output_token,
         )
 
         # Logging and printing 

@@ -9,16 +9,17 @@ args = parser.parse_args()
 NUM_INSTANCES = args.num_instances
 
 # Load the SWE-bench_oracle dataset
-dataset = load_dataset("princeton-nlp/SWE-bench_oracle")
+# dataset = load_dataset("princeton-nlp/SWE-bench_oracle")
+dataset = load_dataset("princeton-nlp/SWE-bench_Lite")
 
 # Access the training set
 test_data = dataset['test']
 
-output_dir = "../testdata/swe-bench-oracle"
+output_dir = "../testdata/swe-bench-lite"
 os.makedirs(output_dir, exist_ok=True)
 
 for idx, row in enumerate(test_data):
-  if idx > NUM_INSTANCES: 
+  if idx >= NUM_INSTANCES: 
     break 
 
   instance_id = row["instance_id"]

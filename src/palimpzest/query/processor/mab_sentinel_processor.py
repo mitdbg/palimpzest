@@ -313,6 +313,7 @@ class MABSentinelQueryProcessor(QueryProcessor):
             # GREEDY ALGORITHM
             # for each record in the expected output, we look for the computed record which maximizes the quality metric;
             # once we've identified that computed record we remove it from consideration for the next expected output
+            import pdb; pdb.set_trace()
             field_to_score_fn = {} if only_using_champion else expected_output["score_fn"]
             for labels_dict in labels_dict_lst:
                 best_quality, best_record_op_stats = 0.0, None

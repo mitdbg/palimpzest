@@ -317,3 +317,82 @@ def add_patch_to_output_dir(file_path, new_data, indent=4):
         file.write(formatted_entry.encode("utf-8"))  # Write new entry
         file.write(b"\n]")  # Close the JSON list
 
+# ------- Patch Data Utilities -------
+
+def verify_and_fix_patch_data(patch_data: dict):
+    """
+    - Verifies the structure of the patch data
+    - Corrects any incorrect old and new line counts for each hunk
+    """
+
+    if "files" not in patch_data:
+        raise KeyError("Missing 'files' key in patch data")
+
+    for file in patch_data.get("files"):
+        if "hunks" not in file:
+            raise KeyError("Missing 'hunks' key in file data")
+        
+        for hunk in file.get("hunks"):
+            if "old_length" not in hunk or "new_length" not in hunk:
+                raise KeyError("Missing 'old_length' or 'new_length' key in hunk data")
+            if hunk["old_start"] == "XXX":
+                raise ValueError(f"Missing line numbers in patch data for {file['old_path']}")
+
+            num_old_lines, num_new_lines = 0, 0
+
+            for line in hunk.get("lines"):
+                if "type" not in line:
+                    raise KeyError(f"Missing 'type' key in line data for {file['old_path']}")
+                if "content" not in line:
+                    raise KeyError(f"Missing 'content' key in line data for {file['old_path']}")
+
+                elif line["type"] == "context":
+                    num_old_lines += 1
+                    num_new_lines += 1
+                elif line["type"] == "addition":
+                    num_new_lines += 1
+                elif line["type"] == "deletion":
+                    num_old_lines += 1
+            
+            # Fix any incorrect counts
+            if num_old_lines != hunk["old_length"]:
+                hunk["old_length"] = num_old_lines
+            if num_new_lines != hunk["new_length"]:
+                hunk["new_length"] = num_new_lines
+
+def minimize_patch_data(patch_data):
+    """
+    Given a patch_data dictionary, mutates it in-place to contain only minimal hunks.
+    Keeps one context line before and/or after changes if available.
+    """
+    for file_patch in patch_data["files"]:
+        for hunk in file_patch["hunks"]:
+            lines = hunk["lines"]
+
+            # Find indices of the first and last changed lines
+            change_indices = [i for i, line in enumerate(lines) if line["type"] in ("addition", "deletion")]
+            if not change_indices:
+                continue  # Nothing to minimize if no changes
+
+            start = max(0, change_indices[0] - 1)  # one line before
+            end = min(len(lines), change_indices[-1] + 2)  # one line after
+
+            # Slice to minimal lines
+            minimal_lines = lines[start:end]
+            hunk["lines"] = minimal_lines
+
+            # Recalculate hunk lengths
+            old_count = sum(1 for line in minimal_lines if line["type"] != "addition")
+            new_count = sum(1 for line in minimal_lines if line["type"] != "deletion")
+            hunk["old_length"] = old_count
+            hunk["new_length"] = new_count
+
+            # Adjust start lines
+            context_before = sum(1 for i in range(start) if lines[i]["type"] != "addition")
+            hunk["old_start"] += context_before
+            hunk["new_start"] += context_before
+
+    return patch_data
+
+            
+

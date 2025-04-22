@@ -33,7 +33,7 @@ class BaseAgentOp(PhysicalOperator):
     # instance_id -> {"base_commit": <str>, "owner": <str>, "repo": <str>}
     instance_params = {}
     PRINTING_ENABLED = True 
-    LOGGING_ENABLED = False
+    LOGGING_ENABLED = True 
 
     def __init__(
         self,
@@ -145,7 +145,7 @@ class BaseAgentOp(PhysicalOperator):
         time_per_record = total_time 
 
         # create the RecordOpStats objects for each output record
-        record_op_stats_lst = RecordOpStats(
+        record_op_stats = RecordOpStats(
             record_id=record.id,
             record_parent_id=record.parent_id,
             record_source_idx=record.source_idx,
@@ -169,16 +169,17 @@ class BaseAgentOp(PhysicalOperator):
         )
 
         # create and return the DataRecordSet
-        return DataRecordSet([record], record_op_stats_lst)
+        return DataRecordSet([record], [record_op_stats])
 
     
     @staticmethod
-    def get_file_content(file_name: str, include_line_numbers: bool, instance_id: str) -> str:
+    def get_file_content(file_name: str, starting_line_number: int, instance_id: str) -> str:
         """
-        Returns the content of an entire file, up to a set max line limit. 
-        Only use this when the entire content of a file is required as it may return many tokens.
-        Only set include_line_numbers to True if being used to generate a patch. 
+        Returns the content of an entire file including line numbers, up to a set max of 750 lines.
         """
+
+        MAX_NUM_LINES = 750
+
         if BaseAgentOp.PRINTING_ENABLED:
             print(f'get_file_content {file_name}')
 
@@ -186,10 +187,12 @@ class BaseAgentOp(PhysicalOperator):
         owner = BaseAgentOp.instance_params[instance_id]["owner"]
         repo = BaseAgentOp.instance_params[instance_id]["repo"]
         content = utils.fetch_github_code(file_name, owner, repo, base_commit)
+        content = utils.add_line_numbers(content)
 
-        print(f'Number of tokens: {utils.count_tokens(content)}')
+        # Limit number of lines returned
+        end_line = min(len(content) + 1, starting_line_number + MAX_NUM_LINES)
+        content = {i: content[i] for i in range(starting_line_number, end_line)}
 
-        content = utils.add_line_numbers(content) if include_line_numbers else content 
         return content
 
     @staticmethod
@@ -198,6 +201,8 @@ class BaseAgentOp(PhysicalOperator):
         Searches the codebase for the provided keyword and returns the files the keyword. 
         Provide repo_name in "owner/repo" format. 
         If searching for a function or class definition, it may be useful to prefix the keyword with "def " or "class ".
+        Do not search for vague keywords that may return too many results, such as "test" or "function". 
+        Search for more specific words instead. 
         """
 
         if BaseAgentOp.PRINTING_ENABLED:
@@ -209,16 +214,6 @@ class BaseAgentOp(PhysicalOperator):
         matching_files = utils.search_keyword(local_repo_path, base_commit, keyword)
 
         return matching_files
-
-        # results = utils.search_files(keyword)
-
-        # if results and "items" in results:
-        #     print(f"Found {results['total_count']} matching files:")
-        #     relevant_files = ', '.join([item['name'] for item in results["items"]])
-        #     return relevant_files 
-        # else:
-        #     print("No results found.")
-        #     return "No Results found"
 
     @staticmethod
     def extract_method(file_name: str, function_name: str, instance_id: str, include_line_numbers: bool = False) -> str: 
