@@ -1,0 +1,73 @@
+Message-ID: <22986285.1075840543754.JavaMail.evans@thyme>
+Date: Wed, 6 Feb 2002 08:03:03 -0800 (PST)
+From: louise.kitchen@enron.com
+To: rob.milnthorp@enron.com, f..calger@enron.com, dale.furrow@enron.com, 
+	mike.curry@enron.com, brian.redmond@enron.com, 
+	frank.vickers@enron.com, barry.tycholiz@enron.com, 
+	louise.kitchen@enron.com, david.forster@enron.com, 
+	fred.lagrasta@enron.com, john.llodra@enron.com, 
+	s..bradford@enron.com, legal <.taylor@enron.com>, 
+	mary.cook@enron.com, t..hodge@enron.com, elizabeth.sager@enron.com, 
+	leslie.hansen@enron.com, jake.thomas@enron.com, h..foster@enron.com, 
+	michael.mcdonald@enron.com, derek.davies@enron.com, 
+	eric.le@enron.com, tim.belden@enron.com, mike.swerzbin@enron.com, 
+	m..presto@enron.com, dana.davis@enron.com, j..sturm@enron.com, 
+	john.zufferli@enron.com, k..allen@enron.com, s..shively@enron.com, 
+	john.lavorato@enron.com, mike.grigsby@enron.com, a..martin@enron.com, 
+	greg.whalley@enron.com, doug.gilbert-smith@enron.com, 
+	mike.carson@enron.com, david.oxley@enron.com, e..haedicke@enron.com, 
+	wes.colwell@enron.com, sally.beck@enron.com, leslie.reeves@enron.com, 
+	w..white@enron.com, c..gossett@enron.com, robert.superty@enron.com, 
+	naveen.andrews@enron.com, vladimir.gorny@enron.com, 
+	frank.hayden@enron.com, jennifer.walker@enron.com, 
+	jenny.rub@enron.com, jay.webb@enron.com, d..steffes@enron.com, 
+	dale.furrow@enron.com, h..foster@enron.com, 
+	michael.mcdonald@enron.com, derek.davies@enron.com, 
+	eric.le@enron.com, david.ryan@enron.com
+Subject: YOU HAVE 48 HOURS
+Cc: greg.piper@enron.com
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+Bcc: greg.piper@enron.com
+X-From: Kitchen, Louise </O=ENRON/OU=NA/CN=RECIPIENTS/CN=LKITCHEN>
+X-To: Milnthorp, Rob </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rmilnth>, Calger, Christopher F. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Ccalger>, Furrow, Dale </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dfurrow>, Curry, Mike </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mcurry>, Redmond, Brian </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Bredmon>, Vickers, Frank </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Fvicker>, Tycholiz, Barry </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Btychol>, Kitchen, Louise </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lkitchen>, Forster, David </O=ENRON/OU=NA/CN=RECIPIENTS/CN=DFORSTER>, Lagrasta, Fred </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Flagras>, Llodra, John </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jllodra>, Bradford, William S. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Wbradfo>, Taylor, Mark E (Legal) </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mtaylo1>, Cook, Mary </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mcook>, Hodge, Jeffrey T. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jhodge>, Sager, Elizabeth </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Esager>, Hansen, Leslie </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lhansen>, Thomas, Jake </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jthomas5>, Foster, Chris H. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Cfoster>, Mcdonald, Michael </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mmcdona>, Davies, Derek </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Ddavies>, Le Dain, Eric </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Eledain>, Belden, Tim </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Tbelden>, Swerzbin, Mike </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mswerzb>, Presto, Kevin M. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Kpresto>, Davis, Mark Dana </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mdavis>, Sturm, Fletcher J. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Fsturm>, Zufferli, John </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jzuffer>, Allen, Phillip K. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Pallen>, Shively, Hunter S. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Hshivel>, Lavorato, John </O=ENRON/OU=NA/CN=RECIPIENTS/CN=JLAVORA>, Grigsby, Mike </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mgrigsb>, Martin, Thomas A. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Tmartin>, Whalley, Greg </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Gwhalle>, Gilbert-smith, Doug </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dsmith3>, Carson, Mike </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mcarson2>, Oxley, David </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Doxley>, Haedicke, Mark E. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mhaedic>, Colwell, Wes </O=ENRON/OU=NA/CN=RECIPIENTS/CN=WCOLWEL>, Beck, Sally </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Sbeck>, Reeves, Leslie </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lreeves>, White, Stacey W. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Swhite>, Gossett, Jeffrey C. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jgosset>, Superty, Robert </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rsupert>, Andrews, Naveen </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Nandrew>, Gorny, Vladimir </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Vgorny>, Hayden, Frank </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Fhayden>, Walker, Jennifer </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jwalker3>, Rub, Jenny </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jrub>, Webb, Jay </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jwebb>, Steffes, James D. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jsteffe>, Furrow, Dale </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dfurrow>, Foster, Chris H. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Cfoster>, Mcdonald, Michael </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mmcdona>, Davies, Derek </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Ddavies>, Le Dain, Eric </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Eledain>, Ryan, David </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dryan>
+X-cc: Piper, Greg </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Gpiper>, 'pat.odonnell@ubsw.com'
+X-bcc: 
+X-Folder: \ExMerge - Gilbert-smith, Doug\Inbox
+X-Origin: GILBERTSMITH-D
+X-FileName: doug gilbert smith 6-25-02.PST
+
+This is not a circular and you will not get another chance.  This deals with migration to new systems and you need to migrate your own information or applications in the next day.  Remember do not delete anything and data to be transferred must comply (see attachments below).
+
+The policy must be complied by Thursday.  Please ensure that everyone in your group has moved everything which is in compliance with the policy.  We will not be delaying close or restart for people not having completed their own migrations.
+
+Please make sure that those people who are not in the office are contacted and comply (eg Dana - please cover Kevin's migration requirements)
+
+Thanks
+
+Louise
+
+ -----Original Message-----
+From: 	UBSW Energy General Announcements  
+Sent:	Tuesday, February 05, 2002 6:12 PM
+To:	DL-UBSW Energy Houston
+Subject:	Data Migration Protocol
+
+To:		All Enron Employees Transferring to UBS Warburg Energy (or its affiliates)
+
+Under the terms of the various agreements among certain Enron entities and UBS AG, certain Enron data and documents may be provided to UBS.  To ensure compliance with those agreements, Enron's document retention policy, as well as directives of various investigative agencies, the attached protocol regarding the process for migration of any information or data to UBS has been developed.
+
+Please review the protocol carefully.  Then, complete the attached Certification and return it, with attachments, to Linda Guinn at EB 3829a no later than February 11, 2002.
+
+Questions about this matter may be directed to Michelle Cash at (713) 853-6401 or Francisco Pinto-Leite at (713) 345-7942 .
+
+Protocol Document and Data Copy Instructions
+
+ 
+
+Certification Document
+
+ 
+
+Thank you for your assistance in making the transition to UBS a success.

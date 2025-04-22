@@ -75,6 +75,19 @@ from palimpzest.prompts.moa_proposer_convert_prompts import (
     COT_MOA_PROPOSER_IMAGE_JOB_INSTRUCTION,
     COT_MOA_PROPOSER_JOB_INSTRUCTION,
 )
+from palimpzest.prompts.split_merge_prompts import (
+    COT_SPLIT_MERGER_BASE_SYSTEM_PROMPT,
+    COT_SPLIT_MERGER_BASE_USER_PROMPT,
+)
+from palimpzest.prompts.split_proposer_prompts import (
+    COT_SPLIT_PROPOSER_BASE_SYSTEM_PROMPT,
+    COT_SPLIT_PROPOSER_BASE_USER_PROMPT,
+    SPLIT_PROPOSER_EXAMPLE_ANSWER,
+    SPLIT_PROPOSER_EXAMPLE_CONTEXT,
+    SPLIT_PROPOSER_EXAMPLE_INPUT_FIELDS,
+    SPLIT_PROPOSER_EXAMPLE_OUTPUT_FIELDS,
+    SPLIT_PROPOSER_JOB_INSTRUCTION,
+)
 from palimpzest.prompts.util_phrases import (
     ONE_TO_MANY_OUTPUT_FORMAT_INSTRUCTION,
     ONE_TO_ONE_OUTPUT_FORMAT_INSTRUCTION,
@@ -96,6 +109,8 @@ class PromptFactory:
         PromptStrategy.COT_MOA_PROPOSER: COT_MOA_PROPOSER_BASE_SYSTEM_PROMPT,
         PromptStrategy.COT_MOA_PROPOSER_IMAGE: COT_MOA_PROPOSER_BASE_SYSTEM_PROMPT,
         PromptStrategy.COT_MOA_AGG: COT_MOA_AGG_BASE_SYSTEM_PROMPT,
+        PromptStrategy.SPLIT_PROPOSER: COT_SPLIT_PROPOSER_BASE_SYSTEM_PROMPT,
+        PromptStrategy.SPLIT_MERGER: COT_SPLIT_MERGER_BASE_SYSTEM_PROMPT,
     }
     BASE_USER_PROMPT_MAP = {
         PromptStrategy.COT_BOOL: COT_BOOL_BASE_USER_PROMPT,
@@ -109,6 +124,8 @@ class PromptFactory:
         PromptStrategy.COT_MOA_PROPOSER: COT_MOA_PROPOSER_BASE_USER_PROMPT,
         PromptStrategy.COT_MOA_PROPOSER_IMAGE: COT_MOA_PROPOSER_BASE_USER_PROMPT,
         PromptStrategy.COT_MOA_AGG: COT_MOA_AGG_BASE_USER_PROMPT,
+        PromptStrategy.SPLIT_PROPOSER: COT_SPLIT_PROPOSER_BASE_USER_PROMPT,
+        PromptStrategy.SPLIT_MERGER: COT_SPLIT_MERGER_BASE_USER_PROMPT,
     }
 
     def __init__(self, prompt_strategy: PromptStrategy, model: Model, cardinality: Cardinality) -> None:
@@ -145,7 +162,7 @@ class PromptFactory:
             # NOTE: MIXTRAL_LLAMA_CONTEXT_TOKENS_LIMIT is a rough estimate which leaves room for the rest of the prompt text
             while total_context_len * TOKENS_PER_CHARACTER > MIXTRAL_LLAMA_CONTEXT_TOKENS_LIMIT:
                 # sort fields by length
-                field_lengths = [(field, len(value)) for field, value in context.items()]
+                field_lengths = [(field, len(value) if value is not None else 0) for field, value in context.items()]
                 sorted_fields = sorted(field_lengths, key=lambda item: item[1], reverse=True)
 
                 # get field with longest context
@@ -205,11 +222,7 @@ class PromptFactory:
         """
         output_fields_desc = ""
         output_schema: Schema = kwargs.get("output_schema")
-        if (
-            self.prompt_strategy.is_cot_qa_prompt()
-            or self.prompt_strategy.is_moa_proposer_prompt()
-            or self.prompt_strategy.is_moa_aggregator_prompt()
-        ):
+        if self.prompt_strategy.is_convert_prompt():
             assert output_schema is not None, "Output schema must be provided for convert prompts."
 
             field_desc_map = output_schema.field_desc_map()
@@ -227,7 +240,7 @@ class PromptFactory:
             str | None: The filter condition (if applicable).
         """
         filter_condition = kwargs.get("filter_condition")
-        if self.prompt_strategy.is_cot_bool_prompt():
+        if self.prompt_strategy.is_bool_prompt():
             assert filter_condition is not None, "Filter condition must be provided for filter operations."
 
         return filter_condition
@@ -284,6 +297,24 @@ class PromptFactory:
 
         return model_responses
 
+    def _get_chunk_outputs(self, **kwargs) -> str | None:
+        """
+        Returns the chunk outputs for the split-convert.
+
+        Args:
+            kwargs: The keyword arguments provided by the user.
+
+        Returns:
+            str | None: The chunk outputs.
+        """
+        chunk_outputs = None
+        if self.prompt_strategy.is_split_merger_prompt():
+            chunk_outputs = ""
+            for idx, chunk_output in enumerate(kwargs.get("chunk_outputs")):
+                chunk_outputs += f"CHUNK OUTPUT {idx + 1}: {chunk_output}\n"
+
+        return chunk_outputs
+
     def _get_output_format_instruction(self) -> str:
         """
         Returns the output format instruction based on the cardinality.
@@ -311,6 +342,7 @@ class PromptFactory:
             PromptStrategy.COT_QA_IMAGE: COT_QA_IMAGE_JOB_INSTRUCTION,
             PromptStrategy.COT_MOA_PROPOSER: COT_MOA_PROPOSER_JOB_INSTRUCTION,
             PromptStrategy.COT_MOA_PROPOSER_IMAGE: COT_MOA_PROPOSER_IMAGE_JOB_INSTRUCTION,
+            PromptStrategy.SPLIT_PROPOSER: SPLIT_PROPOSER_JOB_INSTRUCTION,
         }
         return prompt_strategy_to_job_instruction.get(self.prompt_strategy)
 
@@ -375,6 +407,7 @@ class PromptFactory:
             PromptStrategy.COT_QA_IMAGE: COT_QA_IMAGE_EXAMPLE_INPUT_FIELDS,
             PromptStrategy.COT_MOA_PROPOSER: COT_MOA_PROPOSER_EXAMPLE_INPUT_FIELDS,
             PromptStrategy.COT_MOA_PROPOSER_IMAGE: COT_MOA_PROPOSER_IMAGE_EXAMPLE_INPUT_FIELDS,
+            PromptStrategy.SPLIT_PROPOSER: SPLIT_PROPOSER_EXAMPLE_INPUT_FIELDS,
         }
 
         return prompt_strategy_to_example_input_fields.get(self.prompt_strategy)
@@ -391,6 +424,7 @@ class PromptFactory:
             PromptStrategy.COT_QA_IMAGE: COT_QA_IMAGE_EXAMPLE_OUTPUT_FIELDS,
             PromptStrategy.COT_MOA_PROPOSER: COT_MOA_PROPOSER_EXAMPLE_OUTPUT_FIELDS,
             PromptStrategy.COT_MOA_PROPOSER_IMAGE: COT_MOA_PROPOSER_IMAGE_EXAMPLE_OUTPUT_FIELDS,
+            PromptStrategy.SPLIT_PROPOSER: SPLIT_PROPOSER_EXAMPLE_OUTPUT_FIELDS,
         }
 
         return prompt_strategy_to_example_output_fields.get(self.prompt_strategy)
@@ -409,6 +443,7 @@ class PromptFactory:
             PromptStrategy.COT_QA_IMAGE: COT_QA_IMAGE_EXAMPLE_CONTEXT,
             PromptStrategy.COT_MOA_PROPOSER: COT_MOA_PROPOSER_EXAMPLE_CONTEXT,
             PromptStrategy.COT_MOA_PROPOSER_IMAGE: COT_MOA_PROPOSER_IMAGE_EXAMPLE_CONTEXT,
+            PromptStrategy.SPLIT_PROPOSER: SPLIT_PROPOSER_EXAMPLE_CONTEXT,
         }
 
         return prompt_strategy_to_example_context.get(self.prompt_strategy)
@@ -471,6 +506,7 @@ class PromptFactory:
             PromptStrategy.COT_QA_IMAGE: COT_QA_IMAGE_EXAMPLE_ANSWER,
             PromptStrategy.COT_MOA_PROPOSER: COT_MOA_PROPOSER_EXAMPLE_ANSWER,
             PromptStrategy.COT_MOA_PROPOSER_IMAGE: COT_MOA_PROPOSER_IMAGE_EXAMPLE_ANSWER,
+            PromptStrategy.SPLIT_PROPOSER: SPLIT_PROPOSER_EXAMPLE_ANSWER,
         }
 
         return prompt_strategy_to_example_answer.get(self.prompt_strategy)
@@ -499,6 +535,7 @@ class PromptFactory:
             "original_output": self._get_original_output(**kwargs),
             "critique_output": self._get_critique_output(**kwargs),
             "model_responses": self._get_model_responses(**kwargs),
+            "chunk_outputs": self._get_chunk_outputs(**kwargs),
         }
 
         # get format kwargs which depend on the prompt strategy

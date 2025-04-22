@@ -1,0 +1,35 @@
+Message-ID: <1957699.1075853082377.JavaMail.evans@thyme>
+Date: Mon, 29 Oct 2001 09:56:57 -0800 (PST)
+From: alice.johnson@enron.com
+To: jean.adams@enron.com, patrick.barry@enron.com, robert.benningfield@enron.com, 
+	larry.berger@enron.com, jean.blair@enron.com, lynn.blair@enron.com, 
+	randy.bryan@enron.com, nancy.callans@enron.com, james.carr@enron.com, 
+	karen.clapper@enron.com, rick.dietz@enron.com, 
+	sherry.forbish@enron.com, chris.greaney@enron.com, 
+	scott.hibbard@enron.com, randy.janzen@enron.com, 
+	debra.scurlock@enron.com, joe.linhart@enron.com, 
+	janet.mcdaniel@enron.com, l.miller@enron.com, renee.perry@enron.com, 
+	diana.porter@enron.com, kathy.sturr@enron.com, 
+	cara.vaughan@enron.com, shirley.walden@enron.com, 
+	kathy.washington@enron.com, jerry.wilkens@enron.com, 
+	harry.woodson@enron.com, raetta.zadow@enron.com
+Subject: Updates for CA Meeting Due by Noon Tomorrow.
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+X-From: Johnson, Alice </O=ENRON/OU=NA/CN=RECIPIENTS/CN=AJOHNSO>
+X-To: Adams, Jean </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jadams1>, Barry, Patrick </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Pbarry>, Benningfield, Robert </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rbennin>, Berger, Larry </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lberger>, Blair, Jean </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jblair>, Blair, Lynn </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lblair>, Bryan, Randy </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rbryan2>, Callans, Nancy </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Ncallan>, Carr, James </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jcarr2>, Clapper, Karen </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Kclappe>, Dietz, Rick </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rdietz>, Forbish, Sherry </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Sforbis>, Greaney, Chris </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Cgreane>, Hibbard, Scott </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Shibbard>, Janzen, Randy </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rjanzen>, Scurlock, Debra </O=ENRON/OU=NA/CN=RECIPIENTS/CN=DSCURLOC>, Linhart, Joe </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jlinhar>, McDaniel, Janet </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jmcdani>, Miller, Chris L </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Cmiller6>, Perry, Renee </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Kperry>, Porter, Diana </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dporter1>, Sturr, Kathy </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Ksturr>, Vaughan, Cara </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Cvaughan>, Walden, Shirley </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Swalden>, Washington, Kathy </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Kwashin>, Wilkens, Jerry </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jwilken>, Woodson, Harry </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Hwoodso>, Zadow, Raetta </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rzadow>
+X-cc: 
+X-bcc: 
+X-Folder: \LBLAIR (Non-Privileged)\Blair, Lynn\Inbox
+X-Origin: Blair-L
+X-FileName: LBLAIR (Non-Privileged).pst
+
+
+Please update the Excel worksheet T:\COMMON\AR 50K_30.xls by 12 p.m. tomorrow (Tuesday, 10/30). The updates that you provide will be used for the Customer Accounts meeting on Wednesday and should include the reason the invoices have not been paid, the accounting period for which payment has not been received and when the outstanding issues will be resolved.
+
+If you have received payments that will bring your shipper's outstanding amount to less than $50,000, apply the payments today and provide me a copy of  the cash application instructions being sent to Credit and I will remove your shipper from the report. 
+
+Partial payments should be applied using the new cash application procedures. (See T:\Common\Market Services Training\ARNettingProcedures.ppt).
+
+You may contact me at x36951 if  you have questions or need assistance. 

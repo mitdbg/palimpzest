@@ -1,0 +1,89 @@
+Message-ID: <32542360.1075840320020.JavaMail.evans@thyme>
+Date: Mon, 4 Feb 2002 10:31:45 -0800 (PST)
+From: lwbthemarine@alltel.net
+To: eric.bass@enron.com, bass.jason@enron.com, bass.k.@enron.com, 
+	franklin.donnita@enron.com, shanna.husser@enron.com
+Subject:  Good Advice to Protect Yourself
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+X-From: Larry Bass <lwbthemarine@alltel.net>
+X-To: Bass, Eric </O=ENRON/OU=NA/CN=RECIPIENTS/CN=EBASS>, Jason Bass <JBass@stdauto.com>, K. Bass <daphneco64@alltel.net>, Donnita Franklin <DFranklin@HanoverMeasurement.com>, Husser, Shanna </O=ENRON/OU=NA/CN=RECIPIENTS/CN=SHUSSER>
+X-cc: 
+X-bcc: 
+X-Folder: \ExMerge - Bass, Eric\Inbox
+X-Origin: BASS-E
+X-FileName: eric bass 6-25-02.PST
+
+Sounds good.
+
+
+
+
+> Subject: Good Advice to Protect Yourself
+>
+>
+> > ---------- Original Message ----------------------------------
+> > > >
+> > Hi,
+> > >
+> > >This came from my sister in-law and thought I'd pass the info on to
+you.
+> This is what she sent.
+> > >
+> > >I learned a computer trick today that's really ingenious in it's
+> simplicity.
+> > >
+> > >As you may know, when/if a worm virus gets into your computer it heads
+> straight for your e-mail address book and sends itself to everyone in
+there,
+> thus infecting all your friends and associates.
+> > >
+> > >This trick won't keep the virus from getting into your computer, but it
+> will stop it from using your address book to spread further, and it will
+> alert you to the fact that the worm has gotten into your system.
+> > >
+> > >Here is what you do:  First, open your address book and click on "new
+> contact" or "new person" just as you would do if you were adding a new
+> friend to your list of e-mail addresses.  In the window where you would
+type
+> your friends FIRST name, type in !000 (that's an exclamation mark followed
+> by 3 zeros).  In the window below where it prompts you to enter the new
+> e-mail address, type in Worm Alert.  Then complete everything by clicking
+> add, enter, OK, etc.
+> > >
+> > >Now, here is what you've done and why it works: the "name" !000 will be
+> placed at the top of your address book as entry # 1.  This will be where
+the
+> worm will start in an effort to send itself to all your friends.
+> > >
+> > >But when it tries to send itself to !000, it will be undeliverable
+> because of the phony e-mail address you entered (Worm Alert).  If the
+first
+> attempt fails (which it will because of the phony address), the worm goes
+no
+> further and your friends will not be infected.
+> > >
+> > >Here is the second great advantage of this method: If an e-mail cannot
+be
+> delivered, you will be notified of this in your "Inbox" almost
+immediately.
+> > >
+> > >Hence, if you ever get an e-mail telling you that an e-mail addressed
+to
+> Worm Alert could not be delivered, you know right away that you have the
+> worm virus in your system.  You can then take steps to get rid of it!
+> > >
+> > >Pretty slick huh?  It's worth a try.
+> > >
+> > >If everybody you know does this then you need not ever worry about
+> opening e-mail from friends.  Pass this on to all your friends.
+> > >
+> > >RSVP  Himself
+> > >
+> > >
+> > >
+> > >
+> > >
+>
+>

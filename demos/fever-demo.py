@@ -10,6 +10,10 @@ fever_claims_cols = [
     {"name": "claim", "type": str, "desc": "the claim being made"}
 ]
 
+fever_relevant_wikipedia_articles_cols = [
+    {"name": "relevant_wikipedia_articles", "type": list[str], "desc": "the relevant Wikipedia articles to the claim"}
+]
+
 fever_output_cols = [
     {"name": "label", "type": bool, "desc": "Output TRUE if the `claim` is supported by the evidence in `relevant_wikipedia_articles`; output FALSE otherwise."}
 ]
@@ -63,14 +67,13 @@ def build_fever_query(index, dataset, k):
 
     def search_func(index, query, k):
         results = index.search(query, k=k)
-        return [result["content"] for result in results]
+        return {"relevant_wikipedia_articles": [result["content"] for result in results]}
 
     claims_and_relevant_files = claims.retrieve(
         index=index,
         search_func=search_func,
         search_attr="claim",
-        output_attr="relevant_wikipedia_articles",
-        output_attr_desc="Most relevant wikipedia articles to the `claim`",
+        output_attrs=fever_relevant_wikipedia_articles_cols,
         k=k,
     )
     output = claims_and_relevant_files.sem_add_columns(fever_output_cols)

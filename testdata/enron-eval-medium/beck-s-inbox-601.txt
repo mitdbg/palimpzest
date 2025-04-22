@@ -1,0 +1,32 @@
+Message-ID: <11642242.1075862307633.JavaMail.evans@thyme>
+Date: Fri, 2 Nov 2001 10:44:56 -0800 (PST)
+From: leslie.reeves@enron.com
+To: sally.beck@enron.com, m.hall@enron.com
+Subject: FW: Master Netting Agreement Assignments...Identification of legal
+ entities comprising your assigned "houses"
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+X-From: Reeves, Leslie </O=ENRON/OU=NA/CN=RECIPIENTS/CN=LREEVES>
+X-To: Beck, Sally </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Sbeck>, Hall, Bob M </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rhall3>
+X-cc: 
+X-bcc: 
+X-Folder: \SBECK (Non-Privileged)\Beck, Sally\Inbox
+X-Origin: Beck-S
+X-FileName: SBECK (Non-Privileged).pst
+
+FYI - to keep you informed of the ongoing changes with the physical gas monetization issues.  Botttom line - I believe that the remaining amount will be very small if not zero. The atttorney's are sending me names but the ones Barbara mentioned on the phone are the large ones; Aquila, Sempra, Duke, etc.  I wil keep you updated.  Thanks, Leslie
+
+ -----Original Message-----
+From: 	Farrell, Keegan   On Behalf Of Gray, Barbara N.
+Sent:	Friday, November 02, 2001 12:36 PM
+To:	Hansen, Leslie; Murphy, Harlan; Van Hooser, Steve; Sayre, Frank; Hendry, Brent; Davis, Angela; Portz, David; Viverito, John; Leite, Francisco Pinto; St. Clair, Carol; Del vecchio, Peter
+Cc:	Reeves, Leslie; Herron, Chris; Cook, Mary; Ephross, Joel
+Subject:	Master Netting Agreement Assignments...Identification of legal entities comprising your assigned "houses"
+
+Based on the latest Master Netting Agreement Assignment List, you are assigned to one or more "houses" to prepare a Master Netting Agreement.  I am currently working on excising natural gas receivables from an existing gas receivable facility known as the Swee'P Receivables Facility.  This "excisement" is a prerequisite to our actual execution of the various Master Netting Agreements on which you are working.  In order for me to accomplish the excisement, I need to create a list of each of the non-Enron legal entities, which will be parties to the Master Netting Agreement you have been assigned.  The legal entities are needed so that we may assure that none of these legal entities will have its payables to ENA transferred to Swee'P.  The final submission of receivables is due on Monday, November 5th.  The list I am requesting from you will allow Leslie Reeves to excise your complete "house" from the submission of receivables.
+
+I know that each of you are swamped, but this excisement is a prerequisite to the execution of the Master Netting Agreements.  Even if you have only a rough list of the entities in your house, please provide your best available information to me via email, copying the CCs listed on this email.  Thank you for your assistance.
+
+Best Regards,
+BNG

@@ -1,0 +1,23 @@
+Message-ID: <5915654.1075860781447.JavaMail.evans@thyme>
+Date: Fri, 28 Dec 2001 13:05:59 -0800 (PST)
+From: administration.enron@enron.com
+To: maintenance.dl-exchange@enron.com
+Subject: CORRECTION:  Outlook Outage - Friday, December 28, 2001
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+X-From: Enron Messaging Administration </O=ENRON/OU=NA/CN=RECIPIENTS/CN=NOTESADDR/CN=ENRON MESSAGING ADMINISTRATION>
+X-To: DL-Exchange Server Maintenance </O=ENRON/OU=NA/CN=RECIPIENTS/CN=DL-ExchangeServerMaintenance>
+X-cc: 
+X-bcc: 
+X-Folder: \Dave_Delainey_Mar2002_1\Delaney, David\Inbox
+X-Origin: Delainey-D
+X-FileName: ddelaney (Non-Privileged).pst
+
+
+
+This is a notice to inform you that the server where your Outlook mailbox resides is scheduled for an outage tonight.  Your mailbox will be temporarily unavailable starting anytime after 11pm and may continue to be unavailable until 1 a.m., when all server maintenance work have been completed.  Outlook Web Access (OWA) will also be unavailable during this time.  
+
+Blackberry users:  Message delivery may be delayed for a few minutes.
+ 
+If you have any questions, please call the Resolution Center at x31411.

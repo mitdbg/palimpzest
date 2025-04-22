@@ -1,0 +1,111 @@
+Message-ID: <3916190.1075840343208.JavaMail.evans@thyme>
+Date: Wed, 6 Feb 2002 14:08:59 -0800 (PST)
+From: neil.davies@enron.com
+To: a..allen@enron.com, john.anderson@enron.com, debra.bailey@enron.com, 
+	genady.batrak@enron.com, don.baughman@enron.com, 
+	sally.beck@enron.com, michael.belmont@enron.com, 
+	w..bennett@enron.com, corry.bentley@enron.com, 
+	michael.berger@enron.com, jaikishore.bharathi@enron.com, 
+	marc.bir@enron.com, samuel.blaylock@enron.com, 
+	lori.boudreaux@enron.com, chris.bowling@enron.com, 
+	charles.brewer@enron.com, matt.burleigh@enron.com, 
+	lisa.burnett@enron.com, raghu.burra@enron.com, 
+	suzanne.calcagno@enron.com, michelle.cash@enron.com, 
+	jim.cashion@enron.com, andrew.champion@enron.com, 
+	clement.charbonnet@enron.com, alan.chen@enron.com, 
+	cecilia.cheung@enron.com, sundar.chitradurga@enron.com, 
+	jason.choate@enron.com, cynthia.clark@enron.com, 
+	alan.comnes@enron.com, diane.cutsforth@enron.com, 
+	andrea.dahlke@enron.com, ricky.dang@enron.com, 
+	jeff.dasovich@enron.com, nayan.dattani@enron.com, 
+	angela.davis@enron.com, pete.davis@enron.com, l..day@enron.com, 
+	craig.dean@enron.com, laura.dewett@enron.com, 
+	ajit.dhansinghani@enron.com, christine.dinh@enron.com, 
+	m..docwra@enron.com, david.dronet@enron.com, romeo.d'souza@enron.com, 
+	jatinder.dua@enron.com, heather.dunton@enron.com, 
+	kim.durham@enron.com, janette.elbertson@enron.com, 
+	joe.errigo@enron.com, casey.evans@enron.com, 
+	genia.fitzgerald@enron.com, bill.fortney@enron.com, 
+	vijay.gadhavi@enron.com, l..garcia@enron.com, 
+	scotty.gilbert@enron.com, sivakumar.govindasamy@enron.com, 
+	sanjeev.gupta@enron.com, e..haedicke@enron.com, 
+	legal <.hall@enron.com>, patrick.hanse@enron.com, 
+	dan.harrell@enron.com, andrew.hawthorn@enron.com, 
+	frank.hayden@enron.com, marie.heard@enron.com, 
+	sonia.hennessy@enron.com, hilburn.henry@enron.com, 
+	bob.hillier@enron.com, t..hodge@enron.com, kelley.huntley@enron.com, 
+	tantra.invedy@enron.com, george.ji@enron.com, tana.jones@enron.com, 
+	bala.kandaswamy@enron.com, sudheer.kannantha@enron.com, 
+	narasim.kasaru@enron.com, mark.kinkead@enron.com, 
+	john.kinser@enron.com, louise.kitchen@enron.com, 
+	c..koehler@enron.com, jayant.krishnaswamy@enron.com, 
+	terris.kyle-watson@enron.com, moyez.lallani@enron.com, 
+	krishna.lattupally@enron.com, robert.laurel@enron.com, 
+	eugene.lee@enron.com, norman.lee@enron.com, pinto.leite@enron.com, 
+	paul.lewis@enron.com, s..lim@enron.com, kenneth.lim@enron.com, 
+	zhuoming.lou@enron.com, duong.luu@enron.com, felicia.ma@enron.com, 
+	shawn.macphail@enron.com, peter.makkai@enron.com, 
+	marci.mansfield@enron.com, hal.mckinney@enron.com, 
+	anwar.melethil@enron.com, brad.merrell@enron.com, 
+	jim.meyer@enron.com, albert.meyers@enron.com, michael.mier@enron.com, 
+	jeffrey.miller@enron.com, phil.motuzko@enron.com, 
+	bhupesh.nagar@enron.com, steve.nat@enron.com, 
+	marcus.nettelton@enron.com, scott.newkirk@enron.com, 
+	ben.nguyen@enron.com, mai.nguyen@enron.com, ron.nolte@enron.com, 
+	seung-taek.oh@enron.com, juan.padron@enron.com, 
+	piyush.patel@enron.com, virendra.patel@enron.com, 
+	matt.pena@enron.com, dwayne.peterson@enron.com, 
+	david.portz@enron.com, john.postlethwaite@enron.com, 
+	david.poston@enron.com, d..powell@enron.com, 
+	ganapathy.ramesh@enron.com, stacey.ramsay@enron.com, 
+	ramesh.rao@enron.com, leslie.reeves@enron.com, 
+	michael.ritacco@enron.com, michael.robertson@enron.com, 
+	jonathan.ryan@enron.com, holden.salisbury@enron.com, 
+	bryce.schneider@enron.com, chris.schomer@enron.com, 
+	michael.seely@enron.com, jayanta.sengupta@enron.com, 
+	donna.sheidun@enron.com, ajay.sindwani@enron.com, 
+	suvinay.sinha@enron.com, ryan.slinger@enron.com, m..smith@enron.com, 
+	will.smith@enron.com, geir.solberg@enron.com, 
+	victoria.sorkina@enron.com, d..steffes@enron.com, 
+	jason.stephens@enron.com, steve.stock@enron.com, 
+	jim.sugrue@enron.com, franky.sulistio@enron.com, 
+	michael.swaim@enron.com, mark.symms@enron.com, mable.tang@enron.com, 
+	legal <.taylor@enron.com>, tony.thomas@enron.com, 
+	hien.trinh@enron.com, benedicta.tung@enron.com, 
+	rennu.varghese@enron.com, wayne.vinson@enron.com, 
+	robert.virnau@enron.com, todd.walker@enron.com, 
+	george.wang@enron.com, jessie.wang@enron.com, jay.webb@enron.com, 
+	zhiyong.wei@enron.com, w..white@enron.com, bill.williams@enron.com, 
+	jeremy.wong@enron.com, sean.yang@enron.com, 
+	christian.yoder@enron.com, min.zheng@enron.com, tianri.zhu@enron.com
+Subject: REMINDER: UBSW Orientation - Thursday. For those that did not
+ attend the Houstonian Sessions
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+X-From: Davies, Neil </O=ENRON/OU=NA/CN=RECIPIENTS/CN=NDAVIES>
+X-To: Allen, Thresa A. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Tallen>, Anderson, John </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Janders3>, Bailey, Debra </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dbailey2>, Batrak, Genady </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Gbatrak>, Baughman Jr., Don </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dbaughm>, Beck, Sally </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Sbeck>, Belmont, Michael </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mbelmon>, Bennett, Stephen W. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Sbennet>, Bentley, Corry </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Cbentle>, Berger, Michael </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mberger>, Bharathi, Jaikishore </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jbharat>, Bir, Marc </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mbir>, Blaylock Jr., Samuel </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Sblaylo>, Boudreaux, Lori </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lboudrea>, Bowling, Chris </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Cbowlin>, Brewer, Charles </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Cbrewer>, Burleigh, Matt </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mburlei>, Burnett, Lisa </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lburnett>, Burra, Raghu </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rburra>, Calcagno, Suzanne </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Scalcagn>, Cash, Michelle </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mcash>, Cashion, Jim </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jcashion>, Champion, Andrew </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Achampi>, Charbonnet, Clement </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Ccharbo2>, Chen, Alan </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Achen2>, Cheung, Cecilia </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Ccheung>, Chitradurga, Sundar </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Schitra>, Choate, Jason </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jchoate>, Clark, Cynthia </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Cclark6>, Comnes, Alan </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Acomnes>, Cutsforth, Diane </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dcutsfor>, Dahlke, Andrea </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Adahlke>, Dang, Ricky </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rdang>, Dasovich, Jeff </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jdasovic>, Dattani, Nayan </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Ndattani>, Davis, Angela </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Adavis4>, Davis, Pete </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Pdavis1>, Day, Smith L. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Sday>, Dean, Craig </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Cdean2>, Dewett, Laura </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Ldewett>, Dhansinghani, Ajit </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Adhansin>, Dinh, Christine </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Cdinh>, Docwra, Anna M. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Adocwra>, Dronet, David </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Ddronet>, D'Souza, Romeo </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rdsouza>, Dua, Jatinder </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jdua>, Dunton, Heather </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Hdunton>, Durham, Kim </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Kdurham>, Elbertson, Janette </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jelbert>, Errigo, Joe </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jerrigo>, Evans, Casey </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Cevans>, Fitzgerald, Genia </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Gfitzge>, Fortney, Bill </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Bfortne>, Gadhavi, Vijay </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Vgadhavi>, Garcia, Miguel L. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mgarcia6>, Gilbert, Scotty </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Sgilber>, Govindasamy, Sivakumar </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Sgovinda>, Gupta, Sanjeev </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Sgupta2>, Haedicke, Mark E. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mhaedic>, Hall, Steve C. (Legal) </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Shall4>, Hanse, Patrick </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Phanse>, Harrell, Dan </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dharrel>, Hawthorn, Andrew </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Ahawtho>, Hayden, Frank </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Fhayden>, Heard, Marie </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mheard>, Hennessy, Sonia </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Shenness>, Henry, Jane Hilburn </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jhenry6>, Hillier, Bob </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Bhillie>, Hodge, Jeffrey T. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jhodge>, Huntley, Kelley </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Khuntle>, Invedy, Tantra </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Tinvedy>, Ji, George </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Gji>, Jones, Tana </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Tjones>, Kandaswamy, Bala </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Bkandasw>, Kannantha, Sudheer </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Skannant>, Kasaru, Narasim </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Nkasaru>, Kinkead, Mark </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mkinkea>, Kinser, John </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jkinser>, Kitchen, Louise </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lkitchen>, Koehler, Anne C. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Akoehle>, Krishnaswamy, Jayant </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jkrishn>, Kyle-Watson, Terris </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Tkylewat>, Lallani, Moyez </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mlallani>, Lattupally, Krishna </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Klattup>, Laurel, Robert </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rlaurel>, Lee, Eugene </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Elee2>, Lee, Norman </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Nlee>, Leite, Francisco Pinto </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Fleite>, Lewis,  Jon Paul </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jlewis9>, Lim, Francis S. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Flim>, Lim, Kenneth </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Klim>, Lou, Zhuoming </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Zlou>, Luu, Duong </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dluu>, Ma, Felicia </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Fma>, MacPhail, Shawn </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Smacpha>, Makkai, Peter </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Pmakkai>, Mansfield, Marci </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mmansfie>, McKinney, Hal </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Hmckinne>, Melethil, Anwar </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Amelethi>, Merrell, Brad </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Bmerrel>, Meyer, Jim </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jmeyer>, Meyers, Albert </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Bmeyers>, Mier, Michael </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mmier>, Miller, Jeffrey </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jmiller>, Motuzko, Phil </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Pmotuzko>, Nagar, Bhupesh </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Bnagar>, Nat, Steve </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Snat>, Nettelton, Marcus </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mnettelt>, Newkirk, Scott </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Snewkirk>, Nguyen, Ben </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Bnguyen2>, Nguyen, Mai </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mnguyen5>, Nolte, Ron </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rnolte>, Oh, Seung-Taek </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Soh2>, Padron, Juan </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jpadron>, Patel, Piyush </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Ppatel4>, Patel, Virendra </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Vpatel>, Pena, Matt </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mpena2>, Peterson, Dwayne </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dpeterso>, Portz, David </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dportz>, Postlethwaite, John </O=ENRON/OU=NA/CN=RECIPIENTS/CN=JPOSTLE>, Poston, David </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dposton2>, Powell, John D. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jpowell>, Ramesh, Ganapathy </O=ENRON/OU=NA/CN=RECIPIENTS/CN=GRAMESH>, Ramsay, Stacey </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Sramsay2>, Rao, Ramesh </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rrao>, Reeves, Leslie </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Lreeves>, Ritacco, Michael </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mritacco>, Robertson, Michael </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mrobert6>, Ryan, Jonathan </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jryan4>, Salisbury, Holden </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Hsalisbu>, Schneider, Bryce </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Bschneid>, Schomer, Chris </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Cschome>, Seely, Michael </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Charles_Seely>, Sengupta, Jayanta </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jsengupt>, Sheidun, Donna </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dsheidun>, Sindwani, Ajay </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Asindwan>, Sinha, Suvinay </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Ssinha>, Slinger, Ryan </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rslinger>, Smith, Regan M. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rsmith>, Smith, Will </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Wsmith>, Solberg, Geir </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Gsolber>, Sorkina, Victoria </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Vsorkina>, Steffes, James D. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jsteffe>, Stephens, Jason </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jsteph1>, Stock, Steve </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Sstock>, Sugrue, Jim </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jsugrue>, Sulistio, Franky </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Fsulisti>, Swaim, Michael </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mswaim>, Symms, Mark </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Msymms>, Tang, Mable </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mtang>, Taylor, Mark E (Legal) </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mtaylo1>, Thomas, Tony </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Tthomas6>, Trinh, Hien </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Htrinh>, Tung, Benedicta </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Btung>, Varghese, Rennu </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rvarghe>, Vinson, Donald Wayne </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Dvinson>, Virnau, Robert </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Rvirnau>, Walker, Todd </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Twalker3>, Wang, George </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Gwang>, Wang, N. Jessie </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Nwang>, Webb, Jay </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jwebb>, Wei, Zhiyong </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Zwei>, White, Stacey W. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Swhite>, Williams III, Bill </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Bwillia5>, Wong, Jeremy </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jwong1>, Yang, Sean </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Syang>, Yoder, Christian </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Cyoder>, Zheng, Min </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Mzheng>, Zhu, Tianri </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Tzhu>
+X-cc: 
+X-bcc: 
+X-Folder: \ExMerge - Baughman Jr., Don\Inbox
+X-Origin: BAUGHMAN-D
+X-FileName: don baughman 6-25-02.PST
+
+Date: Thursday, February 7th , 2002
+
+Location: ECS 06980
+
+Orientation will be split into two sessions and divided by alpha-order. Sessions will run 10am-12 pm and 2pm- 4 pm.
+
+We encourage all of you to attend your designated session as valuable information will be presented, and you will have the opportunity to get answers to your questions.
+
+You can speed things up tomorrow by filing in the attached forms - alternatively you can complete them there
+
+10am Session   Letters A- K
+
+2pm Session Letters L-Z
+
+
+
+    
+PLEASE RSVP (BY REPLYING TO THIS E-MAIL) - IF YOU HAVEN'T DONE SO ALREADY

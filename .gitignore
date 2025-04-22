@@ -7,6 +7,9 @@ docs/build/*
 docs/source/generated/*
 dist/*
 .vscode/*
+.chroma
+.chroma-biodex
+.chroma-mmqa
 .ragatouille
 plots/
 paper-imgs/
@@ -49,3 +52,4 @@ pyrightconfig.json
 
 # swe-bench output files
 output_*.json
+myenv/

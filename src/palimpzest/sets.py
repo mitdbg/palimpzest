@@ -4,18 +4,18 @@ from pathlib import Path
 from typing import Callable
 
 import pandas as pd
+from chromadb.api.models.Collection import Collection
+from ragatouille.RAGPretrainedModel import RAGPretrainedModel
 
 from palimpzest.constants import AggFunc, Cardinality
 from palimpzest.core.data.datareaders import DataReader
 from palimpzest.core.elements.filters import Filter
 from palimpzest.core.elements.groupbysig import GroupBySig
-from palimpzest.core.lib.fields import ListField, StringField
 from palimpzest.core.lib.schemas import Number, Schema
 from palimpzest.policy import construct_policy_from_kwargs
 from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.utils.datareader_helpers import get_local_datareader
 from palimpzest.utils.hash_helpers import hash_for_serialized_dict
-from palimpzest.utils.index_helpers import get_index_str
 
 
 #####################################################
@@ -35,16 +35,16 @@ class Set:
         agg_func: AggFunc | None = None,
         group_by: GroupBySig | None = None,
         project_cols: list[str] | None = None,
-        index=None,  # TODO(Siva): Abstract Index and add a type here and elsewhere
         agent_name: str | None = None,
+        index: Collection | RAGPretrainedModel | None = None,
         search_func: Callable | None = None,
         search_attr: str | None = None,
-        output_attr: str | None = None,
+        output_attrs: list[dict] | None = None,
         k: int | None = None,  # TODO: disambiguate `k` to be something like `retrieve_k`
         limit: int | None = None,
         cardinality: Cardinality = Cardinality.ONE_TO_ONE,
         depends_on: list[str] | None = None,
-        nocache: bool = False,
+        cache: bool = False,
     ):
         self._schema = schema
         self._source = source
@@ -58,12 +58,12 @@ class Set:
         self._agent_name = agent_name
         self._search_func = search_func
         self._search_attr = search_attr
-        self._output_attr = output_attr
+        self._output_attrs = output_attrs
         self._k = k
         self._limit = limit
         self._cardinality = cardinality
         self._depends_on = [] if depends_on is None else sorted(depends_on)
-        self._nocache = nocache
+        self._cache = cache
 
     @property
     def schema(self) -> Schema:
@@ -85,16 +85,16 @@ class Set:
             "source": self._source.serialize(),
             "desc": repr(self._desc),
             "filter": None if self._filter is None else self._filter.serialize(),
-            "udf": None if self._udf is None else str(self._udf),
+            "udf": None if self._udf is None else self._udf.__name__,
             "agg_func": None if self._agg_func is None else self._agg_func.value,
             "cardinality": self._cardinality,
             "limit": self._limit,
-            "group_by": (None if self._group_by is None else self._group_by.serialize()),
-            "project_cols": (None if self._project_cols is None else self._project_cols),
-            "index": None if self._index is None else get_index_str(self._index),
-            "search_func": None if self._search_func is None else str(self._search_func),
+            "group_by": None if self._group_by is None else self._group_by.serialize(),
+            "project_cols": None if self._project_cols is None else self._project_cols,
+            "index": None if self._index is None else self._index.__class__.__name__,
+            "search_func": None if self._search_func is None else self._search_func.__name__,
             "search_attr": self._search_attr,
-            "output_attr": self._output_attr,
+            "output_attrs": None if self._output_attrs is None else str(self._output_attrs),
             "k": self._k,
         }
 
@@ -134,9 +134,30 @@ class Dataset(Set):
 
         # get the schema
         schema = updated_source.schema if schema is None else schema
- 
+
         # intialize class
         super().__init__(updated_source, schema, *args, **kwargs)
+
+    def copy(self):
+        return Dataset(
+            source=self._source.copy() if isinstance(self._source, Set) else self._source,
+            schema=self._schema,
+            desc=self._desc,
+            filter=self._filter,
+            udf=self._udf,
+            agg_func=self._agg_func,
+            group_by=self._group_by,
+            project_cols=self._project_cols,
+            index=self._index,
+            search_func=self._search_func,
+            search_attr=self._search_attr,
+            output_attrs=self._output_attrs,
+            k=self._k,
+            limit=self._limit,
+            cardinality=self._cardinality,
+            depends_on=self._depends_on,
+            cache=self._cache,
+        )
 
     def filter(
         self,
@@ -161,7 +182,7 @@ class Dataset(Set):
             schema=self.schema,
             filter=f,
             depends_on=depends_on,
-            nocache=self._nocache,
+            cache=self._cache,
         )
 
     def add_agent(self, agent_name: str) -> Dataset:
@@ -204,7 +225,7 @@ class Dataset(Set):
             f = Filter(_filter)
         else:
             raise Exception("sem_filter() only supports `str` input for _filter.", type(_filter))
-        
+
         if isinstance(depends_on, str):
             depends_on = [depends_on]
 
@@ -213,11 +234,11 @@ class Dataset(Set):
             schema=self.schema,
             filter=f,
             depends_on=depends_on,
-            nocache=self._nocache,
+            cache=self._cache,
         )
 
     def sem_add_columns(self, cols: list[dict] | type[Schema],
-                        cardinality: Cardinality = Cardinality.ONE_TO_ONE, 
+                        cardinality: Cardinality = Cardinality.ONE_TO_ONE,
                         depends_on: str | list[str] | None = None,
                         desc: str = "Add new columns via semantic reasoning") -> Dataset:
         """
@@ -248,7 +269,7 @@ class Dataset(Set):
             cardinality=cardinality,
             depends_on=depends_on,
             desc=desc,
-            nocache=self._nocache,
+            cache=self._cache,
         )
 
     def add_columns(self, udf: Callable,
@@ -285,7 +306,7 @@ class Dataset(Set):
                 col_dict["desc"] = col_dict.get("desc", "New column: " + col_dict["name"])
                 updated_cols.append(col_dict)
             new_output_schema = self.schema.add_fields(updated_cols)
-        
+
         elif issubclass(cols, Schema):
             new_output_schema = self.schema.union(cols)
 
@@ -299,7 +320,24 @@ class Dataset(Set):
             cardinality=cardinality,
             desc=desc,
             depends_on=depends_on,
-            nocache=self._nocache,
+            cache=self._cache,
+        )
+
+    def map(self, udf: Callable) -> Dataset:
+        """
+        Apply a UDF map function.
+
+        Examples:
+            map(udf=clean_column_values)
+        """
+        if udf is None:
+            raise ValueError("`udf` must be provided for map.")
+
+        return Dataset(
+            source=self,
+            schema=self.schema,
+            udf=udf,
+            cache=self._cache,
         )
 
     def count(self) -> Dataset:
@@ -309,7 +347,7 @@ class Dataset(Set):
             schema=Number,
             desc="Count results",
             agg_func=AggFunc.COUNT,
-            nocache=self._nocache,
+            cache=self._cache,
         )
 
     def average(self) -> Dataset:
@@ -319,7 +357,7 @@ class Dataset(Set):
             schema=Number,
             desc="Average results",
             agg_func=AggFunc.AVERAGE,
-            nocache=self._nocache,
+            cache=self._cache,
         )
 
     def groupby(self, groupby: GroupBySig) -> Dataset:
@@ -328,34 +366,43 @@ class Dataset(Set):
             schema=groupby.output_schema(),
             desc="Group By",
             group_by=groupby,
-            nocache=self._nocache,
+            cache=self._cache,
         )
 
     def retrieve(
-        self, index, search_func: Callable, search_attr: str, output_attr: str, output_attr_desc: str, k=-1
+        self,
+        index: Collection | RAGPretrainedModel,
+        search_attr: str,
+        output_attrs: list[dict] | type[Schema],
+        search_func: Callable | None = None,
+        k: int = -1,
     ) -> Dataset:
         """
-        Retrieve the top k nearest neighbors of the value of the `search_attr` from the index and
-        stores it in the `output_attr` field. The output schema is a union of the current schema
-        and the `output_attr` with type ListField(StringField). `search_func` is a function of
-        type (index, query: str | list(str), k: int) -> list[str]. It should implement the lookup
-        logic for the index and return the top k results. The value of the `search_attr` field is
-        used as the query to lookup in the index. The results are stored in the `output_attr`
-        field. `output_attr_desc` is the description of the `output_attr` field.
+        Retrieve the top-k nearest neighbors of the value of the `search_attr` from the `index` and
+        use these results to construct the `output_attrs` field(s).
         """
-        # Output schema is a union of the current schema and the output_attr
-        attributes = {output_attr: ListField(StringField)(desc=output_attr_desc)}
-        output_schema = self.schema().union(type("Schema", (Schema,), attributes))
+        new_output_schema = None
+        if isinstance(output_attrs, list):
+            new_output_schema = self.schema.add_fields(output_attrs)
+        elif issubclass(output_attrs, Schema):
+            new_output_schema = self.schema.union(output_attrs)
+        else:
+            raise ValueError("`cols` must be a list of dictionaries or a Schema.")
+
+        # TODO: revisit once we can think through abstraction(s)
+        # # construct the PZIndex from the user-provided index
+        # index = index_factory(index)
+
         return Dataset(
             source=self,
-            schema=output_schema,
+            schema=new_output_schema,
             desc="Retrieve",
             index=index,
             search_func=search_func,
             search_attr=search_attr,
-            output_attr=output_attr,
+            output_attrs=output_attrs,
             k=k,
-            nocache=self._nocache,
+            cache=self._cache,
         )
 
     def limit(self, n: int) -> Dataset:
@@ -365,7 +412,7 @@ class Dataset(Set):
             schema=self.schema,
             desc="LIMIT " + str(n),
             limit=n,
-            nocache=self._nocache,
+            cache=self._cache,
         )
 
     def project(self, project_cols: list[str] | str) -> Dataset:
@@ -374,7 +421,7 @@ class Dataset(Set):
             source=self,
             schema=self.schema.project(project_cols),
             project_cols=project_cols if isinstance(project_cols, list) else [project_cols],
-            nocache=self._nocache,
+            cache=self._cache,
         )
 
     def run(self, config: QueryProcessorConfig | None = None, **kwargs):

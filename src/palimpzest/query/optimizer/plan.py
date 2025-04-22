@@ -106,8 +106,7 @@ class SentinelPlan(Plan):
         # store operator_sets and logical_op_ids; sort operator_sets internally by op_id
         self.operator_sets = operator_sets
         self.operator_sets = [sorted(op_set, key=lambda op: op.get_op_id()) for op_set in self.operator_sets]
-        self.logical_op_ids = [op_set[0].logical_op_id for op_set in operator_sets]
-        self.logical_op_names = [op_set[0].logical_op_name for op_set in operator_sets]
+        self.logical_op_ids = [op_set[0].logical_op_id for op_set in self.operator_sets]
         self.plan_id = self.compute_plan_id()
 
     def compute_plan_id(self) -> str:
@@ -151,7 +150,7 @@ class SentinelPlan(Plan):
         return self.logical_op_ids[slice], self.operator_sets[slice]
 
     def __iter__(self):
-        yield from zip(self.logical_op_ids, self.logical_op_names, self.operator_sets)
+        yield from zip(self.logical_op_ids, self.operator_sets)
 
     def __len__(self):
         return len(self.logical_op_ids)

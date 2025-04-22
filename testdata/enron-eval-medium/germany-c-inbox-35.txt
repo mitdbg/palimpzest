@@ -1,0 +1,48 @@
+Message-ID: <25598919.1075840505228.JavaMail.evans@thyme>
+Date: Wed, 19 Jun 2002 12:15:58 -0700 (PDT)
+From: cgt_customer_services@nisource.com
+Subject: Columbia Contract Awaiting Your Execution
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+X-From: CGT_Customer_Services@nisource.com
+X-To: arlene_c_masi@sunoil.com, hmuckle@sel.com, scott.goodell@ubswenergy.com, victor.lamadrid@ubswenergy.com, Germany, Chris </O=ENRON/OU=NA/CN=RECIPIENTS/CN=CGERMAN>
+X-cc: 
+X-bcc: 
+X-Folder: \ExMerge - Germany, Chris\Inbox
+X-Origin: GERMANY-C
+X-FileName: chris germany 6-25-02.pst
+
+You have an electronic contract awaiting your review and execution.  Use the Execute Electronic Contracts screen to print and electronically execute a Request(s) for service                      
+
+To Print/Execute Electronic Contracts: 
+
+1. Click on the Contracts folder       
+2. Select the Execute Electronic K from the Contract Administration Drop Down menu                                                                          
+3. Select the service requester from the Service Requester drop down menu
+4. Choose the print option of either View Later or E-mail.
+ 4a. If View Later is selected then the contract can be printed from the Utility
+     folder: View Report Selection
+ 4b. If Email is selected then the contract will be emailed to the address  
+     displayed in the Email Address Field. This field will default to the email
+     address currently associated with the Navigator Id that is currently logged
+     on the system. You may change the designation of where the contract is 
+     to be sent by typing in a different email address                      
+5. Click on Retrieve                   
+6. To print a contract, place a check in the Print Contract select box beside the Bid/Request No. that you want to print                                    
+7. To execute your contract, place a check in the Execute select box beside the Bid/Request No. that you want to execute. Note: It is strongly recommended that you print your contract prior to execution. You can select the print option independent of the execution option; that way you may review the printed contract then if the terms were agreeable, return to this screen to execute the contract                                                                       
+8. Click on Submit.                    
+ 8a. After the contract is executed the screen will display the contract      
+     number assigned and the date it was executed                             
+ 8b. The executed contract information will be displayed on the screen for one
+     full day following the date it was executed                              
+
+Note only those Navigator Ids with execution authority may electronically execute a contract. The contract must be executed before the "Execute by Date" expires.                                  
+
+
+
+
+
+
+
+This document was created by TCOAPPS  in the DB2P subsystem in job IPAT0100, job number 06903, program AT12000 

@@ -1,0 +1,25 @@
+Message-ID: <19017492.1075861682589.JavaMail.evans@thyme>
+Date: Fri, 16 Nov 2001 22:42:19 -0800 (PST)
+From: joe.capasso@enron.com
+To: m..forney@enron.com
+Subject: Ercot Balancing for Friday
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+X-From: Capasso, Joe </O=ENRON/OU=NA/CN=RECIPIENTS/CN=JCAPASSO>
+X-To: Forney, John M. </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jforney>
+X-cc: 
+X-bcc: 
+X-Folder: \JFORNEY (Non-Privileged)\Forney, John M.\Inbox
+X-Origin: Forney-J
+X-FileName: JFORNEY (Non-Privileged).pst
+
+John,
+
+I made an adjustment in Enpower for Friday.
+
+When balancing the books, I noticed that we were 100mw's long into the pool for HE21 & HE22, but in the portal it only shows 50mw for each hour.
+(A 16hour block of 50mw was already in the portal.)  So I adjusted HE21 & HE22 from 50mw to 0 mw, so that it matched the portal.  Please notify me 
+if my adjustment was incorrect. I made a note in the comment field for enpower #871228.  
+
+Joe 

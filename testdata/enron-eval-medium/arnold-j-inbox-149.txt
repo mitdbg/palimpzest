@@ -1,0 +1,29 @@
+Message-ID: <22448070.1075861675831.JavaMail.evans@thyme>
+Date: Tue, 20 Nov 2001 06:57:42 -0800 (PST)
+From: tanya.rohauer@enron.com
+To: john.arnold@enron.com
+Subject: AIG positions
+Cc: joey.taylor@enron.com
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+Bcc: joey.taylor@enron.com
+X-From: Rohauer, Tanya </O=ENRON/OU=NA/CN=RECIPIENTS/CN=TROHAUE>
+X-To: Arnold, John </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jarnold>
+X-cc: Taylor, Joey </O=ENRON/OU=NA/CN=RECIPIENTS/CN=Jtaylor1>
+X-bcc: 
+X-Folder: \JARNOLD (Non-Privileged)\Arnold, John\Inbox
+X-Origin: Arnold-J
+X-FileName: JARNOLD (Non-Privileged).pst
+
+John,
+
+As discussed, the AIG exposure is $57MM, and it is distributed among the price, option, and exotic books.
+
+The attached spreadsheet details the dollar value and volume by month by book.  Please call if you have questions.
+
+Tanya
+
+ 
+
+

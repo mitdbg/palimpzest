@@ -55,7 +55,7 @@ file_cols = [
 xls_cols = file_cols + [
     {"name": "number_sheets", "type": int, "desc": "The number of sheets in the Excel file"},
     {"name": "sheet_names", "type": list[str], "desc": "The names of the sheets in the Excel file"},
-] 
+]
 
 table_cols = [
     {"name": "rows", "type": list[str], "desc": "The rows of the table"},
@@ -84,10 +84,9 @@ if __name__ == "__main__":
     parser.add_argument("--from_xls", action="store_true", help="Start from pre-downloaded excel files", default=False)
     parser.add_argument("--experiment", type=str, help="The experiment to run", default="matching")
     parser.add_argument("--policy", type=str, help="The policy to use", default="cost")
-    parser.add_argument("--executor", type=str, help="The plan executor to use. The avaliable executors are: sequential, pipelined_parallel, pipelined_single_thread", default="pipelined_parallel")
+    parser.add_argument("--executor", type=str, help="The plan executor to use. The avaliable executors are: sequential, pipelined, parallel", default="parallel")
 
     args = parser.parse_args()
-    no_cache = args.no_cache
     verbose = args.verbose
     from_xls = args.from_xls
     policy = args.policy
@@ -137,7 +136,7 @@ if __name__ == "__main__":
 
     config = pz.QueryProcessorConfig(
         policy=policy,
-        nocache=True,
+        cache=False,
         allow_code_synth=False,
         allow_token_reduction=False,
         processing_strategy="no_sentinel",
