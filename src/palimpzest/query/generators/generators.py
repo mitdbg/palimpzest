@@ -16,6 +16,9 @@ from typing import Any, Generic, TypeVar
 from transformers import StoppingCriteria, StoppingCriteriaList
 from transformers import AutoModel, AutoConfig
 import torch
+import torchaudio
+import random
+from transformers import Wav2Vec2FeatureExtractor
 
 from colorama import Fore, Style
 from openai import OpenAI
@@ -458,21 +461,34 @@ class Music2TextGenerator(BaseGenerator[str | list[str], str]):
         super().__init__(model, prompt_strategy, cardinality, verbose, system_role)
         
         self.device=device
+        '''
         self.musilingo_model= AutoModel.from_pretrained(self.model_name, trust_remote_code=True)
         self.musilingo_model.to(self.device)
         self.musilingo_model.eval()
+        '''
         
 
-    def __call__(self, candidate: DataRecord, fields: dict[str, Field] | None, json_output: bool=True, **kwargs) -> GenerationOutput:
-        print('RIGHT CALL:generators.py')
+
+    def __call__(self, candidate: DataRecord, fields: dict[str, Field] | None, crop_length:int=30, json_output: bool=True, **kwargs) -> GenerationOutput:
+        
+        
+        self.musilingo_model= AutoModel.from_pretrained(self.model_name, trust_remote_code=True)
+        self.musilingo_model.to(self.device)
+        self.musilingo_model.eval()
         song_id=candidate["song_id"]
-        audio_content=candidate['audio_content']
+        key='audio_'+str(crop_length)
+        print(f'key: {key}')
+        audio_content=candidate[key]
+        
+        
+        
         prompt='Give me a detailed description of the song, including its genre, instruments, mood/theme, bpm, and what occasion this song would be played at'
         
        
         
         stopping = StoppingCriteriaList([StoppingCriteriaSub([torch.tensor([835]).to(self.device),
                                   torch.tensor([2277, 29937]).to(self.device)])])
+       
         response=self.get_musilingo_pred(self.musilingo_model.model,prompt,audio_content, stopping,length_penalty=100, temperature=0.1)
         #should be only one field name
         
@@ -507,14 +523,13 @@ class Music2TextGenerator(BaseGenerator[str | list[str], str]):
         """Extract the log probabilities from the completion object."""
         pass
 
-
     def get_musilingo_pred(self,model, text, audio, stopping, length_penalty=1, temperature=0.1,
         max_new_tokens=300, num_beams=1, min_length=1, top_p=0.5, repetition_penalty=1.0):
 
         # see https://huggingface.co/m-a-p/MusiLingo-musicqa-v1 for load_audio function definition
-    
+        #print(f'audio in pred function: {audio}')
         audio_embeds, atts_audio = model.encode_audio(audio)
-
+       
 
         prompt = '<Audio><AudioHere></Audio> ' + text
         instruction_prompt = [model.prompt_template.format(prompt)]

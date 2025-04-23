@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from collections.abc import Generator
 from typing import Any
-
+import torch
 import pandas as pd
 
 from palimpzest.core.data.dataclasses import ExecutionStats, PlanStats, RecordOpStats
@@ -279,13 +279,15 @@ class DataRecord:
 
         if not include_bytes:
             for k, v in dct.items():
-                if isinstance(v, bytes) or (isinstance(v, list) and len(v) > 0 and  any([isinstance(elt, bytes) for elt in v])):
+                if isinstance(v, bytes) or isinstance(v, torch.Tensor) or (isinstance(v, list) and len(v) > 0 and  any([isinstance(elt, bytes) for elt in v])):
                     dct[k] = "<bytes>"
 
         if bytes_to_str:
             for k, v in dct.items():
                 if isinstance(v, bytes):
                     dct[k] = v.decode("utf-8")
+                elif isinstance(v, torch.Tensor):
+                    dct[k] = str(v)
                 elif isinstance(v, list) and len(v) > 0 and any([isinstance(elt, bytes) for elt in v]):
                     dct[k] = [elt.decode("utf-8") if isinstance(elt, bytes) else elt for elt in v]
 

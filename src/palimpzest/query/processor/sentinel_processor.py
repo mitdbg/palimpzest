@@ -6,7 +6,7 @@ from palimpzest.query.optimizer.cost_model import SampleBasedCostModel
 from palimpzest.query.optimizer.optimizer_strategy_type import OptimizationStrategyType
 from palimpzest.query.optimizer.plan import SentinelPlan
 from palimpzest.query.processor.query_processor import QueryProcessor
-
+import pdb
 logger = logging.getLogger(__name__)
 
 class SentinelQueryProcessor(QueryProcessor):
@@ -46,7 +46,7 @@ class SentinelQueryProcessor(QueryProcessor):
         # get the sentinel plan for the given dataset
         sentinel_plans = optimizer.optimize(dataset)
         sentinel_plan = sentinel_plans[0]
-
+        #pdb.set_trace()
         return sentinel_plan
 
     def execute(self) -> DataRecordCollection:

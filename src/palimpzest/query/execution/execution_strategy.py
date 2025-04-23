@@ -4,7 +4,7 @@ from concurrent.futures import ThreadPoolExecutor, wait
 
 import numpy as np
 from chromadb.api.models.Collection import Collection
-
+import pdb
 from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS
 from palimpzest.core.data.dataclasses import OperatorCostEstimates, PlanStats, RecordOpStats
 from palimpzest.core.data.datareaders import DataReader
@@ -183,6 +183,7 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
                     # compute number of matches between this record's computed fields and this expected record's outputs
                     total_quality = 0
                     for field in record_op_stats.generated_fields:
+                        
                         computed_value = record_op_stats.record_state.get(field, None)
                         expected_value = target_record[field]
 
@@ -191,12 +192,16 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
 
                         # compute exact match
                         if score_fn == "exact":
+                            
+                            
+                            #import pdb; pdb.set_trace()
                             total_quality += int(computed_value == expected_value)
 
                         # compute UDF metric
                         elif callable(score_fn):
+                            
                             total_quality += score_fn(computed_value, expected_value)
-
+                           
                         # otherwise, throw an exception
                         else:
                             raise Exception(f"Unrecognized score_fn: {score_fn}")
@@ -378,6 +383,7 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
             return input.source_idx if isinstance(input, DataRecord) else input
 
         def get_hash(operator, input):
+            #pdb.set_trace()
             logical_op_id = operator.get_logical_op_id()
             phys_op_id = operator.get_op_id()
             return hash(f"{logical_op_id}{phys_op_id}{hash(input)}")

@@ -37,6 +37,9 @@ from palimpzest.query.optimizer.rules import (
 from palimpzest.query.optimizer.rules import (
     RAGConvertRule as _RAGConvertRule,
 )
+from palimpzest.query.optimizer.rules import(
+    AudioCropRule as _AudioCropRule,
+)
 from palimpzest.query.optimizer.rules import (
     RetrieveRule as _RetrieveRule,
 )
@@ -67,6 +70,7 @@ ALL_RULES = [
     _NonLLMFilterRule,
     _PushDownFilter,
     _RAGConvertRule,
+    _AudioCropRule,
     _RetrieveRule,
     _Rule,
     _SplitConvertRule,

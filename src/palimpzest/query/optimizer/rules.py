@@ -25,6 +25,7 @@ from palimpzest.query.operators.map import MapOp
 from palimpzest.query.operators.mixture_of_agents_convert import MixtureOfAgentsConvert
 from palimpzest.query.operators.project import ProjectOp
 from palimpzest.query.operators.rag_convert import RAGConvert
+from palimpzest.query.operators.audio_crop_convert import AudioCropConvert
 from palimpzest.query.operators.retrieve import RetrieveOp
 from palimpzest.query.operators.scan import CacheScanDataOp, MarshalAndScanDataOp
 from palimpzest.query.operators.split_convert import SplitConvert
@@ -334,6 +335,7 @@ class LLMConvertBondedRule(ImplementationRule):
             ]
         )
         physical_expressions = []
+        print(f'available_models:{physical_op_params["available_models"]}')
         for model in physical_op_params["available_models"]:
             #OPAL version
             #skip this model if:
@@ -349,9 +351,9 @@ class LLMConvertBondedRule(ImplementationRule):
             
            
             if first_criteria or second_criteria or third_criteria or fourth_criteria:
-                
+                print(f'did not pass:{model}')
                 continue
-            
+            print(f'passed:{model}')
             '''
 
             #OLD VERSION
@@ -540,7 +542,106 @@ class CodeSynthesisConvertSingleRule(CodeSynthesisConvertRule):
 
     physical_convert_class = CodeSynthesisConvertSingle
 
+class AudioCropRule(ImplementationRule):
+    """
+    Substitute a logical expression for a ConvertScan with a AudioCropConvert physical implementation.
+    """
 
+    crop_lengths=[10,30,60]
+
+    @classmethod
+    def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
+        logical_op = logical_expression.operator
+        is_audio2text= any (
+            [
+                field.is_audio_field
+                for field_name,field in logical_expression.input_fields.items()
+                if field_name.split(".")[-1] in logical_expression.depends_on_field_names
+            ]
+        )
+        '''
+        emb_output = any (
+            [
+                field.is_audio_embed_field
+                for _,field in logical_expression.generated_fields.items()
+            ]
+        )
+        is_audio2text = audio_input and not emb_output
+
+
+        # 
+        audio_input = any (
+            [
+                field.is_audio_field
+                for field_name,field in logical_expression.input_fields.items()
+                if field_name.split(".")[-1] in logical_expression.depends_on_field_names
+            ]
+        )
+        emb_output = any (
+            [
+                field.is_audio_embed_field
+                for _,field in logical_expression.generated_fields.items()
+            ]
+        )
+        is_audio2emb = audio_input and emb_output
+       '''
+        is_match = isinstance(logical_op, ConvertScan) and is_audio2text and logical_op.udf is None
+        logger.debug(f"AudioCropRule matches_pattern: {is_match} for {logical_expression}")
+        return is_match
+
+    @classmethod
+    def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
+        logger.debug(f"Substituting AudioCropRule for {logical_expression}")
+
+        logical_op = logical_expression.operator
+
+        # get initial set of parameters for physical op
+        op_kwargs = logical_op.get_logical_op_params()
+        op_kwargs.update(
+            {
+                "verbose": physical_op_params["verbose"],
+                "logical_op_id": logical_op.get_logical_op_id(),
+                "logical_op_name": logical_op.logical_op_name(),
+            }
+        )
+
+        # NOTE: when comparing pz.Model(s), equality is determined by the string (i.e. pz.Model.value)
+        #       thus, Model.GPT_4o and Model.GPT_4o_V map to the same value; this allows us to use set logic
+        #
+        # identify models which can be used strictly for text or strictly for images
+        
+        audio2text_models=set(get_audio2text_models())
+
+        physical_expressions = []
+        for model in physical_op_params["available_models"]:
+            # skip this model if this is a pure image model
+            if model not in audio2text_models:
+                continue
+            for crop_length in cls.crop_lengths:
+                
+                op=AudioCropConvert(
+                    model=model,
+                    prompt_strategy=PromptStrategy.COT_QA,
+                    crop_length=crop_length,
+                    **op_kwargs
+                )
+           
+                # construct multi-expression
+                
+                expression = PhysicalExpression(
+                    operator=op,
+                    input_group_ids=logical_expression.input_group_ids,
+                    input_fields=logical_expression.input_fields,
+                    depends_on_field_names=logical_expression.depends_on_field_names,
+                    generated_fields=logical_expression.generated_fields,
+                    group_id=logical_expression.group_id,
+                )
+                physical_expressions.append(expression)
+
+        logger.debug(f"Done substituting AudioCropRule for {logical_expression}")
+        deduped_physical_expressions = set(physical_expressions)
+
+        return deduped_physical_expressions
 class RAGConvertRule(ImplementationRule):
     """
     Substitute a logical expression for a ConvertScan with a RAGConvert physical implementation.
@@ -552,6 +653,13 @@ class RAGConvertRule(ImplementationRule):
     @classmethod
     def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
         logical_op = logical_expression.operator
+        is_audio2text=any (
+            [
+                field.is_audio_field
+                for field_name,field in logical_expression.input_fields.items()
+                if field_name.split(".")[-1] in logical_expression.depends_on_field_names
+            ]
+        )
         is_image_conversion = any(
             [
                 field.is_image_field
@@ -559,7 +667,7 @@ class RAGConvertRule(ImplementationRule):
                 if field_name.split(".")[-1] in logical_expression.depends_on_field_names
             ]
         )
-        is_match = isinstance(logical_op, ConvertScan) and not is_image_conversion and logical_op.udf is None
+        is_match = isinstance(logical_op, ConvertScan) and not is_audio2text and not is_image_conversion and logical_op.udf is None
         logger.debug(f"RAGConvertRule matches_pattern: {is_match} for {logical_expression}")
         return is_match
 
@@ -738,7 +846,14 @@ class CriticAndRefineConvertRule(ImplementationRule):
     @classmethod
     def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
         logical_op = logical_expression.operator
-        is_match = isinstance(logical_op, ConvertScan) and logical_op.udf is None
+        is_audio2text=any (
+            [
+                field.is_audio_field
+                for field_name,field in logical_expression.input_fields.items()
+                if field_name.split(".")[-1] in logical_expression.depends_on_field_names
+            ]
+        )
+        is_match = isinstance(logical_op, ConvertScan) and not is_audio2text and logical_op.udf is None
         logger.debug(f"CriticAndRefineConvertRule matches_pattern: {is_match} for {logical_expression}")
         return is_match
 

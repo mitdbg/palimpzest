@@ -33,6 +33,7 @@ class QueryProcessorConfig:
     allow_code_synth: bool = field(default=False)
     allow_token_reduction: bool = field(default=False)
     allow_rag_reduction: bool = field(default=True)
+    allow_audio_crop: bool=field(default=False)
     allow_mixtures: bool = field(default=True)
     allow_critic: bool = field(default=True)
     allow_split_merge: bool = field(default=False)
@@ -61,6 +62,7 @@ class QueryProcessorConfig:
             "allow_code_synth": self.allow_code_synth,
             "allow_token_reduction": self.allow_token_reduction,
             "allow_rag_reduction": self.allow_rag_reduction,
+            "allow_audio_crop":self.allow_audio_crop,
             "allow_mixtures": self.allow_mixtures,
             "allow_critic": self.allow_critic,
             "allow_split_merge": self.allow_split_merge,

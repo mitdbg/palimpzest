@@ -33,6 +33,7 @@ from palimpzest.query.optimizer.rules import (
     LLMConvertBondedRule,
     MixtureOfAgentsConvertRule,
     RAGConvertRule,
+    AudioCropRule,
     SplitConvertRule,
     TokenReducedConvertBondedRule,
 )
@@ -92,6 +93,7 @@ class Optimizer:
         allow_code_synth: bool = False,
         allow_token_reduction: bool = False,
         allow_rag_reduction: bool = False,
+        allow_audio_crop:bool=True,
         allow_mixtures: bool = True,
         allow_critic: bool = False,
         allow_split_merge: bool = False,
@@ -136,6 +138,7 @@ class Optimizer:
             self.allow_code_synth = False
             self.allow_token_reduction = False
             self.allow_rag_reduction = False
+            self.allow_audio_crop= False
             self.allow_mixtures = False
             self.allow_critic = False
             self.allow_split_merge = False
@@ -149,6 +152,7 @@ class Optimizer:
         self.allow_code_synth = allow_code_synth
         self.allow_token_reduction = allow_token_reduction
         self.allow_rag_reduction = allow_rag_reduction
+        self.allow_audio_crop=allow_audio_crop
         self.allow_mixtures = allow_mixtures
         self.allow_critic = allow_critic
         self.allow_split_merge = allow_split_merge
@@ -177,7 +181,10 @@ class Optimizer:
             self.implementation_rules = [
                 rule for rule in self.implementation_rules if not issubclass(rule, RAGConvertRule)
             ]
-
+        if not self.allow_audio_crop:
+            self.implmentation_rules=[
+                rule for rule in self.implementation_rules if not issubclass(rule,AudioCropRule)
+            ]
         if not self.allow_mixtures:
             self.implementation_rules = [
                 rule for rule in self.implementation_rules if not issubclass(rule, MixtureOfAgentsConvertRule)
@@ -220,6 +227,7 @@ class Optimizer:
             allow_code_synth=self.allow_code_synth,
             allow_token_reduction=self.allow_token_reduction,
             allow_rag_reduction=self.allow_rag_reduction,
+            allow_audio_crop=self.allow_audio_crop,
             allow_mixtures=self.allow_mixtures,
             allow_critic=self.allow_critic,
             allow_split_merge=self.allow_split_merge,

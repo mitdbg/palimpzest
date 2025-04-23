@@ -16,6 +16,7 @@ from palimpzest.core.data.dataclasses import GenerationStats, OperatorCostEstima
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.core.lib.schemas import Schema
 from palimpzest.query.operators.physical import PhysicalOperator
+import pdb
 
 
 class RetrieveOp(PhysicalOperator):
@@ -292,6 +293,7 @@ class RetrieveOp(PhysicalOperator):
                 else:
                     top_k_results[output_field_name] = top_results[output_field_name][:self.k]
             else:
+                #import pdb; pdb.set_trace()
                 top_k_results[output_field_name] = []
 
         if self.verbose:

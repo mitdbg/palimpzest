@@ -83,12 +83,12 @@ class ConvertOp(PhysicalOperator, ABC):
             # get input field names and output field names
             input_fields = self.input_schema.field_names()
             output_fields = self.output_schema.field_names()
-            print(f'convert.py:{output_fields}')
+            #print(f'convert.py:{output_fields}')
         
             # parse newly generated fields from the field_answers dictionary for this field; if the list
             # of generated values is shorter than the number of records, we fill in with None
             for field in output_fields:
-                print(f'convert.py, field:{field}')
+                #print(f'convert.py, field:{field}')
                 if field not in input_fields:
                     value = field_answers[field][idx] if idx < len(field_answers[field]) else None
                     setattr(dr, field, value)
@@ -296,7 +296,7 @@ class LLMConvert(ConvertOp):
         self.prompt_strategy = prompt_strategy
 
         if model is not None:
-            print('convert.py:',model.value)
+           
             self.generator = generator_factory(model, prompt_strategy, self.cardinality, self.verbose)
 
     def __str__(self):
