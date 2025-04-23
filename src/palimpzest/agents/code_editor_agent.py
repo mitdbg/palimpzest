@@ -4,7 +4,6 @@ from palimpzest.agents.react import ReAct
 from palimpzest.agents import utils
 from palimpzest.agents.debugger_agent import LOGGER
 from palimpzest.core.data.dataclasses import GenerationStats
-import palimpzest.constants as constants 
 import json
 import dspy
 import time 
@@ -28,15 +27,17 @@ class PatchGeneration(dspy.Signature):
 
 class CodeEditorAgentOp(BaseAgentOp):
 
-    def __init__(self, max_iters: int , *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.max_iters = max_iters
-        self.output_dir = f'output_{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.json' 
+        self.output_dir = f'./results/output_{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.json' 
 
     def run_agent(self, candidate: DataRecord) -> dict: 
         # Let the agent navigate the code base with the same tools and provide the bug fix plan
 
         print(f'\n =============== CODE EDITOR AGENT START for {candidate["instance_id"]} ===============')
+
+        self.set_model()
+        print(f"Model: {dspy.settings.lm.model}")
 
         patch = {
             'instance_id': candidate['instance_id'],
@@ -72,10 +73,7 @@ class CodeEditorAgentOp(BaseAgentOp):
         # Construct generation stats
         input_tokens = react.get_total_input_tokens()
         output_tokens = react.get_total_output_tokens()
-
-        # TODO: Modify based on which model is used
-        usd_per_input_token = constants.GPT_4o_MODEL_CARD['input_token_cost']
-        usd_per_output_token = constants.GPT_4o_MODEL_CARD['output_token_cost']
+        usd_per_input_token, usd_per_output_token = self.get_token_costs()
 
         generation_stats = GenerationStats(
             model_name=str(dspy.settings.lm.model),

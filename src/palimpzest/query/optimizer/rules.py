@@ -222,35 +222,55 @@ class AgentRule(ImplementationRule):
     Base class for agent rules which convert a logical expression to an agent expression.
     """
 
-    max_iters = [5, 10, 15, 20]
+    max_iters_debugger = [5, 10, 15]
+    max_iters_code_editor = [2, 4, 6]
+    model = ["gpt-4o", "gpt-4o-mini"]
 
     @classmethod
     def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
         return isinstance(logical_expression.operator, Agent) and logical_expression.operator.agent_name is not None
-    
+
     @classmethod
     def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
         logical_op = logical_expression.operator
 
+        def apply_hyperparams(op_kwargs: list[dict], param_name, param_options: list) -> list[dict]:
+            """
+            Apply hyperparameters to the operator kwargs.
+            """
+            new_op_kwargs = []
+            for op_kwargs_dict in op_kwargs:
+                for param in param_options:
+                    new_op_kwargs.append({**op_kwargs_dict, f"{param_name}": param})
+            return new_op_kwargs
+
+        # Construct op_kwargs for all combinations of hyperparameters
+        init_kwargs = logical_op.get_logical_op_params()
+        init_kwargs.update({
+            "verbose": physical_op_params["verbose"],
+            "logical_op_id": logical_op.get_logical_op_id(),
+            "logical_op_name": logical_op.logical_op_name(),
+        })
+
+        op_kwargs_list = [init_kwargs]
+        if logical_op.agent_name == "debugger":
+            op_kwargs_list = apply_hyperparams(op_kwargs_list, "max_iters", cls.max_iters_debugger)
+        elif logical_op.agent_name == "code_editor":
+            op_kwargs_list = apply_hyperparams(op_kwargs_list, "max_iters", cls.max_iters_code_editor)
+        else:
+            raise ValueError(f"Unknown agent name: {logical_op.agent_name}") 
+
+        op_kwargs_list = apply_hyperparams(op_kwargs_list, "model", cls.model)
+
+        # Construct physical expressions for op_kwargs
         physical_expressions = []
-        for max_iter in cls.max_iters: 
-            # get initial set of parameters for physical op
-            op_kwargs = logical_op.get_logical_op_params()
-            op_kwargs.update(
-                {
-                    "verbose": physical_op_params["verbose"],
-                    "logical_op_id": logical_op.get_logical_op_id(),
-                    "logical_op_name": logical_op.logical_op_name(),
-                    "max_iters": max_iter,
-                }
-            )
-            
-            # construct multi-expression
+
+        for op_kwargs in op_kwargs_list:
             if logical_op.agent_name == "debugger":
                 op = DebuggerAgentOp(**op_kwargs)
             elif logical_op.agent_name == "code_editor":
                 op = CodeEditorAgentOp(**op_kwargs)
-            else: 
+            else:
                 raise ValueError(f"Unknown agent name: {logical_op.agent_name}")
 
             expression = PhysicalExpression(
@@ -263,9 +283,9 @@ class AgentRule(ImplementationRule):
             )
 
             physical_expressions.append(expression)
-
+        
         return set(physical_expressions)
-
+    
 class NonLLMConvertRule(ImplementationRule):
     """
     Substitute a logical expression for a UDF ConvertScan with a NonLLMConvert physical implementation.

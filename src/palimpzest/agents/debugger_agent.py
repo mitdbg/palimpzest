@@ -32,7 +32,7 @@ class DebuggerAgentOp(BaseAgentOp):
     def run_agent(self, candidate: DataRecord) -> dict:
         print(f'=============== DEBUGGER AGENT START for {candidate["instance_id"]} ===============')
 
-        dspy.configure(lm=GLOBAL_CONTEXT['model'])
+        self.set_model()
         print(f'Model: {dspy.settings.lm.model}')
 
         # Clean problem statement
@@ -78,10 +78,7 @@ class DebuggerAgentOp(BaseAgentOp):
         # Construct generation stats
         input_tokens = react.get_total_input_tokens()
         output_tokens = react.get_total_output_tokens()
-
-        # TODO: Modify based on which model is used
-        usd_per_input_token = constants.GPT_4o_MODEL_CARD['usd_per_input_token']
-        usd_per_output_token = constants.GPT_4o_MODEL_CARD['usd_per_output_token']
+        usd_per_input_token, usd_per_output_token = self.get_token_costs()
 
         generation_stats = GenerationStats(
             model_name=str(dspy.settings.lm.model),

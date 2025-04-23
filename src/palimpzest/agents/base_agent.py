@@ -9,7 +9,7 @@ from palimpzest.query.generators.generators import get_api_key
 from palimpzest.core.data.dataclasses import GenerationStats, OperatorCostEstimates 
 from palimpzest.agents.constants import DEBUGGER_NAIVE_EST_NUM_INPUT_TOKENS_PER_ITER, CODE_EDITOR_NAIVE_EST_NUM_OUTPUT_TOKENS_PER_ITER
 from palimpzest.constants import MODEL_CARDS
-import tiktoken
+import palimpzest.constants as constants
 from abc import ABC, abstractmethod
 import time
 import dspy
@@ -37,17 +37,20 @@ class BaseAgentOp(PhysicalOperator):
 
     def __init__(
         self,
+        max_iters: int,
         agent_name: str = None, 
+        model: str = 'gpt-4o',
         *args, **kwargs
     ):
         super().__init__(*args, **kwargs)
         self.agent_name = agent_name
-        self.model_name = "gpt-4o-2024-08-06"
+        self.max_iters = max_iters
+        self.model = model
 
-    def get_id_params(self):
         id_params = super().get_id_params()
         id_params = {"agent_name": self.agent_name, 
                      "max_iters": self.max_iters, 
+                     "model": self.model,
                      **id_params
                     }
 
@@ -57,10 +60,21 @@ class BaseAgentOp(PhysicalOperator):
         op_params = super().get_op_params()
         op_params = {"agent_name": self.agent_name, 
                      "max_iters": self.max_iters, 
+                     "model": self.model,
                      **op_params
                     }
 
         return op_params
+
+    def set_model(self):
+        if self.model == 'gpt-4o':
+            model = dspy.LM('openai/gpt-4o', api_key=openai_key)
+        elif self.model == 'gpt-4o-mini':
+            model = dspy.LM('openai/gpt-4o-mini', api_key=openai_key)
+        else: 
+            raise ValueError(f"Model {self.model} is not supported")
+
+        dspy.configure(lm=model)
 
     @abstractmethod
     def run_agent(self, candidate: DataRecord) -> dict:
@@ -306,19 +320,25 @@ class BaseAgentOp(PhysicalOperator):
         # Compute cardinality
         cardinality = source_op_cost_estimates.cardinality
 
+        # Get model name
+        if self.model == 'gpt-4o':
+            model_name = 'gpt-4o-2024-08-06' 
+        elif self.model == 'gpt-4o-mini':
+            model_name = 'gpt-4o-mini-2024-07-18'
+
         # Compute time per record
-        model_conversion_time_per_record = est_num_iters * MODEL_CARDS[self.model_name]["seconds_per_output_token"] * est_num_output_tokens_per_iter
+        model_conversion_time_per_record = est_num_iters * MODEL_CARDS[model_name]["seconds_per_output_token"] * est_num_output_tokens_per_iter
 
         # Compute cost per record
         # TODO: Doesn't always go to max_iters - can make better
         model_conversion_usd_per_record = est_num_iters * (
-            MODEL_CARDS[self.model_name]["usd_per_input_token"] * est_input_tokens_per_iter
-            + MODEL_CARDS[self.model_name]["usd_per_output_token"] * est_num_output_tokens_per_iter
+            MODEL_CARDS[model_name]["usd_per_input_token"] * est_input_tokens_per_iter
+            + MODEL_CARDS[model_name]["usd_per_output_token"] * est_num_output_tokens_per_iter
         )
 
-        # Compute quality
-        # TODO: This needs to be refined 
+        # Compute quality based on max_iters and model
         quality = 0.8 if self.max_iters >= 10 else 0.8 * (self.max_iters / 10) 
+        quality = quality * 0.5 if self.model == 'gpt-4o-mini' else quality
 
         return OperatorCostEstimates(
             cardinality=cardinality,
@@ -326,3 +346,13 @@ class BaseAgentOp(PhysicalOperator):
             cost_per_record=model_conversion_usd_per_record,
             quality=quality,
         )
+
+    def get_token_costs(self) -> tuple[float, float]: 
+        if self.model == 'gpt-4o':
+            usd_per_input_token = MODEL_CARDS['gpt-4o']['usd_per_input_token']
+            usd_per_output_token = MODEL_CARDS['gpt-4o']['usd_per_output_token']
+        elif self.model == 'gpt-4o-mini':
+            usd_per_input_token = MODEL_CARDS['gpt-4o-mini']['usd_per_input_token']
+            usd_per_output_token = MODEL_CARDS['gpt-4o-mini']['usd_per_output_token']
+        
+        return usd_per_input_token, usd_per_output_token
