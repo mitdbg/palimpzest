@@ -51,5 +51,6 @@ testdata/enron-eval/*.txt
 pyrightconfig.json
 
 # swe-bench output files
-output_*.json
 myenv/
+swe-bench/logs/*
+swe-bench/results/*
