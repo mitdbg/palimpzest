@@ -11,7 +11,6 @@ from palimpzest.query.operators.rag_convert import RAGConvert
 from palimpzest.query.operators.scan import MarshalAndScanDataOp
 from palimpzest.query.optimizer.plan import PhysicalPlan, SentinelPlan
 
-# from palimpzest.operators.token_reduction_convert import TokenReducedConvertBonded
 
 ### PHYSICAL PLANS ###
 @pytest.fixture
@@ -90,20 +89,6 @@ def rag_convert_plan(email_schema, enron_eval_tiny):
     )
     plan = PhysicalPlan(operators=[scan_op, convert_op_llm])
     return plan
-
-# NOTE: removing until TokenReducedConvertBonded has implementation changes
-# @pytest.fixture
-# def token_reduction_convert_plan(email_schema, enron_eval_tiny):
-#     scan_op = MarshalAndScanDataOp(output_schema=TextFile, datareader=enron_eval_tiny)
-#     convert_op_llm = TokenReducedConvertBonded(
-#         input_schema=TextFile,
-#         output_schema=email_schema,
-#         model=Model.GPT_4o_MINI,
-#         token_budget=0.1,
-#         target_cache_id="abc123",
-#     )
-#     plan = PhysicalPlan(operators=[scan_op, convert_op_llm])
-#     return plan
 
 
 @pytest.fixture
