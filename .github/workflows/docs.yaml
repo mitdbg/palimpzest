@@ -20,7 +20,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
-          pip install .
+          pip install palimpzest[docs]
       - name: MkDocs build
         run: |
           cd docs
