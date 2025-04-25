@@ -138,7 +138,6 @@ if __name__ == "__main__":
         policy=policy,
         cache=False,
         allow_code_synth=False,
-        allow_token_reduction=False,
         processing_strategy="no_sentinel",
         execution_strategy=executor,
     )

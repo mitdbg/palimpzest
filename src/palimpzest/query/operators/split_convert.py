@@ -61,8 +61,7 @@ class SplitConvert(LLMConvert):
             + MODEL_CARDS[self.model.value]["usd_per_output_token"] * est_num_output_tokens
         )
 
-        # set refined estimate of cost per record and, for now,
-        # assume quality multiplier is proportional to sqrt(sqrt(token_budget))
+        # set refined estimate of cost per record
         naive_op_cost_estimates.cost_per_record = model_conversion_usd_per_record
         naive_op_cost_estimates.cost_per_record_lower_bound = naive_op_cost_estimates.cost_per_record
         naive_op_cost_estimates.cost_per_record_upper_bound = naive_op_cost_estimates.cost_per_record

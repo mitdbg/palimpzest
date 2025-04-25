@@ -170,7 +170,6 @@ def execute_task(task, dataset, policy, verbose=False, profile=False, processing
         policy=policy,
         cache=False,
         verbose=verbose,
-        allow_token_reduction=False,
         allow_code_synth=False,
         processing_strategy=processing_strategy,
         execution_strategy=execution_strategy,

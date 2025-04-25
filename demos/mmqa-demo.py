@@ -396,7 +396,6 @@ if __name__ == "__main__":
         allow_critic=False,
         allow_mixtures=False,
         allow_rag_reduction=False,
-        allow_token_reduction=False,
         allow_split_merge=False,
         progress=progress,
     )
