@@ -367,8 +367,8 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
             logger.debug(f"Generated completion in {end_time - start_time:.2f} seconds")
         # if there's an error generating the completion, we have to return an empty answer
         # and can only account for the time spent performing the failed generation
-        except Exception as e:
-            logger.error(f"Error generating completion: {e}")
+        except Exception:
+            # logger.error(f"Error generating completion: {e}")
             field_answers = {field_name: None for field_name in fields}
             reasoning = None
             generation_stats = GenerationStats(
@@ -423,15 +423,17 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
         reasoning = None
         try:
             reasoning = self._parse_reasoning(completion_text, **kwargs)
-        except Exception as e:
-            logger.error(f"Error parsing reasoning and answers: {e}")
+        except Exception:
+            # logger.error(f"Error parsing reasoning and answers: {e}")
+            logger.debug("TODO: undo this")
+            pass
 
         # parse field answers
         field_answers = None if fields is None else {field_name: None for field_name in fields}
         try:
             field_answers = self._parse_answer(completion_text, fields, json_output, **kwargs)
         except Exception as e:
-            logger.error(f"Error parsing answers: {e}")
+            # logger.error(f"Error parsing answers: {e}")
             os.makedirs("parse-answer-errors", exist_ok=True)
             ts = time.time()
             with open(f"parse-answer-errors/error-{ts}.txt", "w") as f:
