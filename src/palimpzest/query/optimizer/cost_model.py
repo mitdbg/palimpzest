@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import math
 
 # NOTE: the answer.mode() call(s) inside of _est_quality() throw a UserWarning when there are multiple
 #       answers to a convert with the same mode. This is because pandas tries to sort the answers
