@@ -12,9 +12,6 @@ dependencies = [
     "chromadb>=0.6.3",
     "fastapi~=0.115.0",
     "gradio>=5.26.0",
-    "mkdocs>=1.6.1",
-    "mkdocs-material>=9.6.3",
-    "mkdocstrings-python>=1.15.0",
     "numpy>=1.23.2",
     "openai>=1.0",
     "pandas>=2.1.1",
@@ -45,6 +42,14 @@ classifiers=[
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",  # Specify versions you support
     # Add more classifiers as appropriate
+]
+
+[project.optional-dependencies]
+docs = [
+    "mkdocs>=1.6.1",
+    "mkdocs-material>=9.6.3",
+    "mkdocstrings-python>=1.15.0",
+    "mkdocs-material[imaging]",
 ]
 
 [tool.setuptools]
