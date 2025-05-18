@@ -1,6 +1,7 @@
 import logging
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor, wait
+import time
 
 import numpy as np
 from chromadb.api.models.Collection import Collection
@@ -17,6 +18,8 @@ from palimpzest.query.operators.retrieve import RetrieveOp
 from palimpzest.query.operators.scan import ScanPhysicalOp
 from palimpzest.query.optimizer.plan import PhysicalPlan, SentinelPlan
 from palimpzest.utils.progress import PZSentinelProgressManager
+from palimpzest.agents.debugger_agent import DebuggerAgentOp
+from palimpzest.agents.code_editor_agent import CodeEditorAgentOp 
 
 logger = logging.getLogger(__name__)
 
@@ -133,6 +136,7 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
         Update the record_set by assigning the quality to each entry in its record_op_stats and
         returning the updated record_set.
         """
+
         # if this operation failed
         if len(record_set) == 0:
             record_set.record_op_stats[0].quality = 0.0
@@ -252,26 +256,75 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
             not issubclass(physical_op_cls, LLMConvert)
             and not issubclass(physical_op_cls, LLMFilter)
             and not issubclass(physical_op_cls, RetrieveOp)
+            and not issubclass(physical_op_cls, DebuggerAgentOp)
         )
 
-        # compute quality of each output computed by this operator
-        for source_idx, record_sets in source_idx_to_record_sets.items():
-            # if this operation does not involve an LLM, every record_op_stats object gets perfect quality
-            if is_perfect_quality_op:
+        # Custom implementation of batch quality computation for debugging and code editor agents
+        if physical_op_cls == CodeEditorAgentOp:
+            # Build tuple list 
+            predictions = []
+            for source_idx, record_sets in source_idx_to_record_sets.items():
+                target_record_set = source_idx_to_target_record_set[source_idx]
+
+                score_fn = target_record_set.get_field_to_score_fn()["model_patch"]
+                for record_set in record_sets: 
+                    predictions.append((record_set, target_record_set))
+            
+            if score_fn.__name__ == "compute_swe_bench_score":
+                self._compute_batch_quality(predictions)
+            else: 
+                self._compute_quality(physical_op_cls, record_set, target_record_set)
+        else:
+            # compute quality of each output computed by this operator
+            for source_idx, record_sets in source_idx_to_record_sets.items():
+                # if this operation does not involve an LLM, every record_op_stats object gets perfect quality
+                if is_perfect_quality_op:
+                    for record_set in record_sets:
+                        for record_op_stats in record_set.record_op_stats:
+                            record_op_stats.quality = 1.0
+                    continue
+
+                # extract target output for this record set
+                target_record_set = source_idx_to_target_record_set[source_idx]
+
+                # for each record_set produced by an operation, compute its quality
                 for record_set in record_sets:
-                    for record_op_stats in record_set.record_op_stats:
-                        record_op_stats.quality = 1.0
-                continue
-
-            # extract target output for this record set
-            target_record_set = source_idx_to_target_record_set[source_idx]
-
-            # for each record_set produced by an operation, compute its quality
-            for record_set in record_sets:
-                record_set = self._compute_quality(physical_op_cls, record_set, target_record_set)
+                    record_set = self._compute_quality(physical_op_cls, record_set, target_record_set)
 
         # return the quality annotated record sets
         return source_idx_to_record_sets
+    
+    def _compute_batch_quality(
+        self, 
+        predictions: list[tuple[DataRecordSet, DataRecordSet]],
+    ):
+        """
+        predictions is a list of tuples of (record_set, target_record_set)
+        """
+
+        print(f"---- Computing quality for {len(predictions)} records ----")
+        field_to_score_fn = predictions[0][1].get_field_to_score_fn()
+        start_time = time.time()
+
+        # Collect the patches and compute their quality 
+        patches = []
+        for record_set, _ in predictions:
+            # TODO: verify there's only one record_op_stats in record_set
+            for record in record_set:
+                patches.append({
+                    'instance_id': record.instance_id,
+                    'model_patch': record.model_patch,
+                    'model_name_or_path': "palimpzest",
+                })
+
+        score_fn = field_to_score_fn['model_patch']
+        quality_scores = score_fn(patches)
+
+        # Assign quality scores to each record set 
+        for i, (record_set, _) in enumerate(predictions):
+            record_set.record_op_stats[0].quality = quality_scores[i]
+
+        print(f" Quality computation took {time.time() - start_time} seconds")
 
     def _get_target_record_sets(
         self,

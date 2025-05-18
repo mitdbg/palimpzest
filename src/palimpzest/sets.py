@@ -148,6 +148,7 @@ class Dataset(Set):
             agg_func=self._agg_func,
             group_by=self._group_by,
             project_cols=self._project_cols,
+            agent_name=self._agent_name,
             index=self._index,
             search_func=self._search_func,
             search_attr=self._search_attr,

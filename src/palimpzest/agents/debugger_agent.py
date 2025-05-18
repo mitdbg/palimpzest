@@ -1,5 +1,5 @@
 
-from palimpzest.agents.base_agent import BaseAgentOp, GLOBAL_CONTEXT
+from palimpzest.agents.base_agent import BaseAgentOp
 from palimpzest.agents.react import ReAct 
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.data.dataclasses import GenerationStats  
@@ -15,22 +15,35 @@ LOGGER = utils.setup_logger()
 
 class DebugGeneration(dspy.Signature): 
     """ 
-    Generates a detailed report of the root cause of the code issue and how it can be fixed, refering to function, class, and file names. 
+    Generates a detailed json formatted report of the root cause of the code issue and how it can be fixed, refering to function, class, and file names. 
     Include how the bug was discovered, detailing the files, functions, and classes that were examined in its discovery. 
+
+    Structure:  
+        - The report should be formatted as a json object with two fields: "report" and "files". 
+        - The "report" field should contain the report and the "files" field should contain a list of the files that should be modified or examined to make a fix. 
+        - Only a json object should be returned
+
+    An Example Output: 
+
+    {
+        "report": "The root cause of the bug is the `_return_list_of_arrays` function in the `astropy/wcs/wcs.py` file, which does not handle empty input arrays properly...",
+        "files": ["file1.py", "file2.py", ...]
+    }
+
     """
 
     problem_statement: str = dspy.InputField(desc="A description of the problem causing the bug")
     instance_id: str = dspy.InputField(desc="An execution identifier used as an argument for tools")
-    fix_report: str = dspy.OutputField(desc="A report detailing the cause of the bug and how it can be fixed, referencing to exact line numbers and files.")
+    bug_report: str = dspy.OutputField(desc="A report detailing the cause of the bug and how it can be fixed, referencing to exact line numbers and files.")
 
 class DebuggerAgentOp(BaseAgentOp): 
 
-    def __init__(self, max_iters: int , *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.max_iters = max_iters
   
     def run_agent(self, candidate: DataRecord) -> dict:
         print(f'=============== DEBUGGER AGENT START for {candidate["instance_id"]} ===============')
+        print(f'Max Iterations: {self.max_iters}, Model: {self.model}')
 
         self.set_model()
         print(f'Model: {dspy.settings.lm.model}')
@@ -67,13 +80,16 @@ class DebuggerAgentOp(BaseAgentOp):
                 Tool(BaseAgentOp.get_file_content),
                 Tool(BaseAgentOp.extract_method), 
                 Tool(BaseAgentOp.search_keyword),
+                Tool(BaseAgentOp.extract_class)
             ],
             max_iters=self.max_iters,
+            context_size = self.context_size
         )
 
         start_time = time.time()
         result = react(instance_id=candidate['instance_id'], problem_statement=problem_statement) 
-        plan['bug_report'] = result.fix_report
+
+        plan['bug_report'] = result.bug_report
 
         # Construct generation stats
         input_tokens = react.get_total_input_tokens()
@@ -93,11 +109,11 @@ class DebuggerAgentOp(BaseAgentOp):
         # Logging and printing 
         if BaseAgentOp.LOGGING_ENABLED:
             pretty_trajectory = json.dumps(result.toDict(), indent=4)
-            LOGGER.info(f'Debugger Trajectory {plan["instance_id"]}: {pretty_trajectory}')
+            LOGGER.info(f'Debugger Trajectory {plan["instance_id"]} (Max Iters: {self.max_iters}, Model: {self.model}): {pretty_trajectory}')
             
-        if BaseAgentOp.PRINTING_ENABLED:
-            cumulative_cost = utils.compute_cost_from_history(dspy.settings.lm.history)
-            print(f'Debugger Agent Cumulative Cost: {cumulative_cost}')
+        # if BaseAgentOp.PRINTING_ENABLED:
+            # cumulative_cost = utils.compute_cost_from_history(dspy.settings.lm.history)
+            # print(f'Debugger Agent Cumulative Cost: {cumulative_cost}')
 
         return plan, generation_stats
 

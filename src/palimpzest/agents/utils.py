@@ -39,23 +39,25 @@ def add_line_numbers(code_str, start_line_no=1):
     """
     lines = code_str.splitlines()
     result = {str(i + 1 + (start_line_no - 1)): line for i, line in enumerate(lines)}
-    return json.dumps(result, indent=2)
+    return result
 
-def fetch_github_code(file_name: str, owner: str, repo: str, base_commit: str = None, branch: str = "main") -> str:
-    """ Fetches the code of a file from the relevant issue code """
+def fetch_github_code(file_name: str, owner: str, repo: str, base_commit: str = None, branch: str = "main") -> tuple[str, str]:
+    """ 
+    Fetches the code of a file returning the best match file path and its content. 
+    """
     # Customize these variables for your repository.
     token = os.getenv("GITHUB_TOKEN")
 
     ref = base_commit if base_commit else branch
     file_paths = get_repo_files(owner, repo, ref, token)
     if file_paths is None:
-        return
+        return None, None
 
     best_match = find_best_match(file_name, file_paths)
     if best_match:
         content = get_file_content(owner=owner, repo=repo, path=best_match, token=token, ref=ref)
         if content:
-            return content
+            return best_match, content
 
 def get_repo_files(owner, repo, ref="main", token=None):
     """
@@ -174,8 +176,6 @@ def search_keyword(repo_path, commit_hash, keyword):
     
     search_tree(commit.tree)
 
-    # import pdb; pdb.set_trace()
-
     return results
 
 def download_repo(repo_name, dest_dir='repos'):
@@ -194,9 +194,7 @@ def download_repo(repo_name, dest_dir='repos'):
     repo_url = f"https://github.com/{owner}/{repo}.git"
     local_path = os.path.join(dest_dir, repo)
 
-    if os.path.isdir(local_path):
-        print(f"Repository '{repo}' is already downloaded at: {local_path}")
-    else:
+    if not os.path.isdir(local_path):
         os.makedirs(dest_dir, exist_ok=True)
         print(f"Cloning '{repo_url}' into '{local_path}'...")
         pygit2.clone_repository(repo_url, local_path)
@@ -255,7 +253,7 @@ def compute_cost_from_history(history, model='gpt-4o'):
     return total_cost 
 
 # Configure logging
-def setup_logger(log_dir="logs", max_bytes=1_000_000, backup_count=5):
+def setup_logger(log_dir="logs", max_bytes=5_000_000, backup_count=10):
     """
     Sets up a rotating file logger.
 
@@ -279,10 +277,12 @@ def setup_logger(log_dir="logs", max_bytes=1_000_000, backup_count=5):
     # Create rotating file handler
     handler = RotatingFileHandler(log_path, maxBytes=max_bytes, backupCount=backup_count)
     handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
-    
-    # Avoid adding multiple handlers
-    if not logger.hasHandlers():
-        logger.addHandler(handler)
+
+    # Add the handler to the logger
+    logger.addHandler(handler)
+
+    # Prevent logs from propagating up to the root logger
+    logger.propagate = False
     
     return logger
 
@@ -319,80 +319,112 @@ def add_patch_to_output_dir(file_path, new_data, indent=4):
 
 # ------- Patch Data Utilities -------
 
-def verify_and_fix_patch_data(patch_data: dict):
+def verify_and_fix_patch_data(patch_data: dict, instance_params: dict, instance_id: str):
     """
+    Expects patch data in the following format:
+
+    {
+        "old_path": "old/file.txt",
+        "new_path": "new/file.txt",
+        "hunks": [
+        {
+            "old_start": 1,
+            "old_length": 3,
+            "new_start": 1,
+            "new_length": 3,
+            "hunk_header_context": "def my_function():",
+            "lines": [
+                {"type": "context", "content": "unchanged line"},
+                {"type": "addition", "content": "added line"},
+                {"type": "deletion", "content": "removed line"}
+            ]
+        }
+    }
+
     - Verifies the structure of the patch data
     - Corrects any incorrect old and new line counts for each hunk
     """
 
-    if "files" not in patch_data:
-        raise KeyError("Missing 'files' key in patch data")
+    if "hunks" not in patch_data:
+        raise KeyError("Missing 'hunks' key in file data")
+    
+    # Test that the file exists
+    try: 
+        file_path = patch_data["old_path"]
+        base_commit = instance_params[instance_id]["base_commit"]
+        owner = instance_params[instance_id]["owner"]
+        repo = instance_params[instance_id]["repo"]
+        best_match, _ = fetch_github_code(file_path, owner, repo, base_commit)
+        if best_match != file_path:
+            return f"File {file_path} not found in the repo. Did you mean {best_match}?"
+    except KeyError as e:
+        raise KeyError(f"Invalid instance_id")
 
-    for file in patch_data.get("files"):
-        if "hunks" not in file:
-            raise KeyError("Missing 'hunks' key in file data")
+    for hunk in patch_data["hunks"]: 
         
-        for hunk in file.get("hunks"):
-            if "old_length" not in hunk or "new_length" not in hunk:
-                raise KeyError("Missing 'old_length' or 'new_length' key in hunk data")
-            if hunk["old_start"] == "XXX":
-                raise ValueError(f"Missing line numbers in patch data for {file['old_path']}")
+        # Check hunk keys
+        if "old_length" not in hunk or "new_length" not in hunk:
+            raise KeyError("Missing 'old_length' or 'new_length' key in hunk data")
+        if hunk["old_start"] == "XXX":
+            raise ValueError(f"Missing line numbers in patch data for {patch_data['old_path']}")
 
-            num_old_lines, num_new_lines = 0, 0
+        num_old_lines, num_new_lines = 0, 0
 
-            for line in hunk.get("lines"):
-                if "type" not in line:
-                    raise KeyError(f"Missing 'type' key in line data for {file['old_path']}")
-                if "content" not in line:
-                    raise KeyError(f"Missing 'content' key in line data for {file['old_path']}")
+        for line in hunk.get("lines"):
+            # Check line keys
+            if "type" not in line:
+                raise KeyError(f"Missing 'type' key in line data for {patch_data['old_path']}")
+            if "content" not in line:
+                raise KeyError(f"Missing 'content' key in line data for {patch_data['old_path']}")
 
-                elif line["type"] == "context":
-                    num_old_lines += 1
-                    num_new_lines += 1
-                elif line["type"] == "addition":
-                    num_new_lines += 1
-                elif line["type"] == "deletion":
-                    num_old_lines += 1
-            
-            # Fix any incorrect counts
-            if num_old_lines != hunk["old_length"]:
-                hunk["old_length"] = num_old_lines
-            if num_new_lines != hunk["new_length"]:
-                hunk["new_length"] = num_new_lines
+            if line["type"] == "context":
+                num_old_lines += 1
+                num_new_lines += 1
+            elif line["type"] == "addition":
+                num_new_lines += 1
+            elif line["type"] == "deletion":
+                num_old_lines += 1
+        
+        # Fix any incorrect counts
+        if num_old_lines != hunk["old_length"]:
+            hunk["old_length"] = num_old_lines
+        if num_new_lines != hunk["new_length"]:
+            hunk["new_length"] = num_new_lines
 
 def minimize_patch_data(patch_data):
     """
     Given a patch_data dictionary, mutates it in-place to contain only minimal hunks.
     Keeps one context line before and/or after changes if available.
     """
-    for file_patch in patch_data["files"]:
-        for hunk in file_patch["hunks"]:
-            lines = hunk["lines"]
+    for hunk in patch_data["hunks"]:
+        lines = hunk["lines"]
 
-            # Find indices of the first and last changed lines
-            change_indices = [i for i, line in enumerate(lines) if line["type"] in ("addition", "deletion")]
-            if not change_indices:
-                continue  # Nothing to minimize if no changes
+        # Find indices of the first and last changed lines
+        change_indices = [i for i, line in enumerate(lines) if line["type"] in ("addition", "deletion")]
+        if not change_indices:
+            continue  # Nothing to minimize if no changes
 
-            start = max(0, change_indices[0] - 1)  # one line before
-            end = min(len(lines), change_indices[-1] + 2)  # one line after
+        start = max(0, change_indices[0] - 1)  # one line before
+        end = min(len(lines), change_indices[-1] + 2)  # one line after
 
-            # Slice to minimal lines
-            minimal_lines = lines[start:end]
-            hunk["lines"] = minimal_lines
+        # Slice to minimal lines
+        minimal_lines = lines[start:end]
+        hunk["lines"] = minimal_lines
 
-            # Recalculate hunk lengths
-            old_count = sum(1 for line in minimal_lines if line["type"] != "addition")
-            new_count = sum(1 for line in minimal_lines if line["type"] != "deletion")
-            hunk["old_length"] = old_count
-            hunk["new_length"] = new_count
+        # Recalculate hunk lengths
+        old_count = sum(1 for line in minimal_lines if line["type"] != "addition")
+        new_count = sum(1 for line in minimal_lines if line["type"] != "deletion")
+        hunk["old_length"] = old_count
+        hunk["new_length"] = new_count
 
-            # Adjust start lines
-            context_before = sum(1 for i in range(start) if lines[i]["type"] != "addition")
-            hunk["old_start"] += context_before
-            hunk["new_start"] += context_before
+        # Adjust start lines
+        context_before = sum(1 for i in range(start) if lines[i]["type"] != "addition")
+        hunk["old_start"] += context_before
+        hunk["new_start"] += context_before
 
     return patch_data
 
-            
-
+def write_target_file(path: str, content: str):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as f:
+        f.write(content)

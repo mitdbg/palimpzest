@@ -222,9 +222,11 @@ class AgentRule(ImplementationRule):
     Base class for agent rules which convert a logical expression to an agent expression.
     """
 
-    max_iters_debugger = [5, 10, 15]
-    max_iters_code_editor = [2, 4, 6]
+    max_iters_debugger = [8, 10, 12]
+    max_iters_code_editor = [4, 6, 8]
     model = ["gpt-4o", "gpt-4o-mini"]
+    debugger_context_size = [None, 5]
+    code_editor_context_size = [None, 3]
 
     @classmethod
     def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
@@ -255,8 +257,10 @@ class AgentRule(ImplementationRule):
         op_kwargs_list = [init_kwargs]
         if logical_op.agent_name == "debugger":
             op_kwargs_list = apply_hyperparams(op_kwargs_list, "max_iters", cls.max_iters_debugger)
+            op_kwargs_list = apply_hyperparams(op_kwargs_list, "context_size", cls.code_editor_context_size)
         elif logical_op.agent_name == "code_editor":
             op_kwargs_list = apply_hyperparams(op_kwargs_list, "max_iters", cls.max_iters_code_editor)
+            op_kwargs_list = apply_hyperparams(op_kwargs_list, "context_size", cls.code_editor_context_size)
         else:
             raise ValueError(f"Unknown agent name: {logical_op.agent_name}") 
 
@@ -283,7 +287,7 @@ class AgentRule(ImplementationRule):
             )
 
             physical_expressions.append(expression)
-        
+
         return set(physical_expressions)
     
 class NonLLMConvertRule(ImplementationRule):

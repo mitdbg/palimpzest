@@ -10,7 +10,7 @@ NUM_INSTANCES = args.num_instances
 
 # Load the SWE-bench_oracle dataset
 # dataset = load_dataset("princeton-nlp/SWE-bench_oracle")
-dataset = load_dataset("princeton-nlp/SWE-bench_Lite")
+dataset = load_dataset("princeton-nlp/SWE-bench_Lite_oracle")
 
 # Access the training set
 test_data = dataset['test']

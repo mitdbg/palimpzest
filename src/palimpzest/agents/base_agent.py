@@ -11,6 +11,7 @@ from palimpzest.agents.constants import DEBUGGER_NAIVE_EST_NUM_INPUT_TOKENS_PER_
 from palimpzest.constants import MODEL_CARDS
 import palimpzest.constants as constants
 from abc import ABC, abstractmethod
+import json
 import time
 import dspy
 import ast
@@ -25,14 +26,10 @@ openai_key = get_api_key("OPENAI_API_KEY")
 # GLOBAL VARIABLES
 # TO DO: Find a better way to create state accessible  
 
-GLOBAL_CONTEXT = {
-    "model": dspy.LM('openai/gpt-4o', api_key=openai_key),
-}
-
 class BaseAgentOp(PhysicalOperator):
     # instance_id -> {"base_commit": <str>, "owner": <str>, "repo": <str>}
     instance_params = {}
-    PRINTING_ENABLED = True 
+    PRINTING_ENABLED = False 
     LOGGING_ENABLED = True 
 
     def __init__(
@@ -40,17 +37,29 @@ class BaseAgentOp(PhysicalOperator):
         max_iters: int,
         agent_name: str = None, 
         model: str = 'gpt-4o',
+        context_size: int = None,
         *args, **kwargs
     ):
         super().__init__(*args, **kwargs)
         self.agent_name = agent_name
         self.max_iters = max_iters
         self.model = model
+        self.context_size = context_size
+    
+    def __str__(self):
+        op = super().__str__()
+        op += f"    Agent Name: {self.agent_name}\n"
+        op += f"    Max Iterations: {self.max_iters}\n"
+        op += f"    Model: {self.model}\n"
+        op += f"    Context Size: {self.context_size}\n"
+        return op
 
+    def get_id_params(self):
         id_params = super().get_id_params()
         id_params = {"agent_name": self.agent_name, 
                      "max_iters": self.max_iters, 
                      "model": self.model,
+                     "context_size": self.context_size,
                      **id_params
                     }
 
@@ -61,6 +70,7 @@ class BaseAgentOp(PhysicalOperator):
         op_params = {"agent_name": self.agent_name, 
                      "max_iters": self.max_iters, 
                      "model": self.model,
+                     "context_size": self.context_size,
                      **op_params
                     }
 
@@ -189,10 +199,11 @@ class BaseAgentOp(PhysicalOperator):
     @staticmethod
     def get_file_content(file_name: str, starting_line_number: int, instance_id: str) -> str:
         """
-        Returns the content of an entire file including line numbers, up to a set max of 750 lines.
+        Returns the content of an entire file including line numbers, up to a set max of 200 lines.
+        The starting line number is one indexed so first line in the file is 1, do not use 0. 
         """
 
-        MAX_NUM_LINES = 750
+        MAX_NUM_LINES = 200
 
         if BaseAgentOp.PRINTING_ENABLED:
             print(f'get_file_content {file_name}')
@@ -200,24 +211,38 @@ class BaseAgentOp(PhysicalOperator):
         base_commit = BaseAgentOp.instance_params[instance_id]["base_commit"]
         owner = BaseAgentOp.instance_params[instance_id]["owner"]
         repo = BaseAgentOp.instance_params[instance_id]["repo"]
-        content = utils.fetch_github_code(file_name, owner, repo, base_commit)
+
+        # Fetch the file content from GitHub
+        best_match, content = utils.fetch_github_code(file_name, owner, repo, base_commit)
+        if best_match != file_name:
+            return f"File {file_name} not found in the repo. Did you mean {best_match}?"
         content = utils.add_line_numbers(content)
+        total_lines = len(content)
 
         # Limit number of lines returned
         end_line = min(len(content) + 1, starting_line_number + MAX_NUM_LINES)
-        content = {i: content[i] for i in range(starting_line_number, end_line)}
+        content = {i: content[str(i)] for i in range(starting_line_number, end_line)}
 
-        return content
+        # Format the content string 
+        content = json.dumps(content, indent=4)
+        content_string = f"There are {total_lines} lines in the file. The requested lines are as follows:\n {content}"
+        return content_string
 
     @staticmethod
     def search_keyword(repo_name : str, keyword: str, instance_id: str) -> str:
         """
-        Searches the codebase for the provided keyword and returns the files the keyword. 
+        Searches the entire codebase for the provided keyword and returns the files the keyword appears in. 
         Provide repo_name in "owner/repo" format. 
-        If searching for a function or class definition, it may be useful to prefix the keyword with "def " or "class ".
-        Do not search for vague keywords that may return too many results, such as "test" or "function". 
-        Search for more specific words instead. 
+
+        Guidelines: 
+        - If searching for a function or class definition, it may be useful to prefix the keyword with "def " or "class ".
+        - Do not search for vague keywords that may return too many results, such as "test", "function", or "def".  Search for more specific words instead. 
+        - Only the first 15 results will be returned so be specific.
+
+        Usage Tips:
+        - Use this to find the location of a function, class definition, or member variable.
         """
+        FILE_LIMIT = 15
 
         if BaseAgentOp.PRINTING_ENABLED:
             print(f'search_keyword {keyword}')
@@ -227,52 +252,126 @@ class BaseAgentOp(PhysicalOperator):
         base_commit = BaseAgentOp.instance_params[instance_id]["base_commit"]
         matching_files = utils.search_keyword(local_repo_path, base_commit, keyword)
 
+        if len(matching_files) > FILE_LIMIT: 
+            matching_files = matching_files[:FILE_LIMIT]
+
         return matching_files
 
     @staticmethod
-    def extract_method(file_name: str, function_name: str, instance_id: str, include_line_numbers: bool = False) -> str: 
+    def extract_method(file_name: str, function_name: str, instance_id: str, include_line_numbers: bool = False, class_name: str = None) -> str:
         """
         Extracts the implementation of a function from a file. 
-        Use this when you only need a single function in the file.
-        Only set include_line_numbers to True if being used to generate a patch.
+        Provide class_name if the function is inside a class. 
+
+        Guidelines: 
+        - Only set include_line_numbers to True if being used to generate a patch.
         """
 
         if BaseAgentOp.PRINTING_ENABLED:
-            print(f'extract_method {function_name} from {file_name}')
+            print(f'extract_method {function_name} from {file_name}, class={class_name}')
 
         try:
             # Parse the source code into an AST
             base_commit = BaseAgentOp.instance_params[instance_id]["base_commit"]
             owner = BaseAgentOp.instance_params[instance_id]["owner"]
             repo = BaseAgentOp.instance_params[instance_id]["repo"]
-            content = utils.fetch_github_code(file_name, owner, repo, base_commit)
+            best_match, content = utils.fetch_github_code(file_name, owner, repo, base_commit)
+            if best_match != file_name: 
+                return f"File {file_name} not found in the repo. Did you mean {best_match}?"
             tree = ast.parse(content)
         except SyntaxError as e:
             return "extract_method(): Error parsing the code"
+        
+        # Walk through nodes in the AST
+        target_function_node = None
 
-        # Walk through all nodes in the AST.
+        if class_name:
+            # Search inside classes
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ClassDef) and node.name == class_name:
+                    for class_node in node.body:
+                        if isinstance(class_node, ast.FunctionDef) and class_node.name == function_name:
+                            target_function_node = class_node
+                            break
+                    if target_function_node:
+                        break
+        else:
+            # Search top-level functions
+            for node in ast.walk(tree):
+                if isinstance(node, ast.FunctionDef) and node.name == function_name:
+                    target_function_node = node
+                    break
+
+        if not target_function_node:
+            if class_name:
+                return f"Function '{function_name}' not found inside class '{class_name}'."
+            else:
+                return f"Function '{function_name}' not found at top level in file."
+            
+        # Extract the function's source code
+        start_line = target_function_node.lineno
+        end_line = target_function_node.end_lineno
+
+        lines = content.splitlines()
+        function_lines = lines[start_line - 1:end_line]
+        method_str = "\n".join(function_lines)
+
+        if include_line_numbers:
+            return utils.add_line_numbers(method_str, start_line_no=start_line)
+        else:
+            return method_str
+    
+    @staticmethod
+    def extract_class(file_name: str, class_name: str, instance_id: str, include_line_numbers: bool = False) -> str:
+        """
+        Extracts the implementation of a class from a file.
+
+        Guildelines: 
+        - Only set include_line_numbers to True if being used to generate a patch.
+        """
+
+        if BaseAgentOp.PRINTING_ENABLED:
+            print(f'extract_class {class_name} from {file_name}')
+
+        try:
+            # Parse the source code into an AST
+            base_commit = BaseAgentOp.instance_params[instance_id]["base_commit"]
+            owner = BaseAgentOp.instance_params[instance_id]["owner"]
+            repo = BaseAgentOp.instance_params[instance_id]["repo"]
+            best_match, content = utils.fetch_github_code(file_name, owner, repo, base_commit)
+            if best_match != file_name: 
+                return f"File {file_name} not found in the repo. Did you mean {best_match}?"
+            tree = ast.parse(content)
+        except SyntaxError as e:
+            return "extract_class(): Error parsing the code"
+
+        target_class_node = None
+
+        # Walk through all nodes in the AST to find the class
         for node in ast.walk(tree):
-            if isinstance(node, ast.FunctionDef) and node.name == function_name:
-                start_line = node.lineno
-                end_line = node.end_lineno
+            if isinstance(node, ast.ClassDef) and node.name == class_name:
+                target_class_node = node
+                break
 
-                # Split the content into lines and extract the block.
-                lines = content.splitlines()
-                function_lines = lines[start_line - 1:end_line]
-                method_str = "\n".join(function_lines)
+        if not target_class_node:
+            return f"Class '{class_name}' not found in file."
 
-                if include_line_numbers: 
-                    return utils.add_line_numbers(method_str, start_line_no=start_line)
-                else:
-                    return method_str
+        start_line = target_class_node.lineno
+        end_line = target_class_node.end_lineno
 
-        return "Function not found in file. Note: Make sure it is a function, not a class"
+        lines = content.splitlines()
+        class_lines = lines[start_line - 1:end_line]
+        class_str = "\n".join(class_lines)
+
+        if include_line_numbers:
+            return utils.add_line_numbers(class_str, start_line_no=start_line)
+        else:
+            return class_str
 
     @staticmethod
     def get_classes_and_methods(file_name: str, instance_id: str) -> str:
         """ 
         Summarizes all the classes and standalone functions in a file.
-        This is use for understanding the structure of a file for subsequent method extraction. 
 
         The expected output format is: 
         {
@@ -288,6 +387,10 @@ class BaseAgentOp(PhysicalOperator):
                 "... more functions ..."
             ]
         }
+
+        Usage Tips:
+        - Use to verify the existence of a function or class in the file.
+        - Use to understand the structure and contents of the file.
         """
 
         if BaseAgentOp.PRINTING_ENABLED:
@@ -305,7 +408,9 @@ class BaseAgentOp(PhysicalOperator):
         base_commit = BaseAgentOp.instance_params[instance_id]["base_commit"]
         owner = BaseAgentOp.instance_params[instance_id]["owner"]
         repo = BaseAgentOp.instance_params[instance_id]["repo"]
-        code = utils.fetch_github_code(file_name, owner, repo, base_commit)
+        best_match, code = utils.fetch_github_code(file_name, owner, repo, base_commit)
+        if best_match != file_name:
+            return f"File {file_name} not found in the repo. Did you mean {best_match}?"
         if not code: 
             return "That file is not found in the relevant issue code, please try another file"
 
@@ -349,10 +454,10 @@ class BaseAgentOp(PhysicalOperator):
 
     def get_token_costs(self) -> tuple[float, float]: 
         if self.model == 'gpt-4o':
-            usd_per_input_token = MODEL_CARDS['gpt-4o']['usd_per_input_token']
-            usd_per_output_token = MODEL_CARDS['gpt-4o']['usd_per_output_token']
+            usd_per_input_token = constants.GPT_4o_MODEL_CARD['usd_per_input_token']
+            usd_per_output_token = constants.GPT_4o_MODEL_CARD['usd_per_output_token']
         elif self.model == 'gpt-4o-mini':
-            usd_per_input_token = MODEL_CARDS['gpt-4o-mini']['usd_per_input_token']
-            usd_per_output_token = MODEL_CARDS['gpt-4o-mini']['usd_per_output_token']
+            usd_per_input_token = constants.GPT_4o_MINI_MODEL_CARD['usd_per_input_token']
+            usd_per_output_token = constants.GPT_4o_MINI_MODEL_CARD['usd_per_output_token']
         
         return usd_per_input_token, usd_per_output_token

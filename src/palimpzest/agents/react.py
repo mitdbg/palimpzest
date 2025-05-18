@@ -8,13 +8,14 @@ class ReAct(dspy.ReAct):
 	A wrapper around dspy's ReAct module for custom functionality (e.g. context management) 
 	"""
 
-	def __init__(self, signature, tools: list[dspy.Tool], max_iters=5):
+	def __init__(self, signature, tools: list[dspy.Tool], max_iters=5, context_size: int = None):
 		"""
 		Initialize the ReAct module with a signature and a list of tools.
 		"""
 		super().__init__(signature=signature, tools=tools, max_iters=max_iters)
 		self._total_input_tokens = 0
 		self._total_output_tokens = 0
+		self._context_size = context_size
 	
 	def get_total_input_tokens(self):
 		"""
@@ -38,10 +39,13 @@ class ReAct(dspy.ReAct):
 		for idx in range(self.max_iters):
 
 			try: 
+				self.compress_trajectory(trajectory, context_window_size=self._context_size)
 				pred = self.react(**input_args, trajectory=format(trajectory, last_iteration=(idx == self.max_iters - 1)))
-			except:
+			except Exception as e:
 				# If ContextWindowErrorExceeded occurs, truncate the trajectory
-				trajectory = self.truncate_trajectory(trajectory)
+				print(f'Error caught: {e}')
+				model = dspy.settings.lm.model.split("/")[-1]
+				self.truncate_trajectory(trajectory, model=model)
 				pred = self.react(**input_args, trajectory=format(trajectory, last_iteration=(idx == self.max_iters - 1)))
 
 			trajectory[f"thought_{idx}"] = pred.next_thought
@@ -65,39 +69,49 @@ class ReAct(dspy.ReAct):
 		extract = self.extract(**input_args, trajectory=format(trajectory, last_iteration=False))
 		return dspy.Prediction(trajectory=trajectory, **extract)
 
-	def truncate_trajectory(self, trajectory: dict, width: int = 20000, token_limit: int = 120000):
+	def compress_trajectory(self, trajectory: dict, model: str = 'gpt-4o', context_window_size=5):
+		""" 
+		Truncates the trajectory to only maintain the last context_window_size observations
+		"""
+		num_iterations = len(trajectory) // 4
+		if num_iterations > context_window_size:
+			for i in range(num_iterations - context_window_size):
+				trajectory[f"observation_{i}"] = "content archived..."
+
+
+	def truncate_trajectory(self, trajectory: dict, model: str = 'gpt-4o', width: int = 20000, token_limit: int = 120000):
 		""" 
 		Truncates the trajectory to contain at most (token_limit - width) number of tokens
 		"""
-
 		# Count tokens 
-		total_tokens = self.count_trajectory_tokens(trajectory)
+		total_tokens = self.count_trajectory_tokens(trajectory, model=model)
 		encoding = tiktoken.encoding_for_model("gpt-4")  
+
+		# Printing
+		print(f'Truncating trajectory: {total_tokens} -> {token_limit - width} tokens')
 
 		# Truncate tokens
 		if token_limit - width >= 0:
-			for step, content in trajectory.items():
+			for step_name, content in trajectory.items():
 				if total_tokens <= token_limit - width:
 					break
 
 				# Archive the step 
-				trajectory[step] = "content archived..."
-
-				# Recalculate total tokens
-				total_tokens -= len(encoding.encode(content)) 
-
+				if "observation" in step_name: 
+					trajectory[step_name] = "content archived..."
+					total_tokens -= len(encoding.encode(str(content))) 
 	
-	def count_trajectory_tokens(trajectory: dict[str, str], model: str = "gpt-4") -> int:
+	def count_trajectory_tokens(self, trajectory: dict[str, str], model: str = "gpt-4") -> int:
 		"""
 		Counts the number of tokens in trajectory 
 		"""
 		encoding = tiktoken.encoding_for_model(model)
-		total_tokens = sum(len(encoding.encode(key)) for key in trajectory.keys())
+		total_tokens = sum(len(encoding.encode(str(value))) for value in trajectory.values())
 		return total_tokens
 
 	def compute_past_n_total_tokens(self, n: int):
 		"""
-		Given a list of data items, returns the total input (prompt) and output (completion) tokens
+		Computes the total input (prompt) and output (completion) tokens
 		across the last n items.
 
 		Args:
