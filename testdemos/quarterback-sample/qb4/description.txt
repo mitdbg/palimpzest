@@ -1,0 +1,39 @@
+#
+Name
+GP
+C
+Att
+Yds
+C%
+Avg
+Y/G
+C/G
+TD
+TD/G
+Int
+Lng
+QB Rate
+\18	J. Daniels(Jr)	15	262	365	4123	0.718	15.7	274.9	17.5	52	3.5	4	77	144.0
+
+
+
+
+
+
+
+#
+Name
+GP
+Car
+Yds
+Avg
+Y/G
+Lng
+100+
+TD
+18	J. Daniels(Jr)	15	63	561	8.9	37.4	60	0	9
+
+
+
+height = 5'11
+weight = 160

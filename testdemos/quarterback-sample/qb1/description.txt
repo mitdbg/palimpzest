@@ -1,0 +1,18 @@
+{
+    'name': 'Patrick Blaze',
+    'games_played': 10,
+    'passing_yards': 3000.0,
+    'passing_touchdowns': 26.5,
+    'passing_completions': 252.9,
+    'passing_attempts': 364.7,
+    'passing_long': 80,
+    'passing_interceptions': 4.1,
+    'rushing_attempts': 35.3,
+    'rushing_yards': 235.3,
+    'rushing_touchdowns': 2.4,
+    'rushing_long': 30,
+    'fumbles': 2.4,
+    'fumbles_lost': 0.6,
+    'height': 76,
+    'weight': 225
+}

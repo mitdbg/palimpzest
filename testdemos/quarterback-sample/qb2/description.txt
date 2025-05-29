@@ -1,0 +1,18 @@
+{
+    'name': 'Kyle Darnell',
+    'games_played': 10,
+    'passing_yards': 1583.3,
+    'passing_touchdowns': 6.7,
+    'passing_completions': 150.0,
+    'passing_attempts': 300.0,
+    'passing_long': 40,
+    'passing_interceptions': 14.2,
+    'rushing_attempts': 15.0,
+    'rushing_yards': 50.0,
+    'rushing_touchdowns': 0.0,
+    'rushing_long': 6,
+    'fumbles': 9.2,
+    'fumbles_lost': 5.0,
+    'height': 72,
+    'weight': 215
+}

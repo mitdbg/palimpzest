@@ -1,0 +1,18 @@
+{
+    'name': 'Jake Turner',
+    'games_played': 10,
+    'passing_yards': 2250.0,
+    'passing_touchdowns': 14.4,
+    'passing_completions': 200.0,
+    'passing_attempts': 318.8,
+    'passing_long': 65,
+    'passing_interceptions': 6.9,
+    'rushing_attempts': 21.9,
+    'rushing_yards': 125.0,
+    'rushing_touchdowns': 1.2,
+    'rushing_long': 18,
+    'fumbles': 3.8,
+    'fumbles_lost': 1.9,
+    'height': 74,
+    'weight': 218
+}
