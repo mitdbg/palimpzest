@@ -5,8 +5,8 @@ from typing import Callable
 
 import pandas as pd
 from chromadb.api.models.Collection import Collection
-from ragatouille.RAGPretrainedModel import RAGPretrainedModel
 
+# from ragatouille.RAGPretrainedModel import RAGPretrainedModel
 from palimpzest.constants import AggFunc, Cardinality
 from palimpzest.core.data.datareaders import DataReader
 from palimpzest.core.elements.filters import Filter
@@ -35,7 +35,7 @@ class Set:
         agg_func: AggFunc | None = None,
         group_by: GroupBySig | None = None,
         project_cols: list[str] | None = None,
-        index: Collection | RAGPretrainedModel | None = None,
+        index: Collection | None = None, # | RAGPretrainedModel
         search_func: Callable | None = None,
         search_attr: str | None = None,
         output_attrs: list[dict] | None = None,
@@ -340,7 +340,7 @@ class Dataset(Set):
 
     def retrieve(
         self,
-        index: Collection | RAGPretrainedModel,
+        index: Collection, # | RAGPretrainedModel,
         search_attr: str,
         output_attrs: list[dict] | type[Schema],
         search_func: Callable | None = None,

@@ -319,17 +319,17 @@ class MockSampleBasedCostModel:
         # construct cost, time, quality, and selectivity matrices for each operator set;
         self.operator_to_stats = operator_to_stats
 
-        # compute set of costed physical op ids from operator_to_stats
-        self.costed_phys_op_ids = set(
+        # compute set of costed full op ids from operator_to_stats
+        self.costed_full_op_ids = set(
             [
-                phys_op_id
-                for _, phys_op_id_to_stats in self.operator_to_stats.items()
-                for phys_op_id, _ in phys_op_id_to_stats.items()
+                full_op_id
+                for _, full_op_id_to_stats in self.operator_to_stats.items()
+                for full_op_id, _ in full_op_id_to_stats.items()
             ]
         )
 
-    def get_costed_phys_op_ids(self):
-        return self.costed_phys_op_ids
+    def get_costed_full_op_ids(self):
+        return self.costed_full_op_ids
 
     def __call__(
         self, operator: PhysicalOperator, source_op_estimates: OperatorCostEstimates | None = None
@@ -339,17 +339,17 @@ class MockSampleBasedCostModel:
         #       we will have execution data for each operator passed into __call__; nevertheless, we
         #       still perform a sanity check
         # look up physical and logical op ids associated with this physical operator
-        phys_op_id = operator.get_op_id()
+        full_op_id = operator.get_full_op_id()
         logical_op_id = operator.logical_op_id
-        assert self.operator_to_stats.get(logical_op_id).get(phys_op_id) is not None, (
+        assert self.operator_to_stats.get(logical_op_id).get(full_op_id) is not None, (
             f"No execution data for {str(operator)}"
         )
 
         # look up stats for this operation
-        est_cost_per_record = self.operator_to_stats[logical_op_id][phys_op_id]["cost"]
-        est_time_per_record = self.operator_to_stats[logical_op_id][phys_op_id]["time"]
-        est_quality = self.operator_to_stats[logical_op_id][phys_op_id]["quality"]
-        est_selectivity = self.operator_to_stats[logical_op_id][phys_op_id]["selectivity"]
+        est_cost_per_record = self.operator_to_stats[logical_op_id][full_op_id]["cost"]
+        est_time_per_record = self.operator_to_stats[logical_op_id][full_op_id]["time"]
+        est_quality = self.operator_to_stats[logical_op_id][full_op_id]["quality"]
+        est_selectivity = self.operator_to_stats[logical_op_id][full_op_id]["selectivity"]
 
         # create source_op_estimates for scan operators if they are not provided
         if isinstance(operator, ScanPhysicalOp):

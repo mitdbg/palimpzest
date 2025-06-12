@@ -300,7 +300,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--policy",
-        default="mincost",
+        default="maxquality",
         type=str,
         help="One of 'mincost', 'mintime', 'maxquality'",
     )
@@ -340,11 +340,23 @@ if __name__ == "__main__":
         type=int,
         help="Total sample budget in Random Sampling or MAB sentinel execution",
     )
+    parser.add_argument(
+        "--quality",
+        default=None,
+        type=float,
+        help="Quality threshold",
+    )
+    parser.add_argument(
+        "--exp-name",
+        default=None,
+        type=str,
+        help="The experiment name.",
+    )
 
     args = parser.parse_args()
 
     # create directory for profiling data
-    os.makedirs("opt-profiling-data", exist_ok=True)
+    os.makedirs("extra-opt-profiling-data", exist_ok=True)
 
     verbose = args.verbose
     progress = args.progress
@@ -356,7 +368,11 @@ if __name__ == "__main__":
     processing_strategy = args.processing_strategy
     execution_strategy = args.execution_strategy
     sentinel_execution_strategy = args.sentinel_execution_strategy
-    exp_name = f"mmqa-final-{sentinel_execution_strategy}-k{k}-j{j}-budget{sample_budget}-seed{seed}"
+    exp_name = (
+        f"mmqa-final-{sentinel_execution_strategy}-k{k}-j{j}-budget{sample_budget}-seed{seed}"
+        if args.exp_name is None
+        else args.exp_name
+    )
 
     policy = pz.MaxQuality()
     if args.policy == "mincost":
@@ -365,9 +381,12 @@ if __name__ == "__main__":
         policy = pz.MinTime()
     elif args.policy == "maxquality":
         policy = pz.MaxQuality()
-    else:
-        print("Policy not supported for this demo")
-        exit(1)
+
+    if args.quality is not None and args.policy == "mincostatfixedquality":
+        policy = pz.MinCostAtFixedQuality(min_quality=args.quality)
+    elif args.quality is not None and args.policy == "minlatencyatfixedquality":
+        policy = pz.MinTimeAtFixedQuality(min_quality=args.quality)
+    print(f"USING POLICY: {policy}")
 
     if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None:
         print("WARNING: Both OPENAI_API_KEY and TOGETHER_API_KEY are unset")
@@ -528,11 +547,11 @@ if __name__ == "__main__":
     )
 
     print(data_record_collection.to_df())
-    data_record_collection.to_df().to_csv(f"opt-profiling-data/{exp_name}-output.csv", index=False)
+    data_record_collection.to_df().to_csv(f"extra-opt-profiling-data/{exp_name}-output.csv", index=False)
 
     # create filepaths for records and stats
-    records_path = f"opt-profiling-data/{exp_name}-records.json"
-    stats_path = f"opt-profiling-data/{exp_name}-profiling.json"
+    records_path = f"extra-opt-profiling-data/{exp_name}-records.json"
+    stats_path = f"extra-opt-profiling-data/{exp_name}-profiling.json"
 
     # save record outputs
     record_jsons = []
@@ -596,5 +615,5 @@ if __name__ == "__main__":
     }
     print(f"F1 IS: {stats_dict['f1']}")
 
-    with open(f"opt-profiling-data/{exp_name}-stats.json", "w") as f:
+    with open(f"extra-opt-profiling-data/{exp_name}-stats.json", "w") as f:
         json.dump(stats_dict, f)

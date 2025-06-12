@@ -44,6 +44,7 @@ class SentinelQueryProcessor(QueryProcessor):
         # get the sentinel plan for the given dataset
         sentinel_plans = optimizer.optimize(dataset)
         sentinel_plan = sentinel_plans[0]
+        print(f"TOTAL OPS: {len(sentinel_plan[1][1])}")
 
         return sentinel_plan
 

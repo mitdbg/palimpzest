@@ -49,7 +49,7 @@ dependencies = [
     "pytest-mock>=3.14.0",
     "python-Levenshtein>=0.25.1",
     "pyyaml>=6.0.1",
-    "ragatouille>=0.0.9",
+    # "ragatouille>=0.0.9",
     "requests>=2.25",
     "ruff>=0.9.0",
     "setuptools>=70.1.1",
@@ -58,7 +58,7 @@ dependencies = [
     "tqdm~=4.66.1",
     "transformers>=4.41.3,<4.50.0",
     "rich[jupyter]>=13.9.2",
-    "voyager>=2.0.9",
+    # "voyager>=2.0.9",
 ]
 classifiers=[
     "Development Status :: 4 - Beta",  # Change as appropriate

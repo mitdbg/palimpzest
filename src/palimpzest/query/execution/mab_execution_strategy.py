@@ -23,7 +23,7 @@ class OpFrontier:
     2. has been sampled fewer than j times
     """
 
-    def __init__(self, op_set: list[PhysicalOperator], source_indices: list[int], k: int, j: int, seed: int, policy: Policy):
+    def __init__(self, op_set: list[PhysicalOperator], source_indices: list[int], k: int, j: int, seed: int, policy: Policy, priors: dict | None = None):
         # set k and j, which are the initial number of operators in the frontier and the
         # initial number of records to sample for each frontier operator
         self.k = min(k, len(op_set))
@@ -32,19 +32,22 @@ class OpFrontier:
         # store the policy that we are optimizing under
         self.policy = policy
 
+        # store the prior beliefs on operator performance (if provided)
+        self.priors = priors
+
         # get order in which we will sample physical operators for this logical operator
         sample_op_indices = self._get_op_index_order(op_set, seed)
 
         # construct the initial set of frontier and reservoir operators
         self.frontier_ops = [op_set[sample_idx] for sample_idx in sample_op_indices[:self.k]]
         self.reservoir_ops = [op_set[sample_idx] for sample_idx in sample_op_indices[self.k:]]
-        self.off_frontier_ops = []
+        self.off_frontier_ops: list[PhysicalOperator] = []
 
         # store the order in which we will sample the source records
         self.source_indices = source_indices
 
         # keep track of the source ids processed by each physical operator
-        self.phys_op_id_to_sources_processed = {op.get_op_id(): set() for op in op_set}
+        self.full_op_id_to_sources_processed = {op.get_full_op_id(): set() for op in op_set}
 
         # set the initial inputs for this logical operator
         is_scan_op = isinstance(op_set[0], ScanPhysicalOp)
@@ -59,13 +62,123 @@ class OpFrontier:
         """
         return self.frontier_ops
 
+    def _compute_op_id_to_pareto_distance(self, priors: dict[str, dict[str, float]]) -> dict[str, float]:
+        """
+        Return l2-distance for each operator from the pareto frontier.
+        """
+        # get the dictionary representation of this poicy
+        policy_dict = self.policy.get_dict()
+
+        # compute the pareto optimal set of operators
+        pareto_op_set = set()
+        for op_id, metrics in priors.items():
+            cost, time, quality = metrics["cost"], metrics["time"], metrics["quality"]
+            pareto_frontier = True
+
+            # check if any other operator dominates op_id
+            for other_op_id, other_metrics in priors.items():
+                other_cost, other_time, other_quality = other_metrics["cost"], other_metrics["time"], other_metrics["quality"]
+                if op_id == other_op_id:
+                    continue
+
+                # if op_id is dominated by other_op_id, set pareto_frontier = False and break
+                # NOTE: here we use a strict inequality (instead of the usual <= or >=) because
+                #       all ops which have equal cost / time / quality / sel. should not be
+                #       filtered out from sampling by our logic in this function
+                cost_dominated = True if policy_dict["cost"] == 0.0 else other_cost < cost
+                time_dominated = True if policy_dict["time"] == 0.0 else other_time < time
+                quality_dominated = True if policy_dict["quality"] == 0.0 else other_quality > quality
+                if cost_dominated and time_dominated and quality_dominated:
+                    pareto_frontier = False
+                    break
+
+            # add op_id to pareto frontier if it's not dominated
+            if pareto_frontier:
+                pareto_op_set.add(op_id)
+
+        # compute the shortest distance from each operator to the pareto frontier
+        op_id_to_pareto_distance = {}
+        for op_id, metrics in priors.items():
+            # set distance to 0.0 if this operator is on the pareto frontier
+            if op_id in pareto_op_set:
+                op_id_to_pareto_distance[op_id] = 0.0
+                continue
+
+            # otherwise, compute min_dist to pareto operators
+            min_dist = None
+            cost, time, quality = metrics["cost"], metrics["time"], metrics["quality"]
+            for pareto_op_id in pareto_op_set:
+                pareto_cost, pareto_time, pareto_quality = priors[pareto_op_id]["cost"], priors[pareto_op_id]["time"], priors[pareto_op_id]["quality"]
+
+                cost_dist_squared = 0.0 if policy_dict["cost"] == 0.0 else (cost - pareto_cost) ** 2
+                time_dist_squared = 0.0 if policy_dict["time"] == 0.0 else (time - pareto_time) ** 2
+                quality_dist_squared = 0.0 if policy_dict["quality"] == 0.0 else (quality - pareto_quality) ** 2
+                dist = np.sqrt(cost_dist_squared + time_dist_squared + quality_dist_squared)
+                if min_dist is None or dist < min_dist:
+                    min_dist = dist
+
+            # set minimum distance for this operator
+            op_id_to_pareto_distance[op_id] = min_dist
+        
+        return op_id_to_pareto_distance
+
     def _get_op_index_order(self, op_set: list[PhysicalOperator], seed: int) -> list[int]:
         """
         Returns a list of indices for the operators in the op_set.
         """
-        rng = np.random.default_rng(seed=seed)
-        op_indices = np.arange(len(op_set))
-        rng.shuffle(op_indices)
+        if self.priors is None or any([op_id not in self.priors for op_id in map(lambda op: op.get_op_id(), op_set)]):
+            print(f"NOT USING PRIORS FOR OP(s): {op_set[0].__class__.__name__}")
+            rng = np.random.default_rng(seed=seed)
+            op_indices = np.arange(len(op_set))
+            rng.shuffle(op_indices)
+            return op_indices
+
+        # NOTE: self.priors is a dictionary with format:
+        # {op_id: {"quality": quality, "cost": cost, "time": time}}
+
+        # compute mean and std. dev. for each field
+        qualities = [op_priors["quality"] for op_priors in self.priors.values()]
+        costs = [op_priors["cost"] for op_priors in self.priors.values()]
+        times = [op_priors["time"] for op_priors in self.priors.values()]
+        metric_to_mean = {"quality": np.mean(qualities), "cost": np.mean(costs), "time": np.mean(times)}
+        metric_to_std = {"quality": np.std(qualities), "cost": np.std(costs), "time": np.std(times)}
+
+        # normalize the scale of each field to be the same
+        for _, op_priors in self.priors.items():
+            for metric, value in op_priors.items():
+                if metric_to_std[metric] == 0.0:
+                    op_priors[metric] = metric_to_mean[metric]
+                else:
+                    op_priors[metric] = (value - metric_to_mean[metric]) / metric_to_std[metric]
+
+        # then, we compute the l2-distance from the pareto frontier for each operator
+        op_id_to_distance = self._compute_op_id_to_pareto_distance(self.priors)
+
+        # compute tuple for every operator, invert quality so ascending sort puts
+        # best operator first: (op_id, dist, -1 * quality, cost, time);
+        op_tuples = []
+        for op in op_set:
+            op_id = op.get_op_id()
+            op_priors = self.priors[op_id]
+            op_tuple = (op_id, op_id_to_distance[op_id], -1 * op_priors["quality"], op_priors["cost"], op_priors["time"])
+            op_tuples.append(op_tuple)
+
+        # sort tuples on distance, then second dim
+        second_dim_idx = None
+        if self.policy.get_primary_metric() == "quality":
+            second_dim_idx = 2
+        elif self.policy.get_primary_metric() == "cost":
+            second_dim_idx = 3
+        elif self.policy.get_primary_metric() == "time":
+            second_dim_idx = 4
+
+        # sort based on distance from pareto frontier; break ties with performance on max / min metric
+        op_tuples = sorted(op_tuples, key=lambda x: (x[1], x[second_dim_idx]))
+
+        # return final list of op indices in sample order
+        op_id_to_idx = {op.get_op_id(): idx for idx, op in enumerate(op_set)}
+        op_indices = [op_id_to_idx[op_tuple[0]] for op_tuple in op_tuples]
+
         return op_indices
 
     def _get_op_source_idx_pairs(self) -> list[tuple[PhysicalOperator, int]]:
@@ -76,7 +189,7 @@ class OpFrontier:
         op_source_idx_pairs = []
         for op in self.frontier_ops:
             # execute new operators on first j source indices, and previously sampled operators on one additional source_idx
-            num_processed = len(self.phys_op_id_to_sources_processed[op.get_op_id()])
+            num_processed = len(self.full_op_id_to_sources_processed[op.get_full_op_id()])
             num_new_samples = 1 if num_processed > 0 else self.j
             num_new_samples = min(num_new_samples, len(self.source_indices) - num_processed)
             assert num_new_samples >= 0, "Number of new samples must be non-negative"
@@ -84,7 +197,7 @@ class OpFrontier:
             # construct list of inputs by looking up the input for the given source_idx
             samples_added = 0
             for source_idx in self.source_indices:
-                if source_idx in self.phys_op_id_to_sources_processed[op.get_op_id()]:
+                if source_idx in self.full_op_id_to_sources_processed[op.get_full_op_id()]:
                     continue
 
                 if samples_added == num_new_samples:
@@ -120,7 +233,7 @@ class OpFrontier:
         for source_idx in unsampled_source_indices:
             op_source_idx_pairs.append((max_quality_op, source_idx))
             for op in self.frontier_ops:
-                if len(self.phys_op_id_to_sources_processed[op.get_op_id()]) == 0 and op.get_op_id() != max_quality_op.get_op_id():
+                if len(self.full_op_id_to_sources_processed[op.get_full_op_id()]) == 0 and op.get_full_op_id() != max_quality_op.get_full_op_id():
                     op_source_idx_pairs.append((op, source_idx))
 
         # fetch the corresponding (op, input) pairs
@@ -143,10 +256,10 @@ class OpFrontier:
         # NOTE: downstream operators may end up re-computing the same record_id with a diff. input as upstream
         #       upstream operators change; in this case, we de-duplicate record_op_stats with identical record_ids
         #       and keep the one with the maximum quality
-        # get a mapping from physical_op_id --> list[RecordOpStats]
-        phys_op_id_to_op_stats: dict[str, OperatorStats] = plan_stats.operator_stats.get(logical_op_id, {})
-        phys_op_id_to_record_op_stats = {}
-        for phys_op_id, op_stats in phys_op_id_to_op_stats.items():
+        # get a mapping from full_op_id --> list[RecordOpStats]
+        full_op_id_to_op_stats: dict[str, OperatorStats] = plan_stats.operator_stats.get(logical_op_id, {})
+        full_op_id_to_record_op_stats = {}
+        for full_op_id, op_stats in full_op_id_to_op_stats.items():
             # skip over operators which have not been sampled
             if len(op_stats.record_op_stats_lst) == 0:
                 continue
@@ -162,19 +275,19 @@ class OpFrontier:
                     record_id_to_max_quality_record_op_stats[record_id] = record_op_stats
 
             # compute final list of record op stats
-            phys_op_id_to_record_op_stats[phys_op_id] = list(record_id_to_max_quality_record_op_stats.values())
+            full_op_id_to_record_op_stats[full_op_id] = list(record_id_to_max_quality_record_op_stats.values())
 
         # compute mapping of physical op to num samples and total samples drawn;
         # also update the set of source indices which have been processed by each physical operator
-        phys_op_id_to_num_samples, total_num_samples = {}, 0
-        for phys_op_id, record_op_stats_lst in phys_op_id_to_record_op_stats.items():
-            # update teh set of source indices processed
+        full_op_id_to_num_samples, total_num_samples = {}, 0
+        for full_op_id, record_op_stats_lst in full_op_id_to_record_op_stats.items():
+            # update the set of source indices processed
             for record_op_stats in record_op_stats_lst:
-                self.phys_op_id_to_sources_processed[phys_op_id].add(record_op_stats.record_source_idx)
+                self.full_op_id_to_sources_processed[full_op_id].add(record_op_stats.record_source_idx)
 
             # compute the number of samples as the number of source indices processed
-            num_samples = len(self.phys_op_id_to_sources_processed[phys_op_id])
-            phys_op_id_to_num_samples[phys_op_id] = num_samples
+            num_samples = len(self.full_op_id_to_sources_processed[full_op_id])
+            full_op_id_to_num_samples[full_op_id] = num_samples
             total_num_samples += num_samples
 
         # compute avg. selectivity, cost, time, and quality for each physical operator
@@ -184,63 +297,63 @@ class OpFrontier:
         def total_input(record_op_stats_lst):
             return len(set([record_op_stats.record_parent_id for record_op_stats in record_op_stats_lst]))
 
-        phys_op_to_mean_selectivity = {
-            op_id: total_output(record_op_stats_lst) / total_input(record_op_stats_lst)
-            for op_id, record_op_stats_lst in phys_op_id_to_record_op_stats.items()
+        full_op_id_to_mean_selectivity = {
+            full_op_id: total_output(record_op_stats_lst) / total_input(record_op_stats_lst)
+            for full_op_id, record_op_stats_lst in full_op_id_to_record_op_stats.items()
         }
-        phys_op_to_mean_cost = {
-            op_id: np.mean([record_op_stats.cost_per_record for record_op_stats in record_op_stats_lst])
-            for op_id, record_op_stats_lst in phys_op_id_to_record_op_stats.items()
+        full_op_id_to_mean_cost = {
+            full_op_id: np.mean([record_op_stats.cost_per_record for record_op_stats in record_op_stats_lst])
+            for full_op_id, record_op_stats_lst in full_op_id_to_record_op_stats.items()
         }
-        phys_op_to_mean_time = {
-            op_id: np.mean([record_op_stats.time_per_record for record_op_stats in record_op_stats_lst])
-            for op_id, record_op_stats_lst in phys_op_id_to_record_op_stats.items()
+        full_op_id_to_mean_time = {
+            full_op_id: np.mean([record_op_stats.time_per_record for record_op_stats in record_op_stats_lst])
+            for full_op_id, record_op_stats_lst in full_op_id_to_record_op_stats.items()
         }
-        phys_op_to_mean_quality = {
-            op_id: np.mean([record_op_stats.quality for record_op_stats in record_op_stats_lst])
-            for op_id, record_op_stats_lst in phys_op_id_to_record_op_stats.items()
+        full_op_id_to_mean_quality = {
+            full_op_id: np.mean([record_op_stats.quality for record_op_stats in record_op_stats_lst])
+            for full_op_id, record_op_stats_lst in full_op_id_to_record_op_stats.items()
         }
 
         # # compute average, LCB, and UCB of each operator; the confidence bounds depend upon
         # # the computation of the alpha parameter, which we scale to be 0.5 * the mean (of means)
         # # of the metric across all operators in this operator set
-        # cost_alpha = 0.5 * np.mean([mean_cost for mean_cost in phys_op_to_mean_cost.values()])
-        # time_alpha = 0.5 * np.mean([mean_time for mean_time in phys_op_to_mean_time.values()])
-        # quality_alpha = 0.5 * np.mean([mean_quality for mean_quality in phys_op_to_mean_quality.values()])
-        # selectivity_alpha = 0.5 * np.mean([mean_selectivity for mean_selectivity in phys_op_to_mean_selectivity.values()])
-        cost_alpha = 0.5 * (np.max(list(phys_op_to_mean_cost.values())) - np.min(list(phys_op_to_mean_cost.values())))
-        time_alpha = 0.5 * (np.max(list(phys_op_to_mean_time.values())) - np.min(list(phys_op_to_mean_time.values())))
-        quality_alpha = 0.5 * (np.max(list(phys_op_to_mean_quality.values())) - np.min(list(phys_op_to_mean_quality.values())))
-        selectivity_alpha = 0.5 * (np.max(list(phys_op_to_mean_selectivity.values())) - np.min(list(phys_op_to_mean_selectivity.values())))
+        # cost_alpha = 0.5 * np.mean([mean_cost for mean_cost in full_op_id_to_mean_cost.values()])
+        # time_alpha = 0.5 * np.mean([mean_time for mean_time in full_op_id_to_mean_time.values()])
+        # quality_alpha = 0.5 * np.mean([mean_quality for mean_quality in full_op_id_to_mean_quality.values()])
+        # selectivity_alpha = 0.5 * np.mean([mean_selectivity for mean_selectivity in full_op_id_to_mean_selectivity.values()])
+        cost_alpha = 0.5 * (np.max(list(full_op_id_to_mean_cost.values())) - np.min(list(full_op_id_to_mean_cost.values())))
+        time_alpha = 0.5 * (np.max(list(full_op_id_to_mean_time.values())) - np.min(list(full_op_id_to_mean_time.values())))
+        quality_alpha = 0.5 * (np.max(list(full_op_id_to_mean_quality.values())) - np.min(list(full_op_id_to_mean_quality.values())))
+        selectivity_alpha = 0.5 * (np.max(list(full_op_id_to_mean_selectivity.values())) - np.min(list(full_op_id_to_mean_selectivity.values())))
 
         # compute metrics for each physical operator
         op_metrics = {}
-        for op_id in phys_op_id_to_record_op_stats:
-            sample_ratio = np.sqrt(np.log(total_num_samples) / phys_op_id_to_num_samples[op_id])
+        for full_op_id in full_op_id_to_record_op_stats:
+            sample_ratio = np.sqrt(np.log(total_num_samples) / full_op_id_to_num_samples[full_op_id])
             exploration_terms = np.array([cost_alpha * sample_ratio, time_alpha * sample_ratio, quality_alpha * sample_ratio, selectivity_alpha * sample_ratio])
-            mean_terms = (phys_op_to_mean_cost[op_id], phys_op_to_mean_time[op_id], phys_op_to_mean_quality[op_id], phys_op_to_mean_selectivity[op_id])
+            mean_terms = (full_op_id_to_mean_cost[full_op_id], full_op_id_to_mean_time[full_op_id], full_op_id_to_mean_quality[full_op_id], full_op_id_to_mean_selectivity[full_op_id])
 
             # NOTE: we could clip these; however I will not do so for now to allow for arbitrary quality metric(s)
             lcb_terms = mean_terms - exploration_terms
             ucb_terms = mean_terms + exploration_terms
-            op_metrics[op_id] = {"mean": mean_terms, "lcb": lcb_terms, "ucb": ucb_terms}
+            op_metrics[full_op_id] = {"mean": mean_terms, "lcb": lcb_terms, "ucb": ucb_terms}
 
         # get the tuple representation of this policy
         policy_dict = self.policy.get_dict()
 
         # compute the pareto optimal set of operators
         pareto_op_set = set()
-        for op_id, metrics in op_metrics.items():
+        for full_op_id, metrics in op_metrics.items():
             cost, time, quality, selectivity = metrics["mean"]
             pareto_frontier = True
 
-            # check if any other operator dominates op_id
-            for other_op_id, other_metrics in op_metrics.items():
+            # check if any other operator dominates full_op_id
+            for other_full_op_id, other_metrics in op_metrics.items():
                 other_cost, other_time, other_quality, other_selectivity = other_metrics["mean"]
-                if op_id == other_op_id:
+                if full_op_id == other_full_op_id:
                     continue
 
-                # if op_id is dominated by other_op_id, set pareto_frontier = False and break
+                # if full_op_id is dominated by other_full_op_id, set pareto_frontier = False and break
                 # NOTE: here we use a strict inequality (instead of the usual <= or >=) because
                 #       all ops which have equal cost / time / quality / sel. should not be
                 #       filtered out from sampling by our logic in this function
@@ -252,21 +365,21 @@ class OpFrontier:
                     pareto_frontier = False
                     break
 
-            # add op_id to pareto frontier if it's not dominated
+            # add full_op_id to pareto frontier if it's not dominated
             if pareto_frontier:
-                pareto_op_set.add(op_id)
+                pareto_op_set.add(full_op_id)
 
         # iterate over op metrics and compute the new frontier set of operators
-        new_frontier_op_ids = set()
-        for op_id, metrics in op_metrics.items():
+        new_frontier_full_op_ids = set()
+        for full_op_id, metrics in op_metrics.items():
 
             # if this op is fully sampled, do not keep it on the frontier
-            if phys_op_id_to_num_samples[op_id] == len(self.source_indices):
+            if full_op_id_to_num_samples[full_op_id] == len(self.source_indices):
                 continue
 
             # if this op is pareto optimal keep it in our frontier ops
-            if op_id in pareto_op_set:
-                new_frontier_op_ids.add(op_id)
+            if full_op_id in pareto_op_set:
+                new_frontier_full_op_ids.add(full_op_id)
                 continue
 
             # otherwise, if this op overlaps with an op on the pareto frontier, keep it in our frontier ops
@@ -274,11 +387,11 @@ class OpFrontier:
             pareto_frontier = True
             op_cost, op_time, _, op_selectivity = metrics["lcb"]
             op_quality = metrics["ucb"][2]
-            for pareto_op_id in pareto_op_set:
-                pareto_cost, pareto_time, _, pareto_selectivity = op_metrics[pareto_op_id]["ucb"]
-                pareto_quality = op_metrics[pareto_op_id]["lcb"][2]
+            for pareto_full_op_id in pareto_op_set:
+                pareto_cost, pareto_time, _, pareto_selectivity = op_metrics[pareto_full_op_id]["ucb"]
+                pareto_quality = op_metrics[pareto_full_op_id]["lcb"][2]
 
-                # if op_id is dominated by pareto_op_id, set pareto_frontier = False and break
+                # if full_op_id is dominated by pareto_full_op_id, set pareto_frontier = False and break
                 cost_dominated = True if policy_dict["cost"] == 0.0 else pareto_cost <= op_cost
                 time_dominated = True if policy_dict["time"] == 0.0 else pareto_time <= op_time
                 quality_dominated = True if policy_dict["quality"] == 0.0 else pareto_quality >= op_quality
@@ -287,15 +400,15 @@ class OpFrontier:
                     pareto_frontier = False
                     break
 
-            # add op_id to pareto frontier if it's not dominated
+            # add full_op_id to pareto frontier if it's not dominated
             if pareto_frontier:
-                new_frontier_op_ids.add(op_id)
+                new_frontier_full_op_ids.add(full_op_id)
 
         # for operators that were in the frontier, keep them in the frontier if they
         # are still pareto optimal, otherwise, move them to the end of the reservoir
         new_frontier_ops = []
         for op in self.frontier_ops:
-            if op.get_op_id() in new_frontier_op_ids:
+            if op.get_full_op_id() in new_frontier_full_op_ids:
                 new_frontier_ops.append(op)
             else:
                 self.off_frontier_ops.append(op)
@@ -304,7 +417,7 @@ class OpFrontier:
         # add them to the frontier, otherwise, put them back in the off_frontier_ops
         new_off_frontier_ops = []
         for op in self.off_frontier_ops:
-            if op.get_op_id() in new_frontier_op_ids:
+            if op.get_full_op_id() in new_frontier_full_op_ids:
                 new_frontier_ops.append(op)
             else:
                 new_off_frontier_ops.append(op)
@@ -388,19 +501,19 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
         # get the operators in the frontier set for this logical_op_id
         frontier_ops = op_frontiers[logical_op_id].get_frontier_ops()
 
-        # get a mapping from physical_op_id --> list[RecordOpStats]
-        phys_op_id_to_op_stats: dict[str, OperatorStats] = plan_stats.operator_stats.get(logical_op_id, {})
-        phys_op_id_to_record_op_stats = {
-            phys_op_id: op_stats.record_op_stats_lst
-            for phys_op_id, op_stats in phys_op_id_to_op_stats.items()
+        # get a mapping from full_op_id --> list[RecordOpStats]
+        full_op_id_to_op_stats: dict[str, OperatorStats] = plan_stats.operator_stats.get(logical_op_id, {})
+        full_op_id_to_record_op_stats = {
+            full_op_id: op_stats.record_op_stats_lst
+            for full_op_id, op_stats in full_op_id_to_op_stats.items()
         }
 
         # iterate over the frontier ops and return the one with the highest quality
         max_quality_op, max_avg_quality = None, None
         for op in frontier_ops:
             op_quality_stats = []
-            if op.get_op_id() in phys_op_id_to_record_op_stats:
-                op_quality_stats = [record_op_stats.quality for record_op_stats in phys_op_id_to_record_op_stats[op.get_op_id()]]
+            if op.get_full_op_id() in full_op_id_to_record_op_stats:
+                op_quality_stats = [record_op_stats.quality for record_op_stats in full_op_id_to_record_op_stats[op.get_full_op_id()]]
             avg_op_quality = sum(op_quality_stats) / len(op_quality_stats) if len(op_quality_stats) > 0 else 0.0
             if max_avg_quality is None or avg_op_quality > max_avg_quality:
                 max_quality_op = op
@@ -507,7 +620,7 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
 
         # initialize frontier for each logical operator
         op_frontiers = {
-            logical_op_id: OpFrontier(op_set, shuffled_source_indices, self.k, self.j, self.seed, self.policy)
+            logical_op_id: OpFrontier(op_set, shuffled_source_indices, self.k, self.j, self.seed, self.policy, self.priors)
             for logical_op_id, op_set in plan
         }
 

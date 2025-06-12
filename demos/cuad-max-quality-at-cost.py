@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 import string
 from functools import partial
@@ -10,6 +11,7 @@ import pandas as pd
 import palimpzest as pz
 from palimpzest.constants import Model
 from palimpzest.core.lib.fields import ListField, StringField
+from palimpzest.policy import MaxQuality, MaxQualityAtFixedCost
 
 cuad_categories = [
     {
@@ -394,32 +396,11 @@ def compute_precision_recall(label_df, preds_df):
 
     return precision, recall
 
-
-# # Score function for PZ optimizer.
-# # Compare the predictions and labels for schema field.
-# def score_fn(preds, labels):
-#     assert isinstance(labels, list)
-#     preds = handle_empty_preds(preds)
-
-#     tp, fp, fn = 0, 0, 0
-
-#     for category in cuad_categories:
-#         substr_ok = "Parties" in category["Category"]
-#         entry_tp, entry_fp, entry_fn = evaluate_entry(labels, preds, substr_ok)
-#         tp += entry_tp
-#         fp += entry_fp
-#         fn += entry_fn
-
-#     # precision = tp / (tp + fp) if tp + fp > 0 else np.nan
-#     recall = tp / (tp + fn) if tp + fn > 0 else np.nan
-
-#     return recall
-
-
 class CUADDataReader(pz.DataReader):
-    def __init__(self, num_contracts: int = 1, split: str = "train"):
+    def __init__(self, num_contracts: int = 1, split: str = "train", seed: int=42):
         self.num_contracts = num_contracts
         self.split = split
+        self.seed = seed
 
         input_cols = [
             {"name": "contract_id", "type": str, "desc": "The id of the the contract to be analyzed"},
@@ -431,15 +412,20 @@ class CUADDataReader(pz.DataReader):
         # convert the dataset into a list of dictionaries where each row is for a single contract
         include_labels = split == "train"
         dataset = datasets.load_dataset("theatticusproject/cuad-qa")[split]
-        self.dataset = self._construct_dataset(dataset, num_contracts, include_labels)
+        self.dataset = self._construct_dataset(dataset, num_contracts, seed, include_labels)
 
-    def _construct_dataset(self, dataset, num_contracts, include_labels: bool=False):
+
+    def _construct_dataset(self, dataset, num_contracts, seed: int=42, include_labels: bool=False):
         # get the set of unique contract titles; to ensure the order of the contracts is
         # preserved, we use a list rather than using python's set()
         contract_titles = []
         for row in dataset:
             if row["title"] not in contract_titles:
                 contract_titles.append(row["title"])
+
+        # shuffle the contracts for the given seed
+        rng = np.random.default_rng(seed=seed)
+        rng.shuffle(contract_titles)
 
         # get the first num_contracts
         contract_titles = contract_titles[:num_contracts]
@@ -502,7 +488,7 @@ class CUADDataReader(pz.DataReader):
 
     def get_label_df(self):
         full_dataset = datasets.load_dataset("theatticusproject/cuad-qa")[self.split]
-        label_dataset = self._construct_dataset(full_dataset, self.num_contracts, True)
+        label_dataset = self._construct_dataset(full_dataset, self.num_contracts, self.seed, True)
         final_label_dataset = []
         for entry in label_dataset:
             row = {}
@@ -519,11 +505,24 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description="Run CUAD demo")
     parser.add_argument("--mode", type=str, help="one-convert or separate-converts", default="one-convert")
     parser.add_argument("--test", type=str, help="test time compute active or inactive", default="active")
+    parser.add_argument("--constrained", default=False, action="store_true", help="Use constrained objective")
     parser.add_argument(
-        "--processing_strategy",
+        "--processing-strategy",
         default="sentinel",
         type=str,
         help="The engine to use. One of sentinel or no_sentinel",
+    )
+    parser.add_argument(
+        "--sentinel-execution-strategy",
+        default="mab",
+        type=str,
+        help="The engine to use. One of mab or random",
+    )
+    parser.add_argument(
+        "--optimizer-strategy",
+        default="pareto",
+        type=str,
+        help="The optimizer to use. One of pareto or greedy",
     )
     parser.add_argument("--verbose", default=False, action="store_true", help="Print verbose output")
     parser.add_argument(
@@ -549,6 +548,24 @@ def parse_arguments():
         default=100,
         type=int,
         help="Total sample budget in Random Sampling or MAB sentinel execution",
+    )
+    parser.add_argument(
+        "--exp-name",
+        default=None,
+        type=str,
+        help="The experiment name.",
+    )
+    parser.add_argument(
+        "--priors-file",
+        default=None,
+        type=str,
+        help="A file with a dictionary mapping physical operator ids to prior belief on their performance",
+    )
+    parser.add_argument(
+        "--cost",
+        default=1.0,
+        type=float,
+        help="The cost budget for the optimization",
     )
     return parser.parse_args()
 
@@ -587,30 +604,49 @@ def main():
 
     args = parse_arguments()
 
+    # create directory for profiling data
+    os.makedirs("max-quality-at-cost-data", exist_ok=True)
+
     # Create a data reader for the CUAD dataset
-    data_reader = CUADDataReader(split="test", num_contracts=50)
-    val_data_reader = CUADDataReader(split="train", num_contracts=20)
+    data_reader = CUADDataReader(split="test", num_contracts=100, seed=args.seed)
+    val_data_reader = CUADDataReader(split="train", num_contracts=25, seed=args.seed)
     print("Created data reader")
 
     # Build and run the CUAD query
     query = build_cuad_query(data_reader, args.mode)
     print("Built query; Starting query execution")
 
+    # set the optimization policy; constraint set to 25% percentile from unconstrained plans
+    policy = MaxQualityAtFixedCost(max_cost=args.cost) if args.cost < 999 else MaxQuality()
+    print(f"USING POLICY: {policy}")
+
+    # if args.test == "active":
+    #     allow_mixtures = True
+    #     allow_critic = True
+    # else:
+    #     allow_mixtures = False
+    #     allow_critic = False
+    sentinel_strategy = args.sentinel_execution_strategy
+    optimizer_strategy = args.optimizer_strategy
     config = pz.QueryProcessorConfig(
-        verbose=True,
+        policy=policy,
+        verbose=False,
         val_datasource=val_data_reader,
         processing_strategy="sentinel",
-        optimizer_strategy="pareto",
-        sentinel_execution_strategy="mab",
+        optimizer_strategy=optimizer_strategy,
+        sentinel_execution_strategy=sentinel_strategy,
         execution_strategy="parallel",
-        max_workers=20,
+        max_workers=64,
         available_models=[
             Model.GPT_4o,
             Model.GPT_4o_MINI,
-            Model.DEEPSEEK_V3,
-            Model.MIXTRAL,
+            # Model.LLAMA3_2_3B,
+            Model.LLAMA3_1_8B,
             Model.LLAMA3_3_70B,
-            Model.LLAMA3_2_90B_V,
+            # Model.LLAMA3_2_90B_V,
+            Model.MIXTRAL,
+            # Model.DEEPSEEK_V3,
+            Model.DEEPSEEK_R1_DISTILL_QWEN_1_5B,
         ],
         allow_bonded_query=True,
         allow_code_synth=False,
@@ -625,7 +661,17 @@ def main():
     k = args.k
     j = args.j
     sample_budget = args.sample_budget
-    exp_name = f"cuad-demo-{args.mode}-k{k}-j{j}-budget{sample_budget}-seed{seed}"
+    exp_name = (
+        f"cuad-strategy-{optimizer_strategy}-k{k}-j{j}-budget{sample_budget}-seed{seed}"
+        if args.exp_name is None
+        else args.exp_name
+    )
+    priors = None
+    if args.priors_file is not None:
+        with open(args.priors_file) as f:
+            priors = json.load(f)
+
+    print(f"EXPERIMENT NAME: {exp_name}")
     data_record_collection = query.run(
         config=config,
         k=k,
@@ -633,17 +679,40 @@ def main():
         sample_budget=sample_budget,
         seed=seed,
         exp_name=exp_name,
+        priors=priors,
     )
     print("Query execution completed")
 
+    # save statistics
+    execution_stats_dict = data_record_collection.execution_stats.to_json()
+    with open(f"max-quality-at-cost-data/{exp_name}-stats.json", "w") as f:
+        json.dump(execution_stats_dict, f)
+
     pred_df = data_record_collection.to_df()
     label_df = data_reader.get_label_df()
-    pred_df.to_csv(f"{exp_name}-pred.csv", index=False)
-    label_df.to_csv(f"{exp_name}-label.csv", index=False)
+    # pred_df.to_csv(f"{exp_name}-pred.csv", index=False)
+    # label_df.to_csv(f"{exp_name}-label.csv", index=False)
+    final_plan_id = list(data_record_collection.execution_stats.plan_stats.keys())[0]
+    final_plan_str = data_record_collection.execution_stats.plan_strs[final_plan_id]
 
     prec, recall = compute_precision_recall(label_df, pred_df)
-    print(f"Precision: {prec:.3f}, Recall: {recall:.3f}")
+    f1 = 2 * (prec * recall) / (prec + recall) if prec + recall > 0 else 0.0
+    stats_dict = {
+        "precision": prec,
+        "recall": recall,
+        "f1": f1,
+        "optimization_time": data_record_collection.execution_stats.optimization_time,
+        "optimization_cost": data_record_collection.execution_stats.optimization_cost,
+        "plan_execution_time": data_record_collection.execution_stats.plan_execution_time,
+        "plan_execution_cost": data_record_collection.execution_stats.plan_execution_cost,
+        "total_execution_time": data_record_collection.execution_stats.total_execution_time,
+        "total_execution_cost": data_record_collection.execution_stats.total_execution_cost,
+        "plan_str": final_plan_str,
+    }
+    with open(f"max-quality-at-cost-data/{exp_name}-metrics.json", "w") as f:
+        json.dump(stats_dict, f)
 
+    print(f"Precision: {prec:.3f}, Recall: {recall:.3f}, F1: {f1:.3f}")
     print(f"Optimization time: {data_record_collection.execution_stats.optimization_time}")
     print(f"Optimization cost: {data_record_collection.execution_stats.optimization_cost}")
     print(f"Plan Exec. time: {data_record_collection.execution_stats.plan_execution_time}")

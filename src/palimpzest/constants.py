@@ -242,23 +242,10 @@ LOG_LLM_OUTPUT = False
 
 
 #### MODEL PERFORMANCE & COST METRICS ####
-# I've looked across models and grouped knowledge into commonly used categories:
-# - Agg. Benchmark (we only use MMLU for this)
-# - Commonsense Reasoning
-# - World Knowledge
-# - Reading Comprehension
-# - Code
-# - Math
-#
-# We don't have global overlap on the World Knowledge and/or Reading Comprehension
-# datasets. Thus, we include these categories results where we have them, but they
-# are completely omitted for now.
-#
-# Within each category only certain models have overlapping results on the same
-# individual datasets; in order to have consistent evaluations I have computed
-# the average result for each category using only the shared sets of datasets within
-# that category. All datasets for which we have results will be shown but commented
-# with ###; datasets which are used in our category averages will have a ^.
+# Overall model quality is computed using MMLU-Pro; multi-modal models currently use the same score for vision
+# - in the future we should split quality for vision vs. multi-modal vs. text
+# - code quality was computed using HumanEval, but that benchmark is too easy and should be replaced.
+# - https://huggingface.co/spaces/TIGER-Lab/MMLU-Pro
 #
 # Cost is presented in terms of USD / token for input tokens and USD / token for
 # generated tokens.
@@ -275,7 +262,7 @@ LLAMA3_2_3B_INSTRUCT_MODEL_CARD = {
     ##### Time #####
     "seconds_per_output_token": 0.0064,
     ##### Agg. Benchmark #####
-    "overall": 63.4,
+    "overall": 36.50, # https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct/discussions/13
     ##### Code #####
     "code": 0.0,
 }
@@ -286,7 +273,7 @@ LLAMA3_1_8B_INSTRUCT_MODEL_CARD = {
     ##### Time #####
     "seconds_per_output_token": 0.0059,
     ##### Agg. Benchmark #####
-    "overall": 69.4,
+    "overall": 44.25,
     ##### Code #####
     "code": 72.6,
 }
@@ -297,7 +284,7 @@ LLAMA3_3_70B_INSTRUCT_MODEL_CARD = {
     ##### Time #####
     "seconds_per_output_token": 0.0139,
     ##### Agg. Benchmark #####
-    "overall": 86.0,
+    "overall": 65.92,
     ##### Code #####
     "code": 88.4,
 }
@@ -308,7 +295,7 @@ LLAMA3_2_90B_V_MODEL_CARD = {
     ##### Time #####
     "seconds_per_output_token": 0.0222,
     ##### Agg. Benchmark #####
-    "overall": 84.0,
+    "overall": 65.00, # set to be slightly higher than gpt-4o-mini
 }
 MIXTRAL_8X_7B_MODEL_CARD = {
     ##### Cost in USD #####
@@ -317,7 +304,7 @@ MIXTRAL_8X_7B_MODEL_CARD = {
     ##### Time #####
     "seconds_per_output_token": 0.0112,
     ##### Agg. Benchmark #####
-    "overall": 63.0,
+    "overall": 43.27,
     ##### Code #####
     "code": 40.0,
 }
@@ -328,7 +315,7 @@ DEEPSEEK_V3_MODEL_CARD = {
     ##### Time #####
     "seconds_per_output_token": 0.0769,
     ##### Agg. Benchmark #####
-    "overall": 87.0,
+    "overall": 75.87,
     ##### Code #####
     "code": 92.0,
 }
@@ -339,7 +326,7 @@ DEEPSEEK_R1_DISTILL_QWEN_1_5B_MODEL_CARD = {
     ##### Time #####
     "seconds_per_output_token": 0.0026,
     ##### Agg. Benchmark #####
-    "overall": 0.0,
+    "overall": 39.90, # https://www.reddit.com/r/LocalLLaMA/comments/1iserf9/deepseek_r1_distilled_models_mmlu_pro_benchmarks/
     ##### Code #####
     "code": 0.0,
 }
@@ -351,7 +338,7 @@ GPT_4o_MODEL_CARD = {
     ##### Time #####
     "seconds_per_output_token": 0.0079,
     ##### Agg. Benchmark #####
-    "overall": 89.0,
+    "overall": 74.68,
     ##### Code #####
     "code": 90.0,
 }
@@ -363,7 +350,7 @@ GPT_4o_MINI_MODEL_CARD = {
     ##### Time #####
     "seconds_per_output_token": 0.0098,
     ##### Agg. Benchmark #####
-    "overall": 82.0,
+    "overall": 63.09,
     ##### Code #####
     "code": 86.0,
 }
@@ -375,7 +362,7 @@ o1_MODEL_CARD = {  # noqa: N816
     ##### Time #####
     "seconds_per_output_token": 0.0110,
     ##### Agg. Benchmark #####
-    "overall": 92.3,
+    "overall": 89.30,
     ##### Code #####
     "code": 92.3, # NOTE: just copying MMLU score for now
 }
@@ -386,7 +373,7 @@ TEXT_EMBEDDING_3_SMALL_MODEL_CARD = {
     ##### Time #####
     "seconds_per_output_token": 0.0098,  # NOTE: just copying GPT_4o_MINI_MODEL_CARD for now
     ##### Agg. Benchmark #####
-    "overall": 82.0,  # NOTE: just copying GPT_4o_MINI_MODEL_CARD for now
+    "overall": 63.09,  # NOTE: just copying GPT_4o_MINI_MODEL_CARD for now
 }
 CLIP_VIT_B_32_MODEL_CARD = {
     ##### Cost in USD #####

@@ -53,7 +53,7 @@ class PhysicalPlan(Plan):
 
         Two different PhysicalPlan instances with the identical lists of operators will have equivalent plan_ids.
         """
-        hash_str = str(tuple(op.get_op_id() for op in self.operators))
+        hash_str = str(tuple(op.get_full_op_id() for op in self.operators))
         return hash_for_id(hash_str)
 
     def __eq__(self, other):
@@ -103,9 +103,9 @@ class SentinelPlan(Plan):
             assert isinstance(operator_sets[0][0], ScanPhysicalOp), "first operator set must be a scan"
             assert all(len(op_set) > 0 for op_set in operator_sets), "every operator set must have at least one operator"
 
-        # store operator_sets and logical_op_ids; sort operator_sets internally by op_id
+        # store operator_sets and logical_op_ids; sort operator_sets internally by full_op_id
         self.operator_sets = operator_sets
-        self.operator_sets = [sorted(op_set, key=lambda op: op.get_op_id()) for op_set in self.operator_sets]
+        self.operator_sets = [sorted(op_set, key=lambda op: op.get_full_op_id()) for op_set in self.operator_sets]
         self.logical_op_ids = [op_set[0].logical_op_id for op_set in self.operator_sets]
         self.plan_id = self.compute_plan_id()
 
@@ -117,7 +117,7 @@ class SentinelPlan(Plan):
         """
         hash_str = ""
         for logical_op_id, op_set in zip(self.logical_op_ids, self.operator_sets):
-            hash_str += f"{logical_op_id} {tuple(op.get_op_id() for op in op_set)} "
+            hash_str += f"{logical_op_id} {tuple(op.get_full_op_id() for op in op_set)} "
         return hash_for_id(hash_str)
 
     def __eq__(self, other):

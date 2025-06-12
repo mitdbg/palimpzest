@@ -30,35 +30,35 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
         output_records = []
         for op_idx, operator in enumerate(plan.operators):
             # if we've filtered out all records, terminate early
-            op_id = operator.get_op_id()
-            num_inputs = len(input_queues[op_id])
+            full_op_id = operator.get_full_op_id()
+            num_inputs = len(input_queues[full_op_id])
             if num_inputs == 0:
                 break
 
             # begin to process this operator
             records, record_op_stats = [], []
-            logger.info(f"Processing operator {operator.op_name()} ({op_id})")
+            logger.info(f"Processing operator {operator.op_name()} ({full_op_id})")
 
             # if this operator is an aggregate, process all the records in the input_queue
             if isinstance(operator, AggregateOp):
-                record_set = operator(candidates=input_queues[op_id])
+                record_set = operator(candidates=input_queues[full_op_id])
                 records = record_set.data_records
                 record_op_stats = record_set.record_op_stats
                 num_outputs = sum(record.passed_operator for record in records)
 
                 # update the progress manager
-                self.progress_manager.incr(op_id, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
+                self.progress_manager.incr(full_op_id, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
 
             # otherwise, process the records in the input queue for this operator one at a time
             else:
-                for input_record in input_queues[op_id]:
+                for input_record in input_queues[full_op_id]:
                     record_set = operator(input_record)
                     records.extend(record_set.data_records)
                     record_op_stats.extend(record_set.record_op_stats)
                     num_outputs = sum(record.passed_operator for record in record_set.data_records)
 
                     # update the progress manager
-                    self.progress_manager.incr(op_id, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
+                    self.progress_manager.incr(full_op_id, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
 
                     # finish early if this is a limit
                     if isinstance(operator, LimitScanOp) and len(records) == operator.limit:
@@ -73,10 +73,10 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
             # update next input_queue (if it exists)
             output_records = [record for record in records if record.passed_operator]            
             if op_idx + 1 < len(plan.operators):
-                next_op_id = plan.operators[op_idx + 1].get_op_id()
-                input_queues[next_op_id] = output_records
+                next_full_op_id = plan.operators[op_idx + 1].get_full_op_id()
+                input_queues[next_full_op_id] = output_records
 
-            logger.info(f"Finished processing operator {operator.op_name()} ({operator.get_op_id()}), and generated {len(records)} records")
+            logger.info(f"Finished processing operator {operator.op_name()} ({operator.get_full_op_id()}), and generated {len(records)} records")
 
         # close the cache
         self._close_cache([op.target_cache_id for op in plan.operators])
@@ -146,8 +146,8 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
     def _upstream_ops_finished(self, plan: PhysicalPlan, op_idx: int, input_queues: dict[str, list]) -> bool:
         """Helper function to check if all upstream operators have finished processing their inputs."""
         for upstream_op_idx in range(op_idx):
-            upstream_op_id = plan.operators[upstream_op_idx].get_op_id()
-            if len(input_queues[upstream_op_id]) > 0:
+            upstream_full_op_id = plan.operators[upstream_op_idx].get_full_op_id()
+            if len(input_queues[upstream_full_op_id]) > 0:
                 return False
 
         return True
@@ -160,8 +160,8 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
         while self._any_queue_not_empty(input_queues):
             for op_idx, operator in enumerate(plan.operators):
                 # if this operator does not have enough inputs to execute, then skip it
-                op_id = operator.get_op_id()
-                num_inputs = len(input_queues[op_id])
+                full_op_id = operator.get_full_op_id()
+                num_inputs = len(input_queues[full_op_id])
                 agg_op_not_ready = isinstance(operator, AggregateOp) and not self._upstream_ops_finished(plan, op_idx, input_queues)
                 if num_inputs == 0 or agg_op_not_ready:
                     continue
@@ -171,25 +171,25 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
 
                 # if the next operator is an aggregate, process all the records in the input_queue
                 if isinstance(operator, AggregateOp):
-                    input_records = [input_queues[op_id].pop(0) for _ in range(num_inputs)]
+                    input_records = [input_queues[full_op_id].pop(0) for _ in range(num_inputs)]
                     record_set = operator(candidates=input_records)
                     records = record_set.data_records
                     record_op_stats = record_set.record_op_stats
                     num_outputs = sum(record.passed_operator for record in records)
 
                     # update the progress manager
-                    self.progress_manager.incr(op_id, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
+                    self.progress_manager.incr(full_op_id, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
 
                 # otherwise, process the next record in the input queue for this operator
                 else:
-                    input_record = input_queues[op_id].pop(0)
+                    input_record = input_queues[full_op_id].pop(0)
                     record_set = operator(input_record)
                     records = record_set.data_records
                     record_op_stats = record_set.record_op_stats
                     num_outputs = sum(record.passed_operator for record in records)
 
                     # update the progress manager
-                    self.progress_manager.incr(op_id, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
+                    self.progress_manager.incr(full_op_id, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
 
                 # update plan stats
                 plan_stats.add_record_op_stats(record_op_stats)
@@ -200,12 +200,12 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
                 # update next input_queue or final_output_records
                 output_records = [record for record in records if record.passed_operator]            
                 if op_idx + 1 < len(plan.operators):
-                    next_op_id = plan.operators[op_idx + 1].get_op_id()
-                    input_queues[next_op_id].extend(output_records)
+                    next_full_op_id = plan.operators[op_idx + 1].get_full_op_id()
+                    input_queues[next_full_op_id].extend(output_records)
                 else:
                     final_output_records.extend(output_records)
 
-                logger.info(f"Finished processing operator {operator.op_name()} ({operator.get_op_id()}) on {num_inputs} records")
+                logger.info(f"Finished processing operator {operator.op_name()} ({operator.get_full_op_id()}) on {num_inputs} records")
 
             # break out of loop if the final operator is a LimitScanOp and we've reached its limit
             if isinstance(plan.operators[-1], LimitScanOp) and len(final_output_records) == plan.operators[-1].limit:

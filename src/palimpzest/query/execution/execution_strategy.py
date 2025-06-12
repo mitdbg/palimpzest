@@ -78,7 +78,7 @@ class ExecutionStrategy(BaseExecutionStrategy, ABC):
                     else min(self.scan_start_idx + self.num_samples, len(op.datareader))
                 )
                 inputs = [idx for idx in range(self.scan_start_idx, scan_end_idx)]
-            input_queues[op.get_op_id()] = inputs
+            input_queues[op.get_full_op_id()] = inputs
 
         return input_queues
 
@@ -95,6 +95,7 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
         j: int,
         sample_budget: int,
         policy: Policy,
+        priors: dict | None = None,
         use_final_op_quality: bool = False,
         seed: int = 42,
         exp_name: str | None = None,
@@ -107,6 +108,7 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
         self.j = j
         self.sample_budget = sample_budget
         self.policy = policy
+        self.priors = priors
         self.use_final_op_quality = use_final_op_quality
         self.seed = seed
         self.rng = np.random.default_rng(seed=seed)
@@ -378,9 +380,7 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
             return input.source_idx if isinstance(input, DataRecord) else input
 
         def get_hash(operator, input):
-            logical_op_id = operator.get_logical_op_id()
-            phys_op_id = operator.get_op_id()
-            return hash(f"{logical_op_id}{phys_op_id}{hash(input)}")
+            return hash(f"{operator.get_full_op_id()}{hash(input)}")
 
         # initialize mapping from source indices to output record sets
         source_idx_to_record_sets_and_ops = {get_source_idx(input): [] for _, input in op_input_pairs}
@@ -405,7 +405,6 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
         num_llm_ops = 0
 
         # create thread pool w/max workers and run futures over worker pool
-        import pdb; pdb.set_trace()
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             # create futures
             futures = [

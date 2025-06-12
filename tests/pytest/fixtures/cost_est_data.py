@@ -8,10 +8,10 @@ from palimpzest.core.data.dataclasses import RecordOpStats
 def sample_op_data_factory():
     # this fixture returns a function which generates sample execution data as specified by the fcn. parameters
     def sample_op_data_generator(
-            op_id,
+            full_op_id,
             logical_op_id,
             op_name,
-            source_op_id,
+            source_full_op_id,
             plan_ids,
             record_ids,
             record_parent_ids,
@@ -29,14 +29,14 @@ def sample_op_data_factory():
                 record_parent_id=record_parent_ids[idx] if record_parent_ids is not None else None,
                 record_source_idx=record_source_indices[idx],
                 record_state={},
-                op_id=op_id,
+                full_op_id=full_op_id,
                 logical_op_id=logical_op_id,
                 op_name=op_name,
                 time_per_record=time_per_records[idx],
                 cost_per_record=cost_per_records[idx],
                 total_input_tokens=total_input_tokens[idx] if total_input_tokens is not None else 0.0,
                 total_output_tokens=total_output_tokens[idx] if total_output_tokens is not None else 0.0,
-                source_op_id=source_op_id,
+                source_full_op_id=source_full_op_id,
                 plan_id=plan_ids[idx],
                 model_name=model_names[idx] if model_names is not None else None,
                 answer=answers[idx] if answers is not None else None,
@@ -53,10 +53,10 @@ def sample_op_data_factory():
 def simple_plan_scan_data():
     # we simulate scanning two records with three different plans
     return {
-        "op_id": "scan123",
+        "full_op_id": "scan123",
         "logical_op_id": "BaseScan",
         "op_name": "MarshalAndScanDataOp",
-        "source_op_id": None,
+        "source_full_op_id": None,
         "plan_ids": ["plan1"] * 2 + ["plan2"] * 2 + ["plan3"] * 2,
         "record_ids": ["scan1", "scan2"] * 3,
         "record_parent_ids": None,
@@ -75,10 +75,10 @@ def simple_plan_convert_data(simple_plan_scan_data):
     # we simulate converting the records output by the simple plan's scan operation
     scan_record_ids = simple_plan_scan_data["record_ids"]
     return {
-        "op_id": "convert123",
+        "full_op_id": "convert123",
         "logical_op_id": "ConvertScan",
         "op_name": "LLMConvertBonded",
-        "source_op_id": "scan123",
+        "source_full_op_id": "scan123",
         "plan_ids": simple_plan_scan_data["plan_ids"],
         "record_ids": [id.replace("scan", "convert") for id in scan_record_ids],
         "record_parent_ids": scan_record_ids,
@@ -99,10 +99,10 @@ def simple_plan_filter_data(simple_plan_convert_data):
     # we simulate filtering the records output by the simple plan's convert operation
     convert_record_ids = simple_plan_convert_data["record_ids"]
     return {
-        "op_id": "filter123",
+        "full_op_id": "filter123",
         "logical_op_id": "FilteredScan",
         "op_name": "LLMFilter",
-        "source_op_id": "convert123",
+        "source_full_op_id": "convert123",
         "plan_ids": simple_plan_convert_data["plan_ids"],
         "record_ids": [id.replace("convert", "filter") for id in convert_record_ids],
         "record_parent_ids": convert_record_ids,
