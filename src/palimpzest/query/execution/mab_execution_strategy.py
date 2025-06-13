@@ -127,7 +127,6 @@ class OpFrontier:
         Returns a list of indices for the operators in the op_set.
         """
         if self.priors is None or any([op_id not in self.priors for op_id in map(lambda op: op.get_op_id(), op_set)]):
-            print(f"NOT USING PRIORS FOR OP(s): {op_set[0].__class__.__name__}")
             rng = np.random.default_rng(seed=seed)
             op_indices = np.arange(len(op_set))
             rng.shuffle(op_indices)
