@@ -582,7 +582,6 @@ def main():
         allow_critic=True,
         allow_mixtures=True,
         allow_rag_reduction=True,
-        allow_token_reduction=False,
         allow_split_merge=False,
         progress=True,
     )

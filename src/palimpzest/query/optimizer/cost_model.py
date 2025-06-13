@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import math
 
 # NOTE: the answer.mode() call(s) inside of _est_quality() throw a UserWarning when there are multiple
 #       answers to a convert with the same mode. This is because pandas tries to sort the answers
@@ -24,7 +23,6 @@ from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.rag_convert import RAGConvert
 from palimpzest.query.operators.scan import CacheScanDataOp, MarshalAndScanDataOp, ScanPhysicalOp
-from palimpzest.query.operators.token_reduction_convert import TokenReducedConvertBonded
 from palimpzest.utils.model_helpers import get_champion_model_name, get_models
 
 warnings.simplefilter(action='ignore', category=UserWarning)
@@ -565,16 +563,6 @@ class CostModel(BaseCostModel):
                     op_estimates.time_per_record = 1e-5
                     op_estimates.cost_per_record = 1e-4
                     op_estimates.quality = op_estimates.quality * (GPT_4o_MODEL_CARD["code"] / 100.0)
-
-                # token reduction adjustment
-                if isinstance(operator, TokenReducedConvertBonded):
-                    total_input_tokens = operator.token_budget * sample_op_estimates[full_op_id][model_name]["total_input_tokens"]
-                    total_output_tokens = sample_op_estimates[full_op_id][model_name]["total_output_tokens"]
-                    op_estimates.cost_per_record = (
-                        MODEL_CARDS[model_name]["usd_per_input_token"] * total_input_tokens
-                        + MODEL_CARDS[model_name]["usd_per_output_token"] * total_output_tokens
-                    )
-                    op_estimates.quality = op_estimates.quality * math.sqrt(math.sqrt(operator.token_budget))
 
                 # rag convert adjustment
                 if isinstance(operator, RAGConvert):

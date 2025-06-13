@@ -47,9 +47,6 @@ from palimpzest.query.optimizer.rules import (
     SplitConvertRule as _SplitConvertRule,
 )
 from palimpzest.query.optimizer.rules import (
-    TokenReducedConvertBondedRule as _TokenReducedConvertBondedRule,
-)
-from palimpzest.query.optimizer.rules import (
     TransformationRule as _TransformationRule,
 )
 
@@ -70,7 +67,6 @@ ALL_RULES = [
     _RetrieveRule,
     _Rule,
     _SplitConvertRule,
-    _TokenReducedConvertBondedRule,
     _TransformationRule,
 ]
 

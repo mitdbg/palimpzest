@@ -53,6 +53,7 @@ if __name__ == "__main__":
         val_datasource=val_datareader,
         execution_strategy="parallel",
         max_workers=20,
+        progress=True,
     )
     output = plan.run(config=config, k=5, j=3, sample_budget=50)
 

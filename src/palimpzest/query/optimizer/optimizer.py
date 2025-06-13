@@ -34,7 +34,6 @@ from palimpzest.query.optimizer.rules import (
     MixtureOfAgentsConvertRule,
     RAGConvertRule,
     SplitConvertRule,
-    TokenReducedConvertBondedRule,
 )
 from palimpzest.query.optimizer.tasks import (
     ApplyRule,
@@ -90,7 +89,6 @@ class Optimizer:
         verbose: bool = False,
         allow_bonded_query: bool = True,
         allow_code_synth: bool = False,
-        allow_token_reduction: bool = False,
         allow_rag_reduction: bool = False,
         allow_mixtures: bool = True,
         allow_critic: bool = False,
@@ -131,7 +129,6 @@ class Optimizer:
         if optimizer_strategy == OptimizationStrategyType.NONE:
             self.allow_bonded_query = True
             self.allow_code_synth = False
-            self.allow_token_reduction = False
             self.allow_rag_reduction = False
             self.allow_mixtures = False
             self.allow_critic = False
@@ -144,7 +141,6 @@ class Optimizer:
         self.available_models = available_models
         self.allow_bonded_query = allow_bonded_query
         self.allow_code_synth = allow_code_synth
-        self.allow_token_reduction = allow_token_reduction
         self.allow_rag_reduction = allow_rag_reduction
         self.allow_mixtures = allow_mixtures
         self.allow_critic = allow_critic
@@ -157,17 +153,12 @@ class Optimizer:
             self.implementation_rules = [
                 rule
                 for rule in self.implementation_rules
-                if rule not in [LLMConvertBondedRule, TokenReducedConvertBondedRule]
+                if rule not in [LLMConvertBondedRule]
             ]
 
         if not self.allow_code_synth:
             self.implementation_rules = [
                 rule for rule in self.implementation_rules if not issubclass(rule, CodeSynthesisConvertRule)
-            ]
-
-        if not self.allow_token_reduction:
-            self.implementation_rules = [
-                rule for rule in self.implementation_rules if not issubclass(rule, TokenReducedConvertBondedRule)
             ]
 
         if not self.allow_rag_reduction:
@@ -214,7 +205,6 @@ class Optimizer:
             available_models=self.available_models,
             allow_bonded_query=self.allow_bonded_query,
             allow_code_synth=self.allow_code_synth,
-            allow_token_reduction=self.allow_token_reduction,
             allow_rag_reduction=self.allow_rag_reduction,
             allow_mixtures=self.allow_mixtures,
             allow_critic=self.allow_critic,

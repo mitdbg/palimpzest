@@ -47,8 +47,6 @@ def create_plan_str(flatten_ops):
                     else str(right.filter.filter_fn)
                 )
                 plan_str += f'\n    Filter: "{filter_str}"'
-            if hasattr(right, "token_budget"):
-                plan_str += f"\n    Token budget: {right.token_budget}"
         plan_str += "\n"
         plan_str += (
             f"    ({','.join(in_schema.field_names())[:15]}...) -> ({','.join(out_schema.field_names())[:15]}...)"

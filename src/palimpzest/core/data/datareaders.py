@@ -1,15 +1,12 @@
 from __future__ import annotations
 
 import base64
-import json
 import os
 from abc import ABC, abstractmethod
 from io import BytesIO
 
-import modal
 import pandas as pd
 from bs4 import BeautifulSoup
-from papermage import Document
 
 from palimpzest import constants
 from palimpzest.core.lib.schemas import (
@@ -390,22 +387,8 @@ class PDFFileDirectoryReader(DirectoryReader):
         with open(filepath, "rb") as f:
             pdf_bytes = f.read()
 
-        if self.pdfprocessor == "modal":
-            print("handling PDF processing remotely")
-            remote_func = modal.Function.lookup("palimpzest.tools", "processPapermagePdf")
-        else:
-            remote_func = None
-
         # generate text_content from PDF
-        if remote_func is not None:
-            doc_json_str = remote_func.remote([pdf_bytes])
-            docdict = json.loads(doc_json_str[0])
-            doc = Document.from_json(docdict)
-            text_content = ""
-            for p in doc.pages:
-                text_content += p.text
-        else:
-            text_content = get_text_from_pdf(pdf_filename, pdf_bytes, pdfprocessor=self.pdfprocessor, file_cache_dir=self.file_cache_dir)
+        text_content = get_text_from_pdf(pdf_filename, pdf_bytes, pdfprocessor=self.pdfprocessor, file_cache_dir=self.file_cache_dir)
 
         # construct and return item
         return {"filename": pdf_filename, "contents": pdf_bytes, "text_contents": text_content}
