@@ -250,7 +250,7 @@ class TestOptimizer:
             cost_model=cost_model,
             cache=False,
             verbose=True,
-            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL, Model.GPT_4o_MINI],
+            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
             allow_code_synth=False,
             allow_token_reduction=False,
             allow_rag_reduction=False,
@@ -289,7 +289,7 @@ class TestOptimizer:
             cost_model=cost_model,
             cache=False,
             verbose=True,
-            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL, Model.GPT_4o_MINI],
+            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
             optimizer_strategy=opt_strategy,
             allow_code_synth=True,
         )

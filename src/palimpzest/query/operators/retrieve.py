@@ -8,8 +8,7 @@ from chromadb.api.models.Collection import Collection
 from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
 from chromadb.utils.embedding_functions.openai_embedding_function import OpenAIEmbeddingFunction
 from openai import OpenAI
-
-# from ragatouille.RAGPretrainedModel import RAGPretrainedModel
+from ragatouille.RAGPretrainedModel import RAGPretrainedModel
 from sentence_transformers import SentenceTransformer
 
 from palimpzest.constants import MODEL_CARDS, Model
@@ -22,7 +21,7 @@ from palimpzest.query.operators.physical import PhysicalOperator
 class RetrieveOp(PhysicalOperator):
     def __init__(
         self,
-        index: Collection, # | RAGPretrainedModel,
+        index: Collection | RAGPretrainedModel,
         search_attr: str,
         output_attrs: list[dict] | type[Schema],
         search_func: Callable | None,
@@ -101,8 +100,7 @@ class RetrieveOp(PhysicalOperator):
             quality=1.0,
         )
 
-    # index: Collection | RAGPretrainedModel
-    def default_search_func(self, index: Collection, query: list[str] | list[list[float]], k: int) -> list[str] | list[list[str]]:
+    def default_search_func(self, index: Collection | RAGPretrainedModel, query: list[str] | list[list[float]], k: int) -> list[str] | list[list[str]]:
         """
         Default search function for the Retrieve operation. This function uses the index to
         retrieve the top-k results for the given query. The query will be a (possibly singleton)
@@ -134,21 +132,21 @@ class RetrieveOp(PhysicalOperator):
             # NOTE: self.output_field_names must be a singleton for default_search_func to be used
             return {self.output_field_names[0]: final_results}
 
-        # elif isinstance(index, RAGPretrainedModel):
-        #     # if the index is a rag model, use the rag model to get the top k results
-        #     results = index.search(query, k=k)
+        elif isinstance(index, RAGPretrainedModel):
+            # if the index is a rag model, use the rag model to get the top k results
+            results = index.search(query, k=k)
 
-        #     # the results will be a list[dict]; if the input is a singleton list, however
-        #     # it will be a list[list[dict]]; if the input is a list of lists
-        #     final_results = []
-        #     if is_singleton_list:
-        #         final_results = [result["content"] for result in results]
-        #     else:
-        #         for query_results in results:
-        #             final_results.append([result["content"] for result in query_results])
+            # the results will be a list[dict]; if the input is a singleton list, however
+            # it will be a list[list[dict]]; if the input is a list of lists
+            final_results = []
+            if is_singleton_list:
+                final_results = [result["content"] for result in results]
+            else:
+                for query_results in results:
+                    final_results.append([result["content"] for result in query_results])
 
-        #     # NOTE: self.output_field_names must be a singleton for default_search_func to be used
-        #     return {self.output_field_names[0]: final_results}
+            # NOTE: self.output_field_names must be a singleton for default_search_func to be used
+            return {self.output_field_names[0]: final_results}
 
         else:
             raise ValueError("Unsupported index type. Must be either a Collection or RAGPretrainedModel.")
@@ -231,8 +229,7 @@ class RetrieveOp(PhysicalOperator):
             error_msg = "ChromaDB index must use OpenAI or SentenceTransformer embedding function; see: https://docs.trychroma.com/integrations/embedding-models/openai"
             assert uses_openai_embedding_fcn or uses_sentence_transformer_embedding_fcn, error_msg
 
-            # model_name = self.index._embedding_function._model_name if uses_openai_embedding_fcn else "clip-ViT-B-32"
-            model_name = "text-embedding-3-small" if uses_openai_embedding_fcn else "clip-ViT-B-32"
+            model_name = self.index._embedding_function._model_name if uses_openai_embedding_fcn else "clip-ViT-B-32"
             err_msg = f"For Chromadb, we currently only support `text-embedding-3-small` and `clip-ViT-B-32`; your index uses: {model_name}"
             embedding_model_names = [model.value for model in Model if model.is_embedding_model()]
             assert model_name in embedding_model_names, err_msg

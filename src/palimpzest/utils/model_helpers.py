@@ -50,11 +50,15 @@ def get_models(include_vision: bool = False) -> list[Model]:
 
 # The order is the priority of the model
 TEXT_MODEL_PRIORITY = [
+    Model.o1,
     Model.GPT_4o,
     Model.GPT_4o_MINI,
     Model.LLAMA3_3_70B,
     Model.MIXTRAL,
     Model.DEEPSEEK_V3,
+    Model.LLAMA3_2_3B,
+    Model.LLAMA3_1_8B,
+    Model.DEEPSEEK_R1_DISTILL_QWEN_1_5B,
 ]
 
 VISION_MODEL_PRIORITY = [
