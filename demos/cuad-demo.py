@@ -616,7 +616,7 @@ def main():
     args = parse_arguments()
 
     # create directory for profiling data
-    os.makedirs("extra-opt-profiling-data", exist_ok=True)
+    os.makedirs("opt-profiling-data", exist_ok=True)
 
     # Create a data reader for the CUAD dataset
     data_reader = CUADDataReader(split="test", num_contracts=100, seed=args.seed)
@@ -702,7 +702,7 @@ def main():
 
     # save statistics
     execution_stats_dict = data_record_collection.execution_stats.to_json()
-    with open(f"extra-opt-profiling-data/{exp_name}-stats.json", "w") as f:
+    with open(f"opt-profiling-data/{exp_name}-stats.json", "w") as f:
         json.dump(execution_stats_dict, f)
 
     pred_df = data_record_collection.to_df()
@@ -726,7 +726,7 @@ def main():
         "total_execution_cost": data_record_collection.execution_stats.total_execution_cost,
         "plan_str": final_plan_str,
     }
-    with open(f"extra-opt-profiling-data/{exp_name}-metrics.json", "w") as f:
+    with open(f"opt-profiling-data/{exp_name}-metrics.json", "w") as f:
         json.dump(stats_dict, f)
 
     print(f"Precision: {prec:.3f}, Recall: {recall:.3f}, F1: {f1:.3f}")

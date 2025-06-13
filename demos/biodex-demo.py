@@ -246,7 +246,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # create directory for profiling data
-    os.makedirs("extra-opt-profiling-data", exist_ok=True)
+    os.makedirs("opt-profiling-data", exist_ok=True)
 
     verbose = args.verbose
     progress = args.progress
@@ -408,11 +408,11 @@ if __name__ == "__main__":
     )
 
     print(data_record_collection.to_df())
-    data_record_collection.to_df().to_csv(f"extra-opt-profiling-data/{exp_name}-output.csv", index=False)
+    data_record_collection.to_df().to_csv(f"opt-profiling-data/{exp_name}-output.csv", index=False)
 
     # create filepaths for records and stats
-    records_path = f"extra-opt-profiling-data/{exp_name}-records.json"
-    stats_path = f"extra-opt-profiling-data/{exp_name}-profiling.json"
+    records_path = f"opt-profiling-data/{exp_name}-records.json"
+    stats_path = f"opt-profiling-data/{exp_name}-profiling.json"
 
     # save record outputs
     record_jsons = []
@@ -494,7 +494,7 @@ if __name__ == "__main__":
         "total_execution_cost": data_record_collection.execution_stats.total_execution_cost,
         "plan_str": final_plan_str,
     }
-    with open(f"extra-opt-profiling-data/{exp_name}-metrics.json", "w") as f:
+    with open(f"opt-profiling-data/{exp_name}-metrics.json", "w") as f:
         json.dump(stats_dict, f)
 
     print(f"bad: {bad}")
