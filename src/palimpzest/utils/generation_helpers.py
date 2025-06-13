@@ -12,7 +12,7 @@ def get_json_from_answer(answer: str, model: Model, cardinality: Cardinality) ->
     and optimistically searches for the substring containing the JSON object.
     """
     # model-specific trimming for LLAMA3 responses
-    if model in [Model.LLAMA3, Model.LLAMA3_V]:
+    if model.is_llama_model():
         answer = answer.split("---")[0]
         answer = answer.replace("True", "true")
         answer = answer.replace("False", "false")

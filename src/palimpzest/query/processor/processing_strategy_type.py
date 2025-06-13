@@ -17,9 +17,9 @@ class ProcessingStrategyType(Enum):
         Returns a list of valid execution strategies for the given processing strategy.
         """
         if self == ProcessingStrategyType.SENTINEL or self == ProcessingStrategyType.NO_SENTINEL:
-            return [ExecutionStrategyType.SEQUENTIAL, ExecutionStrategyType.PIPELINED, ExecutionStrategyType.PARALLEL]
+            return [ExecutionStrategyType.SEQUENTIAL, ExecutionStrategyType.PIPELINED, ExecutionStrategyType.PARALLEL, ExecutionStrategyType.SEQUENTIAL_PARALLEL]
         elif self == ProcessingStrategyType.STREAMING:
-            return [ExecutionStrategyType.PIPELINED, ExecutionStrategyType.PARALLEL]
+            return [ExecutionStrategyType.PIPELINED, ExecutionStrategyType.PARALLEL, ExecutionStrategyType.SEQUENTIAL_PARALLEL]
 
     def is_sentinel_strategy(self) -> bool:
         """

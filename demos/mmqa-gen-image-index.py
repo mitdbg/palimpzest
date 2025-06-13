@@ -39,11 +39,11 @@ if __name__ == "__main__":
 
             # find the correct image file
             for ending in possible_endings:
-                if os.path.exists(f"testdata/mmqa-images/{image_id}{ending}"):
+                if os.path.exists(f"/ssd1/mdrusso/mmqa-images/{image_id}{ending}"):
                     image_id += ending
                     break
 
-            image_filepaths.append(f"testdata/mmqa-images/{image_id}")
+            image_filepaths.append(f"/ssd1/mdrusso/mmqa-images/{image_id}")
 
     # create directory for embeddings
     os.makedirs("testdata/mmqa-image-embeddings/", exist_ok=True)
