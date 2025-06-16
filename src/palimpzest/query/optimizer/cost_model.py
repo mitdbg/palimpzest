@@ -43,11 +43,11 @@ class BaseCostModel:
         """
         pass
 
-    def get_costed_phys_op_ids(self) -> set[str]:
+    def get_costed_full_op_ids(self) -> set[str]:
         """
-        Return the set of physical op ids which the cost model has cost estimates for.
+        Return the set of full op ids which the cost model has cost estimates for.
         """
-        raise NotImplementedError("Calling get_costed_phys_op_ids from abstract method")
+        raise NotImplementedError("Calling get_costed_full_op_ids from abstract method")
 
     def __call__(self, operator: PhysicalOperator) -> PlanCost:
         """
@@ -66,9 +66,6 @@ class SampleBasedCostModel:
         verbose: bool = False,
         exp_name: str | None = None,
     ):
-        """
-        execution_data is: {logical_op_id: {physical_op_id: [DataRecordSet]}}
-        """
         # store verbose argument
         self.verbose = verbose
 
@@ -77,30 +74,28 @@ class SampleBasedCostModel:
 
         # construct cost, time, quality, and selectivity matrices for each operator set;
         self.operator_to_stats = self.compute_operator_stats(sentinel_plan_stats)
-
-        # compute set of costed physical op ids from operator_to_stats
-        self.costed_phys_op_ids = set([
-            phys_op_id
-            for _, phys_op_id_to_stats in self.operator_to_stats.items()
-            for phys_op_id, _ in phys_op_id_to_stats.items()
+        self.costed_full_op_ids = set([
+            full_op_id
+            for _, full_op_id_to_stats in self.operator_to_stats.items()
+            for full_op_id in full_op_id_to_stats
         ])
 
         logger.info(f"Initialized SampleBasedCostModel with verbose={self.verbose}")
         logger.debug(f"Initialized SampleBasedCostModel with params: {self.__dict__}")
 
-    def get_costed_phys_op_ids(self):
-        return self.costed_phys_op_ids
+    def get_costed_full_op_ids(self):
+        return self.costed_full_op_ids
 
     def compute_operator_stats(self, sentinel_plan_stats: SentinelPlanStats) -> dict:
         logger.debug("Computing operator statistics")
         # flatten the nested dictionary of execution data and pull out fields relevant to cost estimation
         execution_record_op_stats = []
-        for logical_op_id, phys_op_id_to_op_stats in sentinel_plan_stats.operator_stats.items():
+        for logical_op_id, full_op_id_to_op_stats in sentinel_plan_stats.operator_stats.items():
             logger.debug(f"Computing operator statistics for logical_op_id: {logical_op_id}")
             # flatten the execution data into a list of RecordOpStats
             op_set_execution_data = [
                 record_op_stats
-                for _, op_stats in phys_op_id_to_op_stats.items()
+                for _, op_stats in full_op_id_to_op_stats.items()
                 for record_op_stats in op_stats.record_op_stats_lst
             ]
 
@@ -108,7 +103,7 @@ class SampleBasedCostModel:
             for record_op_stats in op_set_execution_data:
                 record_op_stats_dict = {
                     "logical_op_id": logical_op_id,
-                    "physical_op_id": record_op_stats.op_id,
+                    "full_op_id": record_op_stats.full_op_id,
                     "record_id": record_op_stats.record_id,
                     "record_parent_id": record_op_stats.record_parent_id,
                     "cost_per_record": record_op_stats.cost_per_record,
@@ -124,13 +119,13 @@ class SampleBasedCostModel:
         # convert flattened execution data into dataframe
         operator_stats_df = pd.DataFrame(execution_record_op_stats)
 
-        # for each physical_op_id, compute its average cost_per_record, time_per_record, selectivity, and quality
+        # for each full_op_id, compute its average cost_per_record, time_per_record, selectivity, and quality
         operator_to_stats = {}
         for logical_op_id, logical_op_df in operator_stats_df.groupby("logical_op_id"):
             logger.debug(f"Computing operator statistics for logical_op_id: {logical_op_id}")
             operator_to_stats[logical_op_id] = {}
 
-            for physical_op_id, physical_op_df in logical_op_df.groupby("physical_op_id"):
+            for full_op_id, physical_op_df in logical_op_df.groupby("full_op_id"):
                 # compute the number of input records processed by this operator; use source_idx for scan operator(s)
                 num_source_records = (
                     len(physical_op_df.record_parent_id.unique())
@@ -138,10 +133,10 @@ class SampleBasedCostModel:
                     else len(physical_op_df.source_idx.unique())
                 )
 
-                # compute selectivity 
+                # compute selectivity
                 selectivity = physical_op_df.passed_operator.sum() / num_source_records
 
-                operator_to_stats[logical_op_id][physical_op_id] = {
+                operator_to_stats[logical_op_id][full_op_id] = {
                     "cost": physical_op_df.cost_per_record.mean(),
                     "time": physical_op_df.time_per_record.mean(),
                     "quality": physical_op_df.quality.mean(),
@@ -162,18 +157,18 @@ class SampleBasedCostModel:
         #       we will have execution data for each operator passed into __call__; nevertheless, we
         #       still perform a sanity check
         # look up physical and logical op ids associated with this physical operator
-        phys_op_id = operator.get_op_id()
+        full_op_id = operator.get_full_op_id()
         logical_op_id = operator.logical_op_id
         physical_op_to_stats = self.operator_to_stats.get(logical_op_id)
         assert physical_op_to_stats is not None, f"No execution data for logical operator: {str(operator)}"
-        assert physical_op_to_stats.get(phys_op_id) is not None, f"No execution data for physical operator: {str(operator)}"
+        assert physical_op_to_stats.get(full_op_id) is not None, f"No execution data for physical operator: {str(operator)}"
         logger.debug(f"Calling __call__ for {str(operator)}")
 
         # look up stats for this operation
-        est_cost_per_record = self.operator_to_stats[logical_op_id][phys_op_id]["cost"]
-        est_time_per_record = self.operator_to_stats[logical_op_id][phys_op_id]["time"]
-        est_quality = self.operator_to_stats[logical_op_id][phys_op_id]["quality"]
-        est_selectivity = self.operator_to_stats[logical_op_id][phys_op_id]["selectivity"]
+        est_cost_per_record = self.operator_to_stats[logical_op_id][full_op_id]["cost"]
+        est_time_per_record = self.operator_to_stats[logical_op_id][full_op_id]["time"]
+        est_quality = self.operator_to_stats[logical_op_id][full_op_id]["quality"]
+        est_selectivity = self.operator_to_stats[logical_op_id][full_op_id]["selectivity"]
 
         # create source_op_estimates for scan operators if they are not provided
         if isinstance(operator, ScanPhysicalOp):
@@ -238,13 +233,13 @@ class CostModel(BaseCostModel):
         # compute per-operator estimates
         self.operator_estimates = self._compute_operator_estimates()
 
-        # compute set of costed physical op ids from operator_to_stats
-        self.costed_phys_op_ids = None if self.operator_estimates is None else set(self.operator_estimates.keys())
+        # compute set of costed full op ids from operator_to_stats
+        self.costed_full_op_ids = None if self.operator_estimates is None else set(self.operator_estimates.keys())
         logger.info("Initialized CostModel.")
         logger.debug(f"Initialized CostModel with params: {self.__dict__}")
 
-    def get_costed_phys_op_ids(self):
-        return self.costed_phys_op_ids
+    def get_costed_full_op_ids(self):
+        return self.costed_full_op_ids
 
     def _compute_mean(self, df: pd.DataFrame, col: str, model_name: str | None = None) -> float:
         """
@@ -318,9 +313,9 @@ class CostModel(BaseCostModel):
                 if is_filter_op:
                     num_output_records = model_op_df.passed_operator.sum()
                 else:
-                    op_ids = model_op_df.op_id.unique().tolist()
+                    full_op_ids = model_op_df.full_op_id.unique().tolist()
                     plan_ids = model_op_df.plan_id.unique().tolist()
-                    num_output_records = df[df.source_op_id.isin(op_ids) & df.plan_id.isin(plan_ids)].shape[0]
+                    num_output_records = df[df.source_full_op_id.isin(full_op_ids) & df.plan_id.isin(plan_ids)].shape[0]
 
                 # estimate the selectivity / fan-out
                 return num_output_records / num_input_records
@@ -333,8 +328,8 @@ class CostModel(BaseCostModel):
         if is_filter_op:
             num_output_records = op_df.passed_operator.sum()
         else:
-            op_ids = op_df.op_id.unique().tolist()
-            num_output_records = df[df.source_op_id.isin(op_ids)].shape[0]
+            full_op_ids = op_df.full_op_id.unique().tolist()
+            num_output_records = df[df.source_full_op_id.isin(full_op_ids)].shape[0]
 
         # estimate the selectivity / fan-out
         return num_output_records / num_input_records
@@ -422,14 +417,14 @@ class CostModel(BaseCostModel):
             return None
 
         # get the set of operator ids for which we have sample data
-        op_ids = self.sample_execution_data_df.op_id.unique()
+        full_op_ids = self.sample_execution_data_df.full_op_id.unique()
 
         # compute estimates of runtime, cost, and quality (and intermediates like cardinality) for every operator
         operator_estimates = {}
-        for op_id in op_ids:
+        for full_op_id in full_op_ids:
             # filter for subset of sample execution data related to this operation
             op_df = self.sample_execution_data_df[
-                self.sample_execution_data_df.op_id == op_id
+                self.sample_execution_data_df.full_op_id == full_op_id
             ]
 
             # skip computing an estimate if we didn't capture any sampling data for this operator
@@ -480,14 +475,14 @@ class CostModel(BaseCostModel):
                 cardinality = self._est_cardinality(op_df)
                 estimates = {"time_per_record": time_per_record, "cardinality": cardinality}
 
-            operator_estimates[op_id] = estimates
+            operator_estimates[full_op_id] = estimates
 
         return operator_estimates
 
     def __call__(self, operator: PhysicalOperator, source_op_estimates: OperatorCostEstimates | None = None) -> PlanCost:
         # get identifier for operation which is unique within sentinel plan but consistent across sentinels
-        op_id = operator.get_op_id()
-        logger.debug(f"Calling __call__ for {str(operator)} with op_id: {op_id}")
+        full_op_id = operator.get_full_op_id()
+        logger.debug(f"Calling __call__ for {str(operator)} with full_op_id: {full_op_id}")
 
         # initialize estimates of operator metrics based on naive (but sometimes precise) logic
         if isinstance(operator, MarshalAndScanDataOp):
@@ -520,9 +515,9 @@ class CostModel(BaseCostModel):
 
         # if we have sample execution data, update naive estimates with more informed ones
         sample_op_estimates = self.operator_estimates
-        if sample_op_estimates is not None and op_id in sample_op_estimates:
+        if sample_op_estimates is not None and full_op_id in sample_op_estimates:
             if isinstance(operator, (MarshalAndScanDataOp, CacheScanDataOp)):
-                op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
+                op_estimates.time_per_record = sample_op_estimates[full_op_id]["time_per_record"]
 
             elif isinstance(operator, ApplyGroupByOp):
                 # NOTE: in theory we should also treat this cardinality est. as a random variable, but in practice we will
@@ -533,36 +528,33 @@ class CostModel(BaseCostModel):
                 #       produced by the groupby in our sample and assume it may generalize to the full workload. To estimate
                 #       actual cardinalities of operators we estimate their selectivities / fan-outs and multiply those by
                 #       the input cardinality (where the initial input cardinality from the datareader is known).
-                op_estimates.cardinality = sample_op_estimates[op_id]["cardinality"]
-                op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
+                op_estimates.cardinality = sample_op_estimates[full_op_id]["cardinality"]
+                op_estimates.time_per_record = sample_op_estimates[full_op_id]["time_per_record"]
 
             elif isinstance(operator, (CountAggregateOp, AverageAggregateOp)):  # noqa: SIM114
-                op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
+                op_estimates.time_per_record = sample_op_estimates[full_op_id]["time_per_record"]
 
             elif isinstance(operator, LimitScanOp):
-                op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
+                op_estimates.time_per_record = sample_op_estimates[full_op_id]["time_per_record"]
 
             elif isinstance(operator, NonLLMFilter):
-                op_estimates.cardinality = source_op_estimates.cardinality * sample_op_estimates[op_id]["selectivity"]
-                op_estimates.time_per_record = sample_op_estimates[op_id]["time_per_record"]
+                op_estimates.cardinality = source_op_estimates.cardinality * sample_op_estimates[full_op_id]["selectivity"]
+                op_estimates.time_per_record = sample_op_estimates[full_op_id]["time_per_record"]
 
             elif isinstance(operator, LLMFilter):
                 model_name = operator.model.value
-                op_estimates.cardinality = source_op_estimates.cardinality * sample_op_estimates[op_id][model_name]["selectivity"]
-                op_estimates.time_per_record = sample_op_estimates[op_id][model_name]["time_per_record"]
-                op_estimates.cost_per_record = sample_op_estimates[op_id][model_name]["cost_per_record"]
-                op_estimates.quality = sample_op_estimates[op_id][model_name]["quality"]
+                op_estimates.cardinality = source_op_estimates.cardinality * sample_op_estimates[full_op_id][model_name]["selectivity"]
+                op_estimates.time_per_record = sample_op_estimates[full_op_id][model_name]["time_per_record"]
+                op_estimates.cost_per_record = sample_op_estimates[full_op_id][model_name]["cost_per_record"]
+                op_estimates.quality = sample_op_estimates[full_op_id][model_name]["quality"]
 
             elif isinstance(operator, LLMConvert):
-                # TODO: EVEN BETTER: do similarity match (e.g. largest param intersection, more exotic techniques);
-                #       another heuristic: logical_op_id-->subclass_physical_op_id-->specific_physical_op_id-->most_param_match_physical_op_id
-                # TODO: instead of [op_id][model_name] --> [logical_op_id][physical_op_id]
                 # NOTE: code synthesis does not have a model attribute
                 model_name = operator.model.value if hasattr(operator, "model") else None
-                op_estimates.cardinality = source_op_estimates.cardinality * sample_op_estimates[op_id][model_name]["selectivity"]
-                op_estimates.time_per_record = sample_op_estimates[op_id][model_name]["time_per_record"]
-                op_estimates.cost_per_record = sample_op_estimates[op_id][model_name]["cost_per_record"]
-                op_estimates.quality = sample_op_estimates[op_id][model_name]["quality"]
+                op_estimates.cardinality = source_op_estimates.cardinality * sample_op_estimates[full_op_id][model_name]["selectivity"]
+                op_estimates.time_per_record = sample_op_estimates[full_op_id][model_name]["time_per_record"]
+                op_estimates.cost_per_record = sample_op_estimates[full_op_id][model_name]["cost_per_record"]
+                op_estimates.quality = sample_op_estimates[full_op_id][model_name]["quality"]
 
                 # NOTE: if code synth. fails, this will turn into ConventionalQuery calls to GPT-3.5,
                 #       which would wildly mess up estimate of time and cost per-record
@@ -575,7 +567,7 @@ class CostModel(BaseCostModel):
                 # rag convert adjustment
                 if isinstance(operator, RAGConvert):
                     total_input_tokens = operator.num_chunks_per_field * operator.chunk_size
-                    total_output_tokens = sample_op_estimates[op_id][model_name]["total_output_tokens"]
+                    total_output_tokens = sample_op_estimates[full_op_id][model_name]["total_output_tokens"]
                     op_estimates.cost_per_record = (
                         MODEL_CARDS[model_name]["usd_per_input_token"] * total_input_tokens
                         + MODEL_CARDS[model_name]["usd_per_output_token"] * total_output_tokens
@@ -597,7 +589,7 @@ class CostModel(BaseCostModel):
             quality=op_quality,
             op_estimates=op_estimates,
         )
-        logger.debug(f"Done calling __call__ for {str(operator)} with op_id: {op_id}")
+        logger.debug(f"Done calling __call__ for {str(operator)} with full_op_id: {full_op_id}")
         logger.debug(f"Plan cost: {op_plan_cost}")
 
         return op_plan_cost

@@ -103,9 +103,6 @@ class Optimizer:
         # store the cost model
         self.cost_model = cost_model
 
-        # store the set of physical operators for which our cost model has cost estimates
-        self.costed_phys_op_ids = cost_model.get_costed_phys_op_ids()
-
         # mapping from each group id to its Group object
         self.groups = {}
 
@@ -189,7 +186,6 @@ class Optimizer:
 
     def update_cost_model(self, cost_model: CostModel):
         self.cost_model = cost_model
-        self.costed_phys_op_ids = cost_model.get_costed_phys_op_ids()
 
     def get_physical_op_params(self):
         return {
@@ -338,7 +334,7 @@ class Optimizer:
         # compute all properties including this operations'
         all_properties = deepcopy(input_group_properties)
         if isinstance(op, FilteredScan):
-            # NOTE: we could use op.get_op_id() here, but storing filter strings makes
+            # NOTE: we could use op.get_full_op_id() here, but storing filter strings makes
             #       debugging a bit easier as you can read which filters are in the Group
             op_filter_str = op.filter.get_filter_str()
             if "filters" in all_properties:
@@ -464,7 +460,7 @@ class Optimizer:
             elif isinstance(task, OptimizeLogicalExpression):
                 new_tasks = task.perform(self.transformation_rules, self.implementation_rules)
             elif isinstance(task, ApplyRule):
-                context = {"costed_phys_op_ids": self.costed_phys_op_ids}
+                context = {"costed_full_op_ids": self.cost_model.get_costed_full_op_ids()}
                 new_tasks = task.perform(
                     self.groups, self.expressions, context=context, **self.get_physical_op_params()
                 )

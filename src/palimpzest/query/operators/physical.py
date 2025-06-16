@@ -79,7 +79,8 @@ class PhysicalOperator:
               This is particularly true for convert operations, where the output schema
               is now the union of the input and output schemas of the logical operator.
         """
-        return {"generated_fields": self.generated_fields}
+        # return {"generated_fields": self.generated_fields}
+        return {}
 
     def get_op_params(self) -> dict:
         """
@@ -129,8 +130,11 @@ class PhysicalOperator:
     def get_logical_op_id(self) -> str | None:
         return self.logical_op_id
 
+    def get_full_op_id(self):
+        return f"{self.get_logical_op_id()}-{self.get_op_id()}"
+
     def __hash__(self):
-        return int(self.op_id, 16)
+        return int(self.op_id, 16) # NOTE: should we use self.get_full_op_id() instead?
 
     def get_model_name(self) -> str | None:
         """Returns the name of the model used by the physical operator (if it sets self.model). Otherwise, it returns None."""

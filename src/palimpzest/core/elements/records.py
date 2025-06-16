@@ -35,7 +35,7 @@ class DataRecord:
         self.field_values: dict[str, Any] = {}
 
         # the index in the DataReader from which this DataRecord is derived
-        self.source_idx = source_idx
+        self.source_idx = int(source_idx)
 
         # the id of the parent record(s) from which this DataRecord is derived
         self.parent_id = parent_id

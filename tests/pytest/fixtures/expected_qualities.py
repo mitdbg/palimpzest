@@ -54,15 +54,15 @@ def scan_convert_filter_varied_qualities(scan_convert_filter_varied_execution_da
                     if record_op_stats.logical_op_id == "scan1-logical":
                         quality = 1.0
                     elif record_op_stats.logical_op_id == "convert1-logical":
-                        quality = 1.0 if str(Model.GPT_4o) in record_op_stats.op_id else 0.5
+                        quality = 1.0 if str(Model.GPT_4o) in record_op_stats.full_op_id else 0.5
                     elif record_op_stats.logical_op_id == "filter1-logical":
-                        if str(Model.GPT_4o) in record_op_stats.op_id:
+                        if str(Model.GPT_4o) in record_op_stats.full_op_id:
                             quality = 1.0
-                        elif str(Model.GPT_4o_MINI) in record_op_stats.op_id:
+                        elif str(Model.GPT_4o_MINI) in record_op_stats.full_op_id:
                             # by construction, champion model expects odd record outputs but GPT-3.5 outputs even records,
                             # so all records get quality 0.0
                             quality = 0.0
-                        elif str(Model.MIXTRAL) in record_op_stats.op_id:
+                        elif str(Model.MIXTRAL) in record_op_stats.full_op_id:
                             # by construction, champion model expects odd record outputs but Mixtral outputs all records,
                             # so even records get quality 0.0 and odd records get quality 1.0
                             quality = int(bool(source_idx % 2))
@@ -98,11 +98,11 @@ def scan_convert_filter_varied_override_qualities(scan_convert_filter_varied_exe
                         # for expected outputs w/record idx >= 6 (i.e. records 7, 8) the expected `bar` value is f"bar{idx}-{str(Model.MIXTRAL)}";
                         # for records 0, 3, 6, 9; the champion model expects outputs f"bar{idx}-{str(Model.GPT_4o)}"
                         if source_idx % 3 > 0 and source_idx < 6:
-                            quality = 1.0 if str(Model.GPT_4o_MINI) in record_op_stats.op_id else 0.5
+                            quality = 1.0 if str(Model.GPT_4o_MINI) in record_op_stats.full_op_id else 0.5
                         elif source_idx % 3 > 0:
-                            quality = 1.0 if str(Model.MIXTRAL) in record_op_stats.op_id else 0.5
+                            quality = 1.0 if str(Model.MIXTRAL) in record_op_stats.full_op_id else 0.5
                         else:
-                            quality = 1.0 if str(Model.GPT_4o) in record_op_stats.op_id else 0.5
+                            quality = 1.0 if str(Model.GPT_4o) in record_op_stats.full_op_id else 0.5
 
                     elif record_op_stats.logical_op_id == "filter1-logical":
                         # by construction, expected output passes all records with idx % 3 > 0, i.e. records 1, 2, 4, 5, 7, 8
@@ -111,10 +111,10 @@ def scan_convert_filter_varied_override_qualities(scan_convert_filter_varied_exe
                         # champion model passes all odd records
 
                         # using expected_record and match found
-                        if source_idx % 3 > 0 and source_idx < 6 and str(Model.GPT_4o_MINI) in record_op_stats.op_id:  # noqa: SIM114
+                        if source_idx % 3 > 0 and source_idx < 6 and str(Model.GPT_4o_MINI) in record_op_stats.full_op_id:  # noqa: SIM114
                             quality = int(record_op_stats.passed_operator)
                         
-                        elif source_idx % 3 > 0 and source_idx >= 6 and str(Model.MIXTRAL) in record_op_stats.op_id:  # noqa: SIM114
+                        elif source_idx % 3 > 0 and source_idx >= 6 and str(Model.MIXTRAL) in record_op_stats.full_op_id:  # noqa: SIM114
                             quality = int(record_op_stats.passed_operator)
 
                         # using champion record and it thinks record should pass
@@ -152,9 +152,9 @@ def scan_multi_convert_multi_filter_qualities(scan_multi_convert_multi_filter_ex
                         if source_idx == 0 and one_to_many_idx == 1:
                             quality = 0.0
                         elif source_idx < 7:
-                            quality = 1.0 if str(Model.GPT_4o_MINI) in record_op_stats.op_id else 0.5
+                            quality = 1.0 if str(Model.GPT_4o_MINI) in record_op_stats.full_op_id else 0.5
                         else:
-                            quality = 1.0 if str(Model.GPT_4o) in record_op_stats.op_id else 0.5
+                            quality = 1.0 if str(Model.GPT_4o) in record_op_stats.full_op_id else 0.5
 
                     elif record_op_stats.logical_op_id == "filter1-logical":
                         # by construction, expected output passes all records with source_idx < 7
@@ -194,7 +194,7 @@ def scan_multi_convert_multi_filter_qualities(scan_multi_convert_multi_filter_ex
                         if source_idx == 0 and one_to_many_idx == 1:
                             quality = 0.0
                         else:
-                            quality = 1.0 if str(Model.GPT_4o_MINI) in record_op_stats.op_id else 0.0
+                            quality = 1.0 if str(Model.GPT_4o_MINI) in record_op_stats.full_op_id else 0.0
 
                     record_set_expected_qualities.append(quality)
                 expected_qualities[logical_op_id][source_idx].append(record_set_expected_qualities)

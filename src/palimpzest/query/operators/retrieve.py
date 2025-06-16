@@ -163,7 +163,7 @@ class RetrieveOp(PhysicalOperator):
             record_parent_id=output_dr.parent_id,
             record_source_idx=output_dr.source_idx,
             record_state=record_state,
-            op_id=self.get_op_id(),
+            full_op_id=self.get_full_op_id(),
             logical_op_id=self.logical_op_id,
             op_name=self.op_name(),
             time_per_record=total_time,
@@ -214,7 +214,8 @@ class RetrieveOp(PhysicalOperator):
 
             model_name = self.index._embedding_function._model_name if uses_openai_embedding_fcn else "clip-ViT-B-32"
             err_msg = f"For Chromadb, we currently only support `text-embedding-3-small` and `clip-ViT-B-32`; your index uses: {model_name}"
-            assert model_name in [Model.TEXT_EMBEDDING_3_SMALL.value, Model.CLIP_VIT_B_32.value], err_msg
+            embedding_model_names = [model.value for model in Model if model.is_embedding_model()]
+            assert model_name in embedding_model_names, err_msg
 
             # compute embeddings
             try:

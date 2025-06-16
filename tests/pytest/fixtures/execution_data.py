@@ -39,13 +39,13 @@ def scan_convert_filter_execution_data(scan_convert_filter_sentinel_plan, foobar
 
     # create execution data entries for scan operator
     for scan_dr in scan_drs:
-        op_id = op_sets[0][0].get_op_id()
+        full_op_id = op_sets[0][0].get_full_op_id()
         source_idx = scan_dr.source_idx
         record_op_stats = RecordOpStats(
             record_id=scan_dr.id,
             record_parent_id=scan_dr.parent_id,
             record_source_idx=scan_dr.source_idx,
-            op_id=op_id,
+            full_op_id=full_op_id,
             op_name="MarshalAndScanDataOp",
             time_per_record=1.0,
             cost_per_record=0.0,
@@ -59,7 +59,7 @@ def scan_convert_filter_execution_data(scan_convert_filter_sentinel_plan, foobar
 
     # create execution data entries for convert operator
     for op_idx, op in enumerate(op_sets[1]):
-        op_id = op.get_op_id()
+        full_op_id = op.get_full_op_id()
         for source_idx in range(10):
             record_idx = op_idx * len(op_sets) + source_idx
             convert_dr = convert_drs[record_idx]
@@ -67,7 +67,7 @@ def scan_convert_filter_execution_data(scan_convert_filter_sentinel_plan, foobar
                 record_id=convert_dr.id,
                 record_parent_id=convert_dr.parent_id,
                 record_source_idx=convert_dr.source_idx,
-                op_id=op_id,
+                full_op_id=full_op_id,
                 op_name="LLMConvertBonded",
                 time_per_record=1.0,
                 cost_per_record=1.0,
@@ -84,7 +84,7 @@ def scan_convert_filter_execution_data(scan_convert_filter_sentinel_plan, foobar
 
     # create execution data entries for filter operator
     for op_idx, op in enumerate(op_sets[2]):
-        op_id = op.get_op_id()
+        full_op_id = op.get_full_op_id()
         for source_idx in range(10):
             record_idx = op_idx * len(op_sets) + source_idx
             filter_dr = filter_drs[record_idx]
@@ -92,7 +92,7 @@ def scan_convert_filter_execution_data(scan_convert_filter_sentinel_plan, foobar
                 record_id=filter_dr.id,
                 record_parent_id=filter_dr.parent_id,
                 record_source_idx=filter_dr.source_idx,
-                op_id=op_id,
+                full_op_id=full_op_id,
                 op_name="LLMFilter",
                 time_per_record=1.0,
                 cost_per_record=1.0,
@@ -149,7 +149,7 @@ def scan_convert_filter_varied_execution_data(scan_convert_filter_sentinel_plan,
             record_id=scan_dr.id,
             record_parent_id=scan_dr.parent_id,
             record_source_idx=scan_dr.source_idx,
-            op_id="scan1-phys",
+            full_op_id="scan1-phys",
             op_name="MarshalAndScanDataOp",
             time_per_record=1.0,
             cost_per_record=0.0,
@@ -169,7 +169,7 @@ def scan_convert_filter_varied_execution_data(scan_convert_filter_sentinel_plan,
             record_id=convert_dr.id,
             record_parent_id=convert_dr.parent_id,
             record_source_idx=convert_dr.source_idx,
-            op_id=f"convert1-phys-{str(model)}",
+            full_op_id=f"convert1-phys-{str(model)}",
             op_name="LLMConvertBonded",
             time_per_record=1.0,
             cost_per_record=1.0,
@@ -204,7 +204,7 @@ def scan_convert_filter_varied_execution_data(scan_convert_filter_sentinel_plan,
             record_id=filter_dr.id,
             record_parent_id=filter_dr.parent_id,
             record_source_idx=filter_dr.source_idx,
-            op_id=f"filter1-phys-{str(model)}",
+            full_op_id=f"filter1-phys-{str(model)}",
             op_name="LLMFilter",
             time_per_record=1.0,
             cost_per_record=1.0,
@@ -280,7 +280,7 @@ def scan_multi_convert_multi_filter_execution_data(scan_multi_convert_multi_filt
             record_id=scan_dr.id,
             record_parent_id=scan_dr.parent_id,
             record_source_idx=scan_dr.source_idx,
-            op_id="scan1-phys",
+            full_op_id="scan1-phys",
             op_name="MarshalAndScanDataOp",
             time_per_record=1.0,
             cost_per_record=0.0,
@@ -304,7 +304,7 @@ def scan_multi_convert_multi_filter_execution_data(scan_multi_convert_multi_filt
                     record_id=convert_dr.id,
                     record_parent_id=convert_dr.parent_id,
                     record_source_idx=convert_dr.source_idx,
-                    op_id=f"convert1-phys-{str(models[model_idx])}",
+                    full_op_id=f"convert1-phys-{str(models[model_idx])}",
                     op_name="LLMConvertBonded",
                     time_per_record=1.0,
                     cost_per_record=1.0,
@@ -346,7 +346,7 @@ def scan_multi_convert_multi_filter_execution_data(scan_multi_convert_multi_filt
                     record_id=filter_dr.id,
                     record_parent_id=filter_dr.parent_id,
                     record_source_idx=filter_dr.source_idx,
-                    op_id=f"filter1-phys-{str(model)}",
+                    full_op_id=f"filter1-phys-{str(model)}",
                     op_name="LLMFilter",
                     time_per_record=1.0,
                     cost_per_record=1.0,
@@ -387,7 +387,7 @@ def scan_multi_convert_multi_filter_execution_data(scan_multi_convert_multi_filt
                     record_id=filter_dr.id,
                     record_parent_id=filter_dr.parent_id,
                     record_source_idx=filter_dr.source_idx,
-                    op_id=f"filter2-phys-{str(model)}",
+                    full_op_id=f"filter2-phys-{str(model)}",
                     op_name="LLMFilter",
                     time_per_record=1.0,
                     cost_per_record=1.0,
@@ -413,7 +413,7 @@ def scan_multi_convert_multi_filter_execution_data(scan_multi_convert_multi_filt
                     record_id=convert_dr.id,
                     record_parent_id=convert_dr.parent_id,
                     record_source_idx=convert_dr.source_idx,
-                    op_id=f"convert1-phys-{str(models[model_idx])}",
+                    full_op_id=f"convert1-phys-{str(models[model_idx])}",
                     op_name="LLMConvertBonded",
                     time_per_record=1.0,
                     cost_per_record=1.0,
