@@ -9,7 +9,6 @@ import chromadb
 import datasets
 from chromadb.utils.embedding_functions.openai_embedding_function import OpenAIEmbeddingFunction
 
-# from ragatouille import RAGPretrainedModel
 import palimpzest as pz
 from palimpzest.constants import Model
 from palimpzest.utils.model_helpers import get_models
@@ -289,16 +288,6 @@ if __name__ == "__main__":
         shuffle=True,
         seed=seed,
     )
-
-    # # load index [Colbert]
-    # index_path = ".ragatouille/colbert/indexes/reaction-terms"
-    # index = RAGPretrainedModel.from_index(index_path)
-
-    # def search_func(index, query, k):
-    #     results = index.search(query, k=1)
-    #     results = [result[0] if isinstance(result, list) else result for result in results]
-    #     sorted_results = sorted(results, key=lambda result: result["score"], reverse=True)
-    #     return {"reaction_labels": [result["content"] for result in sorted_results[:k]], GenerationStats(model_name="colbert")}
 
     # load index [text-embedding-3-small]
     chroma_client = chromadb.PersistentClient(".chroma-biodex")
