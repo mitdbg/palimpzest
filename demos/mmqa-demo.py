@@ -245,7 +245,7 @@ def compute_f1(final_df, answers_df):
                 # try parsing preds as JSON list and cast everything to str to match targets
                 preds = get_json_from_answer(preds)
                 preds = [str(pred).lower() for pred in preds]
-            except:
+            except Exception:
                 # if that fails, give it a shot as a singleton answer that the LLM failed to wrap in a list
                 preds = [preds.lower()]
             remove_tokens = [c for c in string.punctuation if c != "/"]

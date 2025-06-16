@@ -119,7 +119,7 @@ ANSWER:
         completion_text = completion.choices[0].message.content
         try:
             answer = get_json_from_answer(completion_text, Model.GPT_4o_MINI, Cardinality.ONE_TO_MANY)
-        except:
+        except Exception:
             answer = [completion_text]
         preds.append(answer)
 
