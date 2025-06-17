@@ -58,8 +58,8 @@ class PhysicalOperator:
         return op
 
     def __eq__(self, other) -> bool:
-        all_id_params_match = all(value == getattr(other, key) for key, value in self.get_id_params().items())
-        return isinstance(other, self.__class__) and all_id_params_match
+        all_op_params_match = all(value == getattr(other, key) for key, value in self.get_op_params().items())
+        return isinstance(other, self.__class__) and all_op_params_match
 
     def copy(self) -> PhysicalOperator:
         return self.__class__(**self.get_op_params())

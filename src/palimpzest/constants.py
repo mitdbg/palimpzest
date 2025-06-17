@@ -19,9 +19,9 @@ class Model(str, Enum):
     DEEPSEEK_R1_DISTILL_QWEN_1_5B = "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"
     GPT_4o = "gpt-4o-2024-08-06"
     GPT_4o_MINI = "gpt-4o-mini-2024-07-18"
-    o1 = "o1-2024-12-17"
     TEXT_EMBEDDING_3_SMALL = "text-embedding-3-small"
     CLIP_VIT_B_32 = "clip-ViT-B-32"
+    # o1 = "o1-2024-12-17"
 
     def __repr__(self):
         return f"{self.name}"
@@ -396,7 +396,7 @@ MODEL_CARDS = {
     Model.MIXTRAL.value: MIXTRAL_8X_7B_MODEL_CARD,
     Model.GPT_4o.value: GPT_4o_MODEL_CARD,
     Model.GPT_4o_MINI.value: GPT_4o_MINI_MODEL_CARD,
-    Model.o1.value: o1_MODEL_CARD,
+    # Model.o1.value: o1_MODEL_CARD,
     Model.TEXT_EMBEDDING_3_SMALL.value: TEXT_EMBEDDING_3_SMALL_MODEL_CARD,
     Model.CLIP_VIT_B_32.value: CLIP_VIT_B_32_MODEL_CARD,
 }
