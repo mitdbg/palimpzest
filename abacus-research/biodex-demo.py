@@ -8,11 +8,8 @@ import chromadb
 import datasets
 from chromadb.utils.embedding_functions.openai_embedding_function import OpenAIEmbeddingFunction
 
-# from ragatouille import RAGPretrainedModel
 import palimpzest as pz
 from palimpzest.constants import Model
-from palimpzest.policy import MaxQualityAtFixedCost
-from palimpzest.utils.model_helpers import get_models
 
 biodex_entry_cols = [
     {"name": "pmid", "type": str, "desc": "The PubMed ID of the medical paper"},
@@ -165,6 +162,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run a simple demo")
     parser.add_argument("--verbose", default=False, action="store_true", help="Print verbose output")
     parser.add_argument("--progress", default=False, action="store_true", help="Print progress output")
+    parser.add_argument("--constrained", default=False, action="store_true", help="Use constrained objective")
+    parser.add_argument("--gpt4-mini-only", default=False, action="store_true", help="Use only GPT-4o-mini")
     parser.add_argument(
         "--processing-strategy",
         default="sentinel",
@@ -184,16 +183,22 @@ if __name__ == "__main__":
         help="The sentinel execution strategy to use. One of mab or random",
     )
     parser.add_argument(
-        "--optimizer-strategy",
-        default="pareto",
+        "--policy",
+        default="maxquality",
         type=str,
-        help="The optimizer to use. One of pareto or greedy",
+        help="One of 'mincost', 'mintime', 'maxquality'",
     )
     parser.add_argument(
         "--val-examples",
-        default=30,
+        default=25,
         type=int,
         help="Number of validation examples to sample from",
+    )
+    parser.add_argument(
+        "--model",
+        default="gpt-4o",
+        type=str,
+        help="One of 'gpt-4o', 'gpt-4o-mini', 'llama', 'mixtral'",
     )
     parser.add_argument(
         "--seed",
@@ -220,12 +225,6 @@ if __name__ == "__main__":
         help="Total sample budget in Random Sampling or MAB sentinel execution",
     )
     parser.add_argument(
-        "--cost",
-        default=1.0,
-        type=float,
-        help="The cost budget for the optimization",
-    )
-    parser.add_argument(
         "--exp-name",
         default=None,
         type=str,
@@ -237,11 +236,17 @@ if __name__ == "__main__":
         type=str,
         help="A file with a dictionary mapping physical operator ids to prior belief on their performance",
     )
+    parser.add_argument(
+        "--quality",
+        default=None,
+        type=float,
+        help="Quality threshold",
+    )
 
     args = parser.parse_args()
 
     # create directory for profiling data
-    os.makedirs("pareto-cascades-data", exist_ok=True)
+    os.makedirs("opt-profiling-data", exist_ok=True)
 
     verbose = args.verbose
     progress = args.progress
@@ -253,10 +258,8 @@ if __name__ == "__main__":
     processing_strategy = args.processing_strategy
     execution_strategy = args.execution_strategy
     sentinel_execution_strategy = args.sentinel_execution_strategy
-    optimizer_strategy = args.optimizer_strategy
-    cost = args.cost
     exp_name = (
-        f"biodex-strategy-{optimizer_strategy}-k{k}-j{j}-budget{sample_budget}-seed{seed}"
+        f"biodex-final-{sentinel_execution_strategy}-k{k}-j{j}-budget{sample_budget}-seed{seed}"
         if args.exp_name is None
         else args.exp_name
     )
@@ -264,7 +267,14 @@ if __name__ == "__main__":
     if args.priors_file is not None:
         with open(args.priors_file) as f:
             priors = json.load(f)
-    print(f"EXPERIMENT NAME: {exp_name}")
+
+    # set the optimization policy; constraint set to 25% percentile from unconstrained plans
+    policy = pz.MaxQuality() if not args.constrained else pz.MaxQualityAtFixedCost(max_cost=2.250)
+    if args.quality is not None and args.policy == "mincostatfixedquality":
+        policy = pz.MinCostAtFixedQuality(min_quality=args.quality)
+    elif args.quality is not None and args.policy == "minlatencyatfixedquality":
+        policy = pz.MinTimeAtFixedQuality(min_quality=args.quality)
+    print(f"USING POLICY: {policy}")
 
     if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None:
         print("WARNING: Both OPENAI_API_KEY and TOGETHER_API_KEY are unset")
@@ -284,16 +294,6 @@ if __name__ == "__main__":
         shuffle=True,
         seed=seed,
     )
-
-    # # load index [Colbert]
-    # index_path = ".ragatouille/colbert/indexes/reaction-terms"
-    # index = RAGPretrainedModel.from_index(index_path)
-
-    # def search_func(index, query, k):
-    #     results = index.search(query, k=1)
-    #     results = [result[0] if isinstance(result, list) else result for result in results]
-    #     sorted_results = sorted(results, key=lambda result: result["score"], reverse=True)
-    #     return {"reaction_labels": [result["content"] for result in sorted_results[:k]], GenerationStats(model_name="colbert")}
 
     # load index [text-embedding-3-small]
     chroma_client = chromadb.PersistentClient(".chroma-biodex")
@@ -339,42 +339,34 @@ if __name__ == "__main__":
     )
     plan = plan.sem_add_columns(biodex_ranked_reactions_labels_cols, depends_on=["title", "abstract", "fulltext", "reaction_labels"])
 
-    # only use final op quality
-    use_final_op_quality = True
-
-    # fetch available models
-    available_models = get_models(include_vision=True)
+    # set models
+    models = [Model.GPT_4o_MINI] if args.gpt4_mini_only else [
+        Model.GPT_4o,
+        Model.GPT_4o_MINI,
+        Model.LLAMA3_1_8B,
+        Model.LLAMA3_3_70B,
+        Model.MIXTRAL,
+        Model.DEEPSEEK_R1_DISTILL_QWEN_1_5B,
+    ]
 
     # execute pz plan
     config = pz.QueryProcessorConfig(
-        policy=MaxQualityAtFixedCost(max_cost=cost),
+        policy=policy,
         cache=False,
         val_datasource=val_datasource,
         processing_strategy=processing_strategy,
-        optimizer_strategy=optimizer_strategy,
+        optimizer_strategy="pareto",
         sentinel_execution_strategy=sentinel_execution_strategy,
         execution_strategy=execution_strategy,
-        use_final_op_quality=use_final_op_quality,
+        use_final_op_quality=True,
         max_workers=64,
         verbose=verbose,
-        available_models=[
-            # Model.GPT_4o,
-            Model.GPT_4o_MINI,
-            Model.LLAMA3_2_3B,
-            Model.LLAMA3_1_8B,
-            Model.LLAMA3_3_70B,
-            # Model.LLAMA3_2_90B_V,
-            Model.MIXTRAL,
-            # Model.DEEPSEEK_V3,
-            Model.DEEPSEEK_R1_DISTILL_QWEN_1_5B,
-        ],
+        available_models=models,
         allow_bonded_query=True,
         allow_code_synth=False,
         allow_critic=True,
         allow_mixtures=True,
         allow_rag_reduction=True,
-        allow_token_reduction=False,
-        allow_split_merge=False,
         progress=progress,
     )
 
@@ -389,11 +381,11 @@ if __name__ == "__main__":
     )
 
     print(data_record_collection.to_df())
-    data_record_collection.to_df().to_csv(f"pareto-cascades-data/{exp_name}-output.csv", index=False)
+    data_record_collection.to_df().to_csv(f"opt-profiling-data/{exp_name}-output.csv", index=False)
 
     # create filepaths for records and stats
-    records_path = f"pareto-cascades-data/{exp_name}-records.json"
-    stats_path = f"pareto-cascades-data/{exp_name}-profiling.json"
+    records_path = f"opt-profiling-data/{exp_name}-records.json"
+    stats_path = f"opt-profiling-data/{exp_name}-profiling.json"
 
     # save record outputs
     record_jsons = []
@@ -449,7 +441,8 @@ if __name__ == "__main__":
         return total / denom
 
     def compute_avg_rp_at_k(records, k=5):
-        total_rp_at_k, bad = 0, 0
+        total_rp_at_k = 0
+        bad = 0
         for record in records:
             pmid = record['pmid']
             preds = record['ranked_reaction_labels']
@@ -457,17 +450,15 @@ if __name__ == "__main__":
             try:
                 total_rp_at_k += rank_precision_at_k(preds, targets, k)
             except Exception:
-                print(f"Error computing rank precision at k for record with pmid {pmid}")
                 bad += 1
 
         return total_rp_at_k / len(records), bad
 
-    rp_at_k, failed = compute_avg_rp_at_k(record_jsons, k=5)
+    rp_at_k, bad = compute_avg_rp_at_k(record_jsons, k=5)
     final_plan_id = list(data_record_collection.execution_stats.plan_stats.keys())[0]
     final_plan_str = data_record_collection.execution_stats.plan_strs[final_plan_id]
     stats_dict = {
         "rp@5": rp_at_k,
-        "failed": failed,
         "optimization_time": data_record_collection.execution_stats.optimization_time,
         "optimization_cost": data_record_collection.execution_stats.optimization_cost,
         "plan_execution_time": data_record_collection.execution_stats.plan_execution_time,
@@ -476,11 +467,12 @@ if __name__ == "__main__":
         "total_execution_cost": data_record_collection.execution_stats.total_execution_cost,
         "plan_str": final_plan_str,
     }
-    with open(f"pareto-cascades-data/{exp_name}-metrics.json", "w") as f:
+    with open(f"opt-profiling-data/{exp_name}-metrics.json", "w") as f:
         json.dump(stats_dict, f)
 
+    print(f"bad: {bad}")
+    print("-------")
     print(f"rp@k: {rp_at_k:.5f}")
-    print(f"failed: {failed}")
     print(f"Optimization time: {data_record_collection.execution_stats.optimization_time}")
     print(f"Optimization cost: {data_record_collection.execution_stats.optimization_cost}")
     print(f"Plan Exec. time: {data_record_collection.execution_stats.plan_execution_time}")

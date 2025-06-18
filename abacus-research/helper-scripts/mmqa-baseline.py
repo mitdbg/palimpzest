@@ -71,7 +71,7 @@ if __name__ == "__main__":
 
     # read the appropriate dataset
     dataset = []
-    with open("testdata/MMQA_dev.jsonl") as f:
+    with open("data/MMQA_dev.jsonl") as f:
         for line in f:
             dict_line = json.loads(line)
             if "image" in dict_line["metadata"]["modalities"] and len(dict_line["metadata"]["modalities"]) > 1:

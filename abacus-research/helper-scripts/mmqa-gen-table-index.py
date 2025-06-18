@@ -15,7 +15,7 @@ if __name__ == "__main__":
 
     # load table texts
     table_texts, table_ids = [], []
-    with open("testdata/MMQA_tables.jsonl") as f:
+    with open("data/MMQA_tables.jsonl") as f:
         for line in f:
             dict_line = json.loads(line)
             
