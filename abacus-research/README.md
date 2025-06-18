@@ -1,3 +1,10 @@
+## Chroma Embeddings and MMQA files
+You can download the chroma embeddings we computed for MMQA and BioDEX by executing the following:
+```sh
+$ ./download_embeddings_and_mmqa.sh
+```
+This folder also contains questions for the different splits of MMQA -- of which we only use `MMQA_dev.jsonl` for scoring PZ's output. If you need the full MMQA dataset for any reason (e.g. to visualize at which images are being retrieved by a pipeline), you can find it here: https://github.com/allenai/multimodalqa/tree/master.
+
 ## Table 2
 The following scripts create the data for Abacus in Table 2 in our Abacus paper.
 - `run_biodex.sh`
