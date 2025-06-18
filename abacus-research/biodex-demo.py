@@ -163,6 +163,7 @@ if __name__ == "__main__":
     parser.add_argument("--verbose", default=False, action="store_true", help="Print verbose output")
     parser.add_argument("--progress", default=False, action="store_true", help="Print progress output")
     parser.add_argument("--constrained", default=False, action="store_true", help="Use constrained objective")
+    parser.add_argument("--gpt4-mini-only", default=False, action="store_true", help="Use only GPT-4o-mini")
     parser.add_argument(
         "--processing-strategy",
         default="sentinel",
@@ -267,17 +268,6 @@ if __name__ == "__main__":
         with open(args.priors_file) as f:
             priors = json.load(f)
 
-    # policy = pz.MaxQuality()
-    # if args.policy == "mincost":
-    #     policy = pz.MinCost()
-    # elif args.policy == "mintime":
-    #     policy = pz.MinTime()
-    # elif args.policy == "maxquality":
-    #     policy = pz.MaxQuality()
-    # else:
-    #     print("Policy not supported for this demo")
-    #     exit(1)
-
     # set the optimization policy; constraint set to 25% percentile from unconstrained plans
     policy = pz.MaxQuality() if not args.constrained else pz.MaxQualityAtFixedCost(max_cost=2.250)
     if args.quality is not None and args.policy == "mincostatfixedquality":
@@ -349,8 +339,15 @@ if __name__ == "__main__":
     )
     plan = plan.sem_add_columns(biodex_ranked_reactions_labels_cols, depends_on=["title", "abstract", "fulltext", "reaction_labels"])
 
-    # only use final op quality
-    use_final_op_quality = True
+    # set models
+    models = [Model.GPT_4o_MINI] if args.gpt4_mini_only else [
+        Model.GPT_4o,
+        Model.GPT_4o_MINI,
+        Model.LLAMA3_1_8B,
+        Model.LLAMA3_3_70B,
+        Model.MIXTRAL,
+        Model.DEEPSEEK_R1_DISTILL_QWEN_1_5B,
+    ]
 
     # execute pz plan
     config = pz.QueryProcessorConfig(
@@ -361,27 +358,15 @@ if __name__ == "__main__":
         optimizer_strategy="pareto",
         sentinel_execution_strategy=sentinel_execution_strategy,
         execution_strategy=execution_strategy,
-        use_final_op_quality=use_final_op_quality,
+        use_final_op_quality=True,
         max_workers=64,
         verbose=verbose,
-        available_models=[
-            Model.GPT_4o_MINI,
-            # Model.GPT_4o,
-            # Model.GPT_4o_MINI,
-            # # Model.LLAMA3_2_3B,
-            # Model.LLAMA3_1_8B,
-            # Model.LLAMA3_3_70B,
-            # # Model.LLAMA3_2_90B_V,
-            # Model.MIXTRAL,
-            # # Model.DEEPSEEK_V3,
-            # Model.DEEPSEEK_R1_DISTILL_QWEN_1_5B,
-        ],
+        available_models=models,
         allow_bonded_query=True,
         allow_code_synth=False,
         allow_critic=True,
         allow_mixtures=True,
         allow_rag_reduction=True,
-        allow_split_merge=False,
         progress=progress,
     )
 

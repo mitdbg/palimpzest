@@ -358,14 +358,11 @@ if __name__ == "__main__":
         max_workers=64,
         verbose=verbose,
         available_models=[
-            # Model.GPT_4o,
             Model.GPT_4o_MINI,
             Model.LLAMA3_2_3B,
             Model.LLAMA3_1_8B,
             Model.LLAMA3_3_70B,
-            # Model.LLAMA3_2_90B_V,
             Model.MIXTRAL,
-            # Model.DEEPSEEK_V3,
             Model.DEEPSEEK_R1_DISTILL_QWEN_1_5B,
         ],
         allow_bonded_query=True,
@@ -373,8 +370,6 @@ if __name__ == "__main__":
         allow_critic=True,
         allow_mixtures=True,
         allow_rag_reduction=True,
-        allow_token_reduction=False,
-        allow_split_merge=False,
         progress=progress,
     )
 

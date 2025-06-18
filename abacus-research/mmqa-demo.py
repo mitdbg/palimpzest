@@ -18,7 +18,6 @@ from chromadb.utils.embedding_functions.openai_embedding_function import (
 import palimpzest as pz
 from palimpzest.constants import Model
 from palimpzest.core.lib.fields import ImageBase64Field, ListField
-from palimpzest.utils.model_helpers import get_models
 
 mmqa_entry_cols = [
     {"name": "qid", "type": str, "desc": "The id of the MMQA question"},
@@ -280,6 +279,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run a simple demo")
     parser.add_argument("--verbose", default=False, action="store_true", help="Print verbose output")
     parser.add_argument("--progress", default=False, action="store_true", help="Print progress output")
+    parser.add_argument("--gpt4-mini-only", default=False, action="store_true", help="Use only GPT-4o-mini")
     parser.add_argument(
         "--processing-strategy",
         default="sentinel",
@@ -375,13 +375,6 @@ if __name__ == "__main__":
     )
 
     policy = pz.MaxQuality()
-    if args.policy == "mincost":
-        policy = pz.MinCost()
-    elif args.policy == "mintime":
-        policy = pz.MinTime()
-    elif args.policy == "maxquality":
-        policy = pz.MaxQuality()
-
     if args.quality is not None and args.policy == "mincostatfixedquality":
         policy = pz.MinCostAtFixedQuality(min_quality=args.quality)
     elif args.quality is not None and args.policy == "minlatencyatfixedquality":
@@ -501,12 +494,6 @@ if __name__ == "__main__":
     )
     plan = plan.sem_add_columns(mmqa_answer_cols)
 
-    # only use final op quality
-    use_final_op_quality = True
-
-    # fetch available models
-    available_models = get_models(include_vision=True)
-
     # execute pz plan
     config = pz.QueryProcessorConfig(
         policy=policy,
@@ -516,23 +503,17 @@ if __name__ == "__main__":
         optimizer_strategy="pareto",
         sentinel_execution_strategy=sentinel_execution_strategy,
         execution_strategy=execution_strategy,
-        use_final_op_quality=use_final_op_quality,
+        use_final_op_quality=True,
         max_workers=1,
         verbose=verbose,
         available_models=[
-            # Model.GPT_4o,
             Model.GPT_4o_MINI,
-            # Model.DEEPSEEK_V3,
-            # Model.MIXTRAL,
-            # Model.LLAMA3_3_70B,
-            # Model.LLAMA3_2_90B_V,
         ],
         allow_bonded_query=True,
         allow_code_synth=False,
         allow_critic=True,
         allow_mixtures=True,
         allow_rag_reduction=True,
-        allow_split_merge=False,
         progress=progress,
     )
 

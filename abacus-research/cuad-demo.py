@@ -505,6 +505,7 @@ def parse_arguments():
     parser.add_argument("--mode", type=str, help="one-convert or separate-converts", default="one-convert")
     parser.add_argument("--test", type=str, help="test time compute active or inactive", default="active")
     parser.add_argument("--constrained", default=False, action="store_true", help="Use constrained objective")
+    parser.add_argument("--gpt4-mini-only", default=False, action="store_true", help="Use only GPT-4o-mini")
     parser.add_argument(
         "--processing-strategy",
         default="sentinel",
@@ -635,12 +636,16 @@ def main():
         policy = pz.MinTimeAtFixedQuality(min_quality=args.quality)
     print(f"USING POLICY: {policy}")
 
-    # if args.test == "active":
-    #     allow_mixtures = True
-    #     allow_critic = True
-    # else:
-    #     allow_mixtures = False
-    #     allow_critic = False
+    # set models
+    models = [Model.GPT_4o_MINI] if args.gpt4_mini_only else [
+        Model.GPT_4o,
+        Model.GPT_4o_MINI,
+        Model.LLAMA3_1_8B,
+        Model.LLAMA3_3_70B,
+        Model.MIXTRAL,
+        Model.DEEPSEEK_R1_DISTILL_QWEN_1_5B,
+    ]
+
     sentinel_strategy = args.sentinel_execution_strategy
     optimizer_strategy = args.optimizer_strategy
     execution_strategy = args.execution_strategy
@@ -653,24 +658,12 @@ def main():
         sentinel_execution_strategy=sentinel_strategy,
         execution_strategy=execution_strategy,
         max_workers=64,
-        available_models=[
-            Model.GPT_4o_MINI,
-            # Model.GPT_4o,
-            # Model.GPT_4o_MINI,
-            # # Model.LLAMA3_2_3B,
-            # Model.LLAMA3_1_8B,
-            # Model.LLAMA3_3_70B,
-            # # Model.LLAMA3_2_90B_V,
-            # Model.MIXTRAL,
-            # # Model.DEEPSEEK_V3,
-            # Model.DEEPSEEK_R1_DISTILL_QWEN_1_5B,
-        ],
+        available_models=models,
         allow_bonded_query=True,
         allow_code_synth=False,
         allow_critic=True,
         allow_mixtures=True,
         allow_rag_reduction=True,
-        allow_split_merge=False,
         progress=True,
     )
     seed = args.seed
