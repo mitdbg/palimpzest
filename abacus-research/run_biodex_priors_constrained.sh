@@ -1,15 +1,12 @@
 #!/bin/bash
 
-for sample_budget in 10 20 50 100 # 5
+for sample_budget in 10 20 50 100
 do
   for seed in {0..9}
   do
     k=0
     j=0
-    if [[ $sample_budget -eq 5 ]]; then
-      k=2
-      j=1
-    elif [[ $sample_budget -eq 10 ]]; then
+    if [[ $sample_budget -eq 10 ]]; then
       k=4
       j=1
     elif [[ $sample_budget -eq 20 ]]; then
@@ -21,9 +18,6 @@ do
     elif [[ $sample_budget -eq 100 ]]; then
       k=5
       j=3
-    elif [[ $sample_budget -eq 150 ]]; then
-      k=6
-      j=4
     fi
 
     # run without priors
@@ -33,7 +27,7 @@ do
       echo "Skipping because $FILE exists."
     else
       echo "Running Seed: ${seed} -- priors: NO PRIORS -- k: ${k} -- j: ${j} -- budget: ${sample_budget}"
-      python demos/biodex-demo.py --constrained --progress --k $k --j $j --sample-budget $sample_budget --seed $seed --exp-name $exp_name
+      python biodex-demo.py --constrained --progress --k $k --j $j --sample-budget $sample_budget --seed $seed --exp-name $exp_name
     fi
 
     # run with sample-based priors
@@ -43,7 +37,7 @@ do
       echo "Skipping because $FILE exists."
     else
       echo "Running Seed: ${seed} -- priors: WITH PRIORS -- k: ${k} -- j: ${j} -- budget: ${sample_budget}"
-      python demos/biodex-demo.py --constrained --progress --priors-file biodex-priors.json --k $k --j $j --sample-budget $sample_budget --seed $seed --exp-name $exp_name
+      python biodex-demo.py --constrained --progress --priors-file biodex-priors.json --k $k --j $j --sample-budget $sample_budget --seed $seed --exp-name $exp_name
     fi
 
     # run with cheap priors 
@@ -53,7 +47,7 @@ do
       echo "Skipping because $FILE exists."
     else
       echo "Running Seed: ${seed} -- priors: CHEAP PRIORS -- k: ${k} -- j: ${j} -- budget: ${sample_budget}"
-      python demos/biodex-demo.py --constrained --progress --priors-file cheap-priors.json --k $k --j $j --sample-budget $sample_budget --seed $seed --exp-name $exp_name
+      python biodex-demo.py --constrained --progress --priors-file cheap-priors.json --k $k --j $j --sample-budget $sample_budget --seed $seed --exp-name $exp_name
     fi
   done
 done
