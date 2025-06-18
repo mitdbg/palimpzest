@@ -2,11 +2,8 @@ import argparse
 import json
 import os
 import time
-from functools import partial
 
-import chromadb
 import datasets
-from chromadb.utils.embedding_functions.openai_embedding_function import OpenAIEmbeddingFunction
 
 # from ragatouille import RAGPretrainedModel
 import palimpzest as pz
@@ -17,17 +14,11 @@ biodex_entry_cols = [
     {"name": "title", "type": str, "desc": "The title of the medical paper"},
     {"name": "abstract", "type": str, "desc": "The abstract of the medical paper"},
     {"name": "fulltext", "type": str, "desc": "The full text of the medical paper, which contains information relevant for creating a drug safety report."},
+]
+
+biodex_reactions_cols = [
     {"name": "reactions", "type": list[str], "desc": "The list of all medical conditions experienced by the patient as discussed in the report. Try to provide as many relevant medical conditions as possible."},
 ]
-
-biodex_reaction_labels_cols = [
-    {"name": "reaction_labels", "type": list[str], "desc": "Official terms for medical conditions listed in `reactions`"},
-]
-
-biodex_ranked_reactions_labels_cols = [
-    {"name": "ranked_reaction_labels", "type": list[str], "desc": "The ranked list of medical conditions experienced by the patient. The most relevant label occurs first in the list. Be sure to rank ALL of the inputs."},
-]
-
 
 class BiodexReader(pz.DataReader):
     def __init__(
@@ -35,60 +26,31 @@ class BiodexReader(pz.DataReader):
         rp_at_k: int = 5,
         num_samples: int = 5,
         split: str = "test",
+        shuffle: bool = False,
+        seed: int = 42,
     ):
         super().__init__(biodex_entry_cols)
 
-        if split == "test":
-            self.dataset = datasets.load_dataset("BioDEX/BioDEX-Reactions", split=split).to_pandas().to_dict(orient="records")[:num_samples]
+        self.dataset = datasets.load_dataset("BioDEX/BioDEX-Reactions", split=split).to_pandas()
+        if shuffle:
+            self.dataset = self.dataset.sample(n=num_samples, random_state=seed).to_dict(orient="records")
         else:
-            with open('priors-data/source-idx-to-record-state-cascades.json') as f: # NOTE: unique to cascades run
-                self.source_idx_to_record_state = json.load(f)
-                self.dataset = [
-                    self.source_idx_to_record_state[str(idx)]
-                    for idx in range(5)
-                ]
+            self.dataset = self.dataset.to_dict(orient="records")[:num_samples]
 
         self.rp_at_k = rp_at_k
         self.num_samples = num_samples
+        self.shuffle = shuffle
+        self.seed = seed
         self.split = split
 
     def compute_label(self, entry: dict) -> dict:
         """Compute the label for a BioDEX report given its entry in the dataset."""
         reactions_lst = [
             reaction.strip().lower().replace("'", "").replace("^", "")
-            for reaction in json.dumps(entry["reactions"]).split(",")
+            for reaction in entry["reactions"].split(",")
         ]
-        label_dict = {
-            "reaction_labels": reactions_lst,
-            "ranked_reaction_labels": reactions_lst,
-        }
+        label_dict = {"reactions": reactions_lst}
         return label_dict
-
-    @staticmethod
-    def rank_precision_at_k(preds: list | None, targets: list, k: int):
-        if preds is None:
-            return 0.0
-
-        try:
-            # lower-case each list
-            preds = [pred.strip().lower().replace("'", "").replace("^", "") for pred in preds]
-            targets = set([target.strip().lower().replace("'", "").replace("^", "") for target in targets])
-
-            # compute rank-precision at k
-            rn = len(targets)
-            denom = min(k, rn)
-            total = 0.0
-            for i in range(k):
-                total += preds[i] in targets if i < len(preds) else 0.0
-
-            return total / denom
-
-        except Exception:
-            os.makedirs("rp@k-errors", exist_ok=True)
-            ts = time.time()
-            with open(f"rp@k-errors/error-{ts}.txt", "w") as f:
-                f.write(str(preds))
-            return 0.0
 
     @staticmethod
     def term_recall(preds: list | None, targets: list):
@@ -133,7 +95,6 @@ class BiodexReader(pz.DataReader):
         title = entry["title"]
         abstract = entry["abstract"]
         fulltext = entry["fulltext"]
-        reactions = entry["reactions"]
 
         # create item with fields
         item = {"fields": {}, "labels": {}, "score_fn": {}}
@@ -141,16 +102,13 @@ class BiodexReader(pz.DataReader):
         item["fields"]["title"] = title
         item["fields"]["abstract"] = abstract
         item["fields"]["fulltext"] = fulltext
-        item["fields"]["reactions"] = json.dumps(reactions)
 
         if self.split == "train":
             # add label info
             item["labels"] = self.compute_label(entry)
 
             # add scoring functions for list fields
-            rank_precision_at_k = partial(BiodexReader.rank_precision_at_k, k=self.rp_at_k)
-            item["score_fn"]["reaction_labels"] = BiodexReader.term_recall
-            item["score_fn"]["ranked_reaction_labels"] = rank_precision_at_k
+            item["score_fn"]["reactions"] = BiodexReader.term_recall
 
         return item
 
@@ -172,7 +130,7 @@ if __name__ == "__main__":
     execution_strategy = "parallel"
     sentinel_execution_strategy = "all"
     optimizer_strategy = "pareto"
-    exp_name = f"biodex-priors-{optimizer_strategy}-seed{seed}-second-convert-cascades" # NOTE: unique to cascades run
+    exp_name = f"biodex-priors-{optimizer_strategy}-seed{seed}-cascades" # NOTE: unique to cascades run
 
     if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None:
         print("WARNING: Both OPENAI_API_KEY and TOGETHER_API_KEY are unset")
@@ -181,57 +139,21 @@ if __name__ == "__main__":
     datareader = BiodexReader(
         split="test",
         num_samples=1,
+        shuffle=True,
+        seed=seed,
     )
 
     # create validation data source
     val_datasource = BiodexReader(
         split="train",
         num_samples=5,
+        shuffle=True,
+        seed=seed,
     )
-
-    # load index [text-embedding-3-small]
-    chroma_client = chromadb.PersistentClient(".chroma-biodex")
-    openai_ef = OpenAIEmbeddingFunction(
-        api_key=os.environ["OPENAI_API_KEY"],
-        model_name="text-embedding-3-small",
-    )
-    index = chroma_client.get_collection("biodex-reaction-terms", embedding_function=openai_ef)
-
-    def search_func(index: chromadb.Collection, query: list[list[float]], k: int) -> list[str]:
-        # execute query with embeddings
-        results = index.query(query, n_results=5)
-
-        # get list of result terms with their cosine similarity scores
-        final_results = []
-        for query_docs, query_distances in zip(results["documents"], results["distances"]):
-            for doc, dist in zip(query_docs, query_distances):
-                cosine_similarity = 1 - dist
-                final_results.append({"content": doc, "similarity": cosine_similarity})
-
-        # sort the results by similarity score
-        sorted_results = sorted(final_results, key=lambda result: result["similarity"], reverse=True)
-
-        # remove duplicates
-        sorted_results_set = set()
-        final_sorted_results = []
-        for result in sorted_results:
-            if result["content"] not in sorted_results_set:
-                sorted_results_set.add(result["content"])
-                final_sorted_results.append(result["content"])
-
-        # return the top-k similar results and generation stats
-        return {"reaction_labels": final_sorted_results[:k]}
 
     # construct plan
     plan = pz.Dataset(datareader)
-    plan = plan.retrieve(
-        index=index,
-        search_func=search_func,
-        search_attr="reactions",
-        output_attrs=biodex_reaction_labels_cols,
-    )
-    plan = plan.sem_add_columns(biodex_ranked_reactions_labels_cols, depends_on=["title", "abstract", "fulltext", "reaction_labels"])
-
+    plan = plan.sem_add_columns(biodex_reactions_cols)
 
     # only use final op quality
     use_final_op_quality = True
@@ -263,8 +185,6 @@ if __name__ == "__main__":
         allow_critic=True,
         allow_mixtures=True,
         allow_rag_reduction=True,
-        allow_token_reduction=False,
-        allow_split_merge=False,
         progress=progress,
     )
 
@@ -272,7 +192,7 @@ if __name__ == "__main__":
         config=config,
         k=-1,
         j=-1,
-        sample_budget=5*1014 + 5*7,
+        sample_budget=5*1014,
         seed=seed,
         exp_name=exp_name,
     )

@@ -13,31 +13,44 @@ if __name__ == "__main__":
     # initialize openai client
     openai_client = OpenAI()
 
-    # load texts
-    texts, text_ids = [], []
-    with open("testdata/MMQA_texts.jsonl") as f:
+    # load image metadata
+    image_title_set = set()
+    image_titles, image_ids = [], []
+    with open("data/MMQA_images.jsonl") as f:
         for line in f:
             dict_line = json.loads(line)
-            title = dict_line["title"]
-            text = dict_line["text"]
-            texts.append(f"{title}: {text}")
-            text_ids.append(dict_line["id"])
+            image_title = dict_line["title"]
+            if image_title == "":
+                image_title = dict_line["url"]
+
+            if image_title not in image_title_set:
+                image_titles.append(image_title)
+                image_title_set.add(image_title)
+            else:
+                idx = 1
+                while f"{image_title} ({idx})" in image_title_set:
+                    idx += 1
+                image_title = f"{image_title} ({idx})"
+                image_titles.append(image_title)
+                image_title_set.add(image_title)
+
+            image_ids.append(dict_line["id"])
 
     # create directory for embeddings
-    os.makedirs("testdata/mmqa-text-embeddings/", exist_ok=True)
+    os.makedirs("testdata/mmqa-image-title-embeddings/", exist_ok=True)
 
     # generate embeddings in batches of 1000 at a time
-    indices = np.linspace(0, len(texts), len(texts)//1000, dtype=int)
+    indices = np.linspace(0, len(image_titles), len(image_titles)//1000, dtype=int)
     total_embeds = len(indices)
     print(f"Generating {total_embeds} batches of embeddings...")
     gen_indices = []
     for iter_idx, start_idx in tqdm(enumerate(indices), total=total_embeds):
         # check if embedding needs to be computed
         end_idx = indices[iter_idx + 1] if iter_idx + 1 < len(indices) else None
-        filename = f"testdata/mmqa-text-embeddings/{start_idx}_{end_idx}.npy"
+        filename = f"testdata/mmqa-image-title-embeddings/{start_idx}_{end_idx}.npy"
         if end_idx is not None and not os.path.exists(filename):
             # generate embeddings
-            batch = texts[start_idx:end_idx]
+            batch = image_titles[start_idx:end_idx]
             resp = openai_client.embeddings.create(input=batch, model="text-embedding-3-small")
             embeddings = [item.embedding for item in resp.data]
 
@@ -60,7 +73,7 @@ if __name__ == "__main__":
 
     # create a collection
     collection = chroma_client.get_or_create_collection(
-        name="mmqa-texts",
+        name="mmqa-image-titles",
         embedding_function=openai_ef,
         metadata={"hnsw:space": "cosine"},
     )
@@ -69,9 +82,9 @@ if __name__ == "__main__":
     total_inserts = len(gen_indices)
     print(f"Inserting {total_inserts} batches into the collection...")
     for start_idx, end_idx in tqdm(gen_indices, total=total_inserts):
-        embeddings = np.load(f"testdata/mmqa-text-embeddings/{start_idx}_{end_idx}.npy")
+        embeddings = np.load(f"testdata/mmqa-image-title-embeddings/{start_idx}_{end_idx}.npy")
         collection.add(
-            documents=texts[start_idx:end_idx],
+            documents=image_titles[start_idx:end_idx],
             embeddings=embeddings.tolist(),
-            ids=text_ids[start_idx:end_idx],
+            ids=image_ids[start_idx:end_idx],
         )

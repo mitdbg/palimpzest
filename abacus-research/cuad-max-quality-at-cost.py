@@ -620,12 +620,6 @@ def main():
     policy = MaxQualityAtFixedCost(max_cost=args.cost) if args.cost < 999 else MaxQuality()
     print(f"USING POLICY: {policy}")
 
-    # if args.test == "active":
-    #     allow_mixtures = True
-    #     allow_critic = True
-    # else:
-    #     allow_mixtures = False
-    #     allow_critic = False
     sentinel_strategy = args.sentinel_execution_strategy
     optimizer_strategy = args.optimizer_strategy
     config = pz.QueryProcessorConfig(
@@ -640,12 +634,9 @@ def main():
         available_models=[
             Model.GPT_4o,
             Model.GPT_4o_MINI,
-            # Model.LLAMA3_2_3B,
             Model.LLAMA3_1_8B,
             Model.LLAMA3_3_70B,
-            # Model.LLAMA3_2_90B_V,
             Model.MIXTRAL,
-            # Model.DEEPSEEK_V3,
             Model.DEEPSEEK_R1_DISTILL_QWEN_1_5B,
         ],
         allow_bonded_query=True,
@@ -653,8 +644,6 @@ def main():
         allow_critic=True,
         allow_mixtures=True,
         allow_rag_reduction=True,
-        allow_token_reduction=False,
-        allow_split_merge=False,
         progress=True,
     )
     seed = args.seed

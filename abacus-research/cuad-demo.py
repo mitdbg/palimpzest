@@ -504,7 +504,81 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description="Run CUAD demo")
     parser.add_argument("--mode", type=str, help="one-convert or separate-converts", default="one-convert")
     parser.add_argument("--test", type=str, help="test time compute active or inactive", default="active")
+    parser.add_argument("--constrained", default=False, action="store_true", help="Use constrained objective")
+    parser.add_argument("--gpt4-mini-only", default=False, action="store_true", help="Use only GPT-4o-mini")
+    parser.add_argument(
+        "--processing-strategy",
+        default="sentinel",
+        type=str,
+        help="The engine to use. One of sentinel or no_sentinel",
+    )
+    parser.add_argument(
+        "--sentinel-execution-strategy",
+        default="mab",
+        type=str,
+        help="The engine to use. One of mab or random",
+    )
+    parser.add_argument(
+        "--execution-strategy",
+        default="parallel",
+        type=str,
+        help="The plan executor to use. One of sequential, pipelined, parallel",
+    )
+    parser.add_argument(
+        "--optimizer-strategy",
+        default="pareto",
+        type=str,
+        help="The optimizer to use. One of pareto or greedy",
+    )
     parser.add_argument("--verbose", default=False, action="store_true", help="Print verbose output")
+    parser.add_argument(
+        "--seed",
+        default=42,
+        type=int,
+        help="Seed used to initialize RNG for MAB sampling algorithm",
+    )
+    parser.add_argument(
+        "--k",
+        default=10,
+        type=int,
+        help="Number of columns to sample in Random Sampling or MAB sentinel execution",
+    )
+    parser.add_argument(
+        "--j",
+        default=3,
+        type=int,
+        help="Number of columns to sample in Random Sampling or MAB sentinel execution",
+    )
+    parser.add_argument(
+        "--sample-budget",
+        default=100,
+        type=int,
+        help="Total sample budget in Random Sampling or MAB sentinel execution",
+    )
+    parser.add_argument(
+        "--exp-name",
+        default=None,
+        type=str,
+        help="The experiment name.",
+    )
+    parser.add_argument(
+        "--priors-file",
+        default=None,
+        type=str,
+        help="A file with a dictionary mapping physical operator ids to prior belief on their performance",
+    )
+    parser.add_argument(
+        "--quality",
+        default=None,
+        type=float,
+        help="Quality threshold",
+    )
+    parser.add_argument(
+        "--policy",
+        default="maxquality",
+        type=str,
+        help="One of 'mincost', 'mintime', 'maxquality'",
+    )
     return parser.parse_args()
 
 
@@ -546,61 +620,114 @@ def main():
     os.makedirs("opt-profiling-data", exist_ok=True)
 
     # Create a data reader for the CUAD dataset
-    data_reader = CUADDataReader(split="test", num_contracts=1)
-    val_data_reader = CUADDataReader(split="train", num_contracts=5)
+    data_reader = CUADDataReader(split="test", num_contracts=100, seed=args.seed)
+    val_data_reader = CUADDataReader(split="train", num_contracts=25, seed=args.seed)
     print("Created data reader")
 
     # Build and run the CUAD query
     query = build_cuad_query(data_reader, args.mode)
     print("Built query; Starting query execution")
 
-    processing_strategy = "sentinel"
-    execution_strategy = "parallel"
-    sentinel_execution_strategy = "all"
-    optimizer_strategy = "pareto"
+    # set the optimization policy; constraint set to 25% percentile from unconstrained plans
+    policy = pz.MaxQuality() if not args.constrained else pz.MaxQualityAtFixedCost(max_cost=2.759)
+    if args.quality is not None and args.policy == "mincostatfixedquality":
+        policy = pz.MinCostAtFixedQuality(min_quality=args.quality)
+    elif args.quality is not None and args.policy == "minlatencyatfixedquality":
+        policy = pz.MinTimeAtFixedQuality(min_quality=args.quality)
+    print(f"USING POLICY: {policy}")
+
+    # set models
+    models = [Model.GPT_4o_MINI] if args.gpt4_mini_only else [
+        Model.GPT_4o,
+        Model.GPT_4o_MINI,
+        Model.LLAMA3_1_8B,
+        Model.LLAMA3_3_70B,
+        Model.MIXTRAL,
+        Model.DEEPSEEK_R1_DISTILL_QWEN_1_5B,
+    ]
+
+    sentinel_strategy = args.sentinel_execution_strategy
+    optimizer_strategy = args.optimizer_strategy
+    execution_strategy = args.execution_strategy
     config = pz.QueryProcessorConfig(
+        policy=policy,
         verbose=False,
         val_datasource=val_data_reader,
-        processing_strategy=processing_strategy,
+        processing_strategy="sentinel",
         optimizer_strategy=optimizer_strategy,
-        sentinel_execution_strategy=sentinel_execution_strategy,
+        sentinel_execution_strategy=sentinel_strategy,
         execution_strategy=execution_strategy,
         max_workers=64,
-        available_models=[
-            Model.GPT_4o,
-            Model.GPT_4o_MINI,
-            # Model.LLAMA3_2_3B,
-            Model.LLAMA3_1_8B,
-            Model.LLAMA3_3_70B,
-            # Model.LLAMA3_2_90B_V,
-            Model.MIXTRAL,
-            # Model.DEEPSEEK_V3,
-            Model.DEEPSEEK_R1_DISTILL_QWEN_1_5B,
-        ],
+        available_models=models,
         allow_bonded_query=True,
         allow_code_synth=False,
         allow_critic=True,
         allow_mixtures=True,
         allow_rag_reduction=True,
-        allow_split_merge=False,
         progress=True,
     )
-    seed = 0
-    exp_name = f"cuad-priors-{optimizer_strategy}-seed{seed}"
+    seed = args.seed
+    k = args.k
+    j = args.j
+    sample_budget = args.sample_budget
+    exp_name = (
+        f"cuad-final-{sentinel_strategy}-k{k}-j{j}-budget{sample_budget}-seed{seed}"
+        if args.exp_name is None
+        else args.exp_name
+    )
+    priors = None
+    if args.priors_file is not None:
+        with open(args.priors_file) as f:
+            priors = json.load(f)
+
+    print(f"EXPERIMENT NAME: {exp_name}")
     data_record_collection = query.run(
         config=config,
-        k=-1,
-        j=-1,
-        sample_budget=1014*5,
+        k=k,
+        j=j,
+        sample_budget=sample_budget,
         seed=seed,
         exp_name=exp_name,
+        priors=priors,
     )
     print("Query execution completed")
 
     # save statistics
     execution_stats_dict = data_record_collection.execution_stats.to_json()
-    with open(f"priors-data/{exp_name}-stats.json", "w") as f:
+    with open(f"opt-profiling-data/{exp_name}-stats.json", "w") as f:
         json.dump(execution_stats_dict, f)
+
+    pred_df = data_record_collection.to_df()
+    label_df = data_reader.get_label_df()
+    # pred_df.to_csv(f"{exp_name}-pred.csv", index=False)
+    # label_df.to_csv(f"{exp_name}-label.csv", index=False)
+    final_plan_id = list(data_record_collection.execution_stats.plan_stats.keys())[0]
+    final_plan_str = data_record_collection.execution_stats.plan_strs[final_plan_id]
+
+    prec, recall = compute_precision_recall(label_df, pred_df)
+    f1 = 2 * (prec * recall) / (prec + recall) if prec + recall > 0 else 0.0
+    stats_dict = {
+        "precision": prec,
+        "recall": recall,
+        "f1": f1,
+        "optimization_time": data_record_collection.execution_stats.optimization_time,
+        "optimization_cost": data_record_collection.execution_stats.optimization_cost,
+        "plan_execution_time": data_record_collection.execution_stats.plan_execution_time,
+        "plan_execution_cost": data_record_collection.execution_stats.plan_execution_cost,
+        "total_execution_time": data_record_collection.execution_stats.total_execution_time,
+        "total_execution_cost": data_record_collection.execution_stats.total_execution_cost,
+        "plan_str": final_plan_str,
+    }
+    with open(f"opt-profiling-data/{exp_name}-metrics.json", "w") as f:
+        json.dump(stats_dict, f)
+
+    print(f"Precision: {prec:.3f}, Recall: {recall:.3f}, F1: {f1:.3f}")
+    print(f"Optimization time: {data_record_collection.execution_stats.optimization_time}")
+    print(f"Optimization cost: {data_record_collection.execution_stats.optimization_cost}")
+    print(f"Plan Exec. time: {data_record_collection.execution_stats.plan_execution_time}")
+    print(f"Plan Exec. cost: {data_record_collection.execution_stats.plan_execution_cost}")
+    print(f"Total Execution time: {data_record_collection.execution_stats.total_execution_time}")
+    print(f"Total Execution Cost: {data_record_collection.execution_stats.total_execution_cost}")
 
 
 if __name__ == "__main__":
