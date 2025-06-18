@@ -8,9 +8,10 @@ import chromadb
 import datasets
 from chromadb.utils.embedding_functions.openai_embedding_function import OpenAIEmbeddingFunction
 
+# from ragatouille import RAGPretrainedModel
 import palimpzest as pz
 from palimpzest.constants import Model
-from palimpzest.policy import MaxQualityAtFixedCost
+from palimpzest.policy import MaxQuality, MaxQualityAtFixedCost
 
 biodex_entry_cols = [
     {"name": "pmid", "type": str, "desc": "The PubMed ID of the medical paper"},
@@ -163,7 +164,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run a simple demo")
     parser.add_argument("--verbose", default=False, action="store_true", help="Print verbose output")
     parser.add_argument("--progress", default=False, action="store_true", help="Print progress output")
-    parser.add_argument("--constrained", default=False, action="store_true", help="Use constrained objective")
     parser.add_argument(
         "--processing-strategy",
         default="sentinel",
@@ -240,7 +240,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # create directory for profiling data
-    os.makedirs("pareto-cascades-data", exist_ok=True)
+    os.makedirs("max-quality-at-cost-data", exist_ok=True)
 
     verbose = args.verbose
     progress = args.progress
@@ -283,6 +283,16 @@ if __name__ == "__main__":
         shuffle=True,
         seed=seed,
     )
+
+    # # load index [Colbert]
+    # index_path = ".ragatouille/colbert/indexes/reaction-terms"
+    # index = RAGPretrainedModel.from_index(index_path)
+
+    # def search_func(index, query, k):
+    #     results = index.search(query, k=1)
+    #     results = [result[0] if isinstance(result, list) else result for result in results]
+    #     sorted_results = sorted(results, key=lambda result: result["score"], reverse=True)
+    #     return {"reaction_labels": [result["content"] for result in sorted_results[:k]], GenerationStats(model_name="colbert")}
 
     # load index [text-embedding-3-small]
     chroma_client = chromadb.PersistentClient(".chroma-biodex")
@@ -331,9 +341,12 @@ if __name__ == "__main__":
     # only use final op quality
     use_final_op_quality = True
 
+    # set policy
+    policy = MaxQualityAtFixedCost(max_cost=cost) if cost < 999 else MaxQuality()
+
     # execute pz plan
     config = pz.QueryProcessorConfig(
-        policy=MaxQualityAtFixedCost(max_cost=cost),
+        policy=policy,
         cache=False,
         val_datasource=val_datasource,
         processing_strategy=processing_strategy,
@@ -344,11 +357,14 @@ if __name__ == "__main__":
         max_workers=64,
         verbose=verbose,
         available_models=[
+            Model.GPT_4o,
             Model.GPT_4o_MINI,
-            Model.LLAMA3_2_3B,
+            # Model.LLAMA3_2_3B,
             Model.LLAMA3_1_8B,
             Model.LLAMA3_3_70B,
+            # Model.LLAMA3_2_90B_V,
             Model.MIXTRAL,
+            # Model.DEEPSEEK_V3,
             Model.DEEPSEEK_R1_DISTILL_QWEN_1_5B,
         ],
         allow_bonded_query=True,
@@ -356,6 +372,8 @@ if __name__ == "__main__":
         allow_critic=True,
         allow_mixtures=True,
         allow_rag_reduction=True,
+        allow_token_reduction=False,
+        allow_split_merge=False,
         progress=progress,
     )
 
@@ -370,11 +388,11 @@ if __name__ == "__main__":
     )
 
     print(data_record_collection.to_df())
-    data_record_collection.to_df().to_csv(f"pareto-cascades-data/{exp_name}-output.csv", index=False)
+    data_record_collection.to_df().to_csv(f"max-quality-at-cost-data/{exp_name}-output.csv", index=False)
 
     # create filepaths for records and stats
-    records_path = f"pareto-cascades-data/{exp_name}-records.json"
-    stats_path = f"pareto-cascades-data/{exp_name}-profiling.json"
+    records_path = f"max-quality-at-cost-data/{exp_name}-records.json"
+    stats_path = f"max-quality-at-cost-data/{exp_name}-profiling.json"
 
     # save record outputs
     record_jsons = []
@@ -457,7 +475,7 @@ if __name__ == "__main__":
         "total_execution_cost": data_record_collection.execution_stats.total_execution_cost,
         "plan_str": final_plan_str,
     }
-    with open(f"pareto-cascades-data/{exp_name}-metrics.json", "w") as f:
+    with open(f"max-quality-at-cost-data/{exp_name}-metrics.json", "w") as f:
         json.dump(stats_dict, f)
 
     print(f"rp@k: {rp_at_k:.5f}")
