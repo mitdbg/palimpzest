@@ -8,7 +8,6 @@ from chromadb.api.models.Collection import Collection
 from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
 from chromadb.utils.embedding_functions.openai_embedding_function import OpenAIEmbeddingFunction
 from openai import OpenAI
-from ragatouille.RAGPretrainedModel import RAGPretrainedModel
 from sentence_transformers import SentenceTransformer
 
 from palimpzest.constants import MODEL_CARDS, Model
@@ -21,7 +20,7 @@ from palimpzest.query.operators.physical import PhysicalOperator
 class RetrieveOp(PhysicalOperator):
     def __init__(
         self,
-        index: Collection | RAGPretrainedModel,
+        index: Collection,
         search_attr: str,
         output_attrs: list[dict] | type[Schema],
         search_func: Callable | None,
@@ -33,7 +32,7 @@ class RetrieveOp(PhysicalOperator):
         Initialize the RetrieveOp object.
         
         Args:
-            index (Collection | RAGPretrainedModel): The PZ index to use for retrieval.
+            index (Collection): The PZ index to use for retrieval.
             search_attr (str): The attribute to search on.
             output_attrs (list[dict]): The output fields containing the results of the search.
             search_func (Callable | None): The function to use for searching the index. If None, the default search function will be used.
@@ -100,7 +99,7 @@ class RetrieveOp(PhysicalOperator):
             quality=1.0,
         )
 
-    def default_search_func(self, index: Collection | RAGPretrainedModel, query: list[str] | list[list[float]], k: int) -> list[str] | list[list[str]]:
+    def default_search_func(self, index: Collection, query: list[str] | list[list[float]], k: int) -> list[str] | list[list[str]]:
         """
         Default search function for the Retrieve operation. This function uses the index to
         retrieve the top-k results for the given query. The query will be a (possibly singleton)
@@ -132,24 +131,8 @@ class RetrieveOp(PhysicalOperator):
             # NOTE: self.output_field_names must be a singleton for default_search_func to be used
             return {self.output_field_names[0]: final_results}
 
-        elif isinstance(index, RAGPretrainedModel):
-            # if the index is a rag model, use the rag model to get the top k results
-            results = index.search(query, k=k)
-
-            # the results will be a list[dict]; if the input is a singleton list, however
-            # it will be a list[list[dict]]; if the input is a list of lists
-            final_results = []
-            if is_singleton_list:
-                final_results = [result["content"] for result in results]
-            else:
-                for query_results in results:
-                    final_results.append([result["content"] for result in query_results])
-
-            # NOTE: self.output_field_names must be a singleton for default_search_func to be used
-            return {self.output_field_names[0]: final_results}
-
         else:
-            raise ValueError("Unsupported index type. Must be either a Collection or RAGPretrainedModel.")
+            raise ValueError("Unsupported index type. Must be either a Collection.")
 
     def _create_record_set(
         self,
@@ -180,7 +163,7 @@ class RetrieveOp(PhysicalOperator):
             record_parent_id=output_dr.parent_id,
             record_source_idx=output_dr.source_idx,
             record_state=record_state,
-            op_id=self.get_op_id(),
+            full_op_id=self.get_full_op_id(),
             logical_op_id=self.logical_op_id,
             op_name=self.op_name(),
             time_per_record=total_time,
@@ -231,7 +214,8 @@ class RetrieveOp(PhysicalOperator):
 
             model_name = self.index._embedding_function._model_name if uses_openai_embedding_fcn else "clip-ViT-B-32"
             err_msg = f"For Chromadb, we currently only support `text-embedding-3-small` and `clip-ViT-B-32`; your index uses: {model_name}"
-            assert model_name in [Model.TEXT_EMBEDDING_3_SMALL.value, Model.CLIP_VIT_B_32.value], err_msg
+            embedding_model_names = [model.value for model in Model if model.is_embedding_model()]
+            assert model_name in embedding_model_names, err_msg
 
             # compute embeddings
             try:

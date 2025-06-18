@@ -21,17 +21,17 @@ class TestCostModel:
         assert sorted(operator_estimates.keys()) == sorted(simple_plan_expected_operator_estimates.keys())
 
         # validate operator estimates
-        for op_id, expected_op_estimates in simple_plan_expected_operator_estimates.items():
+        for full_op_id, expected_op_estimates in simple_plan_expected_operator_estimates.items():
             # validate scan operator estimates
-            if "scan" in op_id:
+            if "scan" in full_op_id:
                 for metric, expected_value in expected_op_estimates.items():
-                    assert operator_estimates[op_id][metric] == expected_value
+                    assert operator_estimates[full_op_id][metric] == expected_value
 
             # validate convert and filter operator estimates
-            if "convert" in op_id or "filter" in op_id:
+            if "convert" in full_op_id or "filter" in full_op_id:
                 for model_name, expected_model_estimates in expected_op_estimates.items():
                     for metric, expected_value in expected_model_estimates.items():
-                        assert operator_estimates[op_id][model_name][metric] == expected_value
+                        assert operator_estimates[full_op_id][model_name][metric] == expected_value
 
     # TODO: rewrite this test to be agnostic to the simple plan
     @pytest.mark.parametrize(
@@ -55,14 +55,14 @@ class TestCostModel:
 
         # TODO: if we test with a plan other than the simple test plan; this will break
         # get the scan, convert, and filter op ids from the physical_plan and update the simple_plan_sample_execution_data
-        scan_op_id = physical_plan.operators[0].get_op_id()
-        convert_op_id = physical_plan.operators[1].get_op_id()
-        filter_op_id = physical_plan.operators[2].get_op_id()
-        test_op_id_to_new_op_id = {"scan123": scan_op_id, "convert123": convert_op_id, "filter123": filter_op_id}
+        scan_full_op_id = physical_plan.operators[0].get_full_op_id()
+        convert_full_op_id = physical_plan.operators[1].get_full_op_id()
+        filter_full_op_id = physical_plan.operators[2].get_full_op_id()
+        test_full_op_id_to_new_full_op_id = {"scan123": scan_full_op_id, "convert123": convert_full_op_id, "filter123": filter_full_op_id}
         for record_op_stats in simple_plan_sample_execution_data:
-            record_op_stats.op_id = test_op_id_to_new_op_id[record_op_stats.op_id]
-            if record_op_stats.source_op_id is not None:
-                record_op_stats.source_op_id = test_op_id_to_new_op_id[record_op_stats.source_op_id]
+            record_op_stats.full_op_id = test_full_op_id_to_new_full_op_id[record_op_stats.full_op_id]
+            if record_op_stats.source_full_op_id is not None:
+                record_op_stats.source_full_op_id = test_full_op_id_to_new_full_op_id[record_op_stats.source_full_op_id]
 
         # construct cost model
         cost_model = CostModel(

@@ -396,9 +396,10 @@ def compute_precision_recall(label_df, preds_df):
     return precision, recall
 
 class CUADDataReader(pz.DataReader):
-    def __init__(self, num_contracts: int = 1, split: str = "train"):
+    def __init__(self, num_contracts: int = 1, split: str = "train", seed: int=42):
         self.num_contracts = num_contracts
         self.split = split
+        self.seed = seed
 
         input_cols = [
             {"name": "contract_id", "type": str, "desc": "The id of the the contract to be analyzed"},
@@ -410,15 +411,20 @@ class CUADDataReader(pz.DataReader):
         # convert the dataset into a list of dictionaries where each row is for a single contract
         include_labels = split == "train"
         dataset = datasets.load_dataset("theatticusproject/cuad-qa")[split]
-        self.dataset = self._construct_dataset(dataset, num_contracts, include_labels)
+        self.dataset = self._construct_dataset(dataset, num_contracts, seed, include_labels)
 
-    def _construct_dataset(self, dataset, num_contracts, include_labels: bool=False):
+
+    def _construct_dataset(self, dataset, num_contracts, seed: int=42, include_labels: bool=False):
         # get the set of unique contract titles; to ensure the order of the contracts is
         # preserved, we use a list rather than using python's set()
         contract_titles = []
         for row in dataset:
             if row["title"] not in contract_titles:
                 contract_titles.append(row["title"])
+
+        # shuffle the contracts for the given seed
+        rng = np.random.default_rng(seed=seed)
+        rng.shuffle(contract_titles)
 
         # get the first num_contracts
         contract_titles = contract_titles[:num_contracts]
@@ -481,7 +487,7 @@ class CUADDataReader(pz.DataReader):
 
     def get_label_df(self):
         full_dataset = datasets.load_dataset("theatticusproject/cuad-qa")[self.split]
-        label_dataset = self._construct_dataset(full_dataset, self.num_contracts, True)
+        label_dataset = self._construct_dataset(full_dataset, self.num_contracts, self.seed, True)
         final_label_dataset = []
         for entry in label_dataset:
             row = {}
@@ -498,6 +504,7 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description="Run CUAD demo")
     parser.add_argument("--mode", type=str, help="one-convert or separate-converts", default="one-convert")
     parser.add_argument("--test", type=str, help="test time compute active or inactive", default="active")
+    parser.add_argument("--constrained", default=False, action="store_true", help="Use constrained objective")
     parser.add_argument(
         "--processing-strategy",
         default="sentinel",
@@ -509,6 +516,18 @@ def parse_arguments():
         default="mab",
         type=str,
         help="The engine to use. One of mab or random",
+    )
+    parser.add_argument(
+        "--execution-strategy",
+        default="parallel",
+        type=str,
+        help="The plan executor to use. One of sequential, pipelined, parallel",
+    )
+    parser.add_argument(
+        "--optimizer-strategy",
+        default="pareto",
+        type=str,
+        help="The optimizer to use. One of pareto or greedy",
     )
     parser.add_argument("--verbose", default=False, action="store_true", help="Print verbose output")
     parser.add_argument(
@@ -534,6 +553,30 @@ def parse_arguments():
         default=100,
         type=int,
         help="Total sample budget in Random Sampling or MAB sentinel execution",
+    )
+    parser.add_argument(
+        "--exp-name",
+        default=None,
+        type=str,
+        help="The experiment name.",
+    )
+    parser.add_argument(
+        "--priors-file",
+        default=None,
+        type=str,
+        help="A file with a dictionary mapping physical operator ids to prior belief on their performance",
+    )
+    parser.add_argument(
+        "--quality",
+        default=None,
+        type=float,
+        help="Quality threshold",
+    )
+    parser.add_argument(
+        "--policy",
+        default="maxquality",
+        type=str,
+        help="One of 'mincost', 'mintime', 'maxquality'",
     )
     return parser.parse_args()
 
@@ -576,13 +619,21 @@ def main():
     os.makedirs("opt-profiling-data", exist_ok=True)
 
     # Create a data reader for the CUAD dataset
-    data_reader = CUADDataReader(split="test", num_contracts=50)
-    val_data_reader = CUADDataReader(split="train", num_contracts=25)
+    data_reader = CUADDataReader(split="test", num_contracts=100, seed=args.seed)
+    val_data_reader = CUADDataReader(split="train", num_contracts=25, seed=args.seed)
     print("Created data reader")
 
     # Build and run the CUAD query
     query = build_cuad_query(data_reader, args.mode)
     print("Built query; Starting query execution")
+
+    # set the optimization policy; constraint set to 25% percentile from unconstrained plans
+    policy = pz.MaxQuality() if not args.constrained else pz.MaxQualityAtFixedCost(max_cost=2.759)
+    if args.quality is not None and args.policy == "mincostatfixedquality":
+        policy = pz.MinCostAtFixedQuality(min_quality=args.quality)
+    elif args.quality is not None and args.policy == "minlatencyatfixedquality":
+        policy = pz.MinTimeAtFixedQuality(min_quality=args.quality)
+    print(f"USING POLICY: {policy}")
 
     # if args.test == "active":
     #     allow_mixtures = True
@@ -591,23 +642,28 @@ def main():
     #     allow_mixtures = False
     #     allow_critic = False
     sentinel_strategy = args.sentinel_execution_strategy
+    optimizer_strategy = args.optimizer_strategy
+    execution_strategy = args.execution_strategy
     config = pz.QueryProcessorConfig(
+        policy=policy,
         verbose=False,
         val_datasource=val_data_reader,
         processing_strategy="sentinel",
-        optimizer_strategy="pareto",
+        optimizer_strategy=optimizer_strategy,
         sentinel_execution_strategy=sentinel_strategy,
-        execution_strategy="parallel",
-        max_workers=20,
+        execution_strategy=execution_strategy,
+        max_workers=64,
         available_models=[
-            Model.GPT_4o,
-            Model.GPT_4o_V,
             Model.GPT_4o_MINI,
-            Model.GPT_4o_MINI_V,
-            Model.DEEPSEEK,
-            Model.MIXTRAL,
-            Model.LLAMA3,
-            Model.LLAMA3_V,
+            # Model.GPT_4o,
+            # Model.GPT_4o_MINI,
+            # # Model.LLAMA3_2_3B,
+            # Model.LLAMA3_1_8B,
+            # Model.LLAMA3_3_70B,
+            # # Model.LLAMA3_2_90B_V,
+            # Model.MIXTRAL,
+            # # Model.DEEPSEEK_V3,
+            # Model.DEEPSEEK_R1_DISTILL_QWEN_1_5B,
         ],
         allow_bonded_query=True,
         allow_code_synth=False,
@@ -621,7 +677,17 @@ def main():
     k = args.k
     j = args.j
     sample_budget = args.sample_budget
-    exp_name = f"cuad-demo-no-priors-{sentinel_strategy}-k{k}-j{j}-budget{sample_budget}-seed{seed}"
+    exp_name = (
+        f"cuad-final-{sentinel_strategy}-k{k}-j{j}-budget{sample_budget}-seed{seed}"
+        if args.exp_name is None
+        else args.exp_name
+    )
+    priors = None
+    if args.priors_file is not None:
+        with open(args.priors_file) as f:
+            priors = json.load(f)
+
+    print(f"EXPERIMENT NAME: {exp_name}")
     data_record_collection = query.run(
         config=config,
         k=k,
@@ -629,8 +695,14 @@ def main():
         sample_budget=sample_budget,
         seed=seed,
         exp_name=exp_name,
+        priors=priors,
     )
     print("Query execution completed")
+
+    # save statistics
+    execution_stats_dict = data_record_collection.execution_stats.to_json()
+    with open(f"opt-profiling-data/{exp_name}-stats.json", "w") as f:
+        json.dump(execution_stats_dict, f)
 
     pred_df = data_record_collection.to_df()
     label_df = data_reader.get_label_df()

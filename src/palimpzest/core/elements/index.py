@@ -3,30 +3,27 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 
 from chromadb.api.models.Collection import Collection
-from ragatouille.RAGPretrainedModel import RAGPretrainedModel
 
 
-def index_factory(index: Collection | RAGPretrainedModel) -> PZIndex:
+def index_factory(index: Collection) -> PZIndex:
     """
     Factory function to create a PZ index based on the type of the provided index.
 
     Args:
-        index (Collection | RAGPretrainedModel): The index provided by the user.
+        index (Collection): The index provided by the user.
 
     Returns:
         PZIndex: The PZ wrapped Index.
     """
     if isinstance(index, Collection):
         return ChromaIndex(index)
-    elif isinstance(index, RAGPretrainedModel):
-        return RagatouilleIndex(index)
     else:
-        raise TypeError(f"Unsupported index type: {type(index)}\nindex must be a `chromadb.api.models.Collection.Collection` or `ragatouille.RAGPretrainedModel.RAGPretrainedModel`")
+        raise TypeError(f"Unsupported index type: {type(index)}\nindex must be a `chromadb.api.models.Collection.Collection`")
 
 
 class BaseIndex(ABC):
 
-    def __init__(self, index: Collection | RAGPretrainedModel):
+    def __init__(self, index: Collection):
         self.index = index
 
     def __str__(self):
@@ -59,12 +56,5 @@ class ChromaIndex(BaseIndex):
         super().__init__(index)
 
 
-
-class RagatouilleIndex(BaseIndex):
-    def __init__(self, index: RAGPretrainedModel):
-        assert isinstance(index, RAGPretrainedModel), "RagatouilleIndex input must be a `ragatouille.RAGPretrainedModel.RAGPretrainedModel`"
-        super().__init__(index)
-
-
 # define type for PZIndex
-PZIndex = ChromaIndex | RagatouilleIndex
+PZIndex = ChromaIndex

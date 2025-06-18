@@ -2,10 +2,12 @@ import argparse
 import base64
 import json
 import os
-import random
+import string
 import time
 
 import chromadb
+import numpy as np
+import regex as re
 from chromadb.utils.embedding_functions import (
     SentenceTransformerEmbeddingFunction,
 )
@@ -39,15 +41,50 @@ mmqa_image_cols = [
 ]
 
 mmqa_answer_cols = [
-    {"name": "answers", "type": list[str], "desc": "The answer(s) to the question. This is a list of strings which will be a singleton if there is only one answer."},
+    {"name": "answers", "type": list[str], "desc": "The answer(s) to the question. Answer the question using the relevant information from gathered image(s), text(s), and table(s). Return your answer as a JSON list of strings. Do not include any additional context or an explanation in your answer, simply list the entities asked for by the question"},
 ]
+
+def get_json_from_answer(answer: str):
+    """
+    This function parses an LLM response which is supposed to output a JSON object
+    and optimistically searches for the substring containing the JSON object.
+    """
+    # split off context / excess, which models sometimes output after answer
+    answer = answer.split("Context:")[0]
+    answer = answer.split("# this is the answer")[0]
+    # trim the answer to only include the JSON array
+    if not answer.strip().startswith("["):
+        # Find the start index of the actual JSON string assuming the prefix is followed by the JSON array
+        start_index = answer.find("[")
+        if start_index != -1:
+            # Remove the prefix and any leading characters before the JSON starts
+            answer = answer[start_index:]
+    if not answer.strip().endswith("]"):
+        # Find the end index of the actual JSON string
+        # assuming the suffix is preceded by the JSON object/array
+        end_index = answer.rfind("]")
+        if end_index != -1:
+            # Remove the suffix and any trailing characters after the JSON ends
+            answer = answer[: end_index + 1]
+    # Handle weird escaped values. I am not sure why the model
+    # is returning these, but the JSON parser can't take them
+    answer = answer.replace(r"\_", "_")
+    answer = answer.replace("\\n", "\n")
+    # Remove https and http prefixes to not conflict with comment detection
+    # Handle comments in the JSON response. Use regex from // until end of line
+    answer = re.sub(r"(?<!https?:)\/\/.*?$", "", answer, flags=re.MULTILINE)
+    answer = re.sub(r",\n.*\.\.\.$", "", answer, flags=re.MULTILINE)
+    # Sanitize newlines in the JSON response
+    answer = answer.replace("\n", " ")
+    # finally, parse and return the JSON object; errors are handled by the caller
+    return json.loads(answer)
 
 
 class MMQAReader(pz.DataReader):
     def __init__(
         self,
         num_samples: int = 5,
-        split: str = "test",
+        split: str = "dev",
         shuffle: bool = False,
         seed: int = 42,
     ):
@@ -58,14 +95,13 @@ class MMQAReader(pz.DataReader):
         with open(f"testdata/MMQA_{split}.jsonl") as f:
             for line in f:
                 dict_line = json.loads(line)
-                if split == "train" and "image" in dict_line["metadata"]["modalities"]:  # noqa: SIM114
-                    dataset.append(dict_line)
-                elif split == "test" and len(dict_line["metadata"]["image_doc_ids"]) > 0:
+                if "image" in dict_line["metadata"]["modalities"] and len(dict_line["metadata"]["modalities"]) > 1:
                     dataset.append(dict_line)
 
-        # shuffle records if shuffle = True
+        # shuffle the questions for the given seed
         if shuffle:
-            random.Random(seed).shuffle(dataset)
+            rng = np.random.default_rng(seed=seed)
+            rng.shuffle(dataset)
 
         # trim to number of samples
         self.dataset = dataset[:num_samples]
@@ -102,12 +138,63 @@ class MMQAReader(pz.DataReader):
         if preds is None or len(targets) == 0:
             return 0.0
 
+        tp, fn = 0, 0
         try:
             # compute recall of retrieved ids and return
-            intersect = set(preds).intersection(set(targets))
-            recall = len(intersect) / len(targets)
+            preds = [str(pred).lower() for pred in preds]
+            targets = [str(target).lower() for target in targets]
+            remove_tokens = [c for c in string.punctuation if c != "/"]
+            for token in remove_tokens:
+                preds = [pred.replace(token, "") for pred in preds]
+                targets = [target.replace(token, "") for target in targets]
 
-            return recall
+
+            for target in targets:
+                if target in preds:
+                    tp += 1
+                else:
+                    fn += 1
+
+            return tp / (tp + fn)
+
+        except Exception:
+            os.makedirs("mmqa-recall-eval-errors", exist_ok=True)
+            ts = time.time()
+            with open(f"mmqa-recall-eval-errors/error-{ts}.txt", "w") as f:
+                f.write(str(preds))
+            return 0.0
+
+    @staticmethod
+    def f1(preds: list | None, targets: list):
+        if preds is None or len(targets) == 0:
+            return 0.0
+
+        tp, fp, fn = 0, 0, 0
+        try:
+            # compute recall of retrieved ids and return
+            preds = [str(pred).lower() for pred in preds]
+            targets = [str(target).lower() for target in targets]
+
+            remove_tokens = [c for c in string.punctuation if c != "/"]
+            for token in remove_tokens:
+                preds = [pred.replace(token, "") for pred in preds]
+                targets = [target.replace(token, "") for target in targets]
+
+            for pred in preds:
+                if pred in targets:
+                    tp += 1
+                else:
+                    fp += 1
+            for target in targets:
+                if target not in preds:
+                    fn += 1
+
+            # compute overall f1 score and return
+            recall = tp / (tp + fn) if (tp + fn) > 0 else 0
+            precision = tp / (tp + fp) if (tp + fp) > 0 else 0
+            f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
+
+            return f1
 
         except Exception:
             os.makedirs("mmqa-recall-eval-errors", exist_ok=True)
@@ -137,12 +224,55 @@ class MMQAReader(pz.DataReader):
             item["labels"] = self.compute_label(entry)
 
             # add scoring functions for list fields
-            item["score_fn"]["answers"] = MMQAReader.recall
+            item["score_fn"]["answers"] = MMQAReader.f1
             item["score_fn"]["supporting_text_ids"] = MMQAReader.recall
             item["score_fn"]["supporting_table_ids"] = MMQAReader.recall
             item["score_fn"]["supporting_image_ids"] = MMQAReader.recall
 
         return item
+
+
+def compute_f1(final_df, answers_df):
+    merged_df = final_df.merge(answers_df, on="qid", how="left")
+    tp, fp, fn = 0, 0, 0
+    for _, row in merged_df.iterrows():
+        targets = [str(target).lower() for target in row["gt_answers"]]
+        preds = row["answers"]
+        if isinstance(preds, str):
+            try:
+                # convert single quotes to double quotes before parsing for JSON
+                preds = preds.replace("'", '"')
+                # try parsing preds as JSON list and cast everything to str to match targets
+                preds = get_json_from_answer(preds)
+                preds = [str(pred).lower() for pred in preds]
+            except Exception:
+                # if that fails, give it a shot as a singleton answer that the LLM failed to wrap in a list
+                preds = [preds.lower()]
+            remove_tokens = [c for c in string.punctuation if c != "/"]
+            for token in remove_tokens:
+                preds = [pred.replace(token, "") for pred in preds]
+                targets = [target.replace(token, "") for target in targets]
+        elif isinstance(preds, list):
+            preds = [str(pred).lower() for pred in preds]
+            remove_tokens = [c for c in string.punctuation if c != "/"]
+            for token in remove_tokens:
+                preds = [pred.replace(token, "") for pred in preds]
+                targets = [target.replace(token, "") for target in targets]
+        else:
+            preds = []
+        for pred in preds:
+            if pred in targets:
+                tp += 1
+            else:
+                fp += 1
+        for target in targets:
+            if target not in preds:
+                fn += 1
+    # compute overall f1 score and return
+    recall = tp / (tp + fn) if (tp + fn) > 0 else 0
+    precision = tp / (tp + fp) if (tp + fp) > 0 else 0
+    f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
+    return f1
 
 
 if __name__ == "__main__":
@@ -170,13 +300,13 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--policy",
-        default="mincost",
+        default="maxquality",
         type=str,
         help="One of 'mincost', 'mintime', 'maxquality'",
     )
     parser.add_argument(
         "--val-examples",
-        default=5,
+        default=20,
         type=int,
         help="Number of validation examples to sample from",
     )
@@ -194,13 +324,13 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--k",
-        default=10,
+        default=6,
         type=int,
         help="Number of columns to sample in Random Sampling or MAB sentinel execution",
     )
     parser.add_argument(
         "--j",
-        default=3,
+        default=4,
         type=int,
         help="Number of columns to sample in Random Sampling or MAB sentinel execution",
     )
@@ -211,18 +341,19 @@ if __name__ == "__main__":
         help="Total sample budget in Random Sampling or MAB sentinel execution",
     )
     parser.add_argument(
+        "--quality",
+        default=None,
+        type=float,
+        help="Quality threshold",
+    )
+    parser.add_argument(
         "--exp-name",
         default=None,
         type=str,
-        help="Name of experiment which is used in output filename",
+        help="The experiment name.",
     )
 
     args = parser.parse_args()
-
-    # The user has to indicate the workload and experiment name
-    if args.exp_name is None:
-        print("Please provide an experiment name using --exp-name")
-        exit(1)
 
     # create directory for profiling data
     os.makedirs("opt-profiling-data", exist_ok=True)
@@ -234,10 +365,14 @@ if __name__ == "__main__":
     k = args.k
     j = args.j
     sample_budget = args.sample_budget
-    exp_name = args.exp_name
     processing_strategy = args.processing_strategy
     execution_strategy = args.execution_strategy
     sentinel_execution_strategy = args.sentinel_execution_strategy
+    exp_name = (
+        f"mmqa-final-{sentinel_execution_strategy}-k{k}-j{j}-budget{sample_budget}-seed{seed}"
+        if args.exp_name is None
+        else args.exp_name
+    )
 
     policy = pz.MaxQuality()
     if args.policy == "mincost":
@@ -246,18 +381,21 @@ if __name__ == "__main__":
         policy = pz.MinTime()
     elif args.policy == "maxquality":
         policy = pz.MaxQuality()
-    else:
-        print("Policy not supported for this demo")
-        exit(1)
+
+    if args.quality is not None and args.policy == "mincostatfixedquality":
+        policy = pz.MinCostAtFixedQuality(min_quality=args.quality)
+    elif args.quality is not None and args.policy == "minlatencyatfixedquality":
+        policy = pz.MinTimeAtFixedQuality(min_quality=args.quality)
+    print(f"USING POLICY: {policy}")
 
     if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None:
         print("WARNING: Both OPENAI_API_KEY and TOGETHER_API_KEY are unset")
 
     # create data source
     datareader = MMQAReader(
-        split="test",
+        split="dev",
         num_samples=100,
-        shuffle=False,
+        shuffle=True,
         seed=seed,
     )
 
@@ -320,7 +458,7 @@ if __name__ == "__main__":
 
     def image_search_func(index: chromadb.Collection, query: list[list[float]], k: int) -> list[str]:
         # limit max number of results to 5
-        k = min(k, 5)
+        # k = min(k, 5)
 
         # execute query with embeddings
         _, result_ids = get_results_and_ids(index, query, n_results=k, image=True)
@@ -382,20 +520,18 @@ if __name__ == "__main__":
         max_workers=1,
         verbose=verbose,
         available_models=[
-            Model.GPT_4o,
-            Model.GPT_4o_V,
-            # Model.GPT_4o_MINI,
-            # Model.GPT_4o_MINI_V,
-            # Model.DEEPSEEK,
+            # Model.GPT_4o,
+            Model.GPT_4o_MINI,
+            # Model.DEEPSEEK_V3,
             # Model.MIXTRAL,
-            # Model.LLAMA3,
-            # Model.LLAMA3_V,
+            # Model.LLAMA3_3_70B,
+            # Model.LLAMA3_2_90B_V,
         ],
         allow_bonded_query=True,
         allow_code_synth=False,
-        allow_critic=False,
-        allow_mixtures=False,
-        allow_rag_reduction=False,
+        allow_critic=True,
+        allow_mixtures=True,
+        allow_rag_reduction=True,
         allow_split_merge=False,
         progress=progress,
     )
@@ -410,11 +546,11 @@ if __name__ == "__main__":
     )
 
     print(data_record_collection.to_df())
-    data_record_collection.to_df().to_csv(f"opt-profiling-data/mmqa-{exp_name}-output.csv", index=False)
+    data_record_collection.to_df().to_csv(f"opt-profiling-data/{exp_name}-output.csv", index=False)
 
     # create filepaths for records and stats
-    records_path = f"opt-profiling-data/mmqa-{exp_name}-records.json"
-    stats_path = f"opt-profiling-data/mmqa-{exp_name}-profiling.json"
+    records_path = f"opt-profiling-data/{exp_name}-records.json"
+    stats_path = f"opt-profiling-data/{exp_name}-profiling.json"
 
     # save record outputs
     record_jsons = []
@@ -430,7 +566,53 @@ if __name__ == "__main__":
     with open(records_path, "w") as f:
         json.dump(record_jsons, f)
 
-    # save statistics
-    execution_stats_dict = data_record_collection.execution_stats.to_json()
-    with open(stats_path, "w") as f:
-        json.dump(execution_stats_dict, f)
+    # # save statistics
+    # execution_stats_dict = data_record_collection.execution_stats.to_json()
+    # with open(stats_path, "w") as f:
+    #     json.dump(execution_stats_dict, f)
+
+    # read the appropriate dataset
+    dataset = []
+    with open("testdata/MMQA_dev.jsonl") as f:
+        for line in f:
+            dict_line = json.loads(line)
+            if "image" in dict_line["metadata"]["modalities"] and len(dict_line["metadata"]["modalities"]) > 1:
+                dataset.append(dict_line)
+
+    # shuffle the questions for the given seed
+    rng = np.random.default_rng(seed=seed)
+    rng.shuffle(dataset)
+
+    # trim to 100 samples
+    dataset = dataset[:100]
+    answer_dataset = []
+    for item in dataset:
+        answers = list(map(lambda elt: str(elt["answer"]), item["answers"]))
+        answer_dataset.append({
+            "qid": item["qid"],
+            "gt_answers": answers
+        })
+
+    # construction dataframe
+    import pandas as pd
+    answers_df = pd.DataFrame(answer_dataset)
+
+    # get final plan str
+    final_plan_id = list(data_record_collection.execution_stats.plan_stats.keys())[0]
+    final_plan_str = data_record_collection.execution_stats.plan_strs[final_plan_id]
+
+    # write stats to disk
+    stats_dict = {
+        "f1": compute_f1(data_record_collection.to_df(), answers_df),
+        "optimization_time": data_record_collection.execution_stats.optimization_time,
+        "optimization_cost": data_record_collection.execution_stats.optimization_cost,
+        "plan_execution_time": data_record_collection.execution_stats.plan_execution_time,
+        "plan_execution_cost": data_record_collection.execution_stats.plan_execution_cost,
+        "total_execution_time": data_record_collection.execution_stats.total_execution_time,
+        "total_execution_cost": data_record_collection.execution_stats.total_execution_cost,
+        "plan_str": final_plan_str,
+    }
+    print(f"F1 IS: {stats_dict['f1']}")
+
+    with open(f"opt-profiling-data/{exp_name}-stats.json", "w") as f:
+        json.dump(stats_dict, f)

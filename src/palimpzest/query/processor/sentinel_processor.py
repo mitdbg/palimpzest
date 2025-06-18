@@ -33,8 +33,6 @@ class SentinelQueryProcessor(QueryProcessor):
         """
         Generates and returns a SentinelPlan for the given dataset.
         """
-        # TODO: explicitly pull up filters; for SIGMOD we can explicitly write plans w/filters pulled up
-
         # create a new optimizer and update its strategy to SENTINEL
         optimizer = self.optimizer.deepcopy_clean()
         optimizer.update_strategy(OptimizationStrategyType.SENTINEL)

@@ -81,21 +81,21 @@ class ProgressManager(ABC):
             expand=True,   # Use full width
         )
 
-        # initialize mapping from op_id --> ProgressStats
-        self.op_id_to_stats: dict[str, ProgressStats] = {}
+        # initialize mapping from full_op_id --> ProgressStats
+        self.full_op_id_to_stats: dict[str, ProgressStats] = {}
 
-        # initialize mapping from op_id --> task
-        self.op_id_to_task = {}
+        # initialize mapping from full_op_id --> task
+        self.full_op_id_to_task = {}
 
         # initialize start time
         self.start_time = None
 
-        # create mapping from op_id --> next_op
-        self.op_id_to_next_op: dict[str, PhysicalOperator] = {}
+        # create mapping from full_op_id --> next_op
+        self.full_op_id_to_next_op: dict[str, PhysicalOperator] = {}
         for op_idx, op in enumerate(plan.operators):
-            op_id = op.get_op_id()
+            full_op_id = op.get_full_op_id()
             next_op = plan.operators[op_idx + 1] if op_idx + 1 < len(plan.operators) else None
-            self.op_id_to_next_op[op_id] = next_op
+            self.full_op_id_to_next_op[full_op_id] = next_op
 
         # compute the total number of inputs to be processed by the plan
         datareader_len = len(plan.operators[0].datareader)
@@ -104,8 +104,7 @@ class ProgressManager(ABC):
         # add a task to the progress manager for each operator in the plan
         for op in plan.operators:
             # get the op id and a short string representation of the op; (str(op) is too long)
-            op_id = op.get_op_id()
-            op_str = f"{op.op_name()} ({op_id})"
+            op_str = f"{op.op_name()} ({op.get_op_id()})"
 
             # update the `total` if we encounter an AggregateOp or LimitScanOp
             if isinstance(op, AggregateOp):
@@ -113,20 +112,20 @@ class ProgressManager(ABC):
             elif isinstance(op, LimitScanOp):
                 total = op.limit
 
-            self.add_task(op_id, op_str, total)
+            self.add_task(op.get_full_op_id(), op_str, total)
 
-    def get_task_total(self, op_id: str) -> int:
+    def get_task_total(self, full_op_id: str) -> int:
         """Return the current total value for the given task."""
-        task = self.op_id_to_task[op_id]
+        task = self.full_op_id_to_task[full_op_id]
         return self.progress._tasks[task].total
 
-    def get_task_description(self, op_id: str) -> str:
+    def get_task_description(self, full_op_id: str) -> str:
         """Return the current description for the given task."""
-        task = self.op_id_to_task[op_id]
+        task = self.full_op_id_to_task[full_op_id]
         return self.progress._tasks[task].description
 
     @abstractmethod
-    def add_task(self, op_id: str, op_str: str, total: int):
+    def add_task(self, full_op_id: str, op_str: str, total: int):
         """Initialize progress tracking for operator execution with total items"""
         pass
 
@@ -136,7 +135,7 @@ class ProgressManager(ABC):
         pass
 
     @abstractmethod
-    def incr(self, op_id: str, num_outputs: int = 1, display_text: str | None = None, **kwargs):
+    def incr(self, full_op_id: str, num_outputs: int = 1, display_text: str | None = None, **kwargs):
         """
         Advance the progress bar for the given operator by one. Modify the downstream operators'
         progress bar `total` to reflect the number of outputs produced by this operator.
@@ -156,16 +155,6 @@ class ProgressManager(ABC):
         """Clean up and finalize progress tracking"""
         pass
 
-    def update_stats(self, op_id: str, **kwargs):
-        """Update progress statistics"""
-        for key, value in kwargs.items():
-            if hasattr(self.op_id_to_stats[op_id], key):
-                if key != "total_cost":
-                    setattr(self.op_id_to_stats[op_id], key, value)
-                else:
-                    self.op_id_to_stats[op_id].total_cost += value
-        self.op_id_to_stats[op_id].memory_usage_mb = get_memory_usage()
-
 
 class MockProgressManager(ProgressManager):
     """Mock progress manager for testing purposes"""
@@ -173,13 +162,13 @@ class MockProgressManager(ProgressManager):
     def __init__(self, plan: PhysicalPlan | SentinelPlan, num_samples: int | None = None):
         pass
 
-    def add_task(self, op_id: str, op_str: str, total: int):
+    def add_task(self, full_op_id: str, op_str: str, total: int):
         pass
 
     def start(self):
         pass
 
-    def incr(self, op_id: str, num_outputs: int = 1, display_text: str | None = None, **kwargs):
+    def incr(self, full_op_id: str, num_outputs: int = 1, display_text: str | None = None, **kwargs):
         pass
 
     def finish(self):
@@ -192,7 +181,7 @@ class PZProgressManager(ProgressManager):
         super().__init__(plan, num_samples)
         self.console = Console()
 
-    def add_task(self, op_id: str, op_str: str, total: int):
+    def add_task(self, full_op_id: str, op_str: str, total: int):
         """Add a new task to the progress bar"""
         task = self.progress.add_task(
             f"[blue]{op_str}", 
@@ -205,10 +194,10 @@ class PZProgressManager(ProgressManager):
         )
 
         # store the mapping of operator ID to task ID
-        self.op_id_to_task[op_id] = task
+        self.full_op_id_to_task[full_op_id] = task
 
         # initialize the stats for this operation
-        self.op_id_to_stats[op_id] = ProgressStats(start_time=time.time())
+        self.full_op_id_to_stats[full_op_id] = ProgressStats(start_time=time.time())
 
     def start(self):
         # print a newline before starting to separate from previous output
@@ -220,41 +209,41 @@ class PZProgressManager(ProgressManager):
         # start progress bar
         self.progress.start()
 
-    def incr(self, op_id: str, num_outputs: int = 1, display_text: str | None = None, **kwargs):
+    def incr(self, full_op_id: str, num_outputs: int = 1, display_text: str | None = None, **kwargs):
         # get the task for the given operation
-        task = self.op_id_to_task.get(op_id)
+        task = self.full_op_id_to_task.get(full_op_id)
 
         # update statistics with any additional keyword arguments
         if kwargs != {}:
-            self.update_stats(op_id, **kwargs)
+            self.update_stats(full_op_id, **kwargs)
 
         # update progress bar and recent text in one update
         if display_text is not None:
-            self.op_id_to_stats[op_id].recent_text = display_text
+            self.full_op_id_to_stats[full_op_id].recent_text = display_text
 
         # if num_outputs is not 1, update the downstream operators' progress bar total for any
         # operator which is not an AggregateOp or LimitScanOp
         delta = num_outputs - 1
         if delta != 0:
-            next_op = self.op_id_to_next_op[op_id]
+            next_op = self.full_op_id_to_next_op[full_op_id]
             while next_op is not None:
                 if not isinstance(next_op, (AggregateOp, LimitScanOp)):
-                    next_op_id = next_op.get_op_id()
-                    next_task = self.op_id_to_task[next_op_id]
-                    self.progress.update(next_task, total=self.get_task_total(next_op_id) + delta)
+                    next_full_op_id = next_op.get_full_op_id()
+                    next_task = self.full_op_id_to_task[next_full_op_id]
+                    self.progress.update(next_task, total=self.get_task_total(next_full_op_id) + delta)
 
-                next_op = self.op_id_to_next_op[next_op_id]
+                next_op = self.full_op_id_to_next_op[next_full_op_id]
 
         # advance the progress bar for this task
         self.progress.update(
             task,
             advance=1,
-            description=f"[bold blue]{self.get_task_description(op_id)}",
-            cost=self.op_id_to_stats[op_id].total_cost,
-            success=self.op_id_to_stats[op_id].success_count,
-            failed=self.op_id_to_stats[op_id].failure_count,
+            description=f"[bold blue]{self.get_task_description(full_op_id)}",
+            cost=self.full_op_id_to_stats[full_op_id].total_cost,
+            success=self.full_op_id_to_stats[full_op_id].success_count,
+            failed=self.full_op_id_to_stats[full_op_id].failure_count,
             memory=get_memory_usage(),
-            recent=f"{self.op_id_to_stats[op_id].recent_text}" if display_text is not None else "",
+            recent=f"{self.full_op_id_to_stats[full_op_id].recent_text}" if display_text is not None else "",
             refresh=True,
         )
 
@@ -262,14 +251,24 @@ class PZProgressManager(ProgressManager):
         self.progress.stop()
 
         # compute total cost, success, and failure
-        total_cost = sum(stats.total_cost for stats in self.op_id_to_stats.values())
-        # success_count = sum(stats.success_count for stats in self.op_id_to_stats.values())
-        # failure_count = sum(stats.failure_count for stats in self.op_id_to_stats.values())
+        total_cost = sum(stats.total_cost for stats in self.full_op_id_to_stats.values())
+        # success_count = sum(stats.success_count for stats in self.full_op_id_to_stats.values())
+        # failure_count = sum(stats.failure_count for stats in self.full_op_id_to_stats.values())
 
         # Print final stats on new lines after progress display
         print(f"Total time: {time.time() - self.start_time:.2f}s")
         print(f"Total cost: ${total_cost:.4f}")
         # print(f"Success rate: {success_count}/{success_count + failure_count}")
+
+    def update_stats(self, full_op_id: str, **kwargs):
+        """Update progress statistics"""
+        for key, value in kwargs.items():
+            if hasattr(self.full_op_id_to_stats[full_op_id], key):
+                if key != "total_cost":
+                    setattr(self.full_op_id_to_stats[full_op_id], key, value)
+                else:
+                    self.full_op_id_to_stats[full_op_id].total_cost += value
+        self.full_op_id_to_stats[full_op_id].memory_usage_mb = get_memory_usage()
 
 class PZSentinelProgressManager(ProgressManager):
     def __init__(self, plan: SentinelPlan, sample_budget: int):
@@ -314,11 +313,11 @@ class PZSentinelProgressManager(ProgressManager):
         )
         self.live_display = Live(self.progress_table, refresh_per_second=10)
 
-        # initialize mapping from op_id --> ProgressStats
-        self.op_id_to_stats: dict[str, ProgressStats] = {}
+        # initialize mapping from logical_op_id --> ProgressStats
+        self.logical_op_id_to_stats: dict[str, ProgressStats] = {}
 
-        # initialize mapping from op_id --> task
-        self.op_id_to_task = {}
+        # initialize mapping from logical_op_id --> task
+        self.logical_op_id_to_task = {}
 
         # initialize start time
         self.start_time = None
@@ -341,12 +340,12 @@ class PZSentinelProgressManager(ProgressManager):
         is_llm_retrieve = isinstance(physical_op, RetrieveOp) and isinstance(physical_op.index, Collection)
         return is_llm_convert or is_llm_filter or is_llm_retrieve
 
-    def get_task_description(self, op_id: str) -> str:
+    def get_task_description(self, logical_op_id: str) -> str:
         """Return the current description for the given task."""
-        task = self.op_id_to_task[op_id]
+        task = self.logical_op_id_to_task[logical_op_id]
         return self.op_progress._tasks[task].description
 
-    def add_task(self, op_id: str, op_str: str, total: int):
+    def add_task(self, logical_op_id: str, op_str: str, total: int):
         """Add a new task to the op progress bars"""
         task = self.op_progress.add_task(
             f"[blue]{op_str}", 
@@ -359,10 +358,10 @@ class PZSentinelProgressManager(ProgressManager):
         )
 
         # store the mapping of operator ID to task ID
-        self.op_id_to_task[op_id] = task
+        self.logical_op_id_to_task[logical_op_id] = task
 
         # initialize the stats for this operation
-        self.op_id_to_stats[op_id] = ProgressStats(start_time=time.time())
+        self.logical_op_id_to_stats[logical_op_id] = ProgressStats(start_time=time.time())
 
     def start(self):
         # print a newline before starting to separate from previous output
@@ -374,29 +373,29 @@ class PZSentinelProgressManager(ProgressManager):
         # start progress bars
         self.live_display.start()
 
-    def incr(self, op_id: str, num_samples: int, display_text: str | None = None, **kwargs):
+    def incr(self, logical_op_id: str, num_samples: int, display_text: str | None = None, **kwargs):
         # TODO: (above) organize progress bars into a Live / Table / Panel or something
         # get the task for the given operation
-        task = self.op_id_to_task.get(op_id)
+        task = self.logical_op_id_to_task.get(logical_op_id)
 
         # update statistics with any additional keyword arguments
         if kwargs != {}:
-            self.update_stats(op_id, **kwargs)
+            self.update_stats(logical_op_id, **kwargs)
 
         # update progress bar and recent text in one update
         if display_text is not None:
-            self.op_id_to_stats[op_id].recent_text = display_text
+            self.logical_op_id_to_stats[logical_op_id].recent_text = display_text
 
-        # advance the op progress bar for this op_id
+        # advance the op progress bar for this logical_op_id
         self.op_progress.update(
             task,
             advance=num_samples,
-            description=f"[bold blue]{self.get_task_description(op_id)}",
-            cost=self.op_id_to_stats[op_id].total_cost,
-            success=self.op_id_to_stats[op_id].success_count,
-            failed=self.op_id_to_stats[op_id].failure_count,
+            description=f"[bold blue]{self.get_task_description(logical_op_id)}",
+            cost=self.logical_op_id_to_stats[logical_op_id].total_cost,
+            success=self.logical_op_id_to_stats[logical_op_id].success_count,
+            failed=self.logical_op_id_to_stats[logical_op_id].failure_count,
             memory=get_memory_usage(),
-            recent=f"{self.op_id_to_stats[op_id].recent_text}" if display_text is not None else "",
+            recent=f"{self.logical_op_id_to_stats[logical_op_id].recent_text}" if display_text is not None else "",
             refresh=True,
         )
 
@@ -404,7 +403,7 @@ class PZSentinelProgressManager(ProgressManager):
         self.overall_progress.update(
             self.overall_task_id,
             advance=num_samples,
-            cost=sum(stats.total_cost for _, stats in self.op_id_to_stats.items()),
+            cost=sum(stats.total_cost for _, stats in self.logical_op_id_to_stats.items()),
             refresh=True,
         )
 
@@ -415,14 +414,24 @@ class PZSentinelProgressManager(ProgressManager):
         self.live_display.stop()
 
         # compute total cost, success, and failure
-        total_cost = sum(stats.total_cost for stats in self.op_id_to_stats.values())
-        # success_count = sum(stats.success_count for stats in self.op_id_to_stats.values())
-        # failure_count = sum(stats.failure_count for stats in self.op_id_to_stats.values())
+        total_cost = sum(stats.total_cost for stats in self.logical_op_id_to_stats.values())
+        # success_count = sum(stats.success_count for stats in self.logical_op_id_to_stats.values())
+        # failure_count = sum(stats.failure_count for stats in self.logical_op_id_to_stats.values())
 
         # Print final stats on new lines after progress display
         print(f"Total opt. time: {time.time() - self.start_time:.2f}s")
         print(f"Total opt. cost: ${total_cost:.4f}")
         # print(f"Success rate: {success_count}/{success_count + failure_count}")
+
+    def update_stats(self, logical_op_id: str, **kwargs):
+        """Update progress statistics"""
+        for key, value in kwargs.items():
+            if hasattr(self.logical_op_id_to_stats[logical_op_id], key):
+                if key != "total_cost":
+                    setattr(self.logical_op_id_to_stats[logical_op_id], key, value)
+                else:
+                    self.logical_op_id_to_stats[logical_op_id].total_cost += value
+        self.logical_op_id_to_stats[logical_op_id].memory_usage_mb = get_memory_usage()
 
 def create_progress_manager(
     plan: PhysicalPlan | SentinelPlan,

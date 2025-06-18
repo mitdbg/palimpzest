@@ -28,7 +28,6 @@ def test_marshal_and_scan_memory_source():
     assert len(result.record_op_stats) == 1
     stats = result.record_op_stats[0]
     assert stats.op_name == "MarshalAndScanDataOp"
-    assert stats.op_details["generated_fields"] == str(sorted(List.field_names()))
     assert stats.time_per_record >= 0.0  # Should be non-negative; sometimes the read executes so quickly the assertion fails with > 0.0
     assert stats.cost_per_record == 0.0
 

@@ -42,7 +42,7 @@ class ProjectOp(PhysicalOperator):
             record_parent_id=dr.parent_id,
             record_source_idx=dr.source_idx,
             record_state=dr.to_dict(include_bytes=False),
-            op_id=self.get_op_id(),
+            full_op_id=self.get_full_op_id(),
             logical_op_id=self.logical_op_id,
             op_name=self.op_name(),
             time_per_record=0.0,

@@ -22,10 +22,9 @@ class APIClientFactory:
     @staticmethod
     def _create_client(api_client: APIClient, api_key: str):
         """Create a new client instance based on the api_client name."""
-        match api_client:
-            case APIClient.OPENAI:
-                return OpenAI(api_key=api_key)
-            case APIClient.TOGETHER:
-                return Together(api_key=api_key)
-            case _:
-                raise ValueError(f"Unknown api_client: {api_client}")
+        if api_client == APIClient.OPENAI:
+            return OpenAI(api_key=api_key)
+        elif api_client == APIClient.TOGETHER:
+            return Together(api_key=api_key)
+        else:
+            raise ValueError(f"Unknown api_client: {api_client}")

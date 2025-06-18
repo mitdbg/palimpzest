@@ -47,7 +47,7 @@ class MapOp(PhysicalOperator):
             record_parent_id=record.parent_id,
             record_source_idx=record.source_idx,
             record_state=record.to_dict(include_bytes=False),
-            op_id=self.get_op_id(),
+            full_op_id=self.get_full_op_id(),
             logical_op_id=self.logical_op_id,
             op_name=self.op_name(),
             time_per_record=total_time,
