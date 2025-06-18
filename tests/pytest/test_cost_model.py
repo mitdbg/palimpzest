@@ -31,10 +31,7 @@ class TestCostModel:
             if "convert" in full_op_id or "filter" in full_op_id:
                 for model_name, expected_model_estimates in expected_op_estimates.items():
                     for metric, expected_value in expected_model_estimates.items():
-                        try:
-                            assert operator_estimates[full_op_id][model_name][metric] == expected_value
-                        except:
-                            import pdb; pdb.set_trace()
+                        assert operator_estimates[full_op_id][model_name][metric] == expected_value
 
     # TODO: rewrite this test to be agnostic to the simple plan
     @pytest.mark.parametrize(
