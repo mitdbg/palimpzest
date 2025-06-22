@@ -9,24 +9,24 @@ from palimpzest.constants import (
     Cardinality,
 )
 from palimpzest.core.data.dataclasses import OperatorCostEstimates, RecordOpStats
-from palimpzest.core.data.datareaders import DataReader, DirectoryReader, FileReader
+from palimpzest.core.data.datasource import DataSource, DirectorySource, FileSource
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.query.operators.physical import PhysicalOperator
 
 
 class ScanPhysicalOp(PhysicalOperator, ABC):
     """
-    Physical operators which implement DataReaders require slightly more information
+    Physical operators which implement DataSources require slightly more information
     in order to accurately compute naive cost estimates. Thus, we use a slightly
     modified abstract base class for these operators.
     """
 
-    def __init__(self, datareader: DataReader, *args, **kwargs):
+    def __init__(self, datasource: DataSource, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.datareader = datareader
+        self.datasource = datasource
 
     def __str__(self):
-        op = f"{self.op_name()}({self.datareader}) -> {self.output_schema}\n"
+        op = f"{self.op_name()}({self.datasource}) -> {self.output_schema}\n"
         op += f"    ({', '.join(self.output_schema.field_names())[:30]})\n"
         return op
 
@@ -35,7 +35,7 @@ class ScanPhysicalOp(PhysicalOperator, ABC):
 
     def get_op_params(self):
         op_params = super().get_op_params()
-        return {"datareader": self.datareader, **op_params}
+        return {"datasource": self.datasource, **op_params}
 
     @abstractmethod
     def naive_cost_estimates(
@@ -62,11 +62,11 @@ class ScanPhysicalOp(PhysicalOperator, ABC):
 
     def __call__(self, idx: int) -> DataRecordSet:
         """
-        This function invokes `self.datareader.__getitem__` on the given `idx` to retrieve the next data item.
+        This function invokes `self.datasource.__getitem__` on the given `idx` to retrieve the next data item.
         It then returns this item as a DataRecord wrapped in a DataRecordSet.
         """
         start_time = time.time()
-        item = self.datareader[idx]
+        item = self.datasource[idx]
         end_time = time.time()
 
         # TODO: remove once validation data is refactored
@@ -74,7 +74,7 @@ class ScanPhysicalOp(PhysicalOperator, ABC):
 
         # check that item covers fields in output schema
         output_field_names = self.output_schema.field_names()
-        assert all([field in item_field_dict for field in output_field_names]), f"Some fields in DataReader schema not present in item!\n - DataReader fields: {output_field_names}\n - Item fields: {list(item.keys())}"
+        assert all([field in item_field_dict for field in output_field_names]), f"Some fields in DataSource schema not present in item!\n - DataSource fields: {output_field_names}\n - Item fields: {list(item.keys())}"
 
         # construct a DataRecord from the item
         dr = DataRecord(self.output_schema, source_idx=idx)
@@ -112,7 +112,7 @@ class MarshalAndScanDataOp(ScanPhysicalOp):
         per_record_size_kb = input_record_size_in_bytes / 1024.0
         time_per_record = (
             LOCAL_SCAN_TIME_PER_KB * per_record_size_kb
-            if isinstance(self.datareader, (DirectoryReader, FileReader))
+            if isinstance(self.datasource, (DirectorySource, FileSource))
             else MEMORY_SCAN_TIME_PER_KB * per_record_size_kb
         )
 

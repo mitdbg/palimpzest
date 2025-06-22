@@ -4,7 +4,7 @@ import json
 from typing import Callable
 
 from palimpzest.constants import AggFunc, Cardinality
-from palimpzest.core.data.datareaders import DataReader
+from palimpzest.core.data.datasource import DataSource
 from palimpzest.core.elements.filters import Filter
 from palimpzest.core.elements.groupbysig import GroupBySig
 from palimpzest.core.lib.schemas import Schema
@@ -16,7 +16,7 @@ class LogicalOperator:
     A logical operator is an operator that operates on Sets.
 
     Right now it can be one of:
-    - BaseScan (scans data from DataReader)
+    - BaseScan (scans data from DataSource)
     - CacheScan (scans cached Set)
     - FilteredScan (scans input Set and applies filter)
     - ConvertScan (scans input Set and converts it to new Schema)
@@ -150,19 +150,19 @@ class Aggregate(LogicalOperator):
 class BaseScan(LogicalOperator):
     """A BaseScan is a logical operator that represents a scan of a particular data source."""
 
-    def __init__(self, datareader: DataReader, output_schema: Schema):
+    def __init__(self, datasource: DataSource, output_schema: Schema):
         super().__init__(output_schema=output_schema)
-        self.datareader = datareader
+        self.datasource = datasource
 
     def __str__(self):
-        return f"BaseScan({self.datareader},{self.output_schema})"
+        return f"BaseScan({self.datasource},{self.output_schema})"
 
     def __eq__(self, other) -> bool:
         return (
             isinstance(other, BaseScan)
             and self.input_schema.get_desc() == other.input_schema.get_desc()
             and self.output_schema.get_desc() == other.output_schema.get_desc()
-            and self.datareader == other.datareader
+            and self.datasource == other.datasource
         )
 
     def get_logical_id_params(self) -> dict:
@@ -170,7 +170,7 @@ class BaseScan(LogicalOperator):
 
     def get_logical_op_params(self) -> dict:
         logical_op_params = super().get_logical_op_params()
-        logical_op_params = {"datareader": self.datareader, **logical_op_params}
+        logical_op_params = {"datasource": self.datasource, **logical_op_params}
 
         return logical_op_params
 
@@ -178,19 +178,19 @@ class BaseScan(LogicalOperator):
 class CacheScan(LogicalOperator):
     """A CacheScan is a logical operator that represents a scan of a cached Set."""
 
-    def __init__(self, datareader: DataReader, output_schema: Schema):
+    def __init__(self, datasource: DataSource, output_schema: Schema):
         super().__init__(output_schema=output_schema)
-        self.datareader = datareader
+        self.datasource = datasource
 
     def __str__(self):
-        return f"CacheScan({self.datareader},{self.output_schema})"
+        return f"CacheScan({self.datasource},{self.output_schema})"
 
     def get_logical_id_params(self) -> dict:
         return super().get_logical_id_params()
 
     def get_logical_op_params(self) -> dict:
         logical_op_params = super().get_logical_op_params()
-        logical_op_params = {"datareader": self.datareader, **logical_op_params}
+        logical_op_params = {"datasource": self.datasource, **logical_op_params}
 
         return logical_op_params
 

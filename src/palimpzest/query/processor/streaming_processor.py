@@ -94,14 +94,14 @@ class StreamingQueryProcessor(QueryProcessor):
     def get_input_records(self):
         scan_operator = self.plan.operators[0]
         assert isinstance(scan_operator, ScanPhysicalOp), "First operator in physical plan must be a ScanPhysicalOp"
-        datareader = scan_operator.datareader
-        if not datareader:
-            raise Exception("DataReader not found")
-        datareader_len = len(datareader)
+        datasource = scan_operator.datasource
+        if not datasource:
+            raise Exception("DataSource not found")
+        datasource_len = len(datasource)
 
         input_records = []
         record_op_stats = []
-        for source_idx in range(datareader_len):
+        for source_idx in range(datasource_len):
             record_set = scan_operator(source_idx)
             input_records += record_set.data_records
             record_op_stats += record_set.record_op_stats

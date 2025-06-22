@@ -18,6 +18,7 @@ from palimpzest.core.lib.fields import (
     StringField,
 )
 from palimpzest.utils.field_helpers import construct_field_type
+from palimpzest.utils.hash_helpers import hash_for_serialized_dict
 
 
 class SchemaMetaclass(type):
@@ -69,6 +70,10 @@ class Schema(metaclass=SchemaMetaclass):
         ordered = self.get_desc()
 
         return hash(ordered.encode())
+
+    @classmethod
+    def get_id(cls) -> str:
+        return hash_for_serialized_dict(cls.get_desc())
 
     @classmethod
     def get_desc(cls) -> str:

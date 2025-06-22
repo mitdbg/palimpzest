@@ -4,6 +4,7 @@ import base64
 import os
 from abc import ABC, abstractmethod
 from io import BytesIO
+from pathlib import Path
 
 import pandas as pd
 from bs4 import BeautifulSoup
@@ -23,50 +24,64 @@ from palimpzest.tools.pdfparser import get_text_from_pdf
 
 
 # First level of abstraction
-class DataReader(ABC):
+class DataSource(ABC):
     """
-    The `DataReader` is a base class for which may be used to generate data that
+    The `DataSource` is a base class for which may be used to generate data that
     is processed by PZ.
 
-    Subclasses of the (abstract) `DataReader` class must implement two methods:
+    Subclasses of the (abstract) `DataSource` class must implement two methods:
 
     - `__len__()`: which returns the number of elements in the data source
     - `__getitem__(idx: int)`: which takes in an `idx` and returns the element at that index
     """
 
-    def __init__(self, schema: type[Schema] | list[dict]) -> None:
+    def __init__(self, schema: type[Schema] | list[dict], id: str | None = None) -> None:
         """
-            Constructor for the `DataReader` class.
+            Constructor for the `DataSource` class.
 
             Args:
-                schema (Schema | list[dict]): The output schema of the records returned by the DataReader
+                schema (Schema | list[dict]): The output schema of the records returned by the DataSource
         """
         # NOTE: _schema attribute currently has to match attribute name in Dataset
         self._schema = Schema.from_json(schema) if isinstance(schema, list) else schema
+        self._id = self._get_id_from_schema(self._schema) if id is None else id
 
     def __eq__(self, __value: object) -> bool:
-        return self.__dict__ == __value.__dict__
+        return isinstance(__value, DataSource) and self.id == __value.id
 
     def __str__(self) -> str:
-        return f"{self.__class__.__name__}(schema={self.schema})"
+        return f"{self.__class__.__name__}(schema={self.schema},id={self.id})"
+
+    def _get_id_from_schema(self, schema: type[Schema]) -> str:
+        """
+        Compute an id for the source given its schema.
+        """
+        return schema.get_id()
+
+    @property
+    def id(self) -> str:
+        return self._id
 
     @property
     def schema(self) -> Schema:
         return self._schema
 
-    # NOTE: currently used by optimizer to compute node id for DataReaders
+    def set_id(self, id: str) -> None:
+        self._id = id
+
+    # NOTE: currently used by optimizer to compute node id for DataSources
     def serialize(self) -> dict:
         return {"schema": self._schema.json_schema()}
 
     @abstractmethod
     def __len__(self) -> int:
-        """Returns the number of items in the data reader."""
+        """Returns the number of items in the datasource."""
         pass
 
     @abstractmethod
     def __getitem__(self, idx: int) -> dict:
         """
-        Returns a single item from the data reader at the given index.
+        Returns a single item from the datasource at the given index.
 
         Args:
             idx (int): The index of the item to return
@@ -84,15 +99,15 @@ class DataReader(ABC):
 
 
 # Second level of abstraction
-class DirectoryReader(DataReader):
+class DirectorySource(DataSource):
     """
-    DirectoryReader returns a dictionary for each file in a directory. Each dictionary contains the filename and
+    DirectorySource returns a dictionary for each file in a directory. Each dictionary contains the filename and
     contents of a single file in the directory.
     """
 
     def __init__(self, path: str, schema: Schema) -> None:
         """
-        Constructor for the `DirectoryReader` class.
+        Constructor for the `DirectorySource` class.
 
         Args:
             path (str): The path to the directory
@@ -119,12 +134,12 @@ class DirectoryReader(DataReader):
         return len(self.filepaths)
 
 
-class FileReader(DataReader):
-    """FileReader returns a single dictionary with the filename and contents of a local file (in bytes)."""
+class FileSource(DataSource):
+    """FileSource returns a single dictionary with the filename and contents of a local file (in bytes)."""
 
     def __init__(self, path: str) -> None:
         """
-        Constructor for the `FileReader` class. The `schema` is set to the default `File` schema.
+        Constructor for the `FileSource` class. The `schema` is set to the default `File` schema.
 
         Args:
             path (str): The path to the file
@@ -166,19 +181,19 @@ class FileReader(DataReader):
         return {"filename": filename, "contents": contents}
 
 
-class MemoryReader(DataReader):
+class MemorySource(DataSource):
     """
-    MemoryReader returns one or more dictionaries that reflect the contents of an in-memory Python object `vals`.
+    MemorySource returns one or more dictionaries that reflect the contents of an in-memory Python object `vals`.
     If `vals` is not a pd.DataFrame, then the dictionary returned by `__getitem__()` has a single field called "value".
     Otherwise, the dictionary contains the key-value mapping from columns to values for the `idx` row in the dataframe.
 
     TODO(gerardo): Add support for other types of in-memory data structures (he has some code for subclassing
-        MemoryReader on his branch)
+        MemorySource on his branch)
     """
 
     def __init__(self, vals: list | pd.DataFrame) -> None:
         """
-        Constructor for the `MemoryReader` class. The `schema` is set to the default `DefaultSchema` schema.
+        Constructor for the `MemorySource` class. The `schema` is set to the default `DefaultSchema` schema.
         If `vals` is a pd.DataFrame, then the schema is set to the schema inferred from the DataFrame.
 
         Args:
@@ -229,14 +244,14 @@ class MemoryReader(DataReader):
 
 
 # Third level of abstraction
-class HTMLFileDirectoryReader(DirectoryReader):
+class HTMLFileDirectorySource(DirectorySource):
     """
-    HTMLFileDirectoryReader returns a dictionary for each HTML file in a directory. Each dictionary contains the
+    HTMLFileDirectorySource returns a dictionary for each HTML file in a directory. Each dictionary contains the
     filename, raw HTML content, and parsed content of a single HTML file in the directory.
     """
     def __init__(self, path: str) -> None:
         """
-        Constructor for the `HTMLFileDirectoryReader` class. The `schema` is set to the `WebPage` schema.
+        Constructor for the `HTMLFileDirectorySource` class. The `schema` is set to the `WebPage` schema.
 
         Args:
             path (str): The path to the directory
@@ -296,14 +311,14 @@ class HTMLFileDirectoryReader(DirectoryReader):
         return item
 
 
-class ImageFileDirectoryReader(DirectoryReader):
+class ImageFileDirectorySource(DirectorySource):
     """
-    ImageFileDirectoryReader returns a dictionary for each image file in a directory. Each dictionary contains the
+    ImageFileDirectorySource returns a dictionary for each image file in a directory. Each dictionary contains the
     filename and the base64 encoded bytes content of a single image file in the directory.
     """
     def __init__(self, path: str) -> None:
         """
-        Constructor for the `ImageFileDirectoryReader` class. The `schema` is set to the `ImageFile` schema.
+        Constructor for the `ImageFileDirectorySource` class. The `schema` is set to the `ImageFile` schema.
 
         Args:
             path (str): The path to the directory
@@ -337,9 +352,9 @@ class ImageFileDirectoryReader(DirectoryReader):
         return {"filename": filename, "contents": contents}
 
 
-class PDFFileDirectoryReader(DirectoryReader):
+class PDFFileDirectorySource(DirectorySource):
     """
-    PDFFileDirectoryReader returns a dictionary for each PDF file in a directory. Each dictionary contains the
+    PDFFileDirectorySource returns a dictionary for each PDF file in a directory. Each dictionary contains the
     filename, raw PDF content, and parsed text content of a single PDF file in the directory.
 
     This class also uses one of a predefined set of PDF processors to extract text content from the PDF files.
@@ -351,7 +366,7 @@ class PDFFileDirectoryReader(DirectoryReader):
         file_cache_dir: str = "/tmp",
     ) -> None:
         """
-        Constructor for the `PDFFileDirectoryReader` class. The `schema` is set to the `PDFFile` schema.
+        Constructor for the `PDFFileDirectorySource` class. The `schema` is set to the `PDFFile` schema.
 
         Args:
             path (str): The path to the directory
@@ -394,14 +409,14 @@ class PDFFileDirectoryReader(DirectoryReader):
         return {"filename": pdf_filename, "contents": pdf_bytes, "text_contents": text_content}
 
 
-class TextFileDirectoryReader(DirectoryReader):
+class TextFileDirectorySource(DirectorySource):
     """
-    TextFileDirectoryReader returns a dictionary for each text file in a directory. Each dictionary contains the
+    TextFileDirectorySource returns a dictionary for each text file in a directory. Each dictionary contains the
     filename and contents of a single text file in the directory.
     """
     def __init__(self, path: str) -> None:
         """
-        Constructor for the `TextFileDirectoryReader` class. The `schema` is set to the `TextFile` schema.
+        Constructor for the `TextFileDirectorySource` class. The `schema` is set to the `TextFile` schema.
 
         Args:
             path (str): The path to the directory
@@ -433,14 +448,14 @@ class TextFileDirectoryReader(DirectoryReader):
         return {"filename": filename, "contents": contents}
 
 
-class XLSFileDirectoryReader(DirectoryReader):
+class XLSFileDirectorySource(DirectorySource):
     """
-    XLSFileDirectoryReader returns a dictionary for each XLS file in a directory. Each dictionary contains the
+    XLSFileDirectorySource returns a dictionary for each XLS file in a directory. Each dictionary contains the
     filename, contents, sheet names, and the number of sheets for a single XLS file in the directory.
     """
     def __init__(self, path: str) -> None:
         """
-        Constructor for the `XLSFileDirectoryReader` class. The `schema` is set to the `XLSFile` schema.
+        Constructor for the `XLSFileDirectorySource` class. The `schema` is set to the `XLSFile` schema.
         """
         super().__init__(path=path, schema=XLSFile)
         assert all([filename.endswith(tuple(constants.XLS_EXTENSIONS)) for filename in self.filepaths])
@@ -478,3 +493,48 @@ class XLSFileDirectoryReader(DirectoryReader):
             "sheet_names": xls.sheet_names,
             "number_sheets": len(xls.sheet_names),
         }
+
+
+def get_local_source(path: str | Path, **kwargs) -> DataSource:
+    """Return a DataSource for a local file or directory."""
+    if os.path.isfile(path):
+        return FileSource(path)
+
+    elif os.path.isdir(path):
+        if all([f.endswith(tuple(constants.IMAGE_EXTENSIONS)) for f in os.listdir(path)]):
+            return ImageFileDirectorySource(path)
+
+        elif all([f.endswith(tuple(constants.PDF_EXTENSIONS)) for f in os.listdir(path)]):
+            pdfprocessor = kwargs.get("pdfprocessor", constants.DEFAULT_PDF_PROCESSOR)
+            file_cache_dir = kwargs.get("file_cache_dir", "/tmp")
+            return PDFFileDirectorySource(
+                path=path, pdfprocessor=pdfprocessor, file_cache_dir=file_cache_dir
+            )
+
+        elif all([f.endswith(tuple(constants.XLS_EXTENSIONS)) for f in os.listdir(path)]):
+            return XLSFileDirectorySource(path)
+
+        elif all([f.endswith(tuple(constants.HTML_EXTENSIONS)) for f in os.listdir(path)]):
+            return HTMLFileDirectorySource(path)
+
+        else:
+            return TextFileDirectorySource(path)
+    else:
+        raise ValueError(f"Path {path} is invalid. Does not point to a file or directory.")
+
+
+def resolve_datasource(source: str | Path | list | pd.DataFrame, **kwargs) -> DataSource:
+    """
+    This helper function returns a `DataSource` object based on the `source` type.
+    The returned `DataSource` object is guaranteed to have a schema.
+    """
+    if isinstance(source, (str, Path)):
+        source = get_local_source(source, **kwargs)
+
+    elif isinstance(source, (list, pd.DataFrame)):
+        source = MemorySource(source)
+
+    else:
+        raise ValueError(f"Invalid source type: {type(source)}, We only support str, Path, list[dict], and pd.DataFrame")
+
+    return source

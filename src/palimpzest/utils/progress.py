@@ -57,7 +57,7 @@ class ProgressManager(ABC):
         Initialize the progress manager for the given plan. This function takes in a plan,
         the number of samples to process (if specified).
 
-        If `num_samples` is None, then the entire DataReader will be scanned.
+        If `num_samples` is None, then the entire DataSource will be scanned.
 
         For each operator which is not an `AggregateOp` or `LimitScanOp`, we set its task `total`
         to the number of inputs to be processed by the plan. As intermediate operators process
@@ -98,8 +98,8 @@ class ProgressManager(ABC):
             self.full_op_id_to_next_op[full_op_id] = next_op
 
         # compute the total number of inputs to be processed by the plan
-        datareader_len = len(plan.operators[0].datareader)
-        total = datareader_len if num_samples is None else min(num_samples, datareader_len)
+        datasource_len = len(plan.operators[0].datasource)
+        total = datasource_len if num_samples is None else min(num_samples, datasource_len)
 
         # add a task to the progress manager for each operator in the plan
         for op in plan.operators:

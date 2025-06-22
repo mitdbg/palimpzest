@@ -1,7 +1,7 @@
 import logging
 
 from palimpzest.constants import Cardinality
-from palimpzest.core.data.datareaders import DataReader
+from palimpzest.core.data.datasource import DataSource
 from palimpzest.policy import (
     MaxQuality,
     MaxQualityAtFixedCost,
@@ -23,7 +23,7 @@ __all__ = [
     # constants
     "Cardinality",
     # core
-    "DataReader",
+    "DataSource",
     # policy
     "MaxQuality",
     "MaxQualityAtFixedCost",

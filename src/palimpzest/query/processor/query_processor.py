@@ -2,7 +2,7 @@ import logging
 from abc import abstractmethod
 
 from palimpzest.core.data.dataclasses import PlanStats
-from palimpzest.core.data.datareaders import DataReader
+from palimpzest.core.data.datasource import DataSource
 from palimpzest.core.elements.records import DataRecord, DataRecordCollection
 from palimpzest.policy import Policy
 from palimpzest.query.execution.execution_strategy import ExecutionStrategy, SentinelExecutionStrategy
@@ -27,7 +27,7 @@ class QueryProcessor:
         execution_strategy: ExecutionStrategy,
         sentinel_execution_strategy: SentinelExecutionStrategy | None,
         num_samples: int | None = None,
-        val_datasource: DataReader | None = None,
+        val_datasource: DataSource | None = None,
         scan_start_idx: int = 0,
         cache: bool = False,
         verbose: bool = False,

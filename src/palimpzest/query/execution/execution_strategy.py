@@ -7,7 +7,7 @@ from chromadb.api.models.Collection import Collection
 
 from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS
 from palimpzest.core.data.dataclasses import OperatorCostEstimates, PlanStats, RecordOpStats
-from palimpzest.core.data.datareaders import DataReader
+from palimpzest.core.data.datasource import DataSource
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.policy import Policy
 from palimpzest.query.operators.convert import LLMConvert
@@ -73,9 +73,9 @@ class ExecutionStrategy(BaseExecutionStrategy, ABC):
             inputs = []
             if isinstance(op, ScanPhysicalOp):
                 scan_end_idx = (
-                    len(op.datareader)
+                    len(op.datasource)
                     if self.num_samples is None
-                    else min(self.scan_start_idx + self.num_samples, len(op.datareader))
+                    else min(self.scan_start_idx + self.num_samples, len(op.datasource))
                 )
                 inputs = [idx for idx in range(self.scan_start_idx, scan_end_idx)]
             input_queues[op.get_full_op_id()] = inputs
@@ -90,7 +90,7 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
     """
     def __init__(
         self,
-        val_datasource: DataReader,
+        val_datasource: DataSource,
         k: int,
         j: int,
         sample_budget: int,

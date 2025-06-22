@@ -4,7 +4,7 @@ import logging
 from copy import deepcopy
 
 from palimpzest.constants import Model
-from palimpzest.core.data.datareaders import DataReader
+from palimpzest.core.data.datasource import DataSource
 from palimpzest.core.lib.fields import Field
 from palimpzest.policy import Policy
 from palimpzest.query.operators.logical import (
@@ -49,9 +49,9 @@ from palimpzest.utils.model_helpers import get_champion_model, get_code_champion
 logger = logging.getLogger(__name__)
 
 
-def get_node_uid(node: Dataset | DataReader) -> str:
+def get_node_uid(node: Dataset | DataSource) -> str:
     """Helper function to compute the universal identifier for a node in the query plan."""
-    # NOTE: technically, hash_for_serialized_dict(node.serialize()) would be valid for both DataReader and Dataset;
+    # NOTE: technically, hash_for_serialized_dict(node.serialize()) would be valid for both DataSource and Dataset;
     #       for the moment, I want to be explicit in Dataset about what constitutes a unique Dataset object, but
     #       in ther future we may be able to remove universal_identifier() from Dataset and just use this function
     return node.universal_identifier() if isinstance(node, Dataset) else hash_for_serialized_dict(node.serialize())
@@ -235,9 +235,9 @@ class Optimizer:
 
         # TODO: add cache scan when we add caching back to PZ
         # if self.cache:
-        #     op = CacheScan(datareader=node, output_schema=output_schema)
-        if isinstance(node, DataReader):
-            op = BaseScan(datareader=node, output_schema=output_schema)
+        #     op = CacheScan(datasource=node, output_schema=output_schema)
+        if isinstance(node, DataSource):
+            op = BaseScan(datasource=node, output_schema=output_schema)
         elif node._filter is not None:
             op = FilteredScan(
                 input_schema=input_schema,
@@ -328,7 +328,7 @@ class Optimizer:
 
         # compute the set of (short) field names this operation depends on
         depends_on_field_names = (
-            {} if isinstance(node, DataReader) else {field_name.split(".")[-1] for field_name in node._depends_on}
+            {} if isinstance(node, DataSource) else {field_name.split(".")[-1] for field_name in node._depends_on}
         )
 
         # compute all properties including this operations'
@@ -390,10 +390,10 @@ class Optimizer:
     def convert_query_plan_to_group_tree(self, query_plan: Dataset) -> str:
         logger.debug(f"Converting query plan to group tree for query_plan: {query_plan}")
         # Obtain ordered list of datasets
-        dataset_nodes: list[Dataset | DataReader] = []
+        dataset_nodes: list[Dataset | DataSource] = []
         node = query_plan.copy()
 
-        # NOTE: the very first node will be a DataReader; the rest will be Dataset
+        # NOTE: the very first node will be a DataSource; the rest will be Dataset
         while isinstance(node, Dataset):
             dataset_nodes.append(node)
             node = node._source
@@ -414,7 +414,7 @@ class Optimizer:
                     short_to_full_field_name[short_field_name] = full_field_name
 
             # if the node is a data source, then skip
-            if isinstance(node, DataReader):
+            if isinstance(node, DataSource):
                 continue
 
             # If the node already has depends_on specified, then resolve each field name to a full (unique) field name
