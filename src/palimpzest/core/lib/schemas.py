@@ -152,7 +152,7 @@ class Schema(metaclass=SchemaMetaclass):
         return field_value
 
     @classmethod
-    def union(cls, other_schema: Schema, keep_duplicates: bool = False) -> Schema:
+    def union(cls, other_schema: type[Schema], keep_duplicates: bool = False) -> type[Schema]:
         """Return the union of this schema with the other_schema"""
         # construct the new schema name
         schema_name = cls.class_name()
@@ -214,7 +214,7 @@ class Schema(metaclass=SchemaMetaclass):
         return type(new_schema_name, (Schema,), attributes)
 
     @classmethod
-    def project(cls, project_cols: list[str]) -> Schema:
+    def project(cls, project_cols: list[str]) -> type[Schema]:
         """Return a projection of this schema with only the project_cols"""
         # construct the new schema name
         schema_name = cls.class_name()
@@ -246,7 +246,7 @@ class Schema(metaclass=SchemaMetaclass):
         return type(new_schema_name, (Schema,), attributes)
 
     @staticmethod
-    def from_df(df: pd.DataFrame) -> Schema:
+    def from_df(df: pd.DataFrame) -> type[Schema]:
         # get new field names, types, and descriptions
         new_field_names, new_field_types, new_field_descs = [], [], []
         for column, dtype in zip(df.columns, df.dtypes):
@@ -279,18 +279,18 @@ class Schema(metaclass=SchemaMetaclass):
         return type(new_schema_name, (Schema,), attributes)
 
     @classmethod
-    def from_json(cls, fields: list[dict]) -> Schema:
+    def from_json(cls, fields: list[dict]) -> type[Schema]:
         return cls.add_fields(fields)
 
     @classmethod
-    def add_fields(cls, fields: list[dict]) -> Schema:
+    def add_fields(cls, fields: list[dict]) -> type[Schema]:
         """Add fields to the schema
 
         Args:
             fields: List of dictionaries, each containing 'name', 'desc', and 'type' keys
 
         Returns:
-            A new Schema with the additional fields
+            (type[Schema]) A new Schema with the additional fields
         """
         assert isinstance(fields, list), "fields must be a list of dictionaries"
         for field in fields:

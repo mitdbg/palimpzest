@@ -96,7 +96,7 @@ class StreamingQueryProcessor(QueryProcessor):
         assert isinstance(scan_operator, ScanPhysicalOp), "First operator in physical plan must be a ScanPhysicalOp"
         datasource = scan_operator.datasource
         if not datasource:
-            raise Exception("DataSource not found")
+            raise Exception("Dataset not found")
         datasource_len = len(datasource)
 
         input_records = []

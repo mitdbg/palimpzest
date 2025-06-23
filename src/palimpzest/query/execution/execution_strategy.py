@@ -7,7 +7,7 @@ from chromadb.api.models.Collection import Collection
 
 from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS
 from palimpzest.core.data.dataclasses import OperatorCostEstimates, PlanStats, RecordOpStats
-from palimpzest.core.data.datasource import DataSource
+from palimpzest.core.data.dataset import Dataset
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.policy import Policy
 from palimpzest.query.operators.convert import LLMConvert
@@ -90,7 +90,7 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
     """
     def __init__(
         self,
-        val_datasource: DataSource,
+        val_datasource: Dataset,
         k: int,
         j: int,
         sample_budget: int,

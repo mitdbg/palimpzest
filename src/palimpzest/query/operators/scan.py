@@ -9,19 +9,19 @@ from palimpzest.constants import (
     Cardinality,
 )
 from palimpzest.core.data.dataclasses import OperatorCostEstimates, RecordOpStats
-from palimpzest.core.data.datasource import DataSource, DirectorySource, FileSource
+from palimpzest.core.data.iter_dataset import IterDataset, MemoryDataset
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.query.operators.physical import PhysicalOperator
 
 
 class ScanPhysicalOp(PhysicalOperator, ABC):
     """
-    Physical operators which implement DataSources require slightly more information
+    Physical operators which implement root Datasets require slightly more information
     in order to accurately compute naive cost estimates. Thus, we use a slightly
     modified abstract base class for these operators.
     """
 
-    def __init__(self, datasource: DataSource, *args, **kwargs):
+    def __init__(self, datasource: IterDataset, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.datasource = datasource
 
@@ -74,7 +74,7 @@ class ScanPhysicalOp(PhysicalOperator, ABC):
 
         # check that item covers fields in output schema
         output_field_names = self.output_schema.field_names()
-        assert all([field in item_field_dict for field in output_field_names]), f"Some fields in DataSource schema not present in item!\n - DataSource fields: {output_field_names}\n - Item fields: {list(item.keys())}"
+        assert all([field in item_field_dict for field in output_field_names]), f"Some fields in Dataset schema not present in item!\n - Dataset fields: {output_field_names}\n - Item fields: {list(item.keys())}"
 
         # construct a DataRecord from the item
         dr = DataRecord(self.output_schema, source_idx=idx)
@@ -111,9 +111,9 @@ class MarshalAndScanDataOp(ScanPhysicalOp):
         # estimate time spent reading each record
         per_record_size_kb = input_record_size_in_bytes / 1024.0
         time_per_record = (
-            LOCAL_SCAN_TIME_PER_KB * per_record_size_kb
-            if isinstance(self.datasource, (DirectorySource, FileSource))
-            else MEMORY_SCAN_TIME_PER_KB * per_record_size_kb
+            MEMORY_SCAN_TIME_PER_KB * per_record_size_kb
+            if isinstance(self.datasource, (MemoryDataset))
+            else LOCAL_SCAN_TIME_PER_KB * per_record_size_kb
         )
 
         # estimate output cardinality

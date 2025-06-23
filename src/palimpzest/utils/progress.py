@@ -57,7 +57,7 @@ class ProgressManager(ABC):
         Initialize the progress manager for the given plan. This function takes in a plan,
         the number of samples to process (if specified).
 
-        If `num_samples` is None, then the entire DataSource will be scanned.
+        If `num_samples` is None, then the entire Dataset will be scanned.
 
         For each operator which is not an `AggregateOp` or `LimitScanOp`, we set its task `total`
         to the number of inputs to be processed by the plan. As intermediate operators process

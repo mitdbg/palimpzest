@@ -2,7 +2,7 @@ import json
 from dataclasses import dataclass, field
 
 from palimpzest.constants import Model
-from palimpzest.core.data.datasource import DataSource
+from palimpzest.core.data.dataset import Dataset
 from palimpzest.policy import MaxQuality, Policy
 
 
@@ -16,7 +16,7 @@ class QueryProcessorConfig:
     sentinel_execution_strategy: str | None = field(default="auto")  # substituted with SentinelExecutionStrategyType
     optimizer_strategy: str = field(default="pareto")                # substituted with OptimizationStrategyType
 
-    val_datasource: DataSource | None = field(default=None)
+    val_datasource: Dataset | None = field(default=None)
 
     policy: Policy = field(default_factory=MaxQuality)
     scan_start_idx: int = field(default=0)
