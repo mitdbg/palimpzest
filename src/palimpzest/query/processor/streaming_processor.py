@@ -2,6 +2,7 @@ import logging
 import time
 
 from palimpzest.core.data.dataclasses import PlanStats
+from palimpzest.core.data.dataset import Dataset
 from palimpzest.core.elements.records import DataRecordCollection
 from palimpzest.query.operators.aggregate import AggregateOp
 from palimpzest.query.operators.filter import FilterOp
@@ -9,7 +10,6 @@ from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.operators.scan import ScanPhysicalOp
 from palimpzest.query.optimizer.plan import PhysicalPlan
 from palimpzest.query.processor.query_processor import QueryProcessor
-from palimpzest.sets import Dataset
 
 logger = logging.getLogger(__name__)
 

@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import inspect
 import json
+import re
+import sys
 from typing import Any as TypingAny
 
 import pandas as pd
 
 from palimpzest.constants import MAX_ROWS
+from palimpzest.core.lib import fields
 from palimpzest.core.lib.fields import (
     BooleanField,
     BytesField,
@@ -125,27 +129,6 @@ class Schema(metaclass=SchemaMetaclass):
         field_map = {prefix + attr: getattr(cls, attr) for attr in attributes if isinstance(getattr(cls, attr), Field)}
         return field_map
 
-    @classmethod
-    def json_schema(cls) -> dict[str, TypingAny]:
-        """The JSON representation of the Schema"""
-        fields = cls.field_names()
-
-        schema = {
-            "fields": {},
-            "type": "object",
-            "description": cls.__doc__,
-        }
-        for k in fields:
-            if k.startswith("_"):
-                continue
-            v = getattr(cls, k)
-            if v is None:
-                continue
-
-            schema["fields"][k] = v.json_schema()
-
-        return schema
-
     @staticmethod
     def field_to_json(field_name: str, field_value: TypingAny) -> TypingAny:
         """Return a representation of the specified field which will be used in its conversion to JSON"""
@@ -210,8 +193,15 @@ class Schema(metaclass=SchemaMetaclass):
         # compute the name for the new schema
         new_schema_name = f"Schema[{sorted(new_field_names)}]"
 
-        # Create the class dynamically
-        return type(new_schema_name, (Schema,), attributes)
+        # create the class dynamically
+        new_class = type(new_schema_name, (Schema,), attributes)
+
+        # register it in the module's namespace so pickle can find it
+        module = sys.modules[__name__]
+        setattr(module, new_schema_name, new_class)
+        new_class.__module__ = module.__name__
+
+        return new_class
 
     @classmethod
     def project(cls, project_cols: list[str]) -> type[Schema]:
@@ -242,8 +232,15 @@ class Schema(metaclass=SchemaMetaclass):
         # compute the name for the new schema
         new_schema_name = f"Schema[{sorted(new_field_names)}]"
 
-        # Create the class dynamically
-        return type(new_schema_name, (Schema,), attributes)
+        # create the class dynamically
+        new_class = type(new_schema_name, (Schema,), attributes)
+
+        # register it in the module's namespace so pickle can find it
+        module = sys.modules[__name__]
+        setattr(module, new_schema_name, new_class)
+        new_class.__module__ = module.__name__
+
+        return new_class
 
     @staticmethod
     def from_df(df: pd.DataFrame) -> type[Schema]:
@@ -275,11 +272,88 @@ class Schema(metaclass=SchemaMetaclass):
         # compute the name for the new schema
         new_schema_name = f"Schema[{sorted(new_field_names)}]"
 
-        # create and return the schema
-        return type(new_schema_name, (Schema,), attributes)
+        # create the class dynamically
+        new_class = type(new_schema_name, (Schema,), attributes)
+
+        # register it in the module's namespace so pickle can find it
+        module = sys.modules[__name__]
+        setattr(module, new_schema_name, new_class)
+        new_class.__module__ = module.__name__
+
+        return new_class
 
     @classmethod
-    def from_json(cls, fields: list[dict]) -> type[Schema]:
+    def to_json(cls) -> list[dict]:
+        """The JSON representation of the Schema."""
+        schema_json = {
+            "schema_name": cls.class_name(),
+            "_desc": cls._desc,
+            "__doc__": cls.__doc__,
+            "fields": [],
+        }
+
+        # iterate over Schema field names
+        field_names = cls.field_names()
+        for field_name in field_names:
+            if field_name.startswith("_"):
+                continue
+            field: Field = getattr(cls, field_name)
+            if field is None:
+                continue
+
+            # construct dict with "name", "desc", and "type" keys
+            field_dict = field.to_json()
+            field_dict["name"] = field_name
+            schema_json["fields"].append(field_dict)
+
+        return schema_json
+
+    @classmethod
+    def from_json(cls, schema_json: dict) -> type[Schema]:
+        """Load Schema from its JSON representation."""
+        schema_name = schema_json["schema_name"]
+        schema_desc = schema_json["_desc"]
+        schema_doc = schema_json["__doc__"]
+
+        # build up field names, descriptions, and types
+        field_names, field_objs = [], []
+        for field_dict in schema_json["fields"]:
+            field_name = field_dict["name"]
+            field_desc = field_dict["desc"]
+            field_class_name = field_dict["type"]
+
+            # ListFields are compound types which need special treatment
+            field_obj = None
+            if "ListField" in field_class_name:
+                m = re.search(r"\[([A-Za-z]+)\]", field_class_name)
+                elt_type = m.group(1)
+                field_obj = ListField(elt_type, desc=field_desc)
+
+            # otherwise, simply get the appropriate class and construct the field_obj
+            else:
+                for name, field_cls in inspect.getmembers(fields):
+                    if name == field_class_name:
+                        field_obj = field_cls(desc=field_desc)
+                        break
+
+            # assert that field was constructed properly
+            assert field_obj is not None, f"Could not construct Field with name: `{field_name}` and class_name: `{field_class_name}`"
+
+            # handle
+            field_names.append(field_name)
+            field_objs.append(field_obj)
+
+        # construct new schema
+        attributes = {"_desc": schema_desc, "__doc__": schema_doc}
+        for field_name, field_obj in zip(field_names, field_objs):
+            attributes[field_name] = field_obj
+
+        # NOTE: we don't register this class because it should already exist
+        return type(schema_name, (Schema,), attributes)
+
+    @classmethod
+    def from_fields(cls, fields: list[dict]) -> type[Schema]:
+        """Create Schema from a list of fields."""
         return cls.add_fields(fields)
 
     @classmethod
@@ -311,6 +385,7 @@ class Schema(metaclass=SchemaMetaclass):
         for field_name, field_obj in zip(new_field_names, new_field_objs):
             attributes[field_name] = field_obj
 
+        # NOTE: we don't register this class because it is a temporary / intermediate class
         new_output_schema = type(f"{cls.__name__}Extended", (Schema,), attributes)
 
         # return the union of this new schema with the cls

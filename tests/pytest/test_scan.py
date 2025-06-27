@@ -1,4 +1,4 @@
-from palimpzest.core.data.datareaders import MemoryReader
+from palimpzest.core.data.iter_dataset import MemoryDataset
 from palimpzest.core.lib.fields import Field
 from palimpzest.core.lib.schemas import Schema
 from palimpzest.query.operators.scan import MarshalAndScanDataOp
@@ -12,11 +12,11 @@ def test_marshal_and_scan_memory_source():
     # Create test data
     test_data = ["test1", "test2", "test3"]
     
-    # Create MemoryReader with test data
-    memory_source = MemoryReader(test_data)
+    # Create MemoryDataset with test data
+    memory_source = MemoryDataset(id="test", vals=test_data)
     
     # Create MarshalAndScanDataOp
-    op = MarshalAndScanDataOp(output_schema=List, datareader=memory_source)
+    op = MarshalAndScanDataOp(output_schema=List, datasource=memory_source)
     
     # Execute the scan operator on the first source record
     result = op(0)
@@ -36,7 +36,7 @@ def test_marshal_and_scan_memory_source():
 #     test_data = [1, 2, 3, 4, 5]
 #     memory_source = MemoryReader(test_data, schema=List)
 
-#     op = MarshalAndScanDataOp(datareader=memory_source)
+#     op = MarshalAndScanDataOp(datasource=memory_source)
 
 #     # Test each index
 #     for idx in range(len(memory_source)):
@@ -51,7 +51,7 @@ def test_marshal_and_scan_memory_source():
 #     # Test with empty data
 #     memory_source = MemoryReader([], schema=List)
 
-#     op = MarshalAndScanDataOp(datareader=memory_source)
+#     op = MarshalAndScanDataOp(datasource=memory_source)
 
 #     # Should raise IndexError when trying to access empty source
 #     with pytest.raises(IndexError):

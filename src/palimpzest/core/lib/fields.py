@@ -34,8 +34,8 @@ class Field:
     def desc(self) -> str:
         return self._desc
 
-    def json_schema(self) -> dict:
-        return {"description": self._desc, "type": str(self.type)}
+    def to_json(self) -> dict:
+        return {"desc": self._desc, "type": self.__class__.__name__}
 
 
 class BooleanField(Field):
@@ -52,14 +52,6 @@ class BytesField(Field):
     def __init__(self, desc: str):
         super().__init__(desc=desc)
         self.type = bytes
-
-    def json_schema(self) -> dict[str, str]:
-        return {
-            "description": self._desc,
-            "type": str(self.type),
-            "contentEncoding": "base64",
-            "contentMediaType": "application/octet-stream",
-        }
 
 
 class CallableField(Field):
@@ -138,4 +130,4 @@ class ListField(Field):
             "_desc": desc,
         }
 
-        return type(f"List[{element_type.__name__}]", (Field,), attrs)
+        return type(f"ListField[{element_type.__name__}]", (Field,), attrs)

@@ -10,22 +10,20 @@ from palimpzest.query.operators.convert import LLMConvertBonded
 from palimpzest.query.operators.filter import LLMFilter
 from palimpzest.query.operators.logical import BaseScan, ConvertScan, FilteredScan
 from palimpzest.query.operators.scan import MarshalAndScanDataOp
-from palimpzest.query.optimizer.optimizer import get_node_uid
 from palimpzest.query.optimizer.plan import PhysicalPlan
-from palimpzest.sets import Dataset
 
 
 ### THREE CONVERTS PHYSICAL PLANS ###
 def get_three_converts_plan(three_converts_workload, enron_eval_tiny, email_schema, foobar_schema, baz_schema, models, expected_cost, expected_time, expected_quality):
     # extract node id's from workload Datasets
-    scan_node_id = get_node_uid(three_converts_workload._source._source._source)
-    first_convert_node_id = get_node_uid(three_converts_workload._source._source)
-    second_convert_node_id = get_node_uid(three_converts_workload._source)
-    third_convert_node_id = get_node_uid(three_converts_workload)
+    scan_node_id = three_converts_workload._sources[0]._sources[0]._sources[0].id
+    first_convert_node_id = three_converts_workload._sources[0]._sources[0].id
+    second_convert_node_id = three_converts_workload._sources[0].id
+    third_convert_node_id = three_converts_workload.id
 
     # create physical op for scan operator
-    scan_logical_op = BaseScan(datareader=enron_eval_tiny, output_schema=TextFile)
-    scan_op = MarshalAndScanDataOp(output_schema=TextFile, datareader=enron_eval_tiny, logical_op_id=scan_logical_op.get_logical_op_id())
+    scan_logical_op = BaseScan(datasource=enron_eval_tiny, output_schema=TextFile)
+    scan_op = MarshalAndScanDataOp(output_schema=TextFile, datasource=enron_eval_tiny, logical_op_id=scan_logical_op.get_logical_op_id())
 
     # create physical op for first convert operator
     depends_on = set(scan_logical_op.output_schema.field_names(unique=True, id=scan_node_id))
@@ -128,27 +126,20 @@ def three_converts_max_quality_at_fixed_cost_expected_plan(three_converts_worklo
 def get_one_filter_one_convert_plan(one_filter_one_convert_workload, enron_eval_tiny, email_schema, models, expected_cost, expected_time, expected_quality):
     dataset_nodes = []
     node = deepcopy(one_filter_one_convert_workload)
-    while isinstance(node, Dataset):
+    while not node.is_root:
         dataset_nodes.append(node)
-        node = node._source
+        node = node._sources[0]
     dataset_nodes.append(node)
     dataset_nodes = list(reversed(dataset_nodes))
 
-    # remove unnecessary convert because output schema from data source scan matches
-    # input schema for the next operator
-    if len(dataset_nodes) > 1 and dataset_nodes[0].schema.get_desc() == dataset_nodes[1].schema.get_desc():
-        dataset_nodes = [dataset_nodes[0]] + dataset_nodes[2:]
-        if len(dataset_nodes) > 1:
-            dataset_nodes[1]._source = dataset_nodes[0]
-
     # extract node id's from workload Datasets
-    scan_node_id = get_node_uid(dataset_nodes[0])
-    first_filter_node_id = get_node_uid(dataset_nodes[1])
-    first_convert_node_id = get_node_uid(dataset_nodes[2])
+    scan_node_id = dataset_nodes[0].id
+    first_filter_node_id = dataset_nodes[1].id
+    first_convert_node_id = dataset_nodes[2].id
 
     # create physical op for scan operator
-    scan_logical_op = BaseScan(datareader=enron_eval_tiny, output_schema=TextFile)
-    scan_op = MarshalAndScanDataOp(output_schema=TextFile, datareader=enron_eval_tiny, logical_op_id=scan_logical_op.get_logical_op_id())
+    scan_logical_op = BaseScan(datasource=enron_eval_tiny, output_schema=TextFile)
+    scan_op = MarshalAndScanDataOp(output_schema=TextFile, datasource=enron_eval_tiny, logical_op_id=scan_logical_op.get_logical_op_id())
 
     # get physical op id for first filter operator
     depends_on = set(scan_logical_op.output_schema.field_names(unique=True, id=scan_node_id))
@@ -192,15 +183,15 @@ def one_filter_one_convert_min_cost_expected_plan(one_filter_one_convert_workloa
 ### TWO CONVERTS TWO FILTERS PHYSICAL PLANS ###
 def get_two_converts_two_filters_plan(two_converts_two_filters_workload, enron_eval_tiny, email_schema, foobar_schema, first_filter_str, models, expected_cost, expected_time, expected_quality):
     # extract node id's from workload Datasets
-    scan_node_id = get_node_uid(two_converts_two_filters_workload._source._source._source._source)
-    first_convert_node_id = get_node_uid(two_converts_two_filters_workload._source._source._source)
-    second_convert_node_id = get_node_uid(two_converts_two_filters_workload._source._source)
-    first_filter_node_id = get_node_uid(two_converts_two_filters_workload._source)
-    second_filter_node_id = get_node_uid(two_converts_two_filters_workload)
+    scan_node_id = two_converts_two_filters_workload._sources[0]._sources[0]._sources[0]._sources[0].id
+    first_convert_node_id = two_converts_two_filters_workload._sources[0]._sources[0]._sources[0].id
+    second_convert_node_id = two_converts_two_filters_workload._sources[0]._sources[0].id
+    first_filter_node_id = two_converts_two_filters_workload._sources[0].id
+    second_filter_node_id = two_converts_two_filters_workload.id
 
     # create physical op for scan operator
-    scan_logical_op = BaseScan(datareader=enron_eval_tiny, output_schema=TextFile)
-    scan_op = MarshalAndScanDataOp(output_schema=TextFile, datareader=enron_eval_tiny, logical_op_id=scan_logical_op.get_logical_op_id())
+    scan_logical_op = BaseScan(datasource=enron_eval_tiny, output_schema=TextFile)
+    scan_op = MarshalAndScanDataOp(output_schema=TextFile, datasource=enron_eval_tiny, logical_op_id=scan_logical_op.get_logical_op_id())
 
     # create physical op for first convert operator
     depends_on = set(scan_logical_op.output_schema.field_names(unique=True, id=scan_node_id))

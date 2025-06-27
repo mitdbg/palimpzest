@@ -4,7 +4,7 @@ import json
 from typing import Callable
 
 from palimpzest.constants import AggFunc, Cardinality
-from palimpzest.core.data.dataset import Dataset
+from palimpzest.core.data import context, dataset
 from palimpzest.core.elements.filters import Filter
 from palimpzest.core.elements.groupbysig import GroupBySig
 from palimpzest.core.lib.schemas import Schema
@@ -17,7 +17,7 @@ class LogicalOperator:
 
     Right now it can be one of:
     - BaseScan (scans data from a root Dataset)
-    - CacheScan (scans cached Set)
+    - ContextScan (loads the context for a root Dataset)
     - FilteredScan (scans input Set and applies filter)
     - ConvertScan (scans input Set and converts it to new Schema)
     - LimitScan (scans up to N records from a Set)
@@ -25,6 +25,7 @@ class LogicalOperator:
     - Aggregate (applies an aggregation on the Set)
     - RetrieveScan (fetches documents from a provided input for a given query)
     - Map (applies a function to each record in the Set without adding any new columns)
+    - ComputeOperator (executes a computation described in natural language)
 
     Every logical operator must declare the get_logical_id_params() and get_logical_op_params() methods,
     which return dictionaries of parameters that are used to compute the logical op id and to implement
@@ -37,6 +38,8 @@ class LogicalOperator:
         input_schema: Schema | None = None,
         depends_on: list[str] | None = None,
     ):
+        # TODO: can we eliminate input_schema?
+        # TODO: should we eliminate output_schema? (and replace it with what?)
         self.output_schema = output_schema
         self.input_schema = input_schema
         self.depends_on = [] if depends_on is None else sorted(depends_on)
@@ -71,6 +74,7 @@ class LogicalOperator:
         NOTE: input_schema and output_schema are not included in the id params because
               they depend on how the Optimizer orders operations.
         """
+        # TODO: should we use `generated_fields` after getting rid of them in PhysicalOperator?
         return {"generated_fields": self.generated_fields}
 
     def get_logical_op_params(self) -> dict:
@@ -156,7 +160,7 @@ class Aggregate(LogicalOperator):
 class BaseScan(LogicalOperator):
     """A BaseScan is a logical operator that represents a scan of a particular root Dataset."""
 
-    def __init__(self, datasource: Dataset, output_schema: Schema):
+    def __init__(self, datasource: dataset.Dataset, output_schema: Schema):
         super().__init__(output_schema=output_schema)
         self.datasource = datasource
 
@@ -181,10 +185,36 @@ class BaseScan(LogicalOperator):
         return logical_op_params
 
 
+class ContextScan(LogicalOperator):
+    """A ContextScan is a logical operator that loads the context for a particular root Dataset."""
+
+    def __init__(self, context: context.Context, output_schema: Schema):
+        super().__init__(output_schema=output_schema)
+        self.context = context
+
+    def __str__(self):
+        return f"ContextScan({self.context},{self.output_schema})"
+
+    def __eq__(self, other) -> bool:
+        return (
+            isinstance(other, ContextScan)
+            and self.context.id == other.context.id
+        )
+
+    def get_logical_id_params(self) -> dict:
+        return super().get_logical_id_params()
+
+    def get_logical_op_params(self) -> dict:
+        logical_op_params = super().get_logical_op_params()
+        logical_op_params = {"context": self.context, **logical_op_params}
+
+        return logical_op_params
+
+
 class CacheScan(LogicalOperator):
     """A CacheScan is a logical operator that represents a scan of a cached Set."""
 
-    def __init__(self, datasource: Dataset, output_schema: Schema):
+    def __init__(self, datasource: dataset.Dataset, output_schema: Schema):
         super().__init__(output_schema=output_schema)
         self.datasource = datasource
 
@@ -457,6 +487,40 @@ class MapScan(LogicalOperator):
         logical_op_params = super().get_logical_op_params()
         logical_op_params = {
             "udf": self.udf,
+            "target_cache_id": self.target_cache_id,
+            **logical_op_params,
+        }
+
+        return logical_op_params
+
+
+class ComputeOperator(LogicalOperator):
+    """
+    A ComputeOperator is a logical operator that performs a computation described in natural language
+    on a given Context.
+    """
+
+    def __init__(self, instruction: str, target_cache_id: str | None = None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.instruction = instruction
+        self.target_cache_id = target_cache_id
+
+    def __str__(self):
+        return f"ComputeOperator(instr={self.instruction:20s})"
+
+    def get_logical_id_params(self) -> dict:
+        logical_id_params = super().get_logical_id_params()
+        logical_id_params = {
+            "instruction": self.instruction,
+            **logical_id_params,
+        }
+
+        return logical_id_params
+
+    def get_logical_op_params(self) -> dict:
+        logical_op_params = super().get_logical_op_params()
+        logical_op_params = {
+            "instruction": self.instruction,
             "target_cache_id": self.target_cache_id,
             **logical_op_params,
         }

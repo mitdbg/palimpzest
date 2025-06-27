@@ -1,8 +1,8 @@
 import json
 from dataclasses import dataclass, field
+from typing import Any
 
 from palimpzest.constants import Model
-from palimpzest.core.data.dataset import Dataset
 from palimpzest.policy import MaxQuality, Policy
 
 
@@ -16,7 +16,7 @@ class QueryProcessorConfig:
     sentinel_execution_strategy: str | None = field(default="auto")  # substituted with SentinelExecutionStrategyType
     optimizer_strategy: str = field(default="pareto")                # substituted with OptimizationStrategyType
 
-    val_datasource: Dataset | None = field(default=None)
+    val_datasource: Any | None = field(default=None) # NOTE: val_datasource is a Dataset
 
     policy: Policy = field(default_factory=MaxQuality)
     scan_start_idx: int = field(default=0)
@@ -70,7 +70,7 @@ class QueryProcessorConfig:
         """Convert the config to a JSON string representation."""
         config_dict = self.to_dict()
         config_dict["val_datasource"] = (
-            None if self.val_datasource is None else self.val_datasource.serialize()
+            None if self.val_datasource is None else self.val_datasource.id
         )
         config_dict["policy"] = self.policy.to_json_str()
         for strategy in ["processing_strategy", "execution_strategy", "sentinel_execution_strategy", "optimizer_strategy"]:

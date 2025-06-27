@@ -2,14 +2,11 @@ from __future__ import annotations
 
 import time
 from abc import ABC, abstractmethod
+from typing import Any
 
-from palimpzest.constants import (
-    LOCAL_SCAN_TIME_PER_KB,
-    MEMORY_SCAN_TIME_PER_KB,
-    Cardinality,
-)
+from palimpzest.constants import LOCAL_SCAN_TIME_PER_KB
+from palimpzest.core.data import context
 from palimpzest.core.data.dataclasses import OperatorCostEstimates, RecordOpStats
-from palimpzest.core.data.iter_dataset import IterDataset, MemoryDataset
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.query.operators.physical import PhysicalOperator
 
@@ -20,8 +17,8 @@ class ScanPhysicalOp(PhysicalOperator, ABC):
     in order to accurately compute naive cost estimates. Thus, we use a slightly
     modified abstract base class for these operators.
     """
-
-    def __init__(self, datasource: IterDataset, *args, **kwargs):
+    # datasource: IterDataset
+    def __init__(self, datasource: Any, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.datasource = datasource
 
@@ -41,7 +38,6 @@ class ScanPhysicalOp(PhysicalOperator, ABC):
     def naive_cost_estimates(
         self,
         source_op_cost_estimates: OperatorCostEstimates,
-        input_cardinality: Cardinality,
         input_record_size_in_bytes: int | float,
     ) -> OperatorCostEstimates:
         """
@@ -97,7 +93,7 @@ class ScanPhysicalOp(PhysicalOperator, ABC):
  
         # construct and return DataRecordSet object
         return DataRecordSet([dr], [record_op_stats])
-        
+
 
 class MarshalAndScanDataOp(ScanPhysicalOp):
     def naive_cost_estimates(
@@ -110,11 +106,14 @@ class MarshalAndScanDataOp(ScanPhysicalOp):
 
         # estimate time spent reading each record
         per_record_size_kb = input_record_size_in_bytes / 1024.0
-        time_per_record = (
-            MEMORY_SCAN_TIME_PER_KB * per_record_size_kb
-            if isinstance(self.datasource, (MemoryDataset))
-            else LOCAL_SCAN_TIME_PER_KB * per_record_size_kb
-        )
+
+        # TODO: cannot do the first computation b/c we cannot import iter_dataset; possibly revisit
+        # time_per_record = (
+        #     MEMORY_SCAN_TIME_PER_KB * per_record_size_kb
+        #     if isinstance(self.datasource, (iter_dataset.MemoryDataset))
+        #     else LOCAL_SCAN_TIME_PER_KB * per_record_size_kb
+        # )
+        time_per_record = LOCAL_SCAN_TIME_PER_KB * per_record_size_kb
 
         # estimate output cardinality
         cardinality = source_op_cost_estimates.cardinality
@@ -151,3 +150,70 @@ class CacheScanDataOp(ScanPhysicalOp):
             cost_per_record=0,
             quality=1.0,
         )
+
+
+class ContextScanOp(PhysicalOperator):
+    """
+    Physical operator which facillitates the loading of a Context for processing.
+    """
+
+    def __init__(self, context: context.Context, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.context = context
+
+    def __str__(self):
+        op = f"{self.op_name()}({self.context}) -> {self.output_schema}\n"
+        op += f"    ({', '.join(self.output_schema.field_names())[:30]})\n"
+        return op
+
+    def get_id_params(self):
+        return super().get_id_params()
+
+    def get_op_params(self):
+        op_params = super().get_op_params()
+        return {"context": self.context, **op_params}
+
+    def naive_cost_estimates(
+        self,
+        source_op_cost_estimates: OperatorCostEstimates,
+    ):
+        # get inputs needed for naive cost estimation
+        # TODO: we should rename cardinality --> "multiplier" or "selectivity" one-to-one / one-to-many
+
+        # estimate time spent reading each record
+        time_per_record = LOCAL_SCAN_TIME_PER_KB * 1.0
+
+        # for now, assume no cost per record for reading from cache
+        return OperatorCostEstimates(
+            cardinality=1.0,
+            time_per_record=time_per_record,
+            cost_per_record=0,
+            quality=1.0,
+        )
+
+    def __call__(self, *args, **kwargs) -> DataRecordSet:
+        """
+        This function returns the context as a DataRecord wrapped in a DataRecordSet.
+        """
+        # construct a DataRecord from the context
+        start_time = time.time()
+        dr = DataRecord(self.output_schema, source_idx=0)
+        dr.context = self.context
+        end_time = time.time()
+
+        # create RecordOpStats objects
+        record_op_stats = RecordOpStats(
+            record_id=dr.id,
+            record_parent_id=dr.parent_id,
+            record_source_idx=dr.source_idx,
+            record_state=dr.to_dict(include_bytes=False),
+            full_op_id=self.get_full_op_id(),
+            logical_op_id=self.logical_op_id,
+            op_name=self.op_name(),
+            time_per_record=(end_time - start_time),
+            cost_per_record=0.0,
+            op_details={k: str(v) for k, v in self.get_id_params().items()},
+        )
+ 
+        # construct and return DataRecordSet object
+        return DataRecordSet([dr], [record_op_stats])

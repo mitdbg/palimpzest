@@ -10,7 +10,7 @@ import pandas as pd
 from bs4 import BeautifulSoup
 
 from palimpzest import constants
-from palimpzest.core.data.dataset import Dataset
+from palimpzest.core.data import dataset
 from palimpzest.core.lib.schemas import (
     DefaultSchema,
     ImageFile,
@@ -27,7 +27,7 @@ from palimpzest.tools.pdfparser import get_text_from_pdf
 ####################
 ### BASE CLASSES ###
 ####################
-class IterDataset(Dataset, ABC):
+class IterDataset(dataset.Dataset, ABC):
     """
     The `IterDataset` is an abstract base class for root `Datasets` whose data is accessed
     via iteration. Classes which inherit from this class must implement two methods:
@@ -48,7 +48,7 @@ class IterDataset(Dataset, ABC):
         self._id = id
 
         # compute Schema and call parent constructor
-        schema = Schema.from_json(schema) if isinstance(schema, list) else schema
+        schema = Schema.from_fields(schema) if isinstance(schema, list) else schema
         super().__init__(sources=None, operator=BaseScan(datasource=self, output_schema=schema), schema=schema)
 
     @abstractmethod
@@ -433,44 +433,44 @@ class XLSFileDataset(BaseFileDataset):
         }
 
 
-def get_local_source(path: str | Path, **kwargs) -> Dataset:
+def get_local_source(id: str, path: str | Path, **kwargs) -> dataset.Dataset:
     """Return a `Dataset` for a local file or directory."""
     if os.path.isfile(path):
-        return TextFileDataset(path)
+        return TextFileDataset(id, path)
 
     elif os.path.isdir(path):
         if all([f.endswith(tuple(constants.IMAGE_EXTENSIONS)) for f in os.listdir(path)]):
-            return ImageFileDataset(path)
+            return ImageFileDataset(id, path)
 
         elif all([f.endswith(tuple(constants.PDF_EXTENSIONS)) for f in os.listdir(path)]):
             pdfprocessor = kwargs.get("pdfprocessor", constants.DEFAULT_PDF_PROCESSOR)
             file_cache_dir = kwargs.get("file_cache_dir", "/tmp")
             return PDFFileDataset(
-                path=path, pdfprocessor=pdfprocessor, file_cache_dir=file_cache_dir
+                id=id, path=path, pdfprocessor=pdfprocessor, file_cache_dir=file_cache_dir
             )
 
         elif all([f.endswith(tuple(constants.XLS_EXTENSIONS)) for f in os.listdir(path)]):
-            return XLSFileDataset(path)
+            return XLSFileDataset(id, path)
 
         elif all([f.endswith(tuple(constants.HTML_EXTENSIONS)) for f in os.listdir(path)]):
-            return HTMLFileDataset(path)
+            return HTMLFileDataset(id, path)
 
         else:
-            return TextFileDataset(path)
+            return TextFileDataset(id, path)
     else:
         raise ValueError(f"Path {path} is invalid. Does not point to a file or directory.")
 
 
-def resolve_datasource(source: str | Path | list | pd.DataFrame, **kwargs) -> Dataset:
+def resolve_datasource(id: str, source: str | Path | list | pd.DataFrame, **kwargs) -> dataset.Dataset:
     """
     This helper function returns a `Dataset` object based on the `source` type.
     The returned `Dataset` object is guaranteed to have a schema.
     """
     if isinstance(source, (str, Path)):
-        source = get_local_source(source, **kwargs)
+        source = get_local_source(id, source, **kwargs)
 
     elif isinstance(source, (list, pd.DataFrame)):
-        source = MemoryDataset(source)
+        source = MemoryDataset(id=id, vals=source)
 
     else:
         raise ValueError(f"Invalid source type: {type(source)}, We only support str, Path, list[dict], and pd.DataFrame")

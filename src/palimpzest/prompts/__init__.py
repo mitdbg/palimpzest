@@ -1,4 +1,5 @@
 from palimpzest.prompts.code_synthesis_prompts import ADVICEGEN_PROMPT, CODEGEN_PROMPT, EXAMPLE_PROMPT
+from palimpzest.prompts.context_search import CONTEXT_SEARCH_PROMPT
 from palimpzest.prompts.prompt_factory import PromptFactory
 from palimpzest.prompts.util_phrases import (
     COT_ANSWER_INSTRUCTION,
@@ -12,6 +13,8 @@ __all__ = [
     "ADVICEGEN_PROMPT",
     "CODEGEN_PROMPT",
     "EXAMPLE_PROMPT",
+    # context search
+    "CONTEXT_SEARCH_PROMPT",
     # prompt factory
     "PromptFactory",
     # util phrases

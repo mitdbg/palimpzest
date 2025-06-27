@@ -8,6 +8,7 @@ from palimpzest.core.data.dataset import Dataset
 from palimpzest.core.lib.fields import Field
 from palimpzest.policy import Policy
 from palimpzest.query.operators.logical import (
+    ComputeOperator,
     FilteredScan,
     LimitScan,
     MapScan,
@@ -205,7 +206,7 @@ class Optimizer:
 
     def construct_group_tree(self, dataset_nodes: list[Dataset]) -> tuple[list[int], dict[str, Field], dict[str, set[str]]]:
         logger.debug(f"Constructing group tree for dataset_nodes: {dataset_nodes}")
-
+        # TODO: debug group tree construction
         # get node
         node = dataset_nodes[-1]
 
@@ -213,11 +214,7 @@ class Optimizer:
         uid = node.id
 
         # create the op for the given node
-        op = node.operator
-
-        # # some legacy plans may have a useless convert; for now we simply skip it
-        # elif output_schema == input_schema:
-        #     return self.construct_group_tree(dataset_nodes[:-1]) if len(dataset_nodes) > 1 else ([], {}, {})
+        op = node._operator
 
         # compute the input group ids and fields for this node
         input_group_ids, input_group_fields, input_group_properties = (
@@ -231,7 +228,7 @@ class Optimizer:
         new_fields = {
             field_name: field
             for field_name, field in op.output_schema.field_map(unique=True, id=uid).items()
-            if (field_name.split(".")[-1] not in input_group_short_field_names) or (node._udf is not None)
+            if (field_name.split(".")[-1] not in input_group_short_field_names) or (hasattr(node._operator, "udf") and node._operator.udf is not None)
         }
         all_fields = {**input_group_fields, **new_fields}
 
@@ -271,6 +268,14 @@ class Optimizer:
                 all_properties["udfs"].add(op_udf_str)
             else:
                 all_properties["udfs"] = set([op_udf_str])
+
+        # TODO: temporary fix; perhaps use op_ids to identify group?
+        elif isinstance(op, ComputeOperator):
+            op_instruction = op.instruction
+            if "instructions" in all_properties:
+                all_properties["instructions"].add(op_instruction)
+            else:
+                all_properties["instructions"] = set([op_instruction])
 
         # construct the logical expression and group
         logical_expression = LogicalExpression(
@@ -318,7 +323,7 @@ class Optimizer:
             for short_field_name, full_field_name in zip(short_field_names, full_field_names):
                 # set mapping automatically if this is a new field
                 if short_field_name not in short_to_full_field_name or (
-                    node_idx > 0 and dataset_nodes[node_idx - 1].schema != node.schema and node._udf is not None
+                    node_idx > 0 and dataset_nodes[node_idx - 1].schema != node.schema and (hasattr(node._operator, "udf") and node._operator.udf is not None)
                 ):
                     short_to_full_field_name[short_field_name] = full_field_name
 
@@ -371,7 +376,7 @@ class Optimizer:
             elif isinstance(task, ApplyRule):
                 context = {"costed_full_op_ids": self.cost_model.get_costed_full_op_ids()}
                 new_tasks = task.perform(
-                    self.groups, self.expressions, context=context, **self.get_physical_op_params()
+                    self.groups, self.expressions, context=context, **self.get_physical_op_params(),
                 )
             elif isinstance(task, OptimizePhysicalExpression):
                 context = {"optimizer_strategy": self.optimizer_strategy}

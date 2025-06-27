@@ -14,7 +14,7 @@ from palimpzest.query.operators.convert import LLMConvert
 from palimpzest.query.operators.filter import FilterOp, LLMFilter
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.retrieve import RetrieveOp
-from palimpzest.query.operators.scan import ScanPhysicalOp
+from palimpzest.query.operators.scan import ContextScanOp, ScanPhysicalOp
 from palimpzest.query.optimizer.plan import PhysicalPlan, SentinelPlan
 from palimpzest.utils.progress import PZSentinelProgressManager
 
@@ -78,6 +78,8 @@ class ExecutionStrategy(BaseExecutionStrategy, ABC):
                     else min(self.scan_start_idx + self.num_samples, len(op.datasource))
                 )
                 inputs = [idx for idx in range(self.scan_start_idx, scan_end_idx)]
+            elif isinstance(op, ContextScanOp):
+                inputs = [None]
             input_queues[op.get_full_op_id()] = inputs
 
         return input_queues

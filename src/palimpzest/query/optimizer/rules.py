@@ -1,10 +1,16 @@
 import logging
+import os
 from copy import deepcopy
 from itertools import combinations
 
+from litellm import completion
+
 from palimpzest.constants import AggFunc, Cardinality, PromptStrategy
+from palimpzest.core.data.context_manager import ContextManager
+from palimpzest.prompts import CONTEXT_SEARCH_PROMPT
 from palimpzest.query.operators.aggregate import ApplyGroupByOp, AverageAggregateOp, CountAggregateOp
 from palimpzest.query.operators.code_synthesis_convert import CodeSynthesisConvertSingle
+from palimpzest.query.operators.compute import SmolAgentsCompute
 from palimpzest.query.operators.convert import LLMConvertBonded, NonLLMConvert
 from palimpzest.query.operators.critique_and_refine_convert import CriticAndRefineConvert
 from palimpzest.query.operators.filter import LLMFilter, NonLLMFilter
@@ -13,6 +19,8 @@ from palimpzest.query.operators.logical import (
     Aggregate,
     BaseScan,
     CacheScan,
+    ComputeOperator,
+    ContextScan,
     ConvertScan,
     FilteredScan,
     GroupByAggregate,
@@ -26,7 +34,7 @@ from palimpzest.query.operators.mixture_of_agents_convert import MixtureOfAgents
 from palimpzest.query.operators.project import ProjectOp
 from palimpzest.query.operators.rag_convert import RAGConvert
 from palimpzest.query.operators.retrieve import RetrieveOp
-from palimpzest.query.operators.scan import CacheScanDataOp, MarshalAndScanDataOp
+from palimpzest.query.operators.scan import CacheScanDataOp, ContextScanOp, MarshalAndScanDataOp
 from palimpzest.query.operators.split_convert import SplitConvert
 from palimpzest.query.optimizer.primitives import Expression, Group, LogicalExpression, PhysicalExpression
 from palimpzest.utils.model_helpers import get_models, get_vision_models
@@ -1007,6 +1015,69 @@ class AggregateRule(ImplementationRule):
         return deduped_physical_expressions
 
 
+class AddContextsBeforeComputeRule(ImplementationRule):
+    """
+    Searches the ContextManager for additional contexts which may be useful for the given computation.
+
+    TODO: track cost of generating search query
+    """
+    k = 1
+    SEARCH_GENERATOR_PROMPT = CONTEXT_SEARCH_PROMPT
+
+    @classmethod
+    def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
+        is_match = isinstance(logical_expression.operator, ComputeOperator)
+        logger.debug(f"AddContextsBeforeComputeRule matches_pattern: {is_match} for {logical_expression}")
+        return is_match
+
+    @classmethod
+    def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
+        logger.debug(f"Substituting AddContextsBeforeComputeRule for {logical_expression}")
+
+        logical_op: ComputeOperator = logical_expression.operator
+        op_kwargs = logical_op.get_logical_op_params()
+        op_kwargs.update(
+            {
+                "verbose": physical_op_params["verbose"],
+                "logical_op_id": logical_op.get_logical_op_id(),
+                "logical_op_name": logical_op.logical_op_name(),
+            }
+        )
+
+        # load an LLM to generate a short search query
+        model = None
+        if os.getenv("OPENAI_API_KEY"):
+            model = "gpt-4o-mini"
+        elif os.getenv("ANTHROPIC_API_KEY"):
+            model = "claude-3-5-sonnet-latest"
+        elif os.getenv("TOGETHER_API_KEY"):
+            model = "together_ai/togethercomputer/Llama-3.3-70B-Instruct-Turbo"
+
+        # retrieve any additional context which may be useful
+        cm = ContextManager()
+        response = completion(
+            model=model,
+            messages=[{"role": "user", "content": cls.SEARCH_GENERATOR_PROMPT.format(instruction=logical_op.instruction)}]
+        )
+        query = response.choices[0].message.content
+        additional_contexts = cm.search_context(query, k=cls.k)
+        op_kwargs["additional_contexts"] = additional_contexts
+        op = SmolAgentsCompute(**op_kwargs)
+
+        expression = PhysicalExpression(
+            operator=op,
+            input_group_ids=logical_expression.input_group_ids,
+            input_fields=logical_expression.input_fields,
+            depends_on_field_names=logical_expression.depends_on_field_names,
+            generated_fields=logical_expression.generated_fields,
+            group_id=logical_expression.group_id,
+        )
+
+        logger.debug(f"Done substituting AddContextsBeforeComputeRule for {logical_expression}")
+        deduped_physical_expressions = set([expression])
+
+        return deduped_physical_expressions
+
 class BasicSubstitutionRule(ImplementationRule):
     """
     For logical operators with a single physical implementation, substitute the
@@ -1016,6 +1087,8 @@ class BasicSubstitutionRule(ImplementationRule):
     LOGICAL_OP_CLASS_TO_PHYSICAL_OP_CLASS_MAP = {
         BaseScan: MarshalAndScanDataOp,
         CacheScan: CacheScanDataOp,
+        ComputeOperator: SmolAgentsCompute,
+        ContextScan: ContextScanOp,
         LimitScan: LimitScanOp,
         Project: ProjectOp,
         GroupByAggregate: ApplyGroupByOp,

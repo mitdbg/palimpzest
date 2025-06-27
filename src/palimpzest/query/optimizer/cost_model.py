@@ -22,7 +22,7 @@ from palimpzest.query.operators.filter import LLMFilter, NonLLMFilter
 from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.rag_convert import RAGConvert
-from palimpzest.query.operators.scan import CacheScanDataOp, MarshalAndScanDataOp, ScanPhysicalOp
+from palimpzest.query.operators.scan import CacheScanDataOp, ContextScanOp, MarshalAndScanDataOp, ScanPhysicalOp
 from palimpzest.utils.model_helpers import get_champion_model_name, get_models
 
 warnings.simplefilter(action='ignore', category=UserWarning)
@@ -509,6 +509,16 @@ class CostModel(BaseCostModel):
             )
 
             op_estimates = operator.naive_cost_estimates(source_op_estimates, input_record_size_in_bytes=NAIVE_BYTES_PER_RECORD)
+
+        elif isinstance(operator, ContextScanOp):
+            source_op_estimates = OperatorCostEstimates(
+                cardinality=1.0,
+                time_per_record=0.0,
+                cost_per_record=0.0,
+                quality=1.0,
+            )
+
+            op_estimates = operator.naive_cost_estimates(source_op_estimates)
 
         else:
             op_estimates = operator.naive_cost_estimates(source_op_estimates)

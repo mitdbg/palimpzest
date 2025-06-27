@@ -24,6 +24,7 @@ from palimpzest.query.operators.filter import LLMFilter
 from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.retrieve import RetrieveOp
+from palimpzest.query.operators.scan import ScanPhysicalOp
 from palimpzest.query.optimizer.plan import PhysicalPlan, SentinelPlan
 
 
@@ -98,7 +99,11 @@ class ProgressManager(ABC):
             self.full_op_id_to_next_op[full_op_id] = next_op
 
         # compute the total number of inputs to be processed by the plan
-        datasource_len = len(plan.operators[0].datasource)
+        datasource_len = (
+            len(plan.operators[0].datasource)
+            if isinstance(plan.operators[0], ScanPhysicalOp)
+            else 1.0  # assuming ContextScanOp
+        )
         total = datasource_len if num_samples is None else min(num_samples, datasource_len)
 
         # add a task to the progress manager for each operator in the plan

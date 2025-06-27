@@ -1,6 +1,6 @@
 import pytest
 
-from palimpzest.core.data.datareaders import MemoryReader
+from palimpzest.core.data.iter_dataset import MemoryDataset
 from palimpzest.core.lib.schemas import Schema, StringField
 from palimpzest.query.operators.logical import BaseScan
 from palimpzest.query.optimizer.primitives import LogicalExpression
@@ -17,7 +17,7 @@ def schema():
 @pytest.fixture
 def base_scan_op(schema):
     return BaseScan(
-        datareader=MemoryReader(vals=[1, 2, 3]),
+        datasource=MemoryDataset(id="test", vals=[1, 2, 3]),
         output_schema=schema
     )
 
@@ -43,7 +43,7 @@ def test_substitute_methods(base_scan_op):
     assert physical_expr.operator.__class__.__name__ == "MarshalAndScanDataOp"
 
     # Verify that the important properties were preserved
-    assert physical_expr.operator.datareader == base_scan_op.datareader
+    assert physical_expr.operator.datasource == base_scan_op.datasource
     assert physical_expr.input_group_ids == logical_expr.input_group_ids
     assert physical_expr.input_fields == logical_expr.input_fields
     assert physical_expr.generated_fields == logical_expr.generated_fields

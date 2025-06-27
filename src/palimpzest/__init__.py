@@ -1,6 +1,7 @@
 import logging
 
 from palimpzest.constants import Cardinality
+from palimpzest.core.data.context import Context, TextFileContext
 from palimpzest.core.data.dataset import Dataset
 from palimpzest.core.data.iter_dataset import (
     HTMLFileDataset,
@@ -31,6 +32,8 @@ __all__ = [
     # constants
     "Cardinality",
     # core
+    "Context",
+    "TextFileContext",
     "Dataset",
     "IterDataset",
     "MemoryDataset",

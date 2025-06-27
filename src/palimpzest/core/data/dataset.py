@@ -1,6 +1,7 @@
 from __future__ import annotations
-
+from pathlib import Path
 from typing import Callable
+import pandas as pd
 
 from chromadb.api.models.Collection import Collection
 
@@ -122,7 +123,7 @@ class Dataset:
         applied to the `Dataset's` sources.
         """
         return hash_for_serialized_dict({
-            "source_ids": [source.id for source in self._sources],
+            "source_ids": None if self._sources is None else [source.id for source in self._sources],
             "logical_op_id": self._operator.get_logical_op_id(),
         })
 
@@ -153,7 +154,7 @@ class Dataset:
 
     def copy(self):
         return Dataset(
-            sources=[source.copy() for source in self._sources],
+            sources=None if self._sources is None else [source.copy() for source in self._sources],
             operator=self._operator,
             schema=self._schema,
         )
