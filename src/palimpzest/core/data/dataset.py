@@ -1,7 +1,6 @@
 from __future__ import annotations
-from pathlib import Path
+
 from typing import Callable
-import pandas as pd
 
 from chromadb.api.models.Collection import Collection
 
@@ -64,6 +63,7 @@ class Dataset:
             sources: list[Dataset] | Dataset | None,
             operator: LogicalOperator,
             schema: type[Schema] | None = None,
+            id: str | None = None,
         ) -> None:
         """
         Initialize a `Dataset` with one or more `sources` and the operator that is being applied.
@@ -74,7 +74,8 @@ class Dataset:
             sources (`list[Dataset] | Dataset`): The (list of) `Dataset(s)` which are input(s) to
                 the operator used to compute this `Dataset`.
             operator (`LogicalOperator`): The `LogicalOperator` used to compute this `Dataset`.
-            schema (type[`Schema`] | None): The `Schema` 
+            schema (type[`Schema`] | None): The `Schema`
+            id (str | None): an identifier for this Dataset provided by the user
 
         Raises:
             ValueError: if `sources` is not a `Dataset` or list of `Datasets`
@@ -98,7 +99,7 @@ class Dataset:
                 self._schema = source.schema if self._schema is None else self._schema.union(source.schema)
 
         # compute the dataset id
-        self._id = self._compute_dataset_id()
+        self._id = self._compute_dataset_id() if id is None else id
 
     @property
     def id(self) -> str:

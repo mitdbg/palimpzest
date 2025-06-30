@@ -20,7 +20,7 @@ biodex_reactions_cols = [
     {"name": "reactions", "type": list[str], "desc": "The list of all medical conditions experienced by the patient as discussed in the report. Try to provide as many relevant medical conditions as possible."},
 ]
 
-class BiodexReader(pz.DataReader):
+class BiodexDataset(pz.IterDataset):
     def __init__(
         self,
         rp_at_k: int = 5,
@@ -108,7 +108,7 @@ class BiodexReader(pz.DataReader):
             item["labels"] = self.compute_label(entry)
 
             # add scoring functions for list fields
-            item["score_fn"]["reactions"] = BiodexReader.term_recall
+            item["score_fn"]["reactions"] = BiodexDataset.term_recall
 
         return item
 
@@ -136,7 +136,7 @@ if __name__ == "__main__":
         print("WARNING: Both OPENAI_API_KEY and TOGETHER_API_KEY are unset")
 
     # create data source
-    datareader = BiodexReader(
+    dataset = BiodexDataset(
         split="test",
         num_samples=1,
         shuffle=True,
@@ -144,7 +144,7 @@ if __name__ == "__main__":
     )
 
     # create validation data source
-    val_datasource = BiodexReader(
+    val_datasource = BiodexDataset(
         split="train",
         num_samples=5,
         shuffle=True,
@@ -152,7 +152,7 @@ if __name__ == "__main__":
     )
 
     # construct plan
-    plan = pz.Dataset(datareader)
+    plan = pz.Dataset(dataset)
     plan = plan.sem_add_columns(biodex_reactions_cols)
 
     # only use final op quality

@@ -500,17 +500,19 @@ class ComputeOperator(LogicalOperator):
     on a given Context.
     """
 
-    def __init__(self, instruction: str, target_cache_id: str | None = None, *args, **kwargs):
+    def __init__(self, context_id: str, instruction: str, target_cache_id: str | None = None, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.context_id = context_id
         self.instruction = instruction
         self.target_cache_id = target_cache_id
 
     def __str__(self):
-        return f"ComputeOperator(instr={self.instruction:20s})"
+        return f"ComputeOperator(id={self.context_id}, instr={self.instruction:20s})"
 
     def get_logical_id_params(self) -> dict:
         logical_id_params = super().get_logical_id_params()
         logical_id_params = {
+            "context_id": self.context_id,
             "instruction": self.instruction,
             **logical_id_params,
         }
@@ -520,6 +522,7 @@ class ComputeOperator(LogicalOperator):
     def get_logical_op_params(self) -> dict:
         logical_op_params = super().get_logical_op_params()
         logical_op_params = {
+            "context_id": self.context_id,
             "instruction": self.instruction,
             "target_cache_id": self.target_cache_id,
             **logical_op_params,

@@ -395,7 +395,7 @@ def compute_precision_recall(label_df, preds_df):
 
     return precision, recall
 
-class CUADDataReader(pz.DataReader):
+class CUADDataset(pz.IterDataset):
     def __init__(self, num_contracts: int = 1, split: str = "train", seed: int=42):
         self.num_contracts = num_contracts
         self.split = split
@@ -546,12 +546,12 @@ def main():
     os.makedirs("opt-profiling-data", exist_ok=True)
 
     # Create a data reader for the CUAD dataset
-    data_reader = CUADDataReader(split="test", num_contracts=1)
-    val_data_reader = CUADDataReader(split="train", num_contracts=5)
+    dataset = CUADDataset(split="test", num_contracts=1)
+    val_datasource = CUADDataset(split="train", num_contracts=5)
     print("Created data reader")
 
     # Build and run the CUAD query
-    query = build_cuad_query(data_reader, args.mode)
+    query = build_cuad_query(dataset, args.mode)
     print("Built query; Starting query execution")
 
     processing_strategy = "sentinel"
@@ -560,7 +560,7 @@ def main():
     optimizer_strategy = "pareto"
     config = pz.QueryProcessorConfig(
         verbose=False,
-        val_datasource=val_data_reader,
+        val_datasource=val_datasource,
         processing_strategy=processing_strategy,
         optimizer_strategy=optimizer_strategy,
         sentinel_execution_strategy=sentinel_execution_strategy,

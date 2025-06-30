@@ -1,9 +1,12 @@
 import os
 
+import chromadb
+
 import palimpzest as pz
+from palimpzest.constants import PZ_DIR
 
 
-def legal_easy_3():
+def legal_easy_3(iter):
     # legal-easy-*
     ds = pz.TextFileContext(
         path="../Kramabench/data/legal/",
@@ -23,19 +26,34 @@ def legal_easy_3():
         # use_context="identity_theft_reports_2024_2021",
         # type=float,
     )
+    ds = ds.sem_add_columns(
+        cols=[{"name": "final_answer", "type": float, "desc": "The ratio of identity theft reports in 2024 vs 2001; output None if the answer cannot be determined"}]
+    )
     out = ds.run(processing_strategy="no_sentinel", progress=False)
-    out.to_df().to_csv("krama-results/legal-easy-3.csv", index=False)
+    out.to_df().to_csv(f"krama-results/legal-easy-3-{iter}.csv", index=False)
 
-    return out.to_df().iloc[0][""] # TODO
+    return out.to_df().iloc[0]
 
 
 if __name__ == "__main__":
+    ### clear cache
+    # remove context files
+    context_dir = os.path.join(PZ_DIR, "contexts")
+    for filename in os.listdir(context_dir):
+        os.remove(os.path.join(context_dir, filename))
+
+    # clear collection
+    chroma_dir = os.path.join(PZ_DIR, "chroma")
+    chroma_client = chromadb.PersistentClient(chroma_dir)
+    chroma_client.delete_collection("contexts")
+
+    # create results dir
     os.makedirs("krama-results", exist_ok=True)
 
     # first time
-    legal_easy_3_answer = legal_easy_3()
+    legal_easy_3_answer = legal_easy_3(0)
     print(legal_easy_3_answer)
 
     # second time
-    legal_easy_3_answer = legal_easy_3()
+    legal_easy_3_answer = legal_easy_3(1)
     print(legal_easy_3_answer)

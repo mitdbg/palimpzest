@@ -32,7 +32,7 @@ output_cols = [
 ]
 
 
-class QuestionDataReader(pz.DataReader):
+class QuestionDataset(pz.IterDataset):
     def __init__(self, questions_dataset_path: str, num_questions_to_process: int):
         super().__init__(question_dataset_cols)
 
@@ -85,7 +85,7 @@ def parse_arguments():
     return parser.parse_args()
 
 
-def build_pneuma_query(pneuma: Pneuma, dataset: QuestionDataReader, k: int):
+def build_pneuma_query(pneuma: Pneuma, dataset: QuestionDataset, k: int):
     questions = pz.Dataset(dataset)
 
     def extract_table_content(df: pd.DataFrame):
@@ -128,7 +128,7 @@ def main():
     args = parse_arguments()
 
     # Create a data reader for the question dataset (in this demo ChEMBL)
-    dataset = QuestionDataReader(
+    dataset = QuestionDataset(
         questions_dataset_path=args.questions_dataset_path,
         num_questions_to_process=args.num_questions_to_process,
     )

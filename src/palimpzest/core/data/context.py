@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import os
-import pickle
 from abc import ABC
+from typing import Callable
 
 import pandas as pd
 
@@ -35,102 +35,72 @@ class Context(Dataset, ABC):
             operator: LogicalOperator,
             schema: type[Schema] | None = None,
             sources: list[Context] | Context | None = None,
+            materialized: bool = False,
         ) -> None:
         """
         Constructor for the `Context` class.
 
         Args:
-            id (str): a string identifier for the `Context`
-            description (str): the description of the data contained within the `Context`
+            id (`str`): a string identifier for the `Context`
+            description (`str`): the description of the data contained within the `Context`
             operator (`LogicalOperator`): The `LogicalOperator` used to compute this `Context`.
-            schema: (`type[Schema]` | None): 
+            schema: (`type[Schema] | None`): 
             sources (`list[Context] | Context | None`): The (list of) `Context(s)` which are input(s) to
                 the operator used to compute this `Context`.
+            materialized (`bool`): True if the `Context` has been computed, False otherwise
         """
-        # set the id for the Dataset
-        self._id = id
-
         # set the description
         self._description = description
 
-        # set the logical operator
-        self._operator: LogicalOperator = operator
-
-        # initialize an empty string for the context
-        self._context = ""
+        # set the materialization status
+        self._materialized = materialized
 
         # compute Schema and call parent constructor
         if schema is None:
-            schema = Schema.from_fields([{"name": f"context-{id}", "desc": "The context", "type": str}])
-        super().__init__(sources=sources, operator=operator, schema=schema)
+            schema = Schema.from_fields([{"name": "context", "desc": "The context", "type": str}])
+        super().__init__(sources=sources, operator=operator, schema=schema, id=id)
+
+        # set the tools associated with this Context
+        self._tools = [getattr(self, attr) for attr in dir(self) if attr.startswith("tool_")]
 
         # add Context to ContextManager
         cm = context_manager.ContextManager()
         cm.add_context(self)
 
     @property
-    def context(self) -> str:
+    def description(self) -> str:
         """The string containing all of the information computed for this `Context`"""
-        return self._context
+        return self._description
+
+    @property
+    def materialized(self) -> bool:
+        """The boolean which specifies whether the `Context` has been computed or not"""
+        return self._materialized
+
+    @property
+    def tools(self) -> list[Callable]:
+        """The list of tools associated with this `Context`"""
+        return self._tools
 
     def __str__(self) -> str:
-        return f"Context(id={self.id}, description={self._description:20s})"
+        return f"Context(id={self.id}, description={self.description:20s}, materialized={self.materialized})"
 
-    # TODO: maybe only need to pickle Dataset? Can we remove the to_json and from_json methods?
-    @classmethod
-    def from_pkl(cls, path: str) -> Context:
-        """Load a `Context` from its serialized pickle file."""
-        with open(path, "rb") as f:
-            context = pickle.load(f)
+    def set_description(self, description: str) -> None:
+        """
+        Update the context's description.
+        """
+        self._description = description
 
-        return context
-
-        # # parse JSON for serialized context
-        # id = context_json["id"]
-        # description = context_json["description"]
-        # op_class_name = context_json["op_class_name"]
-        # op_kwargs = context_json["op_kwargs"]
-        # schema_json = context_json["schema"]
-        # sources_json = context_json["sources"]
-
-        # # reconstruct logical operator
-        # operator = None
-        # for name, op_cls in inspect.getmembers(logical):
-        #     if name == op_class_name:
-        #         operator = op_cls(**op_kwargs)
-        #         break
-
-        # # assert that operator is found
-        # assert operator is not None, f"Could not find operator class for operator with class name: {op_class_name}"
-
-        # # reconstruct sources
-        # sources = None
-        # if sources_json is not None:
-        #     sources = []
-        #     for source_json in sources_json:
-        #         source = Context.from_json(source_json) if source_json["type"] == "Context" else Dataset.from_json(source_json)
-        #         sources.append(source)
-
-        # return cls(id, description, operator, Schema.from_json(schema_json), sources)
-
-    def to_pkl(self, path: str) -> None:
-        """Write this `Context` to a pickle file at the provided `path`."""
-        with open(path, "wb") as f:
-            pickle.dump(self, f)
-        # return {
-        #     "type": "Context",
-        #     "id": self.id,
-        #     "description": self._description,
-        #     "op_class_name": self._operator.__class__.__name__,
-        #     "op_kwargs": self._operator.get_logical_op_params(),
-        #     "schema": self.schema.to_json(),
-        #     "sources": None if self._sources is None else [source.to_json() for source in self._sources]
-        # }
+    def set_materialized(self, materialized: str) -> None:
+        """
+        Update the context's materialization status.
+        """
+        self._materialized = materialized
 
     def compute(self, instruction: str) -> Context:
         # construct new description and output schema
         new_id = hash_for_id(instruction)
-        new_description = f"This Context is the result of computing the following instruction: {instruction}"
+        new_description = f"Parent Context ID: {self.id}\n\nThis Context is the result of computing the following instruction on the parent context.\n\nINSTRUCTION: {instruction}\n\n"
         new_output_schema = self.schema.add_fields([
             {"name": f"instruction-{new_id}", "desc": "The instruction used to compute this Context", "type": str},
             {"name": f"result-{new_id}", "desc": "The result from computing the instruction on the input Context",  "type": str}
@@ -140,10 +110,11 @@ class Context(Dataset, ABC):
         operator = ComputeOperator(
             input_schema=self.schema,
             output_schema=new_output_schema,
+            context_id=new_id,
             instruction=instruction,
         )        
 
-        return Context(id=new_id, description=new_description, operator=operator, sources=[self])
+        return Context(id=new_id, description=new_description, operator=operator, sources=[self], materialized=False)
 
 
 class TextFileContext(Context):
@@ -174,7 +145,13 @@ class TextFileContext(Context):
 
         # call parent constructor to set id, operator, and schema
         schema = Schema.from_fields([{"name": "context", "desc": "The context", "type": str}])
-        super().__init__(id=id, description=description, operator=ContextScan(context=self, output_schema=schema), schema=schema)
+        super().__init__(
+            id=id,
+            description=description,
+            operator=ContextScan(context=self, output_schema=schema),
+            schema=schema,
+            materialized=True,
+        )
 
     def tool_list_filepaths(self) -> list[str]:
         """

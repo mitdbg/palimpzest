@@ -25,13 +25,17 @@ def get_vision_models() -> list[Model]:
     return models
 
 
-def get_models(include_vision: bool = False) -> list[Model]:
+def get_models(include_vision: bool = False, include_embedding: bool = False) -> list[Model]:
     """
     Return the set of models which the system has access to based on the set environment variables.
     """
     models = []
     if os.getenv("OPENAI_API_KEY") is not None:
         openai_models = [model for model in Model if model.is_openai_model()]
+        if not include_embedding:
+            openai_models = [
+                model for model in openai_models if not model.is_embedding_model()
+            ]
         models.extend(openai_models)
 
     if os.getenv("TOGETHER_API_KEY") is not None:
@@ -39,6 +43,10 @@ def get_models(include_vision: bool = False) -> list[Model]:
         if not include_vision:
             together_models = [
                 model for model in together_models if not model.is_vision_model()
+            ]
+        if not include_embedding:
+            together_models = [
+                model for model in together_models if not model.is_embedding_model()
             ]
         models.extend(together_models)
 

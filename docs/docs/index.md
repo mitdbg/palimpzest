@@ -147,7 +147,7 @@ Palimpzest **solves this problem** by applying **cost-based optimization techniq
         ```python
         import pandas as pd
         import palimpzest.datamanager.datamanager as pzdm
-        from palimpzest.sets import Dataset
+        from palimpzest.core.data.dataset import Dataset
         from palimpzest.core.lib.fields import Field
         from palimpzest.core.lib.schemas import Schema, TextFile
         from palimpzest.policy import MinCost, MaxQuality

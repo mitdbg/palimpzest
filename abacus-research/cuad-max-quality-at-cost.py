@@ -396,7 +396,7 @@ def compute_precision_recall(label_df, preds_df):
 
     return precision, recall
 
-class CUADDataReader(pz.DataReader):
+class CUADDataset(pz.IterDataset):
     def __init__(self, num_contracts: int = 1, split: str = "train", seed: int=42):
         self.num_contracts = num_contracts
         self.split = split
@@ -608,12 +608,12 @@ def main():
     os.makedirs("max-quality-at-cost-data", exist_ok=True)
 
     # Create a data reader for the CUAD dataset
-    data_reader = CUADDataReader(split="test", num_contracts=100, seed=args.seed)
-    val_data_reader = CUADDataReader(split="train", num_contracts=25, seed=args.seed)
+    dataset = CUADDataset(split="test", num_contracts=100, seed=args.seed)
+    val_datasource = CUADDataset(split="train", num_contracts=25, seed=args.seed)
     print("Created data reader")
 
     # Build and run the CUAD query
-    query = build_cuad_query(data_reader, args.mode)
+    query = build_cuad_query(dataset, args.mode)
     print("Built query; Starting query execution")
 
     # set the optimization policy; constraint set to 25% percentile from unconstrained plans
@@ -625,7 +625,7 @@ def main():
     config = pz.QueryProcessorConfig(
         policy=policy,
         verbose=False,
-        val_datasource=val_data_reader,
+        val_datasource=val_datasource,
         processing_strategy="sentinel",
         optimizer_strategy=optimizer_strategy,
         sentinel_execution_strategy=sentinel_strategy,
@@ -678,7 +678,7 @@ def main():
         json.dump(execution_stats_dict, f)
 
     pred_df = data_record_collection.to_df()
-    label_df = data_reader.get_label_df()
+    label_df = dataset.get_label_df()
     # pred_df.to_csv(f"{exp_name}-pred.csv", index=False)
     # label_df.to_csv(f"{exp_name}-label.csv", index=False)
     final_plan_id = list(data_record_collection.execution_stats.plan_stats.keys())[0]

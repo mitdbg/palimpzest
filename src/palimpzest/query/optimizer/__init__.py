@@ -1,3 +1,4 @@
+from palimpzest.query.optimizer.rules import AddContextsBeforeComputeRule as _AddContextsBeforeComputeRule
 from palimpzest.query.optimizer.rules import (
     AggregateRule as _AggregateRule,
 )
@@ -51,6 +52,7 @@ from palimpzest.query.optimizer.rules import (
 )
 
 ALL_RULES = [
+    _AddContextsBeforeComputeRule,
     _AggregateRule,
     _BasicSubstitutionRule,
     _CodeSynthesisConvertRule,

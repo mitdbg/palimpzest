@@ -11,7 +11,6 @@ from palimpzest.core.data.context_manager import ContextManager
 from palimpzest.core.data.dataclasses import GenerationStats, OperatorCostEstimates, RecordOpStats
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.query.operators.physical import PhysicalOperator
-from palimpzest.utils.hash_helpers import hash_for_id
 
 
 def make_tool(bound_method):
@@ -38,25 +37,39 @@ def make_tool(bound_method):
 class SmolAgentsCompute(PhysicalOperator):
     """
     """
-    def __init__(self, instruction: str, additional_contexts: list[Context] | None = None, *args, **kwargs):
+    def __init__(self, context_id: str, instruction: str, additional_contexts: list[Context] | None = None, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.context_id = context_id
         self.instruction = instruction
         self.additional_contexts = [] if additional_contexts is None else additional_contexts
         self.model = LiteLLMModel(model_id="anthropic/claude-3-5-sonnet-latest", api_key=os.getenv("ANTHROPIC_API_KEY"))
+        # self.model = LiteLLMModel(model_id="openai/gpt-4o-2024-08-06", api_key=os.getenv("OPENAI_API_KEY"))
 
     def __str__(self):
         op = super().__str__()
+        op += f"    Context ID: {self.context_id:20s}\n"
         op += f"    Instruction: {self.instruction:20s}\n"
+        op += f"    Add. Ctxs: {self.additional_contexts}\n"
         return op
 
     def get_id_params(self):
         id_params = super().get_id_params()
-        return {"instruction": self.instruction, **id_params}
+        return {
+            "context_id": self.context_id,
+            "instruction": self.instruction,
+            "additional_contexts": self.additional_contexts,
+            **id_params,
+        }
 
     def get_op_params(self):
         op_params = super().get_op_params()
-        return {"instruction": self.instruction, **op_params}
-    
+        return {
+            "context_id": self.context_id,
+            "instruction": self.instruction,
+            "additional_contexts": self.additional_contexts,
+            **op_params,
+        }
+
     def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         # for now, assume applying the aggregation takes negligible additional time (and no cost in USD)
         return OperatorCostEstimates(
@@ -81,7 +94,7 @@ class SmolAgentsCompute(PhysicalOperator):
         dr = DataRecord.from_parent(self.output_schema, parent_record=candidate)
         for field in self.output_schema.field_names():
             if field in answer:
-                dr[field] = answer
+                dr[field] = answer[field]
 
         # create RecordOpStats object
         record_op_stats = RecordOpStats(
@@ -112,37 +125,32 @@ class SmolAgentsCompute(PhysicalOperator):
     def __call__(self, candidate: DataRecord) -> Any:
         start_time = time.time()
 
-        # get the context object and its tools
-        context = candidate.context
-        description = context._description
-        tools = [getattr(context, attr) for attr in dir(context) if attr.startswith("tool_")]
-        tools = [tool(make_tool(f)) for f in tools]
+        # get the input context object and its tools
+        input_context: Context = candidate.context
+        description = input_context.description
+        tools = [tool(make_tool(f)) for f in input_context.tools]
 
         # update the description to include any additional contexts
         for ctx in self.additional_contexts:
-            description += f"\n\nHere is some additional Context which may be useful:\n\n{ctx._description}"
+            # TODO: remove additional context if it is an ancestor of the input context
+            # (not just if it is equal to the input context)
+            if ctx.id == input_context.id:
+                continue
+            description += f"\n\nHere is some additional Context which may be useful:\n\n{ctx.description}"
 
         # perform the computation
-        instructions = f"\n\Here is a description of the Context whose data you will be working with, as well as any previously computed results:\n\n{description}"
+        instructions = f"\n\nHere is a description of the Context whose data you will be working with, as well as any previously computed results:\n\n{description}"
         agent = CodeAgent(tools=tools, model=self.model, add_base_tools=False, instructions=instructions, return_full_result=True)
         result = agent.run(self.instruction)
         # NOTE: you can see the system prompt with `agent.memory.system_prompt.system_prompt`
         # full_steps = agent.memory.get_full_steps()
 
-        # TODO: add method to Context to `update()` context in-place (or create a new Context) with result of compute()
+        # compute generation stats
         response = result.output
         input_tokens = result.token_usage.input_tokens
         output_tokens = result.token_usage.output_tokens
         input_cost = input_tokens * (3.0 / 1e6)
         output_cost = output_tokens * (15.0 / 1e6)
-
-        new_description = description + f"\n\nINSTRUCTION: {self.instruction}\n\nRESULT: {response}"
-        candidate.context._description = new_description
-        instr_id = hash_for_id(self.instruction)
-        field_answers = {
-            f"instruction-{instr_id}": self.instruction,
-            f"result-{instr_id}": response,
-        }
         generation_stats = GenerationStats(
             model_name="anthropic/claude-3-5-sonnet-latest",
             total_input_tokens=input_tokens,
@@ -153,11 +161,17 @@ class SmolAgentsCompute(PhysicalOperator):
             llm_call_duration_secs=time.time() - start_time,
         )
 
-        # update context in ContextManager
+        # update the description of the computed Context to include the result
+        new_description = f"RESULT: {response}\n\n"
         cm = ContextManager()
-        cm.update_context(candidate.context)
+        cm.update_context(id=self.context_id, description=new_description)
 
         # create and return record set
+        field_answers = {
+            "context": cm.get_context(id=self.context_id),
+            f"instruction-{self.context_id}": self.instruction,
+            f"result-{self.context_id}": response,
+        }
         record_set = self._create_record_set(
             candidate,
             generation_stats,

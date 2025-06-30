@@ -5,7 +5,7 @@ import palimpzest as pz
 from palimpzest.core.lib.schemas import TextFile
 
 
-class EnronReader(pz.DataReader):
+class EnronDataset(pz.IterDataset):
     def __init__(self, dir: str, labels_file: str | None = None, split: str = "test"):
         super().__init__(TextFile)
         self.filepaths = [os.path.join(dir, filename) for filename in os.listdir(dir)]
@@ -35,11 +35,11 @@ class EnronReader(pz.DataReader):
 
 if __name__ == "__main__":
     # create validation data source
-    val_datareader = EnronReader(dir="testdata/enron-eval-medium", labels_file="testdata/enron-eval-medium-labels.json", split="train")
-    datareader = EnronReader(dir="testdata/enron-eval-medium", split="test")
+    val_datasource = EnronDataset(dir="testdata/enron-eval-medium", labels_file="testdata/enron-eval-medium-labels.json", split="train")
+    dataset = EnronDataset(dir="testdata/enron-eval-medium", split="test")
 
     # construct plan
-    plan = pz.Dataset(datareader)
+    plan = pz.Dataset(dataset)
     plan = plan.sem_add_columns([
         {"name": "subject", "type": str, "desc": "The subject of the email"},
         {"name": "sender", "type": str, "desc": "The email address of the email's sender"},
@@ -50,7 +50,7 @@ if __name__ == "__main__":
     # execute pz plan
     config = pz.QueryProcessorConfig(
         policy=pz.MaxQuality(),
-        val_datasource=val_datareader,
+        val_datasource=val_datasource,
         execution_strategy="parallel",
         max_workers=20,
         progress=True,

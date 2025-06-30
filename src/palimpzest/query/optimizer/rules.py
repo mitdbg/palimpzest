@@ -331,7 +331,8 @@ class LLMConvertBondedRule(ImplementationRule):
             first_criteria = model in pure_vision_models and not is_image_conversion
             second_criteria = model in pure_text_models and is_image_conversion
             third_criteria = model.is_llama_model() and model.is_vision_model() and (num_image_fields > 1 or list_image_field)
-            if first_criteria or second_criteria or third_criteria:
+            fourth_criteria = model.is_embedding_model()
+            if first_criteria or second_criteria or third_criteria or fourth_criteria:
                 continue
 
             # construct multi-expression
@@ -477,8 +478,8 @@ class RAGConvertRule(ImplementationRule):
 
         physical_expressions = []
         for model in physical_op_params["available_models"]:
-            # skip this model if this is a pure image model
-            if model in pure_vision_models:
+            # skip this model if this is a pure image model or embedding model
+            if model in pure_vision_models or model.is_embedding_model():
                 continue
 
             for num_chunks_per_field in cls.num_chunks_per_fields:
@@ -674,7 +675,8 @@ class CriticAndRefineConvertRule(ImplementationRule):
             first_criteria = model in pure_vision_models and not is_image_conversion
             second_criteria = model in pure_text_models and is_image_conversion
             third_criteria = model.is_llama_model() and model.is_vision_model() and (num_image_fields > 1 or list_image_field)
-            if first_criteria or second_criteria or third_criteria:
+            fourth_criteria = model.is_embedding_model()
+            if first_criteria or second_criteria or third_criteria or fourth_criteria:
                 continue
 
             models.append(model)
@@ -753,8 +755,8 @@ class SplitConvertRule(ImplementationRule):
 
         physical_expressions = []
         for model in physical_op_params["available_models"]:
-            # skip this model if this is a pure image model
-            if model in pure_vision_models:
+            # skip this model if this is a pure image model or an embedding model
+            if model in pure_vision_models or model.is_embedding_model():
                 continue
 
             for min_size_to_chunk in cls.min_size_to_chunk:
@@ -942,7 +944,8 @@ class LLMFilterRule(ImplementationRule):
             first_criteria = model in pure_vision_models and not is_image_filter
             second_criteria = model in pure_text_models and is_image_filter
             third_criteria = model.is_llama_model() and model.is_vision_model() and (num_image_fields > 1 or list_image_field)
-            if first_criteria or second_criteria or third_criteria:
+            fourth_criteria = model.is_embedding_model()
+            if first_criteria or second_criteria or third_criteria or fourth_criteria:
                 continue
 
             # construct multi-expression
@@ -1060,7 +1063,7 @@ class AddContextsBeforeComputeRule(ImplementationRule):
             messages=[{"role": "user", "content": cls.SEARCH_GENERATOR_PROMPT.format(instruction=logical_op.instruction)}]
         )
         query = response.choices[0].message.content
-        additional_contexts = cm.search_context(query, k=cls.k)
+        additional_contexts = cm.search_context(query, k=cls.k, where={"materialized": True})
         op_kwargs["additional_contexts"] = additional_contexts
         op = SmolAgentsCompute(**op_kwargs)
 
@@ -1087,7 +1090,7 @@ class BasicSubstitutionRule(ImplementationRule):
     LOGICAL_OP_CLASS_TO_PHYSICAL_OP_CLASS_MAP = {
         BaseScan: MarshalAndScanDataOp,
         CacheScan: CacheScanDataOp,
-        ComputeOperator: SmolAgentsCompute,
+        # ComputeOperator: SmolAgentsCompute,
         ContextScan: ContextScanOp,
         LimitScan: LimitScanOp,
         Project: ProjectOp,
