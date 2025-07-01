@@ -191,13 +191,17 @@ class Schema(metaclass=SchemaMetaclass):
             attributes[field_name] = field_type.__class__(desc=field_desc)
 
         # compute the name for the new schema
-        new_schema_name = f"Schema[{sorted(new_field_names)}]"
+        new_schema_name = f"Schema{sorted(new_field_names)}"
 
-        # create the class dynamically
+        # if this class already exists, get it from the module and return
+        module = sys.modules[__name__]
+        if hasattr(module, new_schema_name):
+            return getattr(module, new_schema_name)
+
+        # otherwise, create the class dynamically
         new_class = type(new_schema_name, (Schema,), attributes)
 
         # register it in the module's namespace so pickle can find it
-        module = sys.modules[__name__]
         setattr(module, new_schema_name, new_class)
         new_class.__module__ = module.__name__
 
@@ -230,7 +234,12 @@ class Schema(metaclass=SchemaMetaclass):
             attributes[field_name] = field_type.__class__(desc=field_desc)
 
         # compute the name for the new schema
-        new_schema_name = f"Schema[{sorted(new_field_names)}]"
+        new_schema_name = f"Schema{sorted(new_field_names)}"
+
+        # if this class already exists, get it from the module and return
+        module = sys.modules[__name__]
+        if hasattr(module, new_schema_name):
+            return getattr(module, new_schema_name)
 
         # create the class dynamically
         new_class = type(new_schema_name, (Schema,), attributes)
@@ -270,7 +279,12 @@ class Schema(metaclass=SchemaMetaclass):
             attributes[field_name] = field_type.__class__(desc=field_desc)
 
         # compute the name for the new schema
-        new_schema_name = f"Schema[{sorted(new_field_names)}]"
+        new_schema_name = f"Schema{sorted(new_field_names)}"
+
+        # if this class already exists, get it from the module and return
+        module = sys.modules[__name__]
+        if hasattr(module, new_schema_name):
+            return getattr(module, new_schema_name)
 
         # create the class dynamically
         new_class = type(new_schema_name, (Schema,), attributes)

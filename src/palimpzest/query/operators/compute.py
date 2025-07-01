@@ -42,8 +42,8 @@ class SmolAgentsCompute(PhysicalOperator):
         self.context_id = context_id
         self.instruction = instruction
         self.additional_contexts = [] if additional_contexts is None else additional_contexts
-        self.model = LiteLLMModel(model_id="anthropic/claude-3-5-sonnet-latest", api_key=os.getenv("ANTHROPIC_API_KEY"))
-        # self.model = LiteLLMModel(model_id="openai/gpt-4o-2024-08-06", api_key=os.getenv("OPENAI_API_KEY"))
+        # self.model = LiteLLMModel(model_id="anthropic/claude-3-5-sonnet-latest", api_key=os.getenv("ANTHROPIC_API_KEY"))
+        self.model = LiteLLMModel(model_id="openai/gpt-4o-2024-08-06", api_key=os.getenv("OPENAI_API_KEY"))
 
     def __str__(self):
         op = super().__str__()

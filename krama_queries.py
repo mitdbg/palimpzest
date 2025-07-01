@@ -32,7 +32,7 @@ def legal_easy_3(iter):
     out = ds.run(processing_strategy="no_sentinel", progress=False)
     out.to_df().to_csv(f"krama-results/legal-easy-3-{iter}.csv", index=False)
 
-    return out.to_df().iloc[0]
+    return out.to_df().iloc[0]['final_answer']
 
 
 if __name__ == "__main__":
