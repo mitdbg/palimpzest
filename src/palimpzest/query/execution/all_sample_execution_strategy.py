@@ -135,7 +135,6 @@ class AllSamplingExecutionStrategy(SentinelExecutionStrategy):
             # get the target record set for each source_idx
             source_idx_to_target_record_set = self._get_target_record_sets(logical_op_id, source_idx_to_record_sets_and_ops, expected_outputs)
 
-            # TODO: make consistent across here and RandomSampling
             # FUTURE TODO: move this outside of the loop (i.e. assume we only get quality label(s) after executing full program)
             # score the quality of each generated output
             physical_op_cls = op_set[0].__class__

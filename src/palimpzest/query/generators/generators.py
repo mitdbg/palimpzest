@@ -365,9 +365,13 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
             logger.debug(f"Generated completion in {end_time - start_time:.2f} seconds")
         # if there's an error generating the completion, we have to return an empty answer
         # and can only account for the time spent performing the failed generation
-        except Exception:
-            # logger.error(f"Error generating completion: {e}")
-            field_answers = {field_name: None for field_name in fields}
+        except Exception as e:
+            logger.error(f"Error generating completion: {e}")
+            field_answers = (
+                {"passed_operator": False}
+                if self.prompt_strategy.is_bool_prompt()
+                else {field_name: None for field_name in fields}
+            )
             reasoning = None
             generation_stats = GenerationStats(
                 model_name=self.model_name,
@@ -427,11 +431,15 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
             pass
 
         # parse field answers
-        field_answers = None if fields is None else {field_name: None for field_name in fields}
+        field_answers = None 
+        if fields is not None and self.prompt_strategy.is_bool_prompt():
+            field_answers = {"passed_operator": False}
+        elif fields is not None and not self.prompt_strategy.is_bool_prompt():
+            field_answers = {field_name: None for field_name in fields}
         try:
             field_answers = self._parse_answer(completion_text, fields, json_output, **kwargs)
         except Exception as e:
-            # logger.error(f"Error parsing answers: {e}")
+            logger.error(f"Error parsing answers: {e}")
             os.makedirs("parse-answer-errors", exist_ok=True)
             ts = time.time()
             with open(f"parse-answer-errors/error-{ts}.txt", "w") as f:
