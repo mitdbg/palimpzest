@@ -6,6 +6,12 @@ from palimpzest.constants import NAIVE_EST_NUM_GROUPS, AggFunc
 from palimpzest.core.data.dataclasses import OperatorCostEstimates, RecordOpStats
 from palimpzest.core.elements.groupbysig import GroupBySig
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
+from palimpzest.core.lib.fields import (
+    BooleanField,
+    FloatField,
+    IntField,
+    NumericField,
+)
 from palimpzest.core.lib.schemas import Number
 from palimpzest.query.operators.physical import PhysicalOperator
 
@@ -158,9 +164,10 @@ class AverageAggregateOp(AggregateOp):
         kwargs["output_schema"] = Number
         super().__init__(*args, **kwargs)
         self.agg_func = agg_func
-
-        if not self.input_schema.get_desc() == Number.get_desc():
-            raise Exception("Aggregate function AVERAGE is only defined over Numbers")
+        input_field_types = list(self.input_schema.field_map().values())
+        is_numeric = len(input_field_types) == 1 and isinstance(input_field_types[0], (BooleanField, FloatField, IntField, NumericField))
+        if not is_numeric:
+            raise Exception("Aggregate function AVERAGE is only defined over numeric types")
 
     def __str__(self):
         op = super().__str__()
@@ -187,10 +194,22 @@ class AverageAggregateOp(AggregateOp):
     def __call__(self, candidates: DataRecordSet) -> DataRecordSet:
         start_time = time.time()
 
+        # NOTE: we currently do not guarantee that input values conform to their specified type;
+        #       as a result, we simply omit any values which do not parse to a float from the average
+        # NOTE: right now we perform a check in the constructor which enforces that the input_schema
+        #       has a single field which is numeric in nature; in the future we may want to have a
+        #       cleaner way of computing the value (rather than `float(list(candidate...))` below)
         # NOTE: this will set the parent_id and source_idx to be the id of the final source record;
         #       in the near future we may want to have parent_id accept a list of ids
         dr = DataRecord.from_parent(schema=Number, parent_record=candidates[-1], project_cols=[])
-        dr.value = sum(list(map(lambda c: float(c.value), candidates))) / len(candidates)
+        summation, total = 0, 0
+        for candidate in candidates:
+            try:
+                summation += float(list(candidate.to_dict().values())[0])
+                total += 1
+            except Exception:
+                pass
+        dr.value = summation / total
 
         # create RecordOpStats object
         record_op_stats = RecordOpStats(

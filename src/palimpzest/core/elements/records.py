@@ -163,14 +163,16 @@ class DataRecord:
         project_cols: list[str] | None = None,
         cardinality_idx: int | None = None,
     ) -> DataRecord:
-        # project_cols must be None or contain at least one column
-        assert project_cols is None or len(project_cols) > 1, "must have at least one column if using projection"
-
         # if project_cols is None, then the new schema is a union of the provided schema and parent_record.schema;
+        # if project_cols is an empty list, then the new schema is simply the provided schema
         # otherwise, it's a ProjectSchema
-        new_schema = schema.union(parent_record.schema)
-        if project_cols is not None:
-            new_schema = new_schema.project(project_cols)
+        new_schema = None
+        if project_cols is None:
+            new_schema = schema.union(parent_record.schema)
+        elif project_cols == []:
+            new_schema = schema
+        else:
+            new_schema = schema.union(parent_record.schema).project(project_cols)
 
         # make new record which has parent_record as its parent (and the same source_idx)
         new_dr = DataRecord(
