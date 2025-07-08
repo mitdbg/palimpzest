@@ -26,6 +26,7 @@ class LogicalOperator:
     - RetrieveScan (fetches documents from a provided input for a given query)
     - Map (applies a function to each record in the Set without adding any new columns)
     - ComputeOperator (executes a computation described in natural language)
+    - SearchOperator (executes a search query on the input Context)
 
     Every logical operator must declare the get_logical_id_params() and get_logical_op_params() methods,
     which return dictionaries of parameters that are used to compute the logical op id and to implement
@@ -524,6 +525,42 @@ class ComputeOperator(LogicalOperator):
         logical_op_params = {
             "context_id": self.context_id,
             "instruction": self.instruction,
+            "target_cache_id": self.target_cache_id,
+            **logical_op_params,
+        }
+
+        return logical_op_params
+
+class SearchOperator(LogicalOperator):
+    """
+    A SearchOperator is a logical operator that executes a search described in natural language
+    on a given Context.
+    """
+
+    def __init__(self, context_id: str, search_query: str, target_cache_id: str | None = None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.context_id = context_id
+        self.search_query = search_query
+        self.target_cache_id = target_cache_id
+
+    def __str__(self):
+        return f"SearchOperator(id={self.context_id}, search_query={self.search_query:20s})"
+
+    def get_logical_id_params(self) -> dict:
+        logical_id_params = super().get_logical_id_params()
+        logical_id_params = {
+            "context_id": self.context_id,
+            "search_query": self.search_query,
+            **logical_id_params,
+        }
+
+        return logical_id_params
+
+    def get_logical_op_params(self) -> dict:
+        logical_op_params = super().get_logical_op_params()
+        logical_op_params = {
+            "context_id": self.context_id,
+            "search_query": self.search_query,
             "target_cache_id": self.target_cache_id,
             **logical_op_params,
         }

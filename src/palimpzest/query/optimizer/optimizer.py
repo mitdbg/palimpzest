@@ -13,6 +13,7 @@ from palimpzest.query.operators.logical import (
     LimitScan,
     MapScan,
     Project,
+    SearchOperator,
 )
 from palimpzest.query.optimizer import (
     IMPLEMENTATION_RULES,
@@ -276,6 +277,13 @@ class Optimizer:
                 all_properties["instructions"].add(op_instruction)
             else:
                 all_properties["instructions"] = set([op_instruction])
+
+        elif isinstance(op, SearchOperator):
+            op_search_query = op.search_query
+            if "search_queries" in all_properties:
+                all_properties["search_queries"].add(op_search_query)
+            else:
+                all_properties["search_queries"] = set([op_search_query])
 
         # construct the logical expression and group
         logical_expression = LogicalExpression(

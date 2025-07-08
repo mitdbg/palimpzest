@@ -42,8 +42,10 @@ class SmolAgentsCompute(PhysicalOperator):
         self.context_id = context_id
         self.instruction = instruction
         self.additional_contexts = [] if additional_contexts is None else additional_contexts
-        # self.model = LiteLLMModel(model_id="anthropic/claude-3-5-sonnet-latest", api_key=os.getenv("ANTHROPIC_API_KEY"))
-        self.model = LiteLLMModel(model_id="openai/gpt-4o-2024-08-06", api_key=os.getenv("OPENAI_API_KEY"))
+        # self.model_id = "anthropic/claude-3-7-sonnet-latest"
+        self.model_id = "openai/gpt-4o-mini-2024-07-18"
+        api_key = os.getenv("ANTHROPIC_API_KEY") if "anthropic" in self.model_id else os.getenv("OPENAI_API_KEY")
+        self.model = LiteLLMModel(model_id=self.model_id, api_key=api_key)
 
     def __str__(self):
         op = super().__str__()
@@ -71,7 +73,6 @@ class SmolAgentsCompute(PhysicalOperator):
         }
 
     def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
-        # for now, assume applying the aggregation takes negligible additional time (and no cost in USD)
         return OperatorCostEstimates(
             cardinality=source_op_cost_estimates.cardinality,
             time_per_record=100,
@@ -116,7 +117,7 @@ class SmolAgentsCompute(PhysicalOperator):
             fn_call_duration_secs=generation_stats.fn_call_duration_secs,
             total_llm_calls=generation_stats.total_llm_calls,
             total_embedding_llm_calls=generation_stats.total_embedding_llm_calls,
-            answer=answer,
+            answer={k: v.description if isinstance(v, Context) else v for k, v in answer.items()},
             op_details={k: str(v) for k, v in self.get_id_params().items()},
         )
 
@@ -149,10 +150,12 @@ class SmolAgentsCompute(PhysicalOperator):
         response = result.output
         input_tokens = result.token_usage.input_tokens
         output_tokens = result.token_usage.output_tokens
-        input_cost = input_tokens * (3.0 / 1e6)
-        output_cost = output_tokens * (15.0 / 1e6)
+        cost_per_input_token = (3.0 / 1e6) if "anthropic" in self.model_id else (0.15 / 1e6)
+        cost_per_output_token = (15.0 / 1e6) if "anthropic" in self.model_id else (0.6 / 1e6)
+        input_cost = input_tokens * cost_per_input_token
+        output_cost = output_tokens * cost_per_output_token
         generation_stats = GenerationStats(
-            model_name="anthropic/claude-3-5-sonnet-latest",
+            model_name=self.model_id,
             total_input_tokens=input_tokens,
             total_output_tokens=output_tokens,
             total_input_cost=input_cost,
@@ -169,7 +172,6 @@ class SmolAgentsCompute(PhysicalOperator):
         # create and return record set
         field_answers = {
             "context": cm.get_context(id=self.context_id),
-            f"instruction-{self.context_id}": self.instruction,
             f"result-{self.context_id}": response,
         }
         record_set = self._create_record_set(

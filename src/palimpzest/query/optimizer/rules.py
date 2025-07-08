@@ -28,6 +28,7 @@ from palimpzest.query.operators.logical import (
     MapScan,
     Project,
     RetrieveScan,
+    SearchOperator,
 )
 from palimpzest.query.operators.map import MapOp
 from palimpzest.query.operators.mixture_of_agents_convert import MixtureOfAgentsConvert
@@ -35,6 +36,7 @@ from palimpzest.query.operators.project import ProjectOp
 from palimpzest.query.operators.rag_convert import RAGConvert
 from palimpzest.query.operators.retrieve import RetrieveOp
 from palimpzest.query.operators.scan import CacheScanDataOp, ContextScanOp, MarshalAndScanDataOp
+from palimpzest.query.operators.search import SmolAgentsManagedSearch  # SmolAgentsSearch
 from palimpzest.query.operators.split_convert import SplitConvert
 from palimpzest.query.optimizer.primitives import Expression, Group, LogicalExpression, PhysicalExpression
 from palimpzest.utils.model_helpers import get_models, get_vision_models
@@ -1091,6 +1093,7 @@ class BasicSubstitutionRule(ImplementationRule):
         BaseScan: MarshalAndScanDataOp,
         CacheScan: CacheScanDataOp,
         # ComputeOperator: SmolAgentsCompute,
+        SearchOperator: SmolAgentsManagedSearch, # SmolAgentsSearch,
         ContextScan: ContextScanOp,
         LimitScan: LimitScanOp,
         Project: ProjectOp,

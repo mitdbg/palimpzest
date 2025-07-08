@@ -9,7 +9,7 @@ import pandas as pd
 from palimpzest.core.data import context_manager
 from palimpzest.core.data.dataset import Dataset
 from palimpzest.core.lib.schemas import Schema
-from palimpzest.query.operators.logical import ComputeOperator, ContextScan, LogicalOperator
+from palimpzest.query.operators.logical import ComputeOperator, ContextScan, LogicalOperator, SearchOperator
 from palimpzest.utils.hash_helpers import hash_for_id
 
 
@@ -102,7 +102,6 @@ class Context(Dataset, ABC):
         new_id = hash_for_id(instruction)
         new_description = f"Parent Context ID: {self.id}\n\nThis Context is the result of computing the following instruction on the parent context.\n\nINSTRUCTION: {instruction}\n\n"
         new_output_schema = self.schema.add_fields([
-            {"name": f"instruction-{new_id}", "desc": "The instruction used to compute this Context", "type": str},
             {"name": f"result-{new_id}", "desc": "The result from computing the instruction on the input Context",  "type": str}
         ])
 
@@ -116,6 +115,20 @@ class Context(Dataset, ABC):
 
         return Context(id=new_id, description=new_description, operator=operator, sources=[self], materialized=False)
 
+    def search(self, search_query: str) -> Context:
+        # construct new description and output schema
+        new_id = hash_for_id(search_query)
+        new_description = f"Parent Context ID: {self.id}\n\nThis Context is the result of searching the parent context for information related to the following query.\n\nSEARCH QUERY: {search_query}\n\n"
+
+        # construct logical operator
+        operator = SearchOperator(
+            input_schema=self.schema,
+            output_schema=self.schema,
+            context_id=new_id,
+            search_query=search_query,
+        )
+
+        return Context(id=new_id, description=new_description, operator=operator, sources=[self], materialized=False)
 
 class TextFileContext(Context):
     def __init__(self, path: str, id: str, description: str) -> None:
