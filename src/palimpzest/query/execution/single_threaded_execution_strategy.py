@@ -89,7 +89,7 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
     def execute_plan(self, plan: PhysicalPlan) -> tuple[list[DataRecord], PlanStats]:
         """Initialize the stats and execute the plan."""
         # for now, assert that the first operator in the plan is a ScanPhysicalOp
-        assert isinstance(plan.operators[0], (ScanPhysicalOp, ContextScanOp)), "First operator in physical plan must be a ScanPhysicalOp or ContextScanOp"
+        assert isinstance(plan.operators[0], (ScanPhysicalOp, ContextScanOp)), "First operator in physical plan must be a scan operator"
         logger.info(f"Executing plan {plan.plan_id} with {self.max_workers} workers")
         logger.info(f"Plan Details: {plan}")
 
@@ -222,7 +222,7 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
     def execute_plan(self, plan: PhysicalPlan):
         """Initialize the stats and execute the plan."""
         # for now, assert that the first operator in the plan is a ScanPhysicalOp
-        assert isinstance(plan.operators[0], ScanPhysicalOp), "First operator in physical plan must be a ScanPhysicalOp"
+        assert isinstance(plan.operators[0], (ScanPhysicalOp, ContextScanOp)), "First operator in physical plan must be a scan operator"
         logger.info(f"Executing plan {plan.plan_id} with {self.max_workers} workers")
         logger.info(f"Plan Details: {plan}")
 
