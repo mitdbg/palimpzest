@@ -79,7 +79,7 @@ def get_json_from_answer(answer: str):
     return json.loads(answer)
 
 
-class MMQAReader(pz.DataReader):
+class MMQADataset(pz.IterDataset):
     def __init__(
         self,
         num_samples: int = 5,
@@ -223,10 +223,10 @@ class MMQAReader(pz.DataReader):
             item["labels"] = self.compute_label(entry)
 
             # add scoring functions for list fields
-            item["score_fn"]["answers"] = MMQAReader.f1
-            item["score_fn"]["supporting_text_ids"] = MMQAReader.recall
-            item["score_fn"]["supporting_table_ids"] = MMQAReader.recall
-            item["score_fn"]["supporting_image_ids"] = MMQAReader.recall
+            item["score_fn"]["answers"] = MMQADataset.f1
+            item["score_fn"]["supporting_text_ids"] = MMQADataset.recall
+            item["score_fn"]["supporting_table_ids"] = MMQADataset.recall
+            item["score_fn"]["supporting_image_ids"] = MMQADataset.recall
 
         return item
 
@@ -385,7 +385,7 @@ if __name__ == "__main__":
         print("WARNING: Both OPENAI_API_KEY and TOGETHER_API_KEY are unset")
 
     # create data source
-    datareader = MMQAReader(
+    dataset = MMQADataset(
         split="dev",
         num_samples=100,
         shuffle=True,
@@ -393,7 +393,7 @@ if __name__ == "__main__":
     )
 
     # create validation data source
-    val_datasource = MMQAReader(
+    val_datasource = MMQADataset(
         split="train",
         num_samples=val_examples,
         shuffle=True,
@@ -473,7 +473,7 @@ if __name__ == "__main__":
         return {"supporting_images": results, "supporting_image_ids": result_ids}
 
     # construct plan
-    plan = pz.Dataset(datareader)
+    plan = pz.Dataset(dataset)
     plan = plan.retrieve(
         index=text_index,
         search_func=text_search_func,

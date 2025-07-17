@@ -1,8 +1,10 @@
 import pandas as pd
 import pytest
 
-from palimpzest.core.lib.schemas import DefaultSchema, NumericField, StringField
-from palimpzest.sets import Dataset
+from palimpzest.core.data.dataset import Dataset
+from palimpzest.core.data.iter_dataset import MemoryDataset
+from palimpzest.core.lib.schemas import NumericField, StringField
+from palimpzest.query.operators.logical import ConvertScan, FilteredScan
 
 
 # Test data
@@ -16,30 +18,27 @@ def sample_df():
 
 
 def test_dataset_initialization(sample_df):
-    ds = Dataset(sample_df)
+    ds = MemoryDataset("test", sample_df)
     assert isinstance(ds, Dataset)
     assert ds.schema.field_names() == ['age', 'id', 'name']
 
-    # Test with default schema
-    ds = Dataset(sample_df, schema=DefaultSchema)
-    assert ds.schema == DefaultSchema
 
 def test_dataset_filter(sample_df):
-    ds = Dataset(sample_df)
+    ds = MemoryDataset("test", sample_df)
     
     # Test callable filter
     filtered_ds = ds.filter(lambda x: x['age'] > 30)
     assert isinstance(filtered_ds, Dataset)
-    assert filtered_ds._filter is not None
+    assert isinstance(filtered_ds._operator, FilteredScan)
     
     # Test semantic filter
     sem_filtered_ds = ds.sem_filter("age > 30")
     assert isinstance(sem_filtered_ds, Dataset)
-    assert sem_filtered_ds._filter is not None
+    assert isinstance(filtered_ds._operator, FilteredScan)
 
 
 def test_dataset_add_columns(sample_df):
-    ds = Dataset(sample_df)
+    ds = MemoryDataset("test", sample_df)
 
     # Test UDF add_columns
     def add_greeting(df):
@@ -48,7 +47,8 @@ def test_dataset_add_columns(sample_df):
     
     new_ds = ds.add_columns(udf=add_greeting, cols=[{'name': 'greeting', 'type': str}])
     assert isinstance(new_ds, Dataset)
-    assert new_ds._udf is not None
+    assert isinstance(new_ds._operator, ConvertScan)
+    assert new_ds._operator.udf is not None
     assert new_ds.schema.field_names() == ['age', 'greeting', 'id', 'name']
     greeting_field = new_ds.schema.field_map()['greeting'] 
     assert isinstance(greeting_field, StringField)
@@ -59,6 +59,7 @@ def test_dataset_add_columns(sample_df):
                 {'name': 'score', 'type': int | float, 'desc': 'Score'}]
     sem_new_ds = ds.sem_add_columns(new_cols)
     assert isinstance(sem_new_ds, Dataset)
+    assert isinstance(sem_new_ds._operator, ConvertScan)
     assert sem_new_ds.schema.field_names() == ['age', 'greeting', 'id', 'name', 'score']
     greeting_field = sem_new_ds.schema.field_map()['greeting']
     assert isinstance(greeting_field, StringField)

@@ -28,7 +28,7 @@ if not os.environ.get("OPENAI_API_KEY"):
 )
 def test_convert(mocker, convert_op, side_effect, email_schema, enron_eval_tiny):
     """Test whether convert operators"""
-    scan_op = MarshalAndScanDataOp(output_schema=TextFile, datareader=enron_eval_tiny)
+    scan_op = MarshalAndScanDataOp(datasource=enron_eval_tiny, output_schema=TextFile)
     convert_op = convert_op(
         input_schema=File,
         output_schema=email_schema,

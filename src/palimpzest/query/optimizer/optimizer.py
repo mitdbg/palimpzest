@@ -4,20 +4,16 @@ import logging
 from copy import deepcopy
 
 from palimpzest.constants import Model
-from palimpzest.core.data.datareaders import DataReader
+from palimpzest.core.data.dataset import Dataset
 from palimpzest.core.lib.fields import Field
 from palimpzest.policy import Policy
 from palimpzest.query.operators.logical import (
-    Aggregate,
-    BaseScan,
-    ConvertScan,
+    ComputeOperator,
     FilteredScan,
-    GroupByAggregate,
     LimitScan,
-    LogicalOperator,
     MapScan,
     Project,
-    RetrieveScan,
+    SearchOperator,
 )
 from palimpzest.query.optimizer import (
     IMPLEMENTATION_RULES,
@@ -42,19 +38,9 @@ from palimpzest.query.optimizer.tasks import (
     OptimizeLogicalExpression,
     OptimizePhysicalExpression,
 )
-from palimpzest.sets import Dataset, Set
-from palimpzest.utils.hash_helpers import hash_for_serialized_dict
 from palimpzest.utils.model_helpers import get_champion_model, get_code_champion_model, get_fallback_model
 
 logger = logging.getLogger(__name__)
-
-
-def get_node_uid(node: Dataset | DataReader) -> str:
-    """Helper function to compute the universal identifier for a node in the query plan."""
-    # NOTE: technically, hash_for_serialized_dict(node.serialize()) would be valid for both DataReader and Dataset;
-    #       for the moment, I want to be explicit in Dataset about what constitutes a unique Dataset object, but
-    #       in ther future we may be able to remove universal_identifier() from Dataset and just use this function
-    return node.universal_identifier() if isinstance(node, Dataset) else hash_for_serialized_dict(node.serialize())
 
 
 class Optimizer:
@@ -219,96 +205,17 @@ class Optimizer:
         optimizer_strategy_cls = optimizer_strategy.value
         self.strategy = optimizer_strategy_cls()
 
-    def construct_group_tree(self, dataset_nodes: list[Set]) -> tuple[list[int], dict[str, Field], dict[str, set[str]]]:
-        # get node, output_schema, and input_schema (if applicable)
+    def construct_group_tree(self, dataset_nodes: list[Dataset]) -> tuple[list[int], dict[str, Field], dict[str, set[str]]]:
         logger.debug(f"Constructing group tree for dataset_nodes: {dataset_nodes}")
-
+        # TODO: debug group tree construction
+        # get node
         node = dataset_nodes[-1]
-        output_schema = node.schema
-        input_schema = dataset_nodes[-2].schema if len(dataset_nodes) > 1 else None
 
         ### convert node --> Group ###
-        uid = get_node_uid(node)
+        uid = node.id
 
         # create the op for the given node
-        op: LogicalOperator | None = None
-
-        # TODO: add cache scan when we add caching back to PZ
-        # if self.cache:
-        #     op = CacheScan(datareader=node, output_schema=output_schema)
-        if isinstance(node, DataReader):
-            op = BaseScan(datareader=node, output_schema=output_schema)
-        elif node._filter is not None:
-            op = FilteredScan(
-                input_schema=input_schema,
-                output_schema=output_schema,
-                filter=node._filter,
-                depends_on=node._depends_on,
-                target_cache_id=uid,
-            )
-        elif node._group_by is not None:
-            op = GroupByAggregate(
-                input_schema=input_schema,
-                output_schema=output_schema,
-                group_by_sig=node._group_by,
-                target_cache_id=uid,
-            )
-        elif node._agg_func is not None:
-            op = Aggregate(
-                input_schema=input_schema,
-                output_schema=output_schema,
-                agg_func=node._agg_func,
-                target_cache_id=uid,
-            )
-        elif node._limit is not None:
-            op = LimitScan(
-                input_schema=input_schema,
-                output_schema=output_schema,
-                limit=node._limit,
-                target_cache_id=uid,
-            )
-        elif node._project_cols is not None:
-            op = Project(
-                input_schema=input_schema,
-                output_schema=output_schema,
-                project_cols=node._project_cols,
-                target_cache_id=uid,
-            )
-        elif node._index is not None:
-            op = RetrieveScan(
-                input_schema=input_schema,
-                output_schema=output_schema,
-                index=node._index,
-                search_func=node._search_func,
-                search_attr=node._search_attr,
-                output_attrs=node._output_attrs,
-                k=node._k,
-                target_cache_id=uid,
-            )
-        elif output_schema != input_schema:
-            op = ConvertScan(
-                input_schema=input_schema,
-                output_schema=output_schema,
-                cardinality=node._cardinality,
-                udf=node._udf,
-                depends_on=node._depends_on,
-                target_cache_id=uid,
-            )
-        elif output_schema == input_schema and node._udf is not None:
-            op = MapScan(
-                input_schema=input_schema,
-                output_schema=output_schema,
-                udf=node._udf,
-                target_cache_id=uid,
-            )
-        # some legacy plans may have a useless convert; for now we simply skip it
-        elif output_schema == input_schema:
-            return self.construct_group_tree(dataset_nodes[:-1]) if len(dataset_nodes) > 1 else ([], {}, {})
-        else:
-            raise NotImplementedError(
-                f"""No logical operator exists for the specified dataset construction.
-                {input_schema}->{output_schema} {"with filter:'" + node._filter + "'" if node._filter is not None else ""}"""
-            )
+        op = node._operator
 
         # compute the input group ids and fields for this node
         input_group_ids, input_group_fields, input_group_properties = (
@@ -322,13 +229,13 @@ class Optimizer:
         new_fields = {
             field_name: field
             for field_name, field in op.output_schema.field_map(unique=True, id=uid).items()
-            if (field_name.split(".")[-1] not in input_group_short_field_names) or (node._udf is not None)
+            if (field_name.split(".")[-1] not in input_group_short_field_names) or (hasattr(node._operator, "udf") and node._operator.udf is not None)
         }
         all_fields = {**input_group_fields, **new_fields}
 
         # compute the set of (short) field names this operation depends on
         depends_on_field_names = (
-            {} if isinstance(node, DataReader) else {field_name.split(".")[-1] for field_name in node._depends_on}
+            {} if node.is_root else {field_name.split(".")[-1] for field_name in node._operator.depends_on}
         )
 
         # compute all properties including this operations'
@@ -363,6 +270,21 @@ class Optimizer:
             else:
                 all_properties["udfs"] = set([op_udf_str])
 
+        # TODO: temporary fix; perhaps use op_ids to identify group?
+        elif isinstance(op, ComputeOperator):
+            op_instruction = op.instruction
+            if "instructions" in all_properties:
+                all_properties["instructions"].add(op_instruction)
+            else:
+                all_properties["instructions"] = set([op_instruction])
+
+        elif isinstance(op, SearchOperator):
+            op_search_query = op.search_query
+            if "search_queries" in all_properties:
+                all_properties["search_queries"].add(op_search_query)
+            else:
+                all_properties["search_queries"] = set([op_search_query])
+
         # construct the logical expression and group
         logical_expression = LogicalExpression(
             operator=op,
@@ -389,14 +311,14 @@ class Optimizer:
 
     def convert_query_plan_to_group_tree(self, query_plan: Dataset) -> str:
         logger.debug(f"Converting query plan to group tree for query_plan: {query_plan}")
-        # Obtain ordered list of datasets
-        dataset_nodes: list[Dataset | DataReader] = []
-        node = query_plan.copy()
 
-        # NOTE: the very first node will be a DataReader; the rest will be Dataset
-        while isinstance(node, Dataset):
+        # TODO: handle joins
+        # Obtain ordered list of datasets
+        dataset_nodes: list[Dataset] = []
+        node = query_plan.copy()
+        while not node.is_root:
             dataset_nodes.append(node)
-            node = node._source
+            node = node._sources[0]
         dataset_nodes.append(node)
         dataset_nodes = list(reversed(dataset_nodes))
 
@@ -405,28 +327,28 @@ class Optimizer:
         for node_idx, node in enumerate(dataset_nodes):
             # update mapping from short to full field names
             short_field_names = node.schema.field_names()
-            full_field_names = node.schema.field_names(unique=True, id=get_node_uid(node))
+            full_field_names = node.schema.field_names(unique=True, id=node.id)
             for short_field_name, full_field_name in zip(short_field_names, full_field_names):
                 # set mapping automatically if this is a new field
                 if short_field_name not in short_to_full_field_name or (
-                    node_idx > 0 and dataset_nodes[node_idx - 1].schema != node.schema and node._udf is not None
+                    node_idx > 0 and dataset_nodes[node_idx - 1].schema != node.schema and (hasattr(node._operator, "udf") and node._operator.udf is not None)
                 ):
                     short_to_full_field_name[short_field_name] = full_field_name
 
-            # if the node is a data source, then skip
-            if isinstance(node, DataReader):
+            # if the node is a root Dataset, then skip
+            if node.is_root:
                 continue
 
             # If the node already has depends_on specified, then resolve each field name to a full (unique) field name
-            if len(node._depends_on) > 0:
-                node._depends_on = list(map(lambda field: short_to_full_field_name[field], node._depends_on))
+            if len(node._operator.depends_on) > 0:
+                node._operator.depends_on = list(map(lambda field: short_to_full_field_name[field], node._operator.depends_on))
                 continue
 
             # otherwise, make the node depend on all upstream nodes
-            node._depends_on = set()
+            node._operator.depends_on = set()
             for upstream_node in dataset_nodes[:node_idx]:
-                node._depends_on.update(upstream_node.schema.field_names(unique=True, id=get_node_uid(upstream_node)))
-            node._depends_on = list(node._depends_on)
+                node._operator.depends_on.update(upstream_node.schema.field_names(unique=True, id=upstream_node.id))
+            node._operator.depends_on = list(node._operator.depends_on)
 
         # construct tree of groups
         final_group_id, _, _ = self.construct_group_tree(dataset_nodes)
@@ -462,7 +384,7 @@ class Optimizer:
             elif isinstance(task, ApplyRule):
                 context = {"costed_full_op_ids": self.cost_model.get_costed_full_op_ids()}
                 new_tasks = task.perform(
-                    self.groups, self.expressions, context=context, **self.get_physical_op_params()
+                    self.groups, self.expressions, context=context, **self.get_physical_op_params(),
                 )
             elif isinstance(task, OptimizePhysicalExpression):
                 context = {"optimizer_strategy": self.optimizer_strategy}

@@ -2,6 +2,7 @@ import logging
 import time
 
 from palimpzest.core.data.dataclasses import PlanStats
+from palimpzest.core.data.dataset import Dataset
 from palimpzest.core.elements.records import DataRecordCollection
 from palimpzest.query.operators.aggregate import AggregateOp
 from palimpzest.query.operators.filter import FilterOp
@@ -9,7 +10,6 @@ from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.operators.scan import ScanPhysicalOp
 from palimpzest.query.optimizer.plan import PhysicalPlan
 from palimpzest.query.processor.query_processor import QueryProcessor
-from palimpzest.sets import Dataset
 
 logger = logging.getLogger(__name__)
 
@@ -94,14 +94,14 @@ class StreamingQueryProcessor(QueryProcessor):
     def get_input_records(self):
         scan_operator = self.plan.operators[0]
         assert isinstance(scan_operator, ScanPhysicalOp), "First operator in physical plan must be a ScanPhysicalOp"
-        datareader = scan_operator.datareader
-        if not datareader:
-            raise Exception("DataReader not found")
-        datareader_len = len(datareader)
+        datasource = scan_operator.datasource
+        if not datasource:
+            raise Exception("Dataset not found")
+        datasource_len = len(datasource)
 
         input_records = []
         record_op_stats = []
-        for source_idx in range(datareader_len):
+        for source_idx in range(datasource_len):
             record_set = scan_operator(source_idx)
             input_records += record_set.data_records
             record_op_stats += record_set.record_op_stats

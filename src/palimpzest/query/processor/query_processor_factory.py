@@ -1,6 +1,7 @@
 import logging
 from enum import Enum
 
+from palimpzest.core.data.dataset import Dataset
 from palimpzest.core.elements.records import DataRecordCollection
 from palimpzest.query.execution.execution_strategy import ExecutionStrategy, SentinelExecutionStrategy
 from palimpzest.query.execution.execution_strategy_type import ExecutionStrategyType, SentinelExecutionStrategyType
@@ -10,7 +11,6 @@ from palimpzest.query.optimizer.optimizer_strategy_type import OptimizationStrat
 from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.query.processor.processing_strategy_type import ProcessingStrategyType
 from palimpzest.query.processor.query_processor import QueryProcessor
-from palimpzest.sets import Dataset, Set
 from palimpzest.utils.model_helpers import get_models
 
 logger = logging.getLogger(__name__)
@@ -122,7 +122,7 @@ class QueryProcessorFactory:
     @classmethod
     def create_processor(
         cls,
-        dataset: Set,
+        dataset: Dataset,
         config: QueryProcessorConfig | None = None,
         **kwargs
     ) -> QueryProcessor:

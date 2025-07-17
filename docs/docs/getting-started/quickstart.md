@@ -28,19 +28,19 @@ emails
 ...
 └── email9.txt
 ```
-Given this flat directory, PZ will create a [`pz.DataReader`](../user-guide/datareaders.md), which iterates over the files in the directory at runtime.
+Given this flat directory, PZ will create a [`pz.IterDataset`](../user-guide/dataset.md), which iterates over the files in the directory at runtime.
 ??? note "What if my data isn't this simple?"
 
     That's perfectly fine!
     
-    The `pz.DataReader` class can be subclassed by the user to read data from more complex sources. The user just has to:
+    The `pz.IterDataset` class can be subclassed by the user to read data from more complex sources. The user just has to:
     
-    1. implement the DataReader's `__len__()` method
-    2. implement the DataReader's `__getitem__()` method
+    1. implement the IterDataset's `__len__()` method
+    2. implement the IterDataset's `__getitem__()` method
     
-    More details can be found in our [user guide for custom DataReaders](../user-guide/datareaders.md).
+    More details can be found in our [user guide for custom Datasets](../user-guide/dataset.md).
 
-The `pz.DataReader` will emit one dictionary per file to the next operator in the program. By default, each dictionary will have two keys: `"contents"` and `"filename"` which map to the file's contents and filename, respectively:
+The `pz.IterDataset` will emit one dictionary per file to the next operator in the program. By default, each dictionary will have two keys: `"contents"` and `"filename"` which map to the file's contents and filename, respectively:
 
 ```python
 import palimpzest as pz

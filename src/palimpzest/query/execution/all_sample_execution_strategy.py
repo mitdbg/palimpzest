@@ -6,7 +6,7 @@ from palimpzest.core.data.dataclasses import SentinelPlanStats
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.query.execution.execution_strategy import SentinelExecutionStrategy
 from palimpzest.query.operators.physical import PhysicalOperator
-from palimpzest.query.operators.scan import ScanPhysicalOp
+from palimpzest.query.operators.scan import ContextScanOp, ScanPhysicalOp
 from palimpzest.query.optimizer.plan import SentinelPlan
 from palimpzest.utils.progress import create_progress_manager
 
@@ -29,7 +29,7 @@ class OpSet:
         self.source_indices = source_indices
 
         # set the initial inputs for this logical operator
-        is_scan_op = isinstance(op_set[0], ScanPhysicalOp)
+        is_scan_op = isinstance(op_set[0], (ContextScanOp, ScanPhysicalOp))
         self.source_idx_to_input = {source_idx: [source_idx] for source_idx in self.source_indices} if is_scan_op else {}
 
     def get_op_input_pairs(self) -> list[PhysicalOperator, DataRecord | int | None]:
@@ -177,7 +177,7 @@ class AllSamplingExecutionStrategy(SentinelExecutionStrategy):
         the progress manager as a result.
         """
         # for now, assert that the first operator in the plan is a ScanPhysicalOp
-        assert all(isinstance(op, ScanPhysicalOp) for op in plan.operator_sets[0]), "First operator in physical plan must be a ScanPhysicalOp"
+        assert all(isinstance(op, (ContextScanOp, ScanPhysicalOp)) for op in plan.operator_sets[0]), "First operator in physical plan must be a scan operator"
         logger.info(f"Executing plan {plan.plan_id} with {self.max_workers} workers")
         logger.info(f"Plan Details: {plan}")
 

@@ -9,7 +9,7 @@ from palimpzest.query.execution.execution_strategy import ExecutionStrategy
 from palimpzest.query.operators.aggregate import AggregateOp
 from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.operators.physical import PhysicalOperator
-from palimpzest.query.operators.scan import ScanPhysicalOp
+from palimpzest.query.operators.scan import ContextScanOp, ScanPhysicalOp
 from palimpzest.query.optimizer.plan import PhysicalPlan
 from palimpzest.utils.progress import create_progress_manager
 
@@ -152,7 +152,7 @@ class ParallelExecutionStrategy(ExecutionStrategy):
     def execute_plan(self, plan: PhysicalPlan):
         """Initialize the stats and execute the plan."""
         # for now, assert that the first operator in the plan is a ScanPhysicalOp
-        assert isinstance(plan.operators[0], ScanPhysicalOp), "First operator in physical plan must be a ScanPhysicalOp"
+        assert isinstance(plan.operators[0], (ScanPhysicalOp, ContextScanOp)), "First operator in physical plan must be a scan operator"
         logger.info(f"Executing plan {plan.plan_id} with {self.max_workers} workers")
         logger.info(f"Plan Details: {plan}")
 
@@ -319,7 +319,7 @@ class SequentialParallelExecutionStrategy(ExecutionStrategy):
     def execute_plan(self, plan: PhysicalPlan):
         """Initialize the stats and execute the plan."""
         # for now, assert that the first operator in the plan is a ScanPhysicalOp
-        assert isinstance(plan.operators[0], ScanPhysicalOp), "First operator in physical plan must be a ScanPhysicalOp"
+        assert isinstance(plan.operators[0], (ScanPhysicalOp, ContextScanOp)), "First operator in physical plan must be a scan operator"
         logger.info(f"Executing plan {plan.plan_id} with {self.max_workers} workers")
         logger.info(f"Plan Details: {plan}")
 

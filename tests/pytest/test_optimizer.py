@@ -17,7 +17,6 @@ from palimpzest.query.optimizer.cost_model import CostModel
 from palimpzest.query.optimizer.optimizer import Optimizer
 from palimpzest.query.optimizer.optimizer_strategy_type import OptimizationStrategyType
 from palimpzest.query.optimizer.primitives import Group, LogicalExpression
-from palimpzest.sets import Dataset
 
 
 class TestPrimitives:
@@ -108,7 +107,7 @@ class TestPrimitives:
 )
 class TestOptimizer:
     def test_basic_functionality(self, enron_eval_tiny, opt_strategy):
-        plan = Dataset(enron_eval_tiny)
+        plan = enron_eval_tiny
         policy = MaxQuality()
         cost_model = CostModel(sample_execution_data=[])
         optimizer = Optimizer(
@@ -126,7 +125,7 @@ class TestOptimizer:
         assert isinstance(physical_plan[0], MarshalAndScanDataOp)
 
     def test_simple_max_quality_convert(self, enron_eval_tiny, email_schema, opt_strategy):
-        plan = Dataset(enron_eval_tiny)
+        plan = enron_eval_tiny
         plan = plan.sem_add_columns(email_schema)
         policy = MaxQuality()
         cost_model = CostModel(sample_execution_data=[])
@@ -152,7 +151,7 @@ class TestOptimizer:
         assert physical_plan[1].model == Model.GPT_4o
 
     def test_simple_min_cost_convert(self, enron_eval_tiny, email_schema, opt_strategy):
-        plan = Dataset(enron_eval_tiny)
+        plan = enron_eval_tiny
         plan = plan.sem_add_columns(email_schema)
         policy = MinCost()
         cost_model = CostModel(sample_execution_data=[])
@@ -173,7 +172,7 @@ class TestOptimizer:
         assert isinstance(physical_plan[1], CodeSynthesisConvert)
 
     def test_simple_min_time_convert(self, enron_eval_tiny, email_schema, opt_strategy):
-        plan = Dataset(enron_eval_tiny)
+        plan = enron_eval_tiny
         plan = plan.sem_add_columns(email_schema)
         policy = MinTime()
         cost_model = CostModel(sample_execution_data=[])
@@ -194,7 +193,7 @@ class TestOptimizer:
         assert isinstance(physical_plan[1], CodeSynthesisConvert)
 
     def test_push_down_filter(self, enron_eval_tiny, email_schema, opt_strategy):
-        plan = Dataset(enron_eval_tiny)
+        plan = enron_eval_tiny
         plan = plan.sem_add_columns(email_schema)
         plan = plan.sem_filter("some text filter", depends_on=["contents"])
         policy = MinCost()
@@ -217,7 +216,7 @@ class TestOptimizer:
         assert isinstance(physical_plan[2], CodeSynthesisConvert)
 
     def test_push_down_two_filters(self, enron_eval_tiny, email_schema, opt_strategy):
-        plan = Dataset(enron_eval_tiny)
+        plan = enron_eval_tiny
         plan = plan.sem_add_columns(email_schema)
         plan = plan.sem_filter("some text filter", depends_on=["contents"])
         plan = plan.sem_filter("another text filter", depends_on=["contents"])
@@ -271,7 +270,7 @@ class TestOptimizer:
     def test_seven_filters(self, enron_eval_tiny, email_schema, opt_strategy):
         start_time = time.time()
 
-        plan = Dataset(enron_eval_tiny)
+        plan = enron_eval_tiny
         plan = plan.sem_add_columns(email_schema)
         plan = plan.sem_filter("filter1", depends_on=["contents"])
         plan = plan.sem_filter("filter2", depends_on=["contents"])
@@ -352,10 +351,10 @@ class MockSampleBasedCostModel:
         # create source_op_estimates for scan operators if they are not provided
         if isinstance(operator, ScanPhysicalOp):
             # get handle to scan operator and pre-compute its size (number of records)
-            datareader_len = len(operator.datareader)
+            datasource_len = len(operator.datasource)
 
             source_op_estimates = OperatorCostEstimates(
-                cardinality=datareader_len,
+                cardinality=datasource_len,
                 time_per_record=0.0,
                 cost_per_record=0.0,
                 quality=1.0,

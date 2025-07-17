@@ -6,7 +6,7 @@ from palimpzest.policy import MaxQuality, MaxQualityAtFixedCost, MinCost, MinCos
 pytest_plugins = [
     "fixtures.champion_outputs",
     "fixtures.cost_est_data",
-    "fixtures.datareaders",
+    "fixtures.datasets",
     "fixtures.execution_data",
     "fixtures.expected_cost_est_results",
     "fixtures.expected_physical_plans",
@@ -25,13 +25,13 @@ pytest_plugins = [
 #       and cache the result. Thus, we minimize recomputation and don't
 #       need to, for example, re-register datasets for each individual test.
 @pytest.fixture
-def datareader(request, enron_eval_tiny, real_estate_eval_tiny):
-    datareader_id = request.param
-    datareader_id_to_datareader = {
+def dataset(request, enron_eval_tiny, real_estate_eval_tiny):
+    dataset_id = request.param
+    dataset_id_to_dataset = {
         "enron-eval-tiny": enron_eval_tiny,
         "real-estate-eval-tiny": real_estate_eval_tiny,
     }
-    return datareader_id_to_datareader[datareader_id]
+    return dataset_id_to_dataset[dataset_id]
 
 
 @pytest.fixture

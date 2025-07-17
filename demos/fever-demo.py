@@ -18,7 +18,7 @@ fever_output_cols = [
     {"name": "label", "type": bool, "desc": "Output TRUE if the `claim` is supported by the evidence in `relevant_wikipedia_articles`; output FALSE otherwise."}
 ]
 
-class FeverDataReader(pz.DataReader):
+class FeverDataset(pz.IterDataset):
     def __init__(self, claims_file_path, num_claims_to_process):
         super().__init__(fever_claims_cols)
 
@@ -87,7 +87,7 @@ def main():
     args = parse_arguments()
 
     # Create a data reader for the FEVER dataset
-    dataset = FeverDataReader(
+    dataset = FeverDataset(
         claims_file_path=args.claims_file_path,
         num_claims_to_process=args.num_claims_to_process,
     )

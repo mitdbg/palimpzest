@@ -22,7 +22,7 @@ from palimpzest.query.operators.filter import LLMFilter, NonLLMFilter
 from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.rag_convert import RAGConvert
-from palimpzest.query.operators.scan import CacheScanDataOp, MarshalAndScanDataOp, ScanPhysicalOp
+from palimpzest.query.operators.scan import CacheScanDataOp, ContextScanOp, MarshalAndScanDataOp, ScanPhysicalOp
 from palimpzest.utils.model_helpers import get_champion_model_name, get_models
 
 warnings.simplefilter(action='ignore', category=UserWarning)
@@ -173,10 +173,10 @@ class SampleBasedCostModel:
         # create source_op_estimates for scan operators if they are not provided
         if isinstance(operator, ScanPhysicalOp):
             # get handle to scan operator and pre-compute its size (number of records)
-            datareader_len = len(operator.datareader)
+            datasource_len = len(operator.datasource)
 
             source_op_estimates = OperatorCostEstimates(
-                cardinality=datareader_len,
+                cardinality=datasource_len,
                 time_per_record=0.0,
                 cost_per_record=0.0,
                 quality=1.0,
@@ -487,10 +487,10 @@ class CostModel(BaseCostModel):
         # initialize estimates of operator metrics based on naive (but sometimes precise) logic
         if isinstance(operator, MarshalAndScanDataOp):
             # get handle to scan operator and pre-compute its size (number of records)
-            datareader_len = len(operator.datareader)
+            datasource_len = len(operator.datasource)
 
             source_op_estimates = OperatorCostEstimates(
-                cardinality=datareader_len,
+                cardinality=datasource_len,
                 time_per_record=0.0,
                 cost_per_record=0.0,
                 quality=1.0,
@@ -499,16 +499,26 @@ class CostModel(BaseCostModel):
             op_estimates = operator.naive_cost_estimates(source_op_estimates, input_record_size_in_bytes=NAIVE_BYTES_PER_RECORD)
 
         elif isinstance(operator, CacheScanDataOp):
-            datareader_len = len(operator.datareader)
+            datasource_len = len(operator.datasource)
 
             source_op_estimates = OperatorCostEstimates(
-                cardinality=datareader_len,
+                cardinality=datasource_len,
                 time_per_record=0.0,
                 cost_per_record=0.0,
                 quality=1.0,
             )
 
             op_estimates = operator.naive_cost_estimates(source_op_estimates, input_record_size_in_bytes=NAIVE_BYTES_PER_RECORD)
+
+        elif isinstance(operator, ContextScanOp):
+            source_op_estimates = OperatorCostEstimates(
+                cardinality=1.0,
+                time_per_record=0.0,
+                cost_per_record=0.0,
+                quality=1.0,
+            )
+
+            op_estimates = operator.naive_cost_estimates(source_op_estimates)
 
         else:
             op_estimates = operator.naive_cost_estimates(source_op_estimates)
@@ -527,7 +537,7 @@ class CostModel(BaseCostModel):
                 # NOTE: this cardinality is the only cardinality we estimate directly b/c we can observe how many groups are
                 #       produced by the groupby in our sample and assume it may generalize to the full workload. To estimate
                 #       actual cardinalities of operators we estimate their selectivities / fan-outs and multiply those by
-                #       the input cardinality (where the initial input cardinality from the datareader is known).
+                #       the input cardinality (where the initial input cardinality from the datasource is known).
                 op_estimates.cardinality = sample_op_estimates[full_op_id]["cardinality"]
                 op_estimates.time_per_record = sample_op_estimates[full_op_id]["time_per_record"]
 

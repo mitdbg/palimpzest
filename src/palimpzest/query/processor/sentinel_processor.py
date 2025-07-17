@@ -37,7 +37,7 @@ class SentinelQueryProcessor(QueryProcessor):
         optimizer = self.optimizer.deepcopy_clean()
         optimizer.update_strategy(OptimizationStrategyType.SENTINEL)
 
-        # create copy of dataset, but change its data source to the validation data source
+        # create copy of dataset, but change its root Dataset(s) to the validation Dataset(s)
         dataset = self.dataset.copy()
         dataset._set_data_source(self.val_datasource)
 

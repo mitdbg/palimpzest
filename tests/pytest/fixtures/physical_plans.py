@@ -1,7 +1,7 @@
 import pytest
 
 from palimpzest.constants import Cardinality, Model
-from palimpzest.core.data.datareaders import MemoryReader
+from palimpzest.core.data.iter_dataset import MemoryDataset
 from palimpzest.core.elements.filters import Filter
 from palimpzest.core.lib.schemas import File, Schema, StringField, TextFile
 from palimpzest.query.operators.code_synthesis_convert import CodeSynthesisConvertSingle
@@ -15,14 +15,14 @@ from palimpzest.query.optimizer.plan import PhysicalPlan, SentinelPlan
 ### PHYSICAL PLANS ###
 @pytest.fixture
 def scan_only_plan(enron_eval_tiny):
-    scan_op = MarshalAndScanDataOp(output_schema=File, datareader=enron_eval_tiny)
+    scan_op = MarshalAndScanDataOp(output_schema=File, datasource=enron_eval_tiny)
     plan = PhysicalPlan(operators=[scan_op])
     return plan
 
 
 @pytest.fixture
 def non_llm_filter_plan(enron_eval_tiny):
-    scan_op = MarshalAndScanDataOp(output_schema=File, datareader=enron_eval_tiny)
+    scan_op = MarshalAndScanDataOp(output_schema=File, datasource=enron_eval_tiny)
 
     def filter_emails(record: dict):
         return record["filename"] in ["buy-r-inbox-628.txt", "buy-r-inbox-749.txt", "zipper-a-espeed-28.txt"]
@@ -35,7 +35,7 @@ def non_llm_filter_plan(enron_eval_tiny):
 
 @pytest.fixture
 def llm_filter_plan(enron_eval_tiny):
-    scan_op = MarshalAndScanDataOp(output_schema=File, datareader=enron_eval_tiny)
+    scan_op = MarshalAndScanDataOp(output_schema=File, datasource=enron_eval_tiny)
     filter = Filter("This filter will be mocked out")
     filter_op = LLMFilter(
         input_schema=File,
@@ -50,7 +50,7 @@ def llm_filter_plan(enron_eval_tiny):
 
 @pytest.fixture
 def bonded_llm_convert_plan(email_schema, enron_eval_tiny):
-    scan_op = MarshalAndScanDataOp(output_schema=TextFile, datareader=enron_eval_tiny)
+    scan_op = MarshalAndScanDataOp(output_schema=TextFile, datasource=enron_eval_tiny)
     convert_op_llm = LLMConvertBonded(
         input_schema=TextFile,
         output_schema=email_schema,
@@ -63,7 +63,7 @@ def bonded_llm_convert_plan(email_schema, enron_eval_tiny):
 
 @pytest.fixture
 def code_synth_convert_plan(email_schema, enron_eval_tiny):
-    scan_op = MarshalAndScanDataOp(output_schema=TextFile, datareader=enron_eval_tiny)
+    scan_op = MarshalAndScanDataOp(output_schema=TextFile, datasource=enron_eval_tiny)
     convert_op_llm = CodeSynthesisConvertSingle(
         input_schema=TextFile,
         output_schema=email_schema,
@@ -78,7 +78,7 @@ def code_synth_convert_plan(email_schema, enron_eval_tiny):
 
 @pytest.fixture
 def rag_convert_plan(email_schema, enron_eval_tiny):
-    scan_op = MarshalAndScanDataOp(output_schema=TextFile, datareader=enron_eval_tiny)
+    scan_op = MarshalAndScanDataOp(output_schema=TextFile, datasource=enron_eval_tiny)
     convert_op_llm = RAGConvert(
         input_schema=TextFile,
         output_schema=email_schema,
@@ -93,7 +93,7 @@ def rag_convert_plan(email_schema, enron_eval_tiny):
 
 @pytest.fixture
 def image_convert_plan(real_estate_listing_files_schema, image_real_estate_listing_schema, real_estate_eval_tiny):
-    scan_op = MarshalAndScanDataOp(output_schema=real_estate_listing_files_schema, datareader=real_estate_eval_tiny)
+    scan_op = MarshalAndScanDataOp(output_schema=real_estate_listing_files_schema, datasource=real_estate_eval_tiny)
     convert_op_llm = LLMConvertBonded(
         input_schema=real_estate_listing_files_schema,
         output_schema=image_real_estate_listing_schema,
@@ -106,7 +106,7 @@ def image_convert_plan(real_estate_listing_files_schema, image_real_estate_listi
 
 @pytest.fixture
 def one_to_many_convert_plan(real_estate_listing_files_schema, room_real_estate_listing_schema, real_estate_eval_tiny):
-    scan_op = MarshalAndScanDataOp(output_schema=real_estate_listing_files_schema, datareader=real_estate_eval_tiny)
+    scan_op = MarshalAndScanDataOp(output_schema=real_estate_listing_files_schema, datasource=real_estate_eval_tiny)
     convert_op_llm = LLMConvertBonded(
         input_schema=real_estate_listing_files_schema,
         output_schema=room_real_estate_listing_schema,
@@ -124,8 +124,8 @@ def simple_plan_factory():
         class FooSchema(Schema):
             foo = StringField("foo")
 
-        datareader = MemoryReader(vals=[1, 2, 3, 4, 5, 6])
-        scan_op = MarshalAndScanDataOp(output_schema=File, datareader=datareader)
+        datasource = MemoryDataset(id="test", vals=[1, 2, 3, 4, 5, 6])
+        scan_op = MarshalAndScanDataOp(output_schema=File, datasource=datasource)
         convert_op_llm = LLMConvertBonded(
             input_schema=File,
             output_schema=FooSchema,
@@ -148,8 +148,8 @@ def simple_plan_factory():
 
 @pytest.fixture
 def scan_convert_filter_sentinel_plan(foobar_schema):
-    datareader = MemoryReader(vals=[1, 2, 3, 4, 5, 6])
-    scan_op = MarshalAndScanDataOp(output_schema=TextFile, logical_op_id="scan1", datareader=datareader)
+    datasource = MemoryDataset(id="test", vals=[1, 2, 3, 4, 5, 6])
+    scan_op = MarshalAndScanDataOp(output_schema=TextFile, logical_op_id="scan1", datasource=datasource)
     convert_ops = [
         LLMConvertBonded(
             input_schema=TextFile,
@@ -177,8 +177,8 @@ def scan_convert_filter_sentinel_plan(foobar_schema):
 
 @pytest.fixture
 def scan_multi_convert_multi_filter_sentinel_plan(foobar_schema, baz_schema):
-    datareader = MemoryReader(vals=[1, 2, 3, 4, 5, 6])
-    scan_op = MarshalAndScanDataOp(output_schema=TextFile, logical_op_id="scan1", datareader=datareader)
+    datasource = MemoryDataset(id="test", vals=[1, 2, 3, 4, 5, 6])
+    scan_op = MarshalAndScanDataOp(output_schema=TextFile, logical_op_id="scan1", datasource=datasource)
     convert_ops1 = [
         LLMConvertBonded(
             input_schema=TextFile,

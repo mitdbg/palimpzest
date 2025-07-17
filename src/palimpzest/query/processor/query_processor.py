@@ -2,12 +2,11 @@ import logging
 from abc import abstractmethod
 
 from palimpzest.core.data.dataclasses import PlanStats
-from palimpzest.core.data.datareaders import DataReader
+from palimpzest.core.data.dataset import Dataset
 from palimpzest.core.elements.records import DataRecord, DataRecordCollection
 from palimpzest.policy import Policy
 from palimpzest.query.execution.execution_strategy import ExecutionStrategy, SentinelExecutionStrategy
 from palimpzest.query.optimizer.optimizer import Optimizer
-from palimpzest.sets import Dataset
 from palimpzest.utils.hash_helpers import hash_for_id
 from palimpzest.utils.model_helpers import get_models
 
@@ -27,7 +26,7 @@ class QueryProcessor:
         execution_strategy: ExecutionStrategy,
         sentinel_execution_strategy: SentinelExecutionStrategy | None,
         num_samples: int | None = None,
-        val_datasource: DataReader | None = None,
+        val_datasource: Dataset | None = None,
         scan_start_idx: int = 0,
         cache: bool = False,
         verbose: bool = False,

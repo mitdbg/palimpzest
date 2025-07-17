@@ -104,7 +104,7 @@ table_cols = [
 #         desc="A list of the filepaths for each image of the listing",
 #     )
 
-class RealEstateListingReader(pz.DataReader):
+class RealEstateListingDataset(pz.IterDataset):
     def __init__(self, listings_dir):
         super().__init__(real_estate_listing_cols)
         self.listings_dir = listings_dir
@@ -198,7 +198,7 @@ if __name__ == "__main__":
         )
 
     elif workload == "real-estate":
-        plan = pz.Dataset(RealEstateListingReader(dataset))
+        plan = pz.Dataset(RealEstateListingDataset(dataset))
         plan = plan.sem_add_columns(real_estate_text_cols, depends_on="text_content")
         plan = plan.sem_add_columns(real_estate_image_cols, depends_on="image_filepaths")
         plan = plan.sem_filter(

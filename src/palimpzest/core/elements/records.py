@@ -6,6 +6,7 @@ from typing import Any
 
 import pandas as pd
 
+from palimpzest.core.data import context
 from palimpzest.core.data.dataclasses import ExecutionStats, PlanStats, RecordOpStats
 from palimpzest.core.lib.fields import Field
 from palimpzest.core.lib.schemas import Schema
@@ -34,7 +35,8 @@ class DataRecord:
         # mapping from field names to their values
         self.field_values: dict[str, Any] = {}
 
-        # the index in the DataReader from which this DataRecord is derived
+        # TODO: handle multiple sources
+        # the index in the root Dataset from which this DataRecord is derived
         self.source_idx = int(source_idx)
 
         # the id of the parent record(s) from which this DataRecord is derived
@@ -255,6 +257,12 @@ class DataRecord:
         if project_cols is not None and len(project_cols) > 0:
             fields = [field for field in fields if field in project_cols]
 
+        # convert Context --> str
+        for record in records:
+            for k in fields:
+                if isinstance(record[k], context.Context):
+                    record[k] = record[k].description
+
         return pd.DataFrame([
             {k: record[k] for k in fields}
             for record in records
@@ -273,7 +281,12 @@ class DataRecord:
         """Return a dictionary representation of this DataRecord"""
         # TODO(chjun): In case of numpy types, the json.dumps will fail. Convert to native types.
         # Better ways to handle this.
-        dct = pd.Series(self.field_values).to_dict()
+        field_values = {
+            k: v.description
+            if isinstance(v, context.Context) else v
+            for k, v in self.field_values.items()
+        }
+        dct = pd.Series(field_values).to_dict()
 
         if project_cols is not None and len(project_cols) > 0:
             project_field_names = set(field.split(".")[-1] for field in project_cols)
@@ -281,7 +294,7 @@ class DataRecord:
 
         if not include_bytes:
             for k, v in dct.items():
-                if isinstance(v, bytes) or (isinstance(v, list) and len(v) > 0 and  any([isinstance(elt, bytes) for elt in v])):
+                if isinstance(v, bytes) or (isinstance(v, list) and len(v) > 0 and any([isinstance(elt, bytes) for elt in v])):
                     dct[k] = "<bytes>"
 
         if bytes_to_str:
