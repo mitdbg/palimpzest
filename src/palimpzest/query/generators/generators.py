@@ -215,14 +215,15 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
 
             # TODO: wrap non-list outputs in a list if expected output is a list
 
-            # common error: if the output is a singleton list which contains a list, but the expected field type
+            # common error for one-to-one: if the output is a singleton list which contains a list, but the expected field type
             # is a list of strings, or a list of floats, i.e. not a list of lists; then extract the inner list
-            for field, field_type in fields.items():
-                answer = field_answers[field]
-                field_type_is_not_list_of_lists = isinstance(field_type, ListField) and not issubclass(field_type.element_type, ListField)
-                answer_is_list_of_lists = isinstance(answer, list) and len(answer) == 1 and isinstance(answer[0], list)
-                if field_type_is_not_list_of_lists and answer_is_list_of_lists:
-                    field_answers[field] = answer[0]
+            if self.cardinality == Cardinality.ONE_TO_ONE:
+                for field, field_type in fields.items():
+                    answer = field_answers[field]
+                    field_type_is_not_list_of_lists = isinstance(field_type, ListField) and not issubclass(field_type.element_type, ListField)
+                    answer_is_list_of_lists = isinstance(answer, list) and len(answer) == 1 and isinstance(answer[0], list)
+                    if field_type_is_not_list_of_lists and answer_is_list_of_lists:
+                        field_answers[field] = answer[0]
 
             # prepare the field answers to match the expected output and return
             return self._prepare_field_answers(field_answers, fields)
@@ -420,6 +421,8 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
                 prompt += message["content"] + "\n" if message["type"] == "text" else "<image>\n"
         logger.debug(f"PROMPT:\n{prompt}")
         logger.debug(Fore.GREEN + f"{completion_text}\n" + Style.RESET_ALL)
+        print(f"PROMPT:\n{prompt}")
+        print(Fore.GREEN + f"{completion_text}\n" + Style.RESET_ALL)
 
         # parse reasoning
         reasoning = None
