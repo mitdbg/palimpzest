@@ -232,8 +232,8 @@ class PZProgressManager(ProgressManager):
         if delta != 0:
             next_op = self.full_op_id_to_next_op[full_op_id]
             while next_op is not None:
+                next_full_op_id = next_op.get_full_op_id()
                 if not isinstance(next_op, (AggregateOp, LimitScanOp)):
-                    next_full_op_id = next_op.get_full_op_id()
                     next_task = self.full_op_id_to_task[next_full_op_id]
                     self.progress.update(next_task, total=self.get_task_total(next_full_op_id) + delta)
 

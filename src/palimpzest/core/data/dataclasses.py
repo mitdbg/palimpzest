@@ -254,6 +254,12 @@ class OperatorStats:
     # the total cost of this operation
     total_op_cost: float = 0.0
 
+    # the total input tokens processed by this operation
+    total_input_tokens: int = 0
+
+    # the total output tokens processed by this operation
+    total_output_tokens: int = 0
+
     # a list of RecordOpStats processed by the operation
     record_op_stats_lst: list[RecordOpStats] = field(default_factory=list)
 
@@ -280,6 +286,8 @@ class OperatorStats:
         if isinstance(stats, OperatorStats):
             self.total_op_time += stats.total_op_time
             self.total_op_cost += stats.total_op_cost
+            self.total_input_tokens += stats.total_input_tokens
+            self.total_output_tokens += stats.total_output_tokens
             self.record_op_stats_lst.extend(stats.record_op_stats_lst)
 
         elif isinstance(stats, RecordOpStats):
@@ -288,6 +296,8 @@ class OperatorStats:
             self.record_op_stats_lst.append(stats)
             self.total_op_time += stats.time_per_record
             self.total_op_cost += stats.cost_per_record
+            self.total_input_tokens += stats.total_input_tokens
+            self.total_output_tokens += stats.total_output_tokens
 
         else:
             raise TypeError(f"Cannot add {type(stats)} to OperatorStats")
@@ -300,6 +310,8 @@ class OperatorStats:
             "op_name": self.op_name,
             "total_op_time": self.total_op_time,
             "total_op_cost": self.total_op_cost,
+            "total_input_tokens": self.total_input_tokens,
+            "total_output_tokens": self.total_output_tokens,
             "record_op_stats_lst": [record_op_stats.to_json() for record_op_stats in self.record_op_stats_lst],
             "op_details": self.op_details,
         }
@@ -352,6 +364,8 @@ class BasePlanStats:
             raise RuntimeError("PlanStats.start() must be called before PlanStats.finish()")
         self.total_plan_time = time.time() - self.start_time
         self.total_plan_cost = self.sum_op_costs()
+        self.total_input_tokens = self.sum_input_tokens()
+        self.total_output_tokens = self.sum_output_tokens()
 
     @staticmethod
     @abstractmethod
@@ -365,6 +379,20 @@ class BasePlanStats:
     def sum_op_costs(self) -> float:
         """
         Sum the costs of all operators in this plan.
+        """
+        pass
+
+    @abstractmethod
+    def sum_input_tokens(self) -> int:
+        """
+        Sum the input tokens processed by all operators in this plan.
+        """
+        pass
+
+    @abstractmethod
+    def sum_output_tokens(self) -> int:
+        """
+        Sum the output tokens processed by all operators in this plan.
         """
         pass
 
@@ -425,6 +453,18 @@ class PlanStats(BasePlanStats):
         """
         return sum([op_stats.total_op_cost for _, op_stats in self.operator_stats.items()])
 
+    def sum_input_tokens(self) -> int:
+        """
+        Sum the input tokens processed by all operators in this plan.
+        """
+        return sum([op_stats.total_input_tokens for _, op_stats in self.operator_stats.items()])
+
+    def sum_output_tokens(self) -> int:
+        """
+        Sum the output tokens processed by all operators in this plan.
+        """
+        return sum([op_stats.total_output_tokens for _, op_stats in self.operator_stats.items()])
+
     def add_record_op_stats(self, record_op_stats: RecordOpStats | list[RecordOpStats]) -> None:
         """
         Add the given RecordOpStats to this plan's operator stats.
@@ -450,6 +490,8 @@ class PlanStats(BasePlanStats):
         """
         self.total_plan_time += plan_stats.total_plan_time
         self.total_plan_cost += plan_stats.total_plan_cost
+        self.total_input_tokens += plan_stats.total_input_tokens
+        self.total_output_tokens += plan_stats.total_output_tokens
         for full_op_id, op_stats in plan_stats.operator_stats.items():
             if full_op_id in self.operator_stats:
                 self.operator_stats[full_op_id] += op_stats
@@ -459,6 +501,8 @@ class PlanStats(BasePlanStats):
     def __str__(self) -> str:
         stats = f"total_plan_time={self.total_plan_time} \n"
         stats += f"total_plan_cost={self.total_plan_cost} \n"
+        stats += f"total_input_tokens={self.total_input_tokens} \n"
+        stats += f"total_output_tokens={self.total_output_tokens} \n"
         for idx, op_stats in enumerate(self.operator_stats.values()):
             stats += f"{idx}. {op_stats.op_name} time={op_stats.total_op_time} cost={op_stats.total_op_cost} \n"
         return stats
@@ -470,6 +514,8 @@ class PlanStats(BasePlanStats):
             "operator_stats": {full_op_id: op_stats.to_json() for full_op_id, op_stats in self.operator_stats.items()},
             "total_plan_time": self.total_plan_time,
             "total_plan_cost": self.total_plan_cost,
+            "total_input_tokens": self.total_input_tokens,
+            "total_output_tokens": self.total_output_tokens,
         }
 
 
@@ -504,6 +550,18 @@ class SentinelPlanStats(BasePlanStats):
         """
         return sum(sum([op_stats.total_op_cost for _, op_stats in phys_op_stats.items()]) for _, phys_op_stats in self.operator_stats.items())
 
+    def sum_input_tokens(self) -> int:
+        """
+        Sum the input tokens processed by all operators in this plan.
+        """
+        return sum(sum([op_stats.total_input_tokens for _, op_stats in phys_op_stats.items()]) for _, phys_op_stats in self.operator_stats.items())
+
+    def sum_output_tokens(self) -> int:
+        """
+        Sum the output tokens processed by all operators in this plan.
+        """
+        return sum(sum([op_stats.total_output_tokens for _, op_stats in phys_op_stats.items()]) for _, phys_op_stats in self.operator_stats.items())
+
     def add_record_op_stats(self, record_op_stats: RecordOpStats | list[RecordOpStats]) -> None:
         """
         Add the given RecordOpStats to this plan's operator stats.
@@ -533,6 +591,8 @@ class SentinelPlanStats(BasePlanStats):
         """
         self.total_plan_time += plan_stats.total_plan_time
         self.total_plan_cost += plan_stats.total_plan_cost
+        self.total_input_tokens += plan_stats.total_input_tokens
+        self.total_output_tokens += plan_stats.total_output_tokens
         for logical_op_id, physical_op_stats in plan_stats.operator_stats.items():
             for full_op_id, op_stats in physical_op_stats.items():
                 if logical_op_id in self.operator_stats:
@@ -546,6 +606,8 @@ class SentinelPlanStats(BasePlanStats):
     def __str__(self) -> str:
         stats = f"total_plan_time={self.total_plan_time} \n"
         stats += f"total_plan_cost={self.total_plan_cost} \n"
+        stats += f"total_input_tokens={self.total_input_tokens} \n"
+        stats += f"total_output_tokens={self.total_output_tokens} \n"
         for outer_idx, physical_op_stats in enumerate(self.operator_stats.values()):
             total_time = sum([op_stats.total_op_time for op_stats in physical_op_stats.values()])
             total_cost = sum([op_stats.total_op_cost for op_stats in physical_op_stats.values()])
@@ -564,6 +626,8 @@ class SentinelPlanStats(BasePlanStats):
             },
             "total_plan_time": self.total_plan_time,
             "total_plan_cost": self.total_plan_cost,
+            "total_input_tokens": self.total_input_tokens,
+            "total_output_tokens": self.total_output_tokens,
         }
 
 
@@ -599,6 +663,15 @@ class ExecutionStats:
 
     # total cost for the entire execution
     total_execution_cost: float = 0.0
+
+    # total number of input tokens processed
+    total_input_tokens: int = 0
+
+    # total number of output tokens processed
+    total_output_tokens: int = 0
+
+    # total number of tokens processed
+    total_tokens: int = 0
 
     # dictionary of sentinel plan strings; useful for printing executed sentinel plans in demos
     sentinel_plan_strs: dict[str, str] = field(default_factory=dict)
@@ -647,6 +720,11 @@ class ExecutionStats:
         self.plan_execution_cost = self.sum_plan_costs()
         self.total_execution_cost = self.optimization_cost + self.plan_execution_cost
 
+        # compute the tokens for total execution
+        self.total_input_tokens = self.sum_input_tokens()
+        self.total_output_tokens = self.sum_output_tokens()
+        self.total_tokens = self.total_input_tokens + self.total_output_tokens
+
         # compute plan_strs
         self.plan_strs = {plan_id: plan_stats.plan_str for plan_id, plan_stats in self.plan_stats.items()}
 
@@ -661,6 +739,22 @@ class ExecutionStats:
         Sum the costs of all PhysicalPlans in this execution.
         """
         return sum([plan_stats.sum_op_costs() for _, plan_stats in self.plan_stats.items()])
+
+    def sum_input_tokens(self) -> int:
+        """
+        Sum the input tokens processed in this execution
+        """
+        sentinel_plan_input_tokens = sum([plan_stats.sum_input_tokens() for _, plan_stats in self.sentinel_plan_stats.items()])
+        plan_input_tokens = sum([plan_stats.sum_input_tokens() for _, plan_stats in self.plan_stats.items()])
+        return plan_input_tokens + sentinel_plan_input_tokens
+
+    def sum_output_tokens(self) -> int:
+        """
+        Sum the output tokens processed in this execution
+        """
+        sentinel_plan_output_tokens = sum([plan_stats.sum_output_tokens() for _, plan_stats in self.sentinel_plan_stats.items()])
+        plan_output_tokens = sum([plan_stats.sum_output_tokens() for _, plan_stats in self.plan_stats.items()])
+        return plan_output_tokens + sentinel_plan_output_tokens
 
     def add_plan_stats(self, plan_stats: PlanStats | SentinelPlanStats | list[PlanStats] | list[SentinelPlanStats]) -> None:
         """
@@ -712,6 +806,9 @@ class ExecutionStats:
             "plan_execution_cost": self.plan_execution_cost,
             "total_execution_time": self.total_execution_time,
             "total_execution_cost": self.total_execution_cost,
+            "total_input_tokens": self.total_input_tokens,
+            "total_output_tokens": self.total_output_tokens,
+            "total_tokens": self.total_tokens,
             "sentinel_plan_strs": self.sentinel_plan_strs,
             "plan_strs": self.plan_strs,
         }
