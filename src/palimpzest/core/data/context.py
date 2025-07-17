@@ -1,14 +1,19 @@
 from __future__ import annotations
 
 import os
+import re
 from abc import ABC
 from typing import Callable
 
+import litellm
 import pandas as pd
 
+from palimpzest.constants import Cardinality, Model, PromptStrategy
 from palimpzest.core.data import context_manager
 from palimpzest.core.data.dataset import Dataset
-from palimpzest.core.lib.schemas import Schema
+from palimpzest.core.elements.records import DataRecord
+from palimpzest.core.lib.schemas import Schema, TextFile
+from palimpzest.prompts.prompt_factory import PromptFactory
 from palimpzest.query.operators.logical import ComputeOperator, ContextScan, LogicalOperator, SearchOperator
 from palimpzest.utils.hash_helpers import hash_for_id
 
@@ -165,6 +170,50 @@ class TextFileContext(Context):
             schema=schema,
             materialized=True,
         )
+    def _check_filter_answer_text(self, answer_text: str) -> dict | None:
+        """
+        Return {"passed_operator": True} if and only if "true" is in the answer text.
+        Return {"passed_operator": False} if and only if "false" is in the answer text.
+        Otherwise, return None.
+        """
+        # NOTE: we may be able to eliminate this condition by specifying this JSON output in the prompt;
+        # however, that would also need to coincide with a change to allow the parse_answer_fn to set "passed_operator"
+        if "true" in answer_text.lower():
+            return {"passed_operator": True}
+        elif "false" in answer_text.lower():
+            return {"passed_operator": False}
+        elif "yes" in answer_text.lower():
+            return {"passed_operator": True}
+
+        return None
+
+    def _parse_filter_answer(self, completion_text: str) -> dict[str, list]:
+        """Extract the answer from the completion object for filter operations."""
+        # if the model followed the default instructions, the completion text will place
+        # its answer between "ANSWER:" and "---"
+        regex = re.compile("answer:(.*?)---", re.IGNORECASE | re.DOTALL)
+        matches = regex.findall(completion_text)
+        if len(matches) > 0:
+            answer_text = matches[0].strip()
+            field_answers = self._check_filter_answer_text(answer_text)
+            if field_answers is not None:
+                return field_answers
+
+        # if the first regex didn't find an answer, try taking all the text after "ANSWER:"
+        regex = re.compile("answer:(.*)", re.IGNORECASE | re.DOTALL)
+        matches = regex.findall(completion_text)
+        if len(matches) > 0:
+            answer_text = matches[0].strip()
+            field_answers = self._check_filter_answer_text(answer_text)
+            if field_answers is not None:
+                return field_answers
+
+        # finally, try taking all of the text; throw an exception if this doesn't work
+        field_answers = self._check_filter_answer_text(completion_text)
+        if field_answers is None:
+            raise Exception(f"Could not parse answer from completion text: {completion_text}")
+
+        return field_answers
 
     def tool_list_filepaths(self) -> list[str]:
         """
@@ -181,7 +230,7 @@ class TextFileContext(Context):
     def tool_read_filepath(self, path: str) -> str:
         """
         This tool takes a filepath (`path`) as input and returns the content of the file as a string.
-        It handles both CSV files and html / regular text files.
+        It handles both CSV files and html / regular text files. It does not handle images.
 
         Args:
             path (str): The path to the file to read.
@@ -196,3 +245,32 @@ class TextFileContext(Context):
             content = file.read()
 
         return content
+
+    # def tool_sem_filter(self, path: str, question: str) -> bool:
+    #     """
+    #     This tool takes a filepath (`path`) and a True/False `question` about the file as input
+    #     and returns True if the answer to the question is True, and False otherwise.
+
+    #     Args:
+    #         path (str): The path to the file to read.
+    #         question (str): The true/false question to ask about the file
+
+    #     Returns:
+    #         bool: True if the question about the file is True, and False otherwise.
+    #     """
+    #     # TODO: handle images
+    #     # create DataRecord with file content
+    #     dr = DataRecord(schema=TextFile, source_idx=0)
+    #     dr.filename = os.path.basename(path)
+    #     dr.contents = self.tool_read_filepath(path)
+
+    #     # call prompt factory to generate messages
+    #     prompt_factory = PromptFactory(PromptStrategy.COT_BOOL, Model.GPT_4o_MINI, Cardinality.ONE_TO_ONE)
+    #     messages = prompt_factory.create_messages(dr, ["answer"], **{"filter_condition": question})
+
+    #     # generate output with litellm
+    #     output = litellm.completion(model="openai/gpt-4o-mini-2024-07-18", messages=messages)
+    #     output = output.choices[0].message.content
+
+    #     # parse output
+    #     return self._parse_filter_answer(output)["passed_operator"]

@@ -36,7 +36,7 @@ from palimpzest.query.operators.project import ProjectOp
 from palimpzest.query.operators.rag_convert import RAGConvert
 from palimpzest.query.operators.retrieve import RetrieveOp
 from palimpzest.query.operators.scan import CacheScanDataOp, ContextScanOp, MarshalAndScanDataOp
-from palimpzest.query.operators.search import SmolAgentsManagedSearch  # SmolAgentsSearch
+from palimpzest.query.operators.search import SmolAgentsCustomManagedSearch  # SmolAgentsManagedSearch  # SmolAgentsSearch
 from palimpzest.query.operators.split_convert import SplitConvert
 from palimpzest.query.optimizer.primitives import Expression, Group, LogicalExpression, PhysicalExpression
 from palimpzest.utils.model_helpers import get_models, get_vision_models
@@ -1093,7 +1093,7 @@ class BasicSubstitutionRule(ImplementationRule):
         BaseScan: MarshalAndScanDataOp,
         CacheScan: CacheScanDataOp,
         # ComputeOperator: SmolAgentsCompute,
-        SearchOperator: SmolAgentsManagedSearch, # SmolAgentsSearch,
+        SearchOperator: SmolAgentsCustomManagedSearch, # SmolAgentsManagedSearch, # SmolAgentsSearch,
         ContextScan: ContextScanOp,
         LimitScan: LimitScanOp,
         Project: ProjectOp,

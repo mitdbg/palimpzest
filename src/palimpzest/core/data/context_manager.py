@@ -5,6 +5,7 @@ import pickle
 
 import chromadb
 import chromadb.utils.embedding_functions as embedding_functions
+import tiktoken
 
 from palimpzest.constants import PZ_DIR
 from palimpzest.core.data import context
@@ -54,6 +55,12 @@ class ContextManager:
         with open(path, "wb") as f:
             pickle.dump(context, f)
 
+    def num_tokens_from_string(self, string: str, encoding_name: str) -> int:
+        """Returns the number of tokens in a text string."""
+        encoding = tiktoken.get_encoding(encoding_name)
+        num_tokens = len(encoding.encode(string))
+        return num_tokens
+
     def add_context(self, context: context.Context, update: bool = False) -> None:
         """
         Add the new `Context` to the `ContextManager` by serializing and writing it to disk.
@@ -73,8 +80,13 @@ class ContextManager:
         # write the context to disk
         ContextManager.to_pkl(context, context_path)
 
+        # compute number of tokens in context.description
+        description = context.description
+        while self.num_tokens_from_string(description, "cl100k_base") > 8192:
+            description = description[:int(0.9*len(description))]
+ 
         # add context to vector store
-        context_embeddings = self.emb_fn([context.description])
+        context_embeddings = self.emb_fn([description])
         context_payload = {
             "ids": [context.id],
             "embeddings": context_embeddings,

@@ -5,9 +5,10 @@ import time
 from typing import Any, Optional
 
 from mem0 import Memory
-from smolagents import CodeAgent, LiteLLMModel, Tool, ToolCallingAgent, tool
+from smolagents import CodeAgent, LiteLLMModel, Tool, tool
 from smolagents.models import MessageRole, Model
 
+from palimpzest.agents.search_agents import DataDiscoveryAgent, SearchManagerAgent
 from palimpzest.core.data.context import Context
 from palimpzest.core.data.context_manager import ContextManager
 from palimpzest.core.data.dataclasses import GenerationStats, OperatorCostEstimates, RecordOpStats
@@ -304,6 +305,7 @@ class SmolAgentsManagedSearch(PhysicalOperator):
         self.search_query = search_query
         # self.model_id = "anthropic/claude-3-7-sonnet-latest"
         self.model_id = "openai/gpt-4o-mini-2024-07-18"
+        # self.model_id = "o1"
         model_params = {
             "model_id": self.model_id,
             "custom_role_conversions": {"tool-call": "assistant", "tool-response": "user"},
@@ -417,12 +419,12 @@ class SmolAgentsManagedSearch(PhysicalOperator):
             return memory_str
 
         # tools.append(tool_search_history)
-        data_discovery_agent = ToolCallingAgent(
+        data_discovery_agent = CodeAgent(
             model=self.model,
             tools=tools,
             max_steps=20,
             verbosity_level=2,
-            # planning_interval=5,
+            planning_interval=4,
             name="data_discovery_agent",
             description="""A team member that will search a data repository to find files which help to answer your question.
         Ask him for all your questions that require searching a repository of relevant data.
@@ -436,7 +438,7 @@ class SmolAgentsManagedSearch(PhysicalOperator):
 
         manager_agent = CodeAgent(
             model=self.model,
-            tools=[visualizer, ], # TextInspectorTool(self.model, self.text_limit)],
+            tools=tools, # [visualizer, ], # TextInspectorTool(self.model, self.text_limit)],
             max_steps=12,
             verbosity_level=2,
             additional_authorized_imports=["*"],
@@ -453,8 +455,155 @@ class SmolAgentsManagedSearch(PhysicalOperator):
         response = result.output
         input_tokens = result.token_usage.input_tokens
         output_tokens = result.token_usage.output_tokens
-        cost_per_input_token = (3.0 / 1e6) if "anthropic" in self.model_id else (0.15 / 1e6)
-        cost_per_output_token = (15.0 / 1e6) if "anthropic" in self.model_id else (0.6 / 1e6)
+        cost_per_input_token = (3.0 / 1e6) if "anthropic" in self.model_id else (0.15 / 1e6) # (15.0 / 1e6)
+        cost_per_output_token = (15.0 / 1e6) if "anthropic" in self.model_id else (0.6 / 1e6) # (60.0 / 1e6)
+        input_cost = input_tokens * cost_per_input_token
+        output_cost = output_tokens * cost_per_output_token
+        generation_stats = GenerationStats(
+            model_name=self.model_id,
+            total_input_tokens=input_tokens,
+            total_output_tokens=output_tokens,
+            total_input_cost=input_cost,
+            total_output_cost=output_cost,
+            cost_per_record=input_cost + output_cost,
+            llm_call_duration_secs=time.time() - start_time,
+        )
+
+        # update the description of the Context to include the search result
+        new_description = f"RESULT: {response}\n\n"
+        cm = ContextManager()
+        cm.update_context(id=self.context_id, description=new_description)
+
+        # create and return record set
+        field_answers = {
+            "context": cm.get_context(id=self.context_id),
+        }
+        record_set = self._create_record_set(
+            candidate,
+            generation_stats,
+            time.time() - start_time,
+            field_answers,
+        )
+
+        return record_set
+
+
+class SmolAgentsCustomManagedSearch(PhysicalOperator):
+    """
+    Physical operator for searching with Smol Agents using an Orchestrator and a Data Discovery Agent.
+    """
+    def __init__(self, context_id: str, search_query: str, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.context_id = context_id
+        self.search_query = search_query
+        # self.model_id = "anthropic/claude-3-7-sonnet-latest"
+        self.model_id = "openai/gpt-4o-mini-2024-07-18"
+        # self.model_id = "o1"
+        model_params = {
+            "model_id": self.model_id,
+            "custom_role_conversions": {"tool-call": "assistant", "tool-response": "user"},
+            "max_completion_tokens": 8192,
+        }
+        if self.model_id == "o1":
+            model_params["reasoning_effort"] = "high"
+        self.model = LiteLLMModel(**model_params)
+        self.text_limit = 100000
+        self.memory = Memory()
+
+    def __str__(self):
+        op = super().__str__()
+        op += f"    Context ID: {self.context_id:20s}\n"
+        op += f"    Search Query: {self.search_query:20s}\n"
+        return op
+
+    def get_id_params(self):
+        id_params = super().get_id_params()
+        return {
+            "context_id": self.context_id,
+            "search_query": self.search_query,
+            **id_params,
+        }
+
+    def get_op_params(self):
+        op_params = super().get_op_params()
+        return {
+            "context_id": self.context_id,
+            "search_query": self.search_query,
+            **op_params,
+        }
+
+    def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
+        return OperatorCostEstimates(
+            cardinality=source_op_cost_estimates.cardinality,
+            time_per_record=100,
+            cost_per_record=1,
+            quality=1.0,
+        )
+
+    def _create_record_set(
+        self,
+        candidate: DataRecord,
+        generation_stats: GenerationStats,
+        total_time: float,
+        answer: dict[str, Any],
+    ) -> DataRecordSet:
+        """
+        Given an input DataRecord and a determination of whether it passed the filter or not,
+        construct the resulting RecordSet.
+        """
+        # create new DataRecord and set passed_operator attribute
+        dr = DataRecord.from_parent(self.output_schema, parent_record=candidate)
+        for field in self.output_schema.field_names():
+            if field in answer:
+                dr[field] = answer[field]
+
+        # create RecordOpStats object
+        record_op_stats = RecordOpStats(
+            record_id=dr.id,
+            record_parent_id=dr.parent_id,
+            record_source_idx=dr.source_idx,
+            record_state=dr.to_dict(include_bytes=False),
+            full_op_id=self.get_full_op_id(),
+            logical_op_id=self.logical_op_id,
+            op_name=self.op_name(),
+            time_per_record=total_time,
+            cost_per_record=generation_stats.cost_per_record,
+            model_name=self.get_model_name(),
+            total_input_tokens=generation_stats.total_input_tokens,
+            total_output_tokens=generation_stats.total_output_tokens,
+            total_input_cost=generation_stats.total_input_cost,
+            total_output_cost=generation_stats.total_output_cost,
+            llm_call_duration_secs=generation_stats.llm_call_duration_secs,
+            fn_call_duration_secs=generation_stats.fn_call_duration_secs,
+            total_llm_calls=generation_stats.total_llm_calls,
+            total_embedding_llm_calls=generation_stats.total_embedding_llm_calls,
+            answer={k: v.description if isinstance(v, Context) else v for k, v in answer.items()},
+            op_details={k: str(v) for k, v in self.get_id_params().items()},
+        )
+
+        return DataRecordSet([dr], [record_op_stats])
+
+    def __call__(self, candidate: DataRecord) -> Any:
+        start_time = time.time()
+
+        # get the input context object and its tools
+        input_context: Context = candidate.context
+        description = input_context.description
+        tools = [tool(make_tool(f)) for f in input_context.tools] + [visualizer]
+
+        # TODO: add semantic operators to tools
+        data_discovery_agent = DataDiscoveryAgent(self.context_id, description, model=self.model, tools=tools)
+        search_manager_agent = SearchManagerAgent(self.context_id, description, model=self.model, tools=tools, managed_agents=[data_discovery_agent])
+
+        # perform the computation
+        result = search_manager_agent.run(self.search_query)
+
+        # compute generation stats
+        response = result.output
+        input_tokens = result.token_usage.input_tokens
+        output_tokens = result.token_usage.output_tokens
+        cost_per_input_token = (3.0 / 1e6) if "anthropic" in self.model_id else (0.15 / 1e6) # (15.0 / 1e6)
+        cost_per_output_token = (15.0 / 1e6) if "anthropic" in self.model_id else (0.6 / 1e6) # (60.0 / 1e6)
         input_cost = input_tokens * cost_per_input_token
         output_cost = output_tokens * cost_per_output_token
         generation_stats = GenerationStats(

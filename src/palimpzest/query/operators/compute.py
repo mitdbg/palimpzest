@@ -11,7 +11,9 @@ from palimpzest.core.data.context_manager import ContextManager
 from palimpzest.core.data.dataclasses import GenerationStats, OperatorCostEstimates, RecordOpStats
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.query.operators.physical import PhysicalOperator
+from palimpzest.utils.visualizer import visualizer
 
+# TODO: need to store final executed code in compute() operator so that humans can debug when human-in-the-loop
 
 def make_tool(bound_method):
     # Get the original function and bound instance
@@ -129,7 +131,7 @@ class SmolAgentsCompute(PhysicalOperator):
         # get the input context object and its tools
         input_context: Context = candidate.context
         description = input_context.description
-        tools = [tool(make_tool(f)) for f in input_context.tools]
+        tools = [tool(make_tool(f)) for f in input_context.tools] + [visualizer]
 
         # update the description to include any additional contexts
         for ctx in self.additional_contexts:
@@ -141,7 +143,13 @@ class SmolAgentsCompute(PhysicalOperator):
 
         # perform the computation
         instructions = f"\n\nHere is a description of the Context whose data you will be working with, as well as any previously computed results:\n\n{description}"
-        agent = CodeAgent(tools=tools, model=self.model, add_base_tools=False, instructions=instructions, return_full_result=True)
+        agent = CodeAgent(
+            tools=tools,
+            model=self.model,
+            add_base_tools=False,
+            instructions=instructions,
+            return_full_result=True,
+        )
         result = agent.run(self.instruction)
         # NOTE: you can see the system prompt with `agent.memory.system_prompt.system_prompt`
         # full_steps = agent.memory.get_full_steps()

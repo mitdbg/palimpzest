@@ -38,13 +38,12 @@ def legal_easy_3(iter):
         # use_context="identity_theft_reports_2024_2021",
         # type=float,
     )
-    ds = ds.sem_add_columns(
-        cols=[{"name": "final_answer", "type": float, "desc": "The ratio of identity theft reports in 2024 vs 2001; output None if the answer cannot be determined"}]
-    )
     out = ds.run(processing_strategy="no_sentinel", progress=False)
-    out.to_df().to_csv(f"krama-results/legal-easy-3-{iter}.csv", index=False)
+    df = out.to_df()
+    df.to_csv(f"krama-results/legal-easy-3-{iter}.csv", index=False)
 
-    return out.to_df().iloc[0]['final_answer']
+    result_col = [col for col in df.columns if "result" in col][0]
+    return df.iloc[0][result_col]
 
 
 def execute_legal_iso():
