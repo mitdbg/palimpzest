@@ -3,9 +3,9 @@ import time
 import pytest
 
 from palimpzest.constants import Cardinality, Model
-from palimpzest.core.data.dataclasses import OperatorCostEstimates, PlanCost
 from palimpzest.core.elements.filters import Filter
 from palimpzest.core.lib.schemas import TextFile
+from palimpzest.core.models import OperatorCostEstimates, PlanCost
 from palimpzest.policy import MaxQuality, MinCost, MinTime
 from palimpzest.query.operators.code_synthesis_convert import CodeSynthesisConvert
 from palimpzest.query.operators.convert import LLMConvert, LLMConvertBonded
@@ -31,7 +31,7 @@ class TestPrimitives:
         LogicalExpression(
             operator=filter1_op,
             input_group_ids=[0],
-            input_fields={"contents": TextFile.field_map()["contents"]},
+            input_fields={"contents": TextFile.model_fields["contents"]},
             depends_on_field_names=set(["contents"]),
             generated_fields={},
             group_id=None,
@@ -46,7 +46,7 @@ class TestPrimitives:
         filter2_expr = LogicalExpression(
             operator=filter2_op,
             input_group_ids=[1],
-            input_fields={"contents": TextFile.field_map()["contents"]},
+            input_fields={"contents": TextFile.model_fields["contents"]},
             depends_on_field_names=set(["contents"]),
             generated_fields={},
             group_id=None,
@@ -61,11 +61,11 @@ class TestPrimitives:
         convert_expr = LogicalExpression(
             operator=convert_op,
             input_group_ids=[2],
-            input_fields={"contents": TextFile.field_map()["contents"]},
+            input_fields={"contents": TextFile.model_fields["contents"]},
             depends_on_field_names=set(["contents"]),
             generated_fields={
-                "sender": email_schema.field_map()["sender"],
-                "subject": email_schema.field_map()["subject"],
+                "sender": email_schema.model_fields["sender"],
+                "subject": email_schema.model_fields["subject"],
             },
             group_id=None,
         )
@@ -75,10 +75,10 @@ class TestPrimitives:
         g1 = Group(
             logical_expressions=[convert_expr],
             fields={
-                "sender": email_schema.field_map()["sender"],
-                "subject": email_schema.field_map()["subject"],
-                "contents": TextFile.field_map()["contents"],
-                "filename": TextFile.field_map()["filename"],
+                "sender": email_schema.model_fields["sender"],
+                "subject": email_schema.model_fields["subject"],
+                "contents": TextFile.model_fields["contents"],
+                "filename": TextFile.model_fields["filename"],
             },
             properties=g1_properties,
         )
@@ -88,10 +88,10 @@ class TestPrimitives:
         g2 = Group(
             logical_expressions=[filter2_expr],
             fields={
-                "sender": email_schema.field_map()["sender"],
-                "subject": email_schema.field_map()["subject"],
-                "contents": TextFile.field_map()["contents"],
-                "filename": TextFile.field_map()["filename"],
+                "sender": email_schema.model_fields["sender"],
+                "subject": email_schema.model_fields["subject"],
+                "contents": TextFile.model_fields["contents"],
+                "filename": TextFile.model_fields["filename"],
             },
             properties=g2_properties,
         )

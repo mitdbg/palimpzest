@@ -2,15 +2,16 @@ from __future__ import annotations
 
 import math
 
+from pydantic.fields import FieldInfo
+
 from palimpzest.constants import (
     MODEL_CARDS,
     NAIVE_EST_NUM_INPUT_TOKENS,
     NAIVE_EST_NUM_OUTPUT_TOKENS,
     PromptStrategy,
 )
-from palimpzest.core.data.dataclasses import GenerationStats, OperatorCostEstimates
 from palimpzest.core.elements.records import DataRecord
-from palimpzest.core.lib.fields import Field, StringField
+from palimpzest.core.models import GenerationStats, OperatorCostEstimates
 from palimpzest.query.generators.generators import generator_factory
 from palimpzest.query.operators.convert import LLMConvert
 
@@ -103,8 +104,8 @@ class SplitConvert(LLMConvert):
             content = candidate[field_name]
 
             # do not chunk this field if it is not a string or a list of strings
-            is_string_field = isinstance(field, StringField)
-            is_list_string_field = hasattr(field, "element_type") and isinstance(field.element_type, StringField)
+            is_string_field = field.annotation in [str, str | None]
+            is_list_string_field = field.annotation in [list[str], list[str] | None]
             if not (is_string_field or is_list_string_field):
                 field_name_to_chunked_content[field_name] = [content]
                 continue
@@ -136,7 +137,7 @@ class SplitConvert(LLMConvert):
 
         return candidates
 
-    def convert(self, candidate: DataRecord, fields: dict[str, Field]) -> tuple[dict[str, list], GenerationStats]:
+    def convert(self, candidate: DataRecord, fields: dict[str, FieldInfo]) -> tuple[dict[str, list], GenerationStats]:
         # get the set of input fields to use for the convert operation
         input_fields = self.get_input_fields()
 

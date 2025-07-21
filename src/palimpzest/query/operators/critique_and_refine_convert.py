@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
+from pydantic.fields import FieldInfo
+
 from palimpzest.constants import MODEL_CARDS, Model, PromptStrategy
-from palimpzest.core.data.dataclasses import GenerationStats, OperatorCostEstimates
 from palimpzest.core.elements.records import DataRecord
+from palimpzest.core.models import GenerationStats, OperatorCostEstimates
 from palimpzest.query.generators.generators import generator_factory
 from palimpzest.query.operators.convert import LLMConvert
 
@@ -86,7 +88,7 @@ class CriticAndRefineConvert(LLMConvert):
 
         return naive_op_cost_estimates
 
-    def convert(self, candidate: DataRecord, fields: list[str]) -> tuple[dict[FieldName, list[Any]], GenerationStats]:
+    def convert(self, candidate: DataRecord, fields: dict[str, FieldInfo]) -> tuple[dict[FieldName, list[Any]], GenerationStats]:
         # get input fields
         input_fields = self.get_input_fields()
 

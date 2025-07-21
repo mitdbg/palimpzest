@@ -10,8 +10,8 @@ from smolagents import CodeAgent, LiteLLMModel, tool
 from palimpzest.agents.search_agents import DataDiscoveryAgent, SearchManagerAgent
 from palimpzest.core.data.context import Context
 from palimpzest.core.data.context_manager import ContextManager
-from palimpzest.core.data.dataclasses import GenerationStats, OperatorCostEstimates, RecordOpStats
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
+from palimpzest.core.models import GenerationStats, OperatorCostEstimates, RecordOpStats
 from palimpzest.query.operators.physical import PhysicalOperator
 
 
@@ -92,7 +92,7 @@ class SmolAgentsSearch(PhysicalOperator):
         """
         # create new DataRecord and set passed_operator attribute
         dr = DataRecord.from_parent(self.output_schema, parent_record=candidate)
-        for field in self.output_schema.field_names():
+        for field in self.output_schema.model_fields:
             if field in answer:
                 dr[field] = answer[field]
 
@@ -242,7 +242,7 @@ class SmolAgentsManagedSearch(PhysicalOperator):
         """
         # create new DataRecord and set passed_operator attribute
         dr = DataRecord.from_parent(self.output_schema, parent_record=candidate)
-        for field in self.output_schema.field_names():
+        for field in self.output_schema.model_fields:
             if field in answer:
                 dr[field] = answer[field]
 
@@ -435,7 +435,7 @@ class SmolAgentsCustomManagedSearch(PhysicalOperator):
         """
         # create new DataRecord and set passed_operator attribute
         dr = DataRecord.from_parent(self.output_schema, parent_record=candidate)
-        for field in self.output_schema.field_names():
+        for field in self.output_schema.model_fields:
             if field in answer:
                 dr[field] = answer[field]
 

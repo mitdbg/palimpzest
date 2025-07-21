@@ -1,15 +1,16 @@
+from typing import Any
+
 import pandas as pd
 import pytest
+from pydantic import BaseModel, Field
 
 from palimpzest.core.elements.records import DataRecord
-from palimpzest.core.lib.fields import Field
-from palimpzest.core.lib.schemas import Schema
 
 
 # Example test schema
-class TestSchema(Schema):
-    name = Field(desc="Test name field")
-    value = Field(desc="Test value field")
+class TestSchema(BaseModel):
+    name: str = Field(description="Test name field")
+    value: Any = Field(description="Test value field")
 
 
 class TestDataRecord:
@@ -65,8 +66,8 @@ class TestDataRecord:
         """Test auto-schema generation from DataFrame"""
         records = DataRecord.from_df(sample_df)  # No schema provided
         assert len(records) == 2
-        assert hasattr(records[0].schema, 'name')
-        assert hasattr(records[0].schema, 'value')
+        assert 'name' in records[0].schema.model_fields
+        assert 'value' in records[0].schema.model_fields
 
     def test_invalid_attribute(self, sample_record):
         """Test accessing non-existent attribute"""

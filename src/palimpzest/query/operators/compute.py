@@ -8,8 +8,8 @@ from smolagents import CodeAgent, LiteLLMModel, tool
 
 from palimpzest.core.data.context import Context
 from palimpzest.core.data.context_manager import ContextManager
-from palimpzest.core.data.dataclasses import GenerationStats, OperatorCostEstimates, RecordOpStats
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
+from palimpzest.core.models import GenerationStats, OperatorCostEstimates, RecordOpStats
 from palimpzest.query.operators.physical import PhysicalOperator
 
 # TODO: need to store final executed code in compute() operator so that humans can debug when human-in-the-loop
@@ -94,7 +94,7 @@ class SmolAgentsCompute(PhysicalOperator):
         """
         # create new DataRecord and set passed_operator attribute
         dr = DataRecord.from_parent(self.output_schema, parent_record=candidate)
-        for field in self.output_schema.field_names():
+        for field in self.output_schema.model_fields:
             if field in answer:
                 dr[field] = answer[field]
 

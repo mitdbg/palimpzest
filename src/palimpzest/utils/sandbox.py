@@ -96,7 +96,7 @@ class API:
     def from_task_descriptor(cls, td, field_name, input_fields=None):
         name, inputs, outputs = "extraction", list(), list()
         if input_fields is None:
-            input_fields = td.input_schema.field_names()
+            input_fields = list(td.input_schema.model_fields)
         for input_field_name in input_fields:
             inputs.append({"name": input_field_name, "desc": getattr(td.input_schema, input_field_name).desc})
         outputs = [{"name": field_name, "desc": getattr(td.output_schema, field_name).desc}]
@@ -106,7 +106,7 @@ class API:
     def from_input_output_schemas(cls, input_schema, output_schema, field_name, input_fields=None):
         name, inputs, outputs = "extraction", list(), list()
         if input_fields is None:
-            input_fields = input_schema.field_names()
+            input_fields = list(input_schema.model_fields)
         for input_field_name in input_fields:
             inputs.append({"name": input_field_name, "desc": getattr(input_schema, input_field_name).desc})
         outputs = [{"name": field_name, "desc": getattr(output_schema, field_name).desc}]

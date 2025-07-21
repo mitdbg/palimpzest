@@ -4,6 +4,8 @@ import time
 from abc import ABC, abstractmethod
 from typing import Callable
 
+from pydantic.fields import FieldInfo
+
 from palimpzest.constants import (
     MODEL_CARDS,
     NAIVE_EST_NUM_INPUT_TOKENS,
@@ -13,9 +15,8 @@ from palimpzest.constants import (
     Model,
     PromptStrategy,
 )
-from palimpzest.core.data.dataclasses import GenerationStats, OperatorCostEstimates, RecordOpStats
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
-from palimpzest.core.lib.fields import Field
+from palimpzest.core.models import GenerationStats, OperatorCostEstimates, RecordOpStats
 from palimpzest.query.generators.generators import generator_factory
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.utils.model_helpers import get_vision_models
@@ -78,8 +79,8 @@ class ConvertOp(PhysicalOperator, ABC):
                 setattr(dr, field, getattr(candidate, field))
 
             # get input field names and output field names
-            input_fields = self.input_schema.field_names()
-            output_fields = self.output_schema.field_names()
+            input_fields = list(self.input_schema.model_fields)
+            output_fields = list(self.output_schema.model_fields)
 
             # parse newly generated fields from the field_answers dictionary for this field; if the list
             # of generated values is shorter than the number of records, we fill in with None
@@ -122,7 +123,7 @@ class ConvertOp(PhysicalOperator, ABC):
                 cost_per_record=per_record_stats.cost_per_record,
                 model_name=self.get_model_name(),
                 answer={field_name: getattr(dr, field_name) for field_name in field_names},
-                input_fields=self.input_schema.field_names(),
+                input_fields=list(self.input_schema.model_fields),
                 generated_fields=field_names,
                 total_input_tokens=per_record_stats.total_input_tokens,
                 total_output_tokens=per_record_stats.total_output_tokens,
@@ -148,7 +149,7 @@ class ConvertOp(PhysicalOperator, ABC):
         pass
 
     @abstractmethod
-    def convert(self, candidate: DataRecord, fields: dict[str, Field]) -> tuple[dict[str, list], GenerationStats]:
+    def convert(self, candidate: DataRecord, fields: dict[str, FieldInfo]) -> tuple[dict[str, list], GenerationStats]:
         """
         This abstract method will be implemented by subclasses of ConvertOp to process the input DataRecord
         and generate the value(s) for each of the specified fields. If the convert operator is a one-to-many
@@ -182,7 +183,7 @@ class ConvertOp(PhysicalOperator, ABC):
 
         # execute the convert
         field_answers: dict[str, list]
-        fields = {field: field_type for field, field_type in self.output_schema.field_map().items() if field in fields_to_generate}
+        fields = {field: field_type for field, field_type in self.output_schema.model_fields.items() if field in fields_to_generate}
         field_answers, generation_stats = self.convert(candidate=candidate, fields=fields)
         assert all([field in field_answers for field in fields_to_generate]), "Not all fields were generated!"
 
@@ -235,7 +236,7 @@ class NonLLMConvert(ConvertOp):
             quality=1.0,
         )
 
-    def convert(self, candidate: DataRecord, fields: dict[str, Field]) -> tuple[dict[str, list], GenerationStats]:
+    def convert(self, candidate: DataRecord, fields: dict[str, FieldInfo]) -> tuple[dict[str, list], GenerationStats]:
         # apply UDF to input record
         start_time = time.time()
         field_answers = {}
@@ -361,7 +362,7 @@ class LLMConvert(ConvertOp):
 
 class LLMConvertBonded(LLMConvert):
 
-    def convert(self, candidate: DataRecord, fields: dict[str, Field]) -> tuple[dict[str, list], GenerationStats]:
+    def convert(self, candidate: DataRecord, fields: dict[str, FieldInfo]) -> tuple[dict[str, list], GenerationStats]:
         # get the set of input fields to use for the convert operation
         input_fields = self.get_input_fields()
 

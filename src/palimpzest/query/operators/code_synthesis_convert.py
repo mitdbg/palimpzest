@@ -3,8 +3,8 @@ from __future__ import annotations
 from typing import Any
 
 from palimpzest.constants import Cardinality, GPT_4o_MODEL_CARD, Model
-from palimpzest.core.data.dataclasses import GenerationStats, OperatorCostEstimates
 from palimpzest.core.elements.records import DataRecord
+from palimpzest.core.models import GenerationStats, OperatorCostEstimates
 from palimpzest.prompts import ADVICEGEN_PROMPT, CODEGEN_PROMPT, EXAMPLE_PROMPT
 from palimpzest.query.generators.generators import code_ensemble_execution, generator_factory
 from palimpzest.query.operators.convert import LLMConvert, LLMConvertBonded

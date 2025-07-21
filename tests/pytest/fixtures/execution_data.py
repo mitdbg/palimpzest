@@ -1,9 +1,9 @@
 import pytest
 
 from palimpzest.constants import Model
-from palimpzest.core.data.dataclasses import RecordOpStats
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.core.lib.schemas import TextFile
+from palimpzest.core.models import RecordOpStats
 
 
 # NOTE: technically the filter should process 10 outputs 3x times

@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from palimpzest.core.data.dataclasses import PlanCost
+from palimpzest.core.models import PlanCost
 from palimpzest.policy import Policy
 from palimpzest.query.optimizer.cost_model import BaseCostModel
 from palimpzest.query.optimizer.optimizer_strategy_type import OptimizationStrategyType

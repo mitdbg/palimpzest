@@ -3,9 +3,11 @@ from __future__ import annotations
 import logging
 from copy import deepcopy
 
+from pydantic.fields import FieldInfo
+
 from palimpzest.constants import Model
 from palimpzest.core.data.dataset import Dataset
-from palimpzest.core.lib.fields import Field
+from palimpzest.core.lib.schemas import get_schema_field_names
 from palimpzest.policy import Policy
 from palimpzest.query.operators.logical import (
     ComputeOperator,
@@ -205,15 +207,12 @@ class Optimizer:
         optimizer_strategy_cls = optimizer_strategy.value
         self.strategy = optimizer_strategy_cls()
 
-    def construct_group_tree(self, dataset_nodes: list[Dataset]) -> tuple[list[int], dict[str, Field], dict[str, set[str]]]:
+    def construct_group_tree(self, dataset_nodes: list[Dataset]) -> tuple[list[int], dict[str, FieldInfo], dict[str, set[str]]]:
         logger.debug(f"Constructing group tree for dataset_nodes: {dataset_nodes}")
-        # TODO: debug group tree construction
         # get node
         node = dataset_nodes[-1]
 
         ### convert node --> Group ###
-        uid = node.id
-
         # create the op for the given node
         op = node._operator
 
@@ -227,9 +226,9 @@ class Optimizer:
             map(lambda full_field: full_field.split(".")[-1], input_group_fields.keys())
         )
         new_fields = {
-            field_name: field
-            for field_name, field in op.output_schema.field_map(unique=True, id=uid).items()
-            if (field_name.split(".")[-1] not in input_group_short_field_names) or (hasattr(node._operator, "udf") and node._operator.udf is not None)
+            field_name: op.output_schema.model_fields[field_name.split(".")[-1]]
+            for field_name in get_schema_field_names(op.output_schema, id=node.id)
+            if (field_name not in input_group_short_field_names) or (hasattr(node._operator, "udf") and node._operator.udf is not None)
         }
         all_fields = {**input_group_fields, **new_fields}
 
@@ -326,8 +325,8 @@ class Optimizer:
         short_to_full_field_name = {}
         for node_idx, node in enumerate(dataset_nodes):
             # update mapping from short to full field names
-            short_field_names = node.schema.field_names()
-            full_field_names = node.schema.field_names(unique=True, id=node.id)
+            short_field_names = get_schema_field_names(node.schema)
+            full_field_names = get_schema_field_names(node.schema, id=node.id)
             for short_field_name, full_field_name in zip(short_field_names, full_field_names):
                 # set mapping automatically if this is a new field
                 if short_field_name not in short_to_full_field_name or (
@@ -347,7 +346,8 @@ class Optimizer:
             # otherwise, make the node depend on all upstream nodes
             node._operator.depends_on = set()
             for upstream_node in dataset_nodes[:node_idx]:
-                node._operator.depends_on.update(upstream_node.schema.field_names(unique=True, id=upstream_node.id))
+                upstream_field_names = get_schema_field_names(upstream_node.schema, id=upstream_node.id)
+                node._operator.depends_on.update(upstream_field_names)
             node._operator.depends_on = list(node._operator.depends_on)
 
         # construct tree of groups

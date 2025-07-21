@@ -17,6 +17,7 @@ from typing import Any, Generic, TypeVar
 from colorama import Fore, Style
 from openai import OpenAI
 from openai.types.chat.chat_completion import ChatCompletion
+from pydantic.fields import FieldInfo
 from together import Together
 from together.types.chat_completions import ChatCompletionResponse
 
@@ -27,9 +28,8 @@ from palimpzest.constants import (
     Model,
     PromptStrategy,
 )
-from palimpzest.core.data.dataclasses import GenerationStats
 from palimpzest.core.elements.records import DataRecord
-from palimpzest.core.lib.fields import Field, ListField
+from palimpzest.core.models import GenerationStats
 from palimpzest.prompts import PromptFactory
 from palimpzest.query.generators.api_client_factory import APIClientFactory
 from palimpzest.utils.generation_helpers import get_json_from_answer
@@ -183,7 +183,7 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
         # otherwise, return the full completion text
         return completion_text
 
-    def _prepare_field_answers(self, field_answers: dict | list[dict], fields: dict[str, Field]) -> dict[str, list]:
+    def _prepare_field_answers(self, field_answers: dict | list[dict], fields: dict[str, FieldInfo]) -> dict[str, list]:
         """
         field_answers is a dictionary mapping fields to their values. For one-to-one converts, wrap each
         answer in a list. For one-to-many converts, invert the list of dictionaries into a dictionary with
@@ -205,25 +205,13 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
 
         return field_answers
 
-    def _check_convert_answer_text(self, answer_text: str, fields: dict[str, Field], throw_exception: bool=False) -> dict | list[dict] | None:
+    def _check_convert_answer_text(self, answer_text: str, fields: dict[str, FieldInfo], throw_exception: bool=False) -> dict | list[dict] | None:
         """
         Try parsing the answer text into a JSON object. If the parsing fails, return None.
         """
         try:
             # extract json from the answer text
             field_answers = get_json_from_answer(answer_text, self.model, self.cardinality)
-
-            # TODO: wrap non-list outputs in a list if expected output is a list
-
-            # common error for one-to-one: if the output is a singleton list which contains a list, but the expected field type
-            # is a list of strings, or a list of floats, i.e. not a list of lists; then extract the inner list
-            if self.cardinality == Cardinality.ONE_TO_ONE:
-                for field, field_type in fields.items():
-                    answer = field_answers[field]
-                    field_type_is_not_list_of_lists = isinstance(field_type, ListField) and not issubclass(field_type.element_type, ListField)
-                    answer_is_list_of_lists = isinstance(answer, list) and len(answer) == 1 and isinstance(answer[0], list)
-                    if field_type_is_not_list_of_lists and answer_is_list_of_lists:
-                        field_answers[field] = answer[0]
 
             # prepare the field answers to match the expected output and return
             return self._prepare_field_answers(field_answers, fields)
@@ -249,7 +237,7 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
 
         return None
 
-    def _parse_convert_answer(self, completion_text: str, fields: dict[str, Field], json_output: bool) -> dict[str, list]:
+    def _parse_convert_answer(self, completion_text: str, fields: dict[str, FieldInfo], json_output: bool) -> dict[str, list]:
         """Extract the answer from the completion object for convert operations."""
         # if the model followed the default instructions, the completion text will place
         # its answer between "ANSWER:" and "---"
@@ -316,7 +304,7 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
 
         return field_answers
 
-    def _parse_answer(self, completion_text: str, fields: dict[str, Field] | None, json_output: bool, **kwargs) -> dict[str, list]:
+    def _parse_answer(self, completion_text: str, fields: dict[str, FieldInfo] | None, json_output: bool, **kwargs) -> dict[str, list]:
         """Extract the answer from the completion object."""
         # use a custom answer parser if provided
         if kwargs.get("parse_answer"):
@@ -335,7 +323,7 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
 
         return field_answers
 
-    def __call__(self, candidate: DataRecord, fields: dict[str, Field] | None, json_output: bool=True, **kwargs) -> GenerationOutput:
+    def __call__(self, candidate: DataRecord, fields: dict[str, FieldInfo] | None, json_output: bool=True, **kwargs) -> GenerationOutput:
         """Take the input record (`candidate`), generate the output `fields`, and return the generated output."""
         client = self._get_client_or_model()
         logger.debug(f"Generating for candidate {candidate} with fields {fields}")
@@ -421,8 +409,6 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
                 prompt += message["content"] + "\n" if message["type"] == "text" else "<image>\n"
         logger.debug(f"PROMPT:\n{prompt}")
         logger.debug(Fore.GREEN + f"{completion_text}\n" + Style.RESET_ALL)
-        print(f"PROMPT:\n{prompt}")
-        print(Fore.GREEN + f"{completion_text}\n" + Style.RESET_ALL)
 
         # parse reasoning
         reasoning = None

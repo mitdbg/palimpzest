@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pandas as pd
 from bs4 import BeautifulSoup
+from pydantic import BaseModel
 
 from palimpzest import constants
 from palimpzest.core.data import dataset
@@ -15,10 +16,11 @@ from palimpzest.core.lib.schemas import (
     DefaultSchema,
     ImageFile,
     PDFFile,
-    Schema,
     TextFile,
     WebPage,
     XLSFile,
+    create_schema_from_df,
+    create_schema_from_fields,
 )
 from palimpzest.query.operators.logical import BaseScan
 from palimpzest.tools.pdfparser import get_text_from_pdf
@@ -36,19 +38,19 @@ class IterDataset(dataset.Dataset, ABC):
     - `__getitem__(idx: int)`: which takes in an `idx` and returns the element at that index
     """
 
-    def __init__(self, id: str, schema: type[Schema] | list[dict]) -> None:
+    def __init__(self, id: str, schema: type[BaseModel] | list[dict]) -> None:
         """
             Constructor for the `IterDataset` class.
 
             Args:
                 id (str): a string identifier for the `Dataset`
-                schema (Schema | list[dict]): The output schema of the records returned by the `Dataset`
+                schema (BaseModel | list[dict]): The output schema of the records returned by the `Dataset`
         """
         # set the id for the Dataset
         self._id = id
 
         # compute Schema and call parent constructor
-        schema = Schema.from_fields(schema) if isinstance(schema, list) else schema
+        schema = create_schema_from_fields(schema) if isinstance(schema, list) else schema
         super().__init__(sources=None, operator=BaseScan(datasource=self, output_schema=schema), schema=schema)
 
     @abstractmethod
@@ -135,7 +137,7 @@ class MemoryDataset(IterDataset):
         """
         # if list[dict] --> convert to pd.DataFrame first
         self.vals = pd.DataFrame(vals) if isinstance(vals, list) and all([isinstance(item, dict) for item in vals]) else vals
-        schema = Schema.from_df(self.vals) if isinstance(self.vals, pd.DataFrame) else DefaultSchema
+        schema = create_schema_from_df(self.vals) if isinstance(self.vals, pd.DataFrame) else DefaultSchema
         super().__init__(id=id, schema=schema)
 
     def __len__(self) -> int:
@@ -282,7 +284,7 @@ class ImageFileDataset(BaseFileDataset):
         filepath = self.filepaths[idx]
         filename = os.path.basename(filepath)
         with open(filepath, "rb") as f:
-            contents = base64.b64encode(f.read())
+            contents = base64.b64encode(f.read()).decode("utf-8")
 
         return {"filename": filename, "contents": contents}
 

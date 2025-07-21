@@ -7,12 +7,13 @@ from typing import Callable
 
 import litellm
 import pandas as pd
+from pydantic import BaseModel
 
 from palimpzest.constants import Cardinality, Model, PromptStrategy
 from palimpzest.core.data import context_manager
 from palimpzest.core.data.dataset import Dataset
 from palimpzest.core.elements.records import DataRecord
-from palimpzest.core.lib.schemas import Schema, TextFile
+from palimpzest.core.lib.schemas import TextFile, create_schema_from_fields, union_schemas
 from palimpzest.prompts.prompt_factory import PromptFactory
 from palimpzest.query.operators.logical import ComputeOperator, ContextScan, LogicalOperator, SearchOperator
 from palimpzest.utils.hash_helpers import hash_for_id
@@ -38,7 +39,7 @@ class Context(Dataset, ABC):
             id: str,
             description: str,
             operator: LogicalOperator,
-            schema: type[Schema] | None = None,
+            schema: type[BaseModel] | None = None,
             sources: list[Context] | Context | None = None,
             materialized: bool = False,
         ) -> None:
@@ -49,7 +50,7 @@ class Context(Dataset, ABC):
             id (`str`): a string identifier for the `Context`
             description (`str`): the description of the data contained within the `Context`
             operator (`LogicalOperator`): The `LogicalOperator` used to compute this `Context`.
-            schema: (`type[Schema] | None`): 
+            schema: (`type[BaseModel] | None`): The schema of this `Context`.
             sources (`list[Context] | Context | None`): The (list of) `Context(s)` which are input(s) to
                 the operator used to compute this `Context`.
             materialized (`bool`): True if the `Context` has been computed, False otherwise
@@ -60,9 +61,9 @@ class Context(Dataset, ABC):
         # set the materialization status
         self._materialized = materialized
 
-        # compute Schema and call parent constructor
+        # compute schema and call parent constructor
         if schema is None:
-            schema = Schema.from_fields([{"name": "context", "desc": "The context", "type": str}])
+            schema = create_schema_from_fields([{"name": "context", "description": "The context", "type": str}])
         super().__init__(sources=sources, operator=operator, schema=schema, id=id)
 
         # set the tools associated with this Context
@@ -106,9 +107,8 @@ class Context(Dataset, ABC):
         # construct new description and output schema
         new_id = hash_for_id(instruction)
         new_description = f"Parent Context ID: {self.id}\n\nThis Context is the result of computing the following instruction on the parent context.\n\nINSTRUCTION: {instruction}\n\n"
-        new_output_schema = self.schema.add_fields([
-            {"name": f"result-{new_id}", "desc": "The result from computing the instruction on the input Context",  "type": str}
-        ])
+        inter_schema = create_schema_from_fields([{"name": f"result-{new_id}", "desc": "The result from computing the instruction on the input Context",  "type": str}])
+        new_output_schema = union_schemas([self.schema, inter_schema])
 
         # construct logical operator
         operator = ComputeOperator(
@@ -162,7 +162,7 @@ class TextFileContext(Context):
             self.filepaths = sorted(self.filepaths)
 
         # call parent constructor to set id, operator, and schema
-        schema = Schema.from_fields([{"name": "context", "desc": "The context", "type": str}])
+        schema = create_schema_from_fields([{"name": "context", "desc": "The context", "type": str}])
         super().__init__(
             id=id,
             description=description,

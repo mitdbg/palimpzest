@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from palimpzest.core.data.dataclasses import PlanCost
+from palimpzest.core.models import PlanCost
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.scan import ScanPhysicalOp
 from palimpzest.utils.hash_helpers import hash_for_id

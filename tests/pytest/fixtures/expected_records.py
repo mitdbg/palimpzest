@@ -39,6 +39,8 @@ def real_estate_all_expected_records(real_estate_eval_tiny_data_path, image_real
 
     data_records = []
     for source_idx, listing in enumerate(expected_listings):
+        if listing == ".DS_Store":
+            continue
         dr = DataRecord(schema=image_real_estate_listing_schema, source_idx=source_idx)
         dr.listing = listing
         dr.is_modern_and_attractive = listing_to_modern_and_attractive[listing]
@@ -59,6 +61,8 @@ def real_estate_one_to_many_expected_records(real_estate_eval_tiny_data_path, ro
 
     data_records = []
     for source_idx, listing in enumerate(expected_listings):
+        if listing == ".DS_Store":
+            continue
         for room in listing_to_rooms[listing]:
             dr = DataRecord(schema=room_real_estate_listing_schema, source_idx=source_idx)
             dr.listing = listing

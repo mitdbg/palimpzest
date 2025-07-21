@@ -1,9 +1,9 @@
 import logging
 from abc import abstractmethod
 
-from palimpzest.core.data.dataclasses import PlanStats
 from palimpzest.core.data.dataset import Dataset
 from palimpzest.core.elements.records import DataRecord, DataRecordCollection
+from palimpzest.core.models import PlanStats
 from palimpzest.policy import Policy
 from palimpzest.query.execution.execution_strategy import ExecutionStrategy, SentinelExecutionStrategy
 from palimpzest.query.optimizer.optimizer import Optimizer

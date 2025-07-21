@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from palimpzest.core.lib.fields import Field
-from palimpzest.core.lib.schemas import OperatorDerivedSchema, Schema
+from pydantic import BaseModel
+
+from palimpzest.core.lib.schemas import create_schema_from_fields
 
 
+# TODO: need to rethink how group bys work
 # signature for a group by aggregate that applies
 # group and aggregation to an input tuple
 class GroupBySig:
@@ -14,7 +16,7 @@ class GroupBySig:
         self.agg_funcs = agg_funcs
         self.agg_fields = agg_fields
 
-    def validate_schema(self, input_schema: Schema) -> tuple[bool, str | None]:
+    def validate_schema(self, input_schema: BaseModel) -> tuple[bool, str | None]:
         for f in self.group_by_fields:
             if not hasattr(input_schema, f):
                 return (False, "Supplied schema has no field " + f)
@@ -48,16 +50,17 @@ class GroupBySig:
             ops.append(self.agg_funcs[i] + "(" + self.agg_fields[i] + ")")
         return ops
 
-    def output_schema(self) -> type[OperatorDerivedSchema]:
+    def output_schema(self) -> type[BaseModel]:
         # the output class varies depending on the group by, so here
         # we dynamically construct this output
-        schema = type("CustomGroupBy", (OperatorDerivedSchema,), {})
-
+        fields = []
         for g in self.group_by_fields:
-            f = Field(desc=g)
-            setattr(schema, g, f)
+            f = {"name": g, "type": Any, "desc": f"Group by field: {g}"}
+            fields.append(f)
+
         ops = self.get_agg_field_names()
         for op in ops:
-            f = Field(desc=op)
-            setattr(schema, op, f)
-        return schema
+            f = {"name": op, "type": Any, "desc": f"Aggregate field: {op}"}
+            fields.append(f)
+
+        return create_schema_from_fields(fields)

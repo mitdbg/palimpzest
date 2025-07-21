@@ -1,7 +1,7 @@
 import pytest
 
 from palimpzest.constants import Model
-from palimpzest.core.data.dataclasses import RecordOpStats
+from palimpzest.core.models import RecordOpStats
 
 
 @pytest.fixture
@@ -40,7 +40,7 @@ def sample_op_data_factory():
                 plan_id=plan_ids[idx],
                 model_name=model_names[idx] if model_names is not None else None,
                 answer=answers[idx] if answers is not None else None,
-                passed_operator=answers[idx] if "filter" in op_name.lower() else None,
+                passed_operator=answers[idx]["passed_operator"] if "filter" in op_name.lower() else True,
             )
             for idx in range(len(time_per_records))
         ]
@@ -112,7 +112,9 @@ def simple_plan_filter_data(simple_plan_convert_data):
         "total_input_tokens": [100, 200, 100, 200, 100, 200],
         "total_output_tokens": [10, 20, 10, 20, 10, 20],
         "model_names": [Model.GPT_4o.value] * 2 + [Model.GPT_4o_MINI.value] * 2 + [Model.MIXTRAL.value] * 2,
-        "answers": [True, False] + [False, True] + [True, True],
+        "answers": [{"passed_operator": True}, {"passed_operator": False}]
+        + [{"passed_operator": False}, {"passed_operator": True}]
+        + [{"passed_operator": True}, {"passed_operator": True}],
     }
 
 

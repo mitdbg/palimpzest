@@ -5,15 +5,15 @@ import time
 from numpy import dot
 from numpy.linalg import norm
 from openai import OpenAI
+from pydantic.fields import FieldInfo
 
 from palimpzest.constants import (
     MODEL_CARDS,
     NAIVE_EST_NUM_OUTPUT_TOKENS,
     Model,
 )
-from palimpzest.core.data.dataclasses import GenerationStats, OperatorCostEstimates
 from palimpzest.core.elements.records import DataRecord
-from palimpzest.core.lib.fields import Field, StringField
+from palimpzest.core.models import GenerationStats, OperatorCostEstimates
 from palimpzest.query.operators.convert import LLMConvert
 
 
@@ -143,9 +143,9 @@ class RAGConvert(LLMConvert):
 
         # compute embedding for output fields
         output_fields_desc = ""
-        field_desc_map = self.output_schema.field_desc_map()
         for field_name in output_fields:
-            output_fields_desc += f"- {field_name}: {field_desc_map[field_name]}\n"
+            desc = self.output_schema.model_fields[field_name].description
+            output_fields_desc += f"- {field_name}: {'no description available' if desc is None else desc}\n"
         query_embedding, query_embed_stats = self.compute_embedding(output_fields_desc)
 
         # add cost of embedding the query to embed_stats
@@ -156,8 +156,8 @@ class RAGConvert(LLMConvert):
             field = candidate.get_field_type(field_name)
 
             # skip this field if it is not a string or a list of strings
-            is_string_field = isinstance(field, StringField)
-            is_list_string_field = hasattr(field, "element_type") and isinstance(field.element_type, StringField)
+            is_string_field = field.annotation in [str, str | None]
+            is_list_string_field = field.annotation in [list[str], list[str] | None]
             if not (is_string_field or is_list_string_field):
                 continue
 
@@ -193,7 +193,7 @@ class RAGConvert(LLMConvert):
 
         return candidate, embed_stats
 
-    def convert(self, candidate: DataRecord, fields: dict[str, Field]) -> tuple[dict[str, list], GenerationStats]:
+    def convert(self, candidate: DataRecord, fields: dict[str, FieldInfo]) -> tuple[dict[str, list], GenerationStats]:
         # set client
         self.client = OpenAI() if self.client is None else self.client
 

@@ -4,6 +4,8 @@ import time
 from abc import ABC, abstractmethod
 from typing import Any
 
+from pydantic.fields import FieldInfo
+
 from palimpzest.constants import (
     MODEL_CARDS,
     NAIVE_EST_FILTER_SELECTIVITY,
@@ -12,10 +14,9 @@ from palimpzest.constants import (
     Model,
     PromptStrategy,
 )
-from palimpzest.core.data.dataclasses import GenerationStats, OperatorCostEstimates, RecordOpStats
 from palimpzest.core.elements.filters import Filter
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
-from palimpzest.core.lib.fields import BooleanField
+from palimpzest.core.models import GenerationStats, OperatorCostEstimates, RecordOpStats
 from palimpzest.query.generators.generators import generator_factory
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.utils.model_helpers import get_vision_models
@@ -24,7 +25,7 @@ from palimpzest.utils.model_helpers import get_vision_models
 class FilterOp(PhysicalOperator, ABC):
     def __init__(self, filter: Filter, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        assert self.input_schema.get_desc() == self.output_schema.get_desc(), "Input and output schemas must match for FilterOp"
+        assert self.input_schema == self.output_schema, "Input and output schemas must match for FilterOp"
         self.filter_obj = filter
 
     def __str__(self):
@@ -251,8 +252,8 @@ class LLMFilter(FilterOp):
         # construct kwargs for generation
         gen_kwargs = {"project_cols": input_fields, "filter_condition": self.filter_obj.filter_condition}
 
-        # generate output; NOTE: BooleanField is used to indicate the output type; thus, the desc is not needed
-        fields = {"passed_operator": BooleanField(desc="")}
+        # generate output; NOTE: FieldInfo is used to indicate the output type; thus, the desc is not needed
+        fields = {"passed_operator": FieldInfo(annotation=bool, description="Whether the record passed the filter operation")}
         field_answers, _, generation_stats, _ = self.generator(candidate, fields, **gen_kwargs)
 
         return field_answers, generation_stats

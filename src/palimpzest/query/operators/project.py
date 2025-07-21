@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from palimpzest.core.data.dataclasses import OperatorCostEstimates, RecordOpStats
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
+from palimpzest.core.models import OperatorCostEstimates, RecordOpStats
 from palimpzest.query.operators.physical import PhysicalOperator
 
 
