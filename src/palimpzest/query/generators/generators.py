@@ -409,8 +409,6 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
                 prompt += message["content"] + "\n" if message["type"] == "text" else "<image>\n"
         logger.debug(f"PROMPT:\n{prompt}")
         logger.debug(Fore.GREEN + f"{completion_text}\n" + Style.RESET_ALL)
-        print(f"PROMPT:\n{prompt}")
-        print(Fore.GREEN + f"{completion_text}\n" + Style.RESET_ALL)
 
         # parse reasoning
         reasoning = None
