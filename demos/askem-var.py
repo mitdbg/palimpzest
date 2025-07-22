@@ -41,7 +41,6 @@ if __name__ == "__main__":
         policy = pz.MaxQuality()
         config = pz.QueryProcessorConfig(
             policy=policy,
-            cache=False,
             verbose=True,
             processing_strategy="streaming",
             execution_strategy="sequential",

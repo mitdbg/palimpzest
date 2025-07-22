@@ -67,9 +67,6 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
             # update plan stats
             plan_stats.add_record_op_stats(record_op_stats)
 
-            # add records to the cache
-            self._add_records_to_cache(operator.target_cache_id, records)
-
             # update next input_queue (if it exists)
             output_records = [record for record in records if record.passed_operator]            
             if op_idx + 1 < len(plan.operators):
@@ -77,9 +74,6 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
                 input_queues[next_full_op_id] = output_records
 
             logger.info(f"Finished processing operator {operator.op_name()} ({operator.get_full_op_id()}), and generated {len(records)} records")
-
-        # close the cache
-        self._close_cache([op.target_cache_id for op in plan.operators])
 
         # finalize plan stats
         plan_stats.finish()
@@ -194,9 +188,6 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
                 # update plan stats
                 plan_stats.add_record_op_stats(record_op_stats)
 
-                # add records to the cache
-                self._add_records_to_cache(operator.target_cache_id, records)
-
                 # update next input_queue or final_output_records
                 output_records = [record for record in records if record.passed_operator]            
                 if op_idx + 1 < len(plan.operators):
@@ -210,9 +201,6 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
             # break out of loop if the final operator is a LimitScanOp and we've reached its limit
             if isinstance(plan.operators[-1], LimitScanOp) and len(final_output_records) == plan.operators[-1].limit:
                 break
-
-        # close the cache
-        self._close_cache([op.target_cache_id for op in plan.operators])
 
         # finalize plan stats
         plan_stats.finish()

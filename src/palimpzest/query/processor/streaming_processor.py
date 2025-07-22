@@ -48,7 +48,6 @@ class StreamingQueryProcessor(QueryProcessor):
         self._plan_stats = plan_stats
 
     def generate_plan(self, dataset: Dataset):
-        # self.clear_cached_examples()
         start_time = time.time()
 
         # check that the plan does not contain any aggregation operators
@@ -70,7 +69,6 @@ class StreamingQueryProcessor(QueryProcessor):
 
     def execute(self):
         logger.info("Executing StreamingQueryProcessor")
-        # Always delete cache
         if not self.plan_generated:
             self.generate_plan(self.dataset)
 

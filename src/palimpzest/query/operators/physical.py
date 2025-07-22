@@ -23,7 +23,6 @@ class PhysicalOperator:
         depends_on: list[str] | None = None,
         logical_op_id: str | None = None,
         logical_op_name: str | None = None,
-        target_cache_id: str | None = None,
         verbose: bool = False,
         *args,
         **kwargs,
@@ -33,7 +32,6 @@ class PhysicalOperator:
         self.depends_on = depends_on if depends_on is None else sorted(depends_on)
         self.logical_op_id = logical_op_id
         self.logical_op_name = logical_op_name
-        self.target_cache_id = target_cache_id
         self.verbose = verbose
         self.op_id = None
 
@@ -96,7 +94,6 @@ class PhysicalOperator:
             "depends_on": self.depends_on,
             "logical_op_id": self.logical_op_id,
             "logical_op_name": self.logical_op_name,
-            "target_cache_id": self.target_cache_id,
             "verbose": self.verbose,
         }
 

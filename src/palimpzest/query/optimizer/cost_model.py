@@ -22,7 +22,7 @@ from palimpzest.query.operators.filter import LLMFilter, NonLLMFilter
 from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.rag_convert import RAGConvert
-from palimpzest.query.operators.scan import CacheScanDataOp, ContextScanOp, MarshalAndScanDataOp, ScanPhysicalOp
+from palimpzest.query.operators.scan import ContextScanOp, MarshalAndScanDataOp, ScanPhysicalOp
 from palimpzest.utils.model_helpers import get_champion_model_name, get_models
 
 warnings.simplefilter(action='ignore', category=UserWarning)
@@ -466,7 +466,7 @@ class CostModel(BaseCostModel):
                 selectivity = self._est_selectivity(self.sample_execution_data_df, op_df)
                 estimates = {"time_per_record": time_per_record, "selectivity": selectivity}
 
-            elif op_name in ["MarshalAndScanDataOp", "CacheScanDataOp", "LimitScanOp", "CountAggregateOp", "AverageAggregateOp"]:
+            elif op_name in ["MarshalAndScanDataOp", "LimitScanOp", "CountAggregateOp", "AverageAggregateOp"]:
                 time_per_record = self._est_time_per_record(op_df)
                 estimates = {"time_per_record": time_per_record}
 
@@ -498,18 +498,6 @@ class CostModel(BaseCostModel):
 
             op_estimates = operator.naive_cost_estimates(source_op_estimates, input_record_size_in_bytes=NAIVE_BYTES_PER_RECORD)
 
-        elif isinstance(operator, CacheScanDataOp):
-            datasource_len = len(operator.datasource)
-
-            source_op_estimates = OperatorCostEstimates(
-                cardinality=datasource_len,
-                time_per_record=0.0,
-                cost_per_record=0.0,
-                quality=1.0,
-            )
-
-            op_estimates = operator.naive_cost_estimates(source_op_estimates, input_record_size_in_bytes=NAIVE_BYTES_PER_RECORD)
-
         elif isinstance(operator, ContextScanOp):
             source_op_estimates = OperatorCostEstimates(
                 cardinality=1.0,
@@ -526,7 +514,7 @@ class CostModel(BaseCostModel):
         # if we have sample execution data, update naive estimates with more informed ones
         sample_op_estimates = self.operator_estimates
         if sample_op_estimates is not None and full_op_id in sample_op_estimates:
-            if isinstance(operator, (MarshalAndScanDataOp, CacheScanDataOp)):
+            if isinstance(operator, MarshalAndScanDataOp):
                 op_estimates.time_per_record = sample_op_estimates[full_op_id]["time_per_record"]
 
             elif isinstance(operator, ApplyGroupByOp):
