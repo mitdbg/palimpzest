@@ -116,7 +116,7 @@ def get_task_config(task, dataset):
     """Get configuration for a specific task"""
     if task == "paper":
         root_set = build_mit_battery_paper_plan(dataset)
-        cols = ["title", "publicationYear", "author", "institution", "journal", "fundingAgency"]
+        cols = ["title", "publication_year", "author", "institution", "journal", "funding_agency"]
         stat_path = "profiling-data/paper-profiling.json"
     elif task == "enron":
         root_set = build_enron_plan(dataset)
@@ -144,7 +144,7 @@ def get_task_config(task, dataset):
         stat_path = "profiling-data/pdftest-profiling.json"
     elif task == "scitest":
         root_set = build_sci_paper_plan(dataset)
-        cols = ["title", "author", "institution", "journal", "fundingAgency"]
+        cols = ["title", "author", "institution", "journal", "funding_agency"]
         stat_path = "profiling-data/scitest-profiling.json"
     elif task == "image":
         root_set = build_image_plan(dataset)
@@ -186,7 +186,7 @@ def execute_task(task, dataset, policy, verbose=False, profile=False, processing
 
 def format_results_table(records: list[DataRecord], cols=None):
     """Format records as a table"""
-    records = [{key: record[key] for key in record.get_field_names()} for record in records]
+    records = [record.to_dict(include_bytes=False) for record in records]
     records_df = pd.DataFrame(records)
     print_cols = records_df.columns if cols is None else cols
     final_df = records_df[print_cols] if not records_df.empty else pd.DataFrame(columns=print_cols)

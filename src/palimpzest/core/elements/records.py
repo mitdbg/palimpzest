@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from pydantic.fields import FieldInfo
 
 from palimpzest.core.data import context
-from palimpzest.core.lib.schemas import create_schema_from_df, project, union_schemas
+from palimpzest.core.lib.schemas import ImageBase64, create_schema_from_df, project, union_schemas
 from palimpzest.core.models import ExecutionStats, PlanStats, RecordOpStats
 from palimpzest.utils.hash_helpers import hash_for_id
 
@@ -289,8 +289,9 @@ class DataRecord:
             dct = {k: v for k, v in dct.items() if k in project_field_names}
 
         if not include_bytes:
-            for k, v in dct.items():
-                if isinstance(v, bytes) or (isinstance(v, list) and len(v) > 0 and any([isinstance(elt, bytes) for elt in v])):
+            for k in dct:
+                field_type = self.field_types[k]
+                if field_type.annotation in [bytes, ImageBase64, list[bytes], list[ImageBase64]]:
                     dct[k] = "<bytes>"
 
         if bytes_to_str:
