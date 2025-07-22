@@ -1,6 +1,6 @@
 [project]
 name = "palimpzest"
-version = "0.7.12"
+version = "0.7.13"
 description = "Palimpzest is a system which enables anyone to process AI-powered analytical queries simply by defining them in a declarative language"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -53,7 +53,7 @@ docs = [
     "mkdocs-material[imaging]",
 ]
 colab = [
-    "PIL==11.3.0"
+    "pillow==11.3.0"
 ]
 
 [tool.setuptools]
