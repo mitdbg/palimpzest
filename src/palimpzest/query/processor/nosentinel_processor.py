@@ -1,7 +1,7 @@
 import logging
 
-from palimpzest.core.data.dataclasses import ExecutionStats
 from palimpzest.core.elements.records import DataRecordCollection
+from palimpzest.core.models import ExecutionStats
 from palimpzest.query.processor.query_processor import QueryProcessor
 
 logger = logging.getLogger(__name__)

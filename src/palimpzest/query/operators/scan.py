@@ -6,8 +6,8 @@ from typing import Any
 
 from palimpzest.constants import LOCAL_SCAN_TIME_PER_KB
 from palimpzest.core.data import context
-from palimpzest.core.data.dataclasses import OperatorCostEstimates, RecordOpStats
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
+from palimpzest.core.models import OperatorCostEstimates, RecordOpStats
 from palimpzest.query.operators.physical import PhysicalOperator
 
 
@@ -24,7 +24,7 @@ class ScanPhysicalOp(PhysicalOperator, ABC):
 
     def __str__(self):
         op = f"{self.op_name()}({self.datasource}) -> {self.output_schema}\n"
-        op += f"    ({', '.join(self.output_schema.field_names())[:30]})\n"
+        op += f"    ({', '.join(list(self.output_schema.model_fields))[:30]})\n"
         return op
 
     def get_id_params(self):
@@ -69,7 +69,7 @@ class ScanPhysicalOp(PhysicalOperator, ABC):
         item_field_dict = item.get("fields", item)
 
         # check that item covers fields in output schema
-        output_field_names = self.output_schema.field_names()
+        output_field_names = list(self.output_schema.model_fields)
         assert all([field in item_field_dict for field in output_field_names]), f"Some fields in Dataset schema not present in item!\n - Dataset fields: {output_field_names}\n - Item fields: {list(item.keys())}"
 
         # construct a DataRecord from the item
@@ -163,7 +163,7 @@ class ContextScanOp(PhysicalOperator):
 
     def __str__(self):
         op = f"{self.op_name()}({self.context}) -> {self.output_schema}\n"
-        op += f"    ({', '.join(self.output_schema.field_names())[:30]})\n"
+        op += f"    ({', '.join(list(self.output_schema.model_fields))[:30]})\n"
         return op
 
     def get_id_params(self):

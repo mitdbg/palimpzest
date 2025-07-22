@@ -3,11 +3,12 @@ from __future__ import annotations
 from typing import Callable
 
 from chromadb.api.models.Collection import Collection
+from pydantic import BaseModel
 
 from palimpzest.constants import AggFunc, Cardinality
 from palimpzest.core.elements.filters import Filter
 from palimpzest.core.elements.groupbysig import GroupBySig
-from palimpzest.core.lib.schemas import Number, Schema
+from palimpzest.core.lib.schemas import create_schema_from_fields, project, union_schemas
 from palimpzest.policy import construct_policy_from_kwargs
 from palimpzest.query.operators.logical import (
     Aggregate,
@@ -62,7 +63,7 @@ class Dataset:
             self,
             sources: list[Dataset] | Dataset | None,
             operator: LogicalOperator,
-            schema: type[Schema] | None = None,
+            schema: type[BaseModel] | None = None,
             id: str | None = None,
         ) -> None:
         """
@@ -74,8 +75,8 @@ class Dataset:
             sources (`list[Dataset] | Dataset`): The (list of) `Dataset(s)` which are input(s) to
                 the operator used to compute this `Dataset`.
             operator (`LogicalOperator`): The `LogicalOperator` used to compute this `Dataset`.
-            schema (type[`Schema`] | None): The `Schema`
-            id (str | None): an identifier for this Dataset provided by the user
+            schema (type[`BaseModel`] | None): The schema of this `Dataset`.
+            id (str | None): an identifier for this `Dataset` provided by the user
 
         Raises:
             ValueError: if `sources` is not a `Dataset` or list of `Datasets`
@@ -89,14 +90,9 @@ class Dataset:
         elif sources is not None:
             raise ValueError("Dataset sources must be another Dataset or a list of Datasets. For root Datasets, you must subclass pz.IterDataset, pz.IndexDataset, or pz.Context.")
 
-        # set the logical operator
+        # set the logical operator and schema
         self._operator: LogicalOperator = operator
-
-        # compute the schema
         self._schema = schema
-        if self._schema is None:
-            for source in self._sources.values():
-                self._schema = source.schema if self._schema is None else self._schema.union(source.schema)
 
         # compute the dataset id
         self._id = self._compute_dataset_id() if id is None else id
@@ -107,8 +103,8 @@ class Dataset:
         return self._id
 
     @property
-    def schema(self) -> Schema:
-        """The `Schema` of this `Dataset`"""
+    def schema(self) -> type[BaseModel]:
+        """The Pydantic model defining the schema of this `Dataset`"""
         return self._schema
 
     @property
@@ -207,7 +203,7 @@ class Dataset:
 
         return Dataset(sources=[self], operator=operator, schema=self.schema)
 
-    def sem_add_columns(self, cols: list[dict] | type[Schema],
+    def sem_add_columns(self, cols: list[dict] | type[BaseModel],
                         cardinality: Cardinality = Cardinality.ONE_TO_ONE,
                         depends_on: str | list[str] | None = None) -> Dataset:
         """
@@ -223,11 +219,12 @@ class Dataset:
         # construct new output schema
         new_output_schema = None
         if isinstance(cols, list):
-            new_output_schema = self.schema.add_fields(cols)
-        elif issubclass(cols, Schema):
-            new_output_schema = self.schema.union(cols)
+            cols = create_schema_from_fields(cols)
+            new_output_schema = union_schemas([self.schema, cols])
+        elif issubclass(cols, BaseModel):
+            new_output_schema = union_schemas([self.schema, cols])
         else:
-            raise ValueError("`cols` must be a list of dictionaries or a Schema.")
+            raise ValueError("`cols` must be a list of dictionaries or a BaseModel.")
 
         # enforce type for depends_on
         if isinstance(depends_on, str):
@@ -245,7 +242,7 @@ class Dataset:
         return Dataset(sources=[self], operator=operator, schema=new_output_schema)
 
     def add_columns(self, udf: Callable,
-                    cols: list[dict] | type[Schema],
+                    cols: list[dict] | type[BaseModel],
                     cardinality: Cardinality = Cardinality.ONE_TO_ONE,
                     depends_on: str | list[str] | None = None) -> Dataset:
         """
@@ -255,9 +252,9 @@ class Dataset:
             add_columns(
                 udf=compute_personal_greeting,
                 cols=[
-                    {'name': 'greeting', 'desc': 'The greeting message', 'type': str},
-                    {'name': 'age', 'desc': 'The age of the person', 'type': int},
-                    {'name': 'full_name', 'desc': 'The name of the person', 'type': str},
+                    {'name': 'greeting', 'description': 'The greeting message', 'type': str},
+                    {'name': 'age', 'description': 'The age of the person', 'type': int},
+                    {'name': 'full_name', 'description': 'The name of the person', 'type': str},
                 ]
             )
         """
@@ -268,20 +265,12 @@ class Dataset:
         # construct new output schema
         new_output_schema = None
         if isinstance(cols, list):
-            updated_cols = []
-            for col_dict in cols:
-                assert isinstance(col_dict, dict), "each entry in `cols` must be a dictionary"
-                assert "name" in col_dict, "each type must contain a 'name' key specifying the column name"
-                assert "type" in col_dict, "each type must contain a 'type' key specifying the column type"
-                col_dict["desc"] = col_dict.get("desc", "New column: " + col_dict["name"])
-                updated_cols.append(col_dict)
-            new_output_schema = self.schema.add_fields(updated_cols)
-
-        elif issubclass(cols, Schema):
-            new_output_schema = self.schema.union(cols)
-
+            cols = create_schema_from_fields(cols)
+            new_output_schema = union_schemas([self.schema, cols])
+        elif issubclass(cols, BaseModel):
+            new_output_schema = union_schemas([self.schema, cols])
         else:
-            raise ValueError("`cols` must be a list of dictionaries or a Schema.")
+            raise ValueError("`cols` must be a list of dictionaries or a BaseModel.")
 
         # enforce type for depends_on
         if isinstance(depends_on, str):
@@ -316,13 +305,13 @@ class Dataset:
 
     def count(self) -> Dataset:
         """Apply a count aggregation to this set"""
-        operator = Aggregate(input_schema=self.schema, output_schema=Number, agg_func=AggFunc.COUNT)
-        return Dataset(sources=[self], operator=operator, schema=Number)
+        operator = Aggregate(input_schema=self.schema, agg_func=AggFunc.COUNT)
+        return Dataset(sources=[self], operator=operator, schema=operator.output_schema)
 
     def average(self) -> Dataset:
         """Apply an average aggregation to this set"""
-        operator = Aggregate(input_schema=self.schema, output_schema=Number, agg_func=AggFunc.AVERAGE)
-        return Dataset(sources=[self], operator=operator, schema=Number)
+        operator = Aggregate(input_schema=self.schema, agg_func=AggFunc.AVERAGE)
+        return Dataset(sources=[self], operator=operator, schema=operator.output_schema)
 
     def groupby(self, groupby: GroupBySig) -> Dataset:
         output_schema = groupby.output_schema()
@@ -333,7 +322,7 @@ class Dataset:
         self,
         index: Collection,
         search_attr: str,
-        output_attrs: list[dict] | type[Schema],
+        output_attrs: list[dict] | type[BaseModel],
         search_func: Callable | None = None,
         k: int = -1,
     ) -> Dataset:
@@ -344,11 +333,12 @@ class Dataset:
         # construct new output schema
         new_output_schema = None
         if isinstance(output_attrs, list):
-            new_output_schema = self.schema.add_fields(output_attrs)
-        elif issubclass(output_attrs, Schema):
-            new_output_schema = self.schema.union(output_attrs)
+            output_attrs = create_schema_from_fields(output_attrs)
+            new_output_schema = union_schemas([self.schema, output_attrs])
+        elif issubclass(output_attrs, BaseModel):
+            new_output_schema = union_schemas([self.schema, output_attrs])
         else:
-            raise ValueError("`cols` must be a list of dictionaries or a Schema.")
+            raise ValueError("`output_attrs` must be a list of dictionaries or a BaseModel.")
 
         # TODO: revisit once we can think through abstraction(s)
         # # construct the PZIndex from the user-provided index
@@ -375,7 +365,7 @@ class Dataset:
     def project(self, project_cols: list[str] | str) -> Dataset:
         """Project the Set to only include the specified columns."""
         project_cols = project_cols if isinstance(project_cols, list) else [project_cols]
-        new_output_schema = self.schema.project(project_cols)
+        new_output_schema = project(self.schema, project_cols)
         operator = Project(input_schema=self.schema, output_schema=new_output_schema, project_cols=project_cols)
         return Dataset(sources=[self], operator=operator, schema=new_output_schema)
 

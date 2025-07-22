@@ -1,29 +1,31 @@
+from typing import Any
+
+from pydantic import BaseModel, Field
+
 from palimpzest.core.data.iter_dataset import MemoryDataset
-from palimpzest.core.lib.fields import Field
-from palimpzest.core.lib.schemas import Schema
 from palimpzest.query.operators.scan import MarshalAndScanDataOp
 
 
-class List(Schema):
-    value = Field(desc="List item")
+class List(BaseModel):
+    value: Any = Field(description="List item")
 
 
 def test_marshal_and_scan_memory_source():
     # Create test data
     test_data = ["test1", "test2", "test3"]
-    
+
     # Create MemoryDataset with test data
     memory_source = MemoryDataset(id="test", vals=test_data)
-    
+
     # Create MarshalAndScanDataOp
-    op = MarshalAndScanDataOp(output_schema=List, datasource=memory_source)
-    
+    op = MarshalAndScanDataOp(output_schema=List, datasource=memory_source, logical_op_id="test_scan")
+
     # Execute the scan operator on the first source record
     result = op(0)
-    
+
     assert len(result.data_records) == 1
     assert result.data_records[0].value == "test1"
-    
+
     # Test stats
     assert len(result.record_op_stats) == 1
     stats = result.record_op_stats[0]

@@ -1,7 +1,7 @@
 import logging
 
-from palimpzest.core.data.dataclasses import ExecutionStats, SentinelPlanStats
 from palimpzest.core.elements.records import DataRecordCollection
+from palimpzest.core.models import ExecutionStats, SentinelPlanStats
 from palimpzest.query.optimizer.cost_model import SampleBasedCostModel
 from palimpzest.query.optimizer.optimizer_strategy_type import OptimizationStrategyType
 from palimpzest.query.optimizer.plan import SentinelPlan

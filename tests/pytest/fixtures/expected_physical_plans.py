@@ -3,9 +3,9 @@ from copy import deepcopy
 import pytest
 
 from palimpzest.constants import Model
-from palimpzest.core.data.dataclasses import PlanCost
 from palimpzest.core.elements.filters import Filter
-from palimpzest.core.lib.schemas import TextFile
+from palimpzest.core.lib.schemas import TextFile, get_schema_field_names
+from palimpzest.core.models import PlanCost
 from palimpzest.query.operators.convert import LLMConvertBonded
 from palimpzest.query.operators.filter import LLMFilter
 from palimpzest.query.operators.logical import BaseScan, ConvertScan, FilteredScan
@@ -26,17 +26,17 @@ def get_three_converts_plan(three_converts_workload, enron_eval_tiny, email_sche
     scan_op = MarshalAndScanDataOp(output_schema=TextFile, datasource=enron_eval_tiny, logical_op_id=scan_logical_op.get_logical_op_id())
 
     # create physical op for first convert operator
-    depends_on = set(scan_logical_op.output_schema.field_names(unique=True, id=scan_node_id))
+    depends_on = set(get_schema_field_names(scan_logical_op.output_schema, id=scan_node_id))
     first_convert_logical_op = ConvertScan(input_schema=TextFile, output_schema=email_schema, depends_on=list(depends_on), target_cache_id=first_convert_node_id)
     first_convert_op = LLMConvertBonded(output_schema=email_schema, input_schema=TextFile, model=models[0], depends_on=list(depends_on), logical_op_id=first_convert_logical_op.get_logical_op_id())
 
     # get physical op id for second convert operators
-    depends_on.update(first_convert_logical_op.output_schema.field_names(unique=True, id=first_convert_node_id))
+    depends_on.update(get_schema_field_names(first_convert_logical_op.output_schema, id=first_convert_node_id))
     second_convert_logical_op = ConvertScan(input_schema=email_schema, output_schema=foobar_schema, depends_on=list(depends_on), target_cache_id=second_convert_node_id)
     second_convert_op = LLMConvertBonded(output_schema=foobar_schema, input_schema=email_schema, model=models[1], depends_on=list(depends_on), logical_op_id=second_convert_logical_op.get_logical_op_id())
 
     # get physical op id for third convert operators
-    depends_on.update(second_convert_logical_op.output_schema.field_names(unique=True, id=second_convert_node_id))
+    depends_on.update(get_schema_field_names(second_convert_logical_op.output_schema, id=second_convert_node_id))
     third_convert_logical_op = ConvertScan(input_schema=foobar_schema, output_schema=baz_schema, depends_on=list(depends_on), target_cache_id=third_convert_node_id)
     third_convert_op = LLMConvertBonded(output_schema=baz_schema, input_schema=foobar_schema, model=models[2], depends_on=list(depends_on), logical_op_id=third_convert_logical_op.get_logical_op_id())
 
@@ -142,12 +142,12 @@ def get_one_filter_one_convert_plan(one_filter_one_convert_workload, enron_eval_
     scan_op = MarshalAndScanDataOp(output_schema=TextFile, datasource=enron_eval_tiny, logical_op_id=scan_logical_op.get_logical_op_id())
 
     # get physical op id for first filter operator
-    depends_on = set(scan_logical_op.output_schema.field_names(unique=True, id=scan_node_id))
+    depends_on = set(get_schema_field_names(scan_logical_op.output_schema, id=scan_node_id))
     first_filter_logical_op = FilteredScan(input_schema=TextFile, output_schema=TextFile, filter=Filter("filter1"), depends_on=list(depends_on), target_cache_id=first_filter_node_id)
     first_filter_op = LLMFilter(output_schema=TextFile, input_schema=TextFile, filter=Filter("filter1"), model=models[0], depends_on=list(depends_on), logical_op_id=first_filter_logical_op.get_logical_op_id())
 
     # create physical op for first convert operator
-    depends_on = depends_on.union(set(first_filter_logical_op.output_schema.field_names(unique=True, id=first_filter_node_id)))
+    depends_on = depends_on.union(set(get_schema_field_names(first_filter_logical_op.output_schema, id=first_filter_node_id)))
     first_convert_logical_op = ConvertScan(input_schema=TextFile, output_schema=email_schema, depends_on=list(depends_on), target_cache_id=first_convert_node_id)
     first_convert_op = LLMConvertBonded(output_schema=email_schema, input_schema=TextFile, model=models[1], depends_on=list(depends_on), logical_op_id=first_convert_logical_op.get_logical_op_id())
 
@@ -194,22 +194,22 @@ def get_two_converts_two_filters_plan(two_converts_two_filters_workload, enron_e
     scan_op = MarshalAndScanDataOp(output_schema=TextFile, datasource=enron_eval_tiny, logical_op_id=scan_logical_op.get_logical_op_id())
 
     # create physical op for first convert operator
-    depends_on = set(scan_logical_op.output_schema.field_names(unique=True, id=scan_node_id))
+    depends_on = set(get_schema_field_names(scan_logical_op.output_schema, id=scan_node_id))
     first_convert_logical_op = ConvertScan(input_schema=TextFile, output_schema=email_schema, depends_on=list(depends_on), target_cache_id=first_convert_node_id)
     first_convert_op = LLMConvertBonded(output_schema=email_schema, input_schema=TextFile, model=models[0], depends_on=list(depends_on), logical_op_id=first_convert_logical_op.get_logical_op_id())
 
     # get physical op id for second convert operators
-    depends_on.update(first_convert_logical_op.output_schema.field_names(unique=True, id=first_convert_node_id))
+    depends_on.update(get_schema_field_names(first_convert_logical_op.output_schema, id=first_convert_node_id))
     second_convert_logical_op = ConvertScan(input_schema=email_schema, output_schema=foobar_schema, depends_on=list(depends_on), target_cache_id=second_convert_node_id)
     second_convert_op = LLMConvertBonded(output_schema=foobar_schema, input_schema=email_schema, model=models[1], depends_on=list(depends_on), logical_op_id=second_convert_logical_op.get_logical_op_id())
 
     # get physical op id for first filter operator
-    depends_on = [field for field in first_convert_logical_op.output_schema.field_names(unique=True, id=first_convert_node_id) if "sender" in field]
+    depends_on = [field for field in get_schema_field_names(first_convert_logical_op.output_schema, id=first_convert_node_id) if "sender" in field]
     first_filter_logical_op = FilteredScan(input_schema=foobar_schema, output_schema=foobar_schema, filter=Filter("filter1"), depends_on=list(depends_on), target_cache_id=first_filter_node_id)
     first_filter_op = LLMFilter(output_schema=foobar_schema, input_schema=foobar_schema, filter=Filter("filter1"), model=models[2], depends_on=list(depends_on), logical_op_id=first_filter_logical_op.get_logical_op_id())
 
     # get physical op id for second filter operator
-    depends_on = [field for field in first_convert_logical_op.output_schema.field_names(unique=True, id=first_convert_node_id) if "subject" in field]
+    depends_on = [field for field in get_schema_field_names(first_convert_logical_op.output_schema, id=first_convert_node_id) if "subject" in field]
     second_filter_logical_op = FilteredScan(input_schema=foobar_schema, output_schema=foobar_schema, filter=Filter("filter2"), depends_on=list(depends_on), target_cache_id=second_filter_node_id)
     second_filter_op = LLMFilter(output_schema=foobar_schema, input_schema=foobar_schema, filter=Filter("filter2"), model=models[3], depends_on=list(depends_on), logical_op_id=second_filter_logical_op.get_logical_op_id())
 

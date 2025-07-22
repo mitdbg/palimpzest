@@ -1,7 +1,7 @@
 import logging
 
-from palimpzest.core.data.dataclasses import PlanStats
 from palimpzest.core.elements.records import DataRecord
+from palimpzest.core.models import PlanStats
 from palimpzest.query.execution.execution_strategy import ExecutionStrategy
 from palimpzest.query.operators.aggregate import AggregateOp
 from palimpzest.query.operators.limit import LimitScanOp

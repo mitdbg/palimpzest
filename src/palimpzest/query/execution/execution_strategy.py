@@ -6,9 +6,9 @@ import numpy as np
 from chromadb.api.models.Collection import Collection
 
 from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS
-from palimpzest.core.data.dataclasses import OperatorCostEstimates, PlanStats, RecordOpStats
 from palimpzest.core.data.dataset import Dataset
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
+from palimpzest.core.models import OperatorCostEstimates, PlanStats, RecordOpStats
 from palimpzest.policy import Policy
 from palimpzest.query.operators.convert import LLMConvert
 from palimpzest.query.operators.filter import FilterOp, LLMFilter

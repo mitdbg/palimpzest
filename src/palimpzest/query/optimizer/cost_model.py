@@ -14,7 +14,7 @@ from typing import Any
 import pandas as pd
 
 from palimpzest.constants import MODEL_CARDS, NAIVE_BYTES_PER_RECORD, GPT_4o_MODEL_CARD, Model
-from palimpzest.core.data.dataclasses import OperatorCostEstimates, PlanCost, RecordOpStats, SentinelPlanStats
+from palimpzest.core.models import OperatorCostEstimates, PlanCost, RecordOpStats, SentinelPlanStats
 from palimpzest.query.operators.aggregate import ApplyGroupByOp, AverageAggregateOp, CountAggregateOp
 from palimpzest.query.operators.code_synthesis_convert import CodeSynthesisConvert
 from palimpzest.query.operators.convert import LLMConvert
@@ -220,7 +220,7 @@ class CostModel(BaseCostModel):
 
         # construct full dataset of samples
         self.sample_execution_data_df = (
-            pd.DataFrame(sample_execution_data)
+            pd.DataFrame([row.model_dump() for row in sample_execution_data])
             if len(sample_execution_data) > 0
             else None
         )

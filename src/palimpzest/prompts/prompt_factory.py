@@ -4,6 +4,8 @@ import base64
 import json
 from string import Formatter
 
+from pydantic import BaseModel
+
 from palimpzest.constants import (
     MIXTRAL_LLAMA_CONTEXT_TOKENS_LIMIT,
     TOKENS_PER_CHARACTER,
@@ -12,8 +14,7 @@ from palimpzest.constants import (
     PromptStrategy,
 )
 from palimpzest.core.elements.records import DataRecord
-from palimpzest.core.lib.fields import BytesField, ImageBase64Field, ImageFilepathField, ImageURLField
-from palimpzest.core.lib.schemas import Schema
+from palimpzest.core.lib.schemas import ImageBase64, ImageFilepath, ImageURL
 from palimpzest.prompts.convert_prompts import (
     COT_QA_BASE_SYSTEM_PROMPT,
     COT_QA_BASE_USER_PROMPT,
@@ -205,7 +206,7 @@ class PromptFactory:
         """
         input_fields_desc = ""
         for field_name in input_fields:
-            input_fields_desc += f"- {field_name}: {candidate.get_field_type(field_name)._desc}\n"
+            input_fields_desc += f"- {field_name}: {candidate.get_field_type(field_name).description}\n"
 
         return input_fields_desc[:-1]
 
@@ -221,13 +222,13 @@ class PromptFactory:
             str: The output fields description.
         """
         output_fields_desc = ""
-        output_schema: Schema = kwargs.get("output_schema")
+        output_schema: BaseModel = kwargs.get("output_schema")
         if self.prompt_strategy.is_convert_prompt():
             assert output_schema is not None, "Output schema must be provided for convert prompts."
 
-            field_desc_map = output_schema.field_desc_map()
             for field_name in output_fields:
-                output_fields_desc += f"- {field_name}: {field_desc_map[field_name]}\n"
+                desc = output_schema.model_fields[field_name].description
+                output_fields_desc += f"- {field_name}: {'no description available' if desc is None else desc}\n"
 
         # strip the last newline characters from the field descriptions and return
         return output_fields_desc[:-1]
@@ -575,14 +576,14 @@ class PromptFactory:
             field_type = candidate.get_field_type(field_name)
 
             # image filepath (or list of image filepaths)
-            if isinstance(field_type, ImageFilepathField):
+            if field_type.annotation in [ImageFilepath, ImageFilepath | None]:
                 with open(field_value, "rb") as f:
                     base64_image_str = base64.b64encode(f.read()).decode("utf-8")
                 image_messages.append(
                     {"role": "user", "type": "image", "content": f"data:image/jpeg;base64,{base64_image_str}"}
                 )
 
-            elif hasattr(field_type, "element_type") and issubclass(field_type.element_type, ImageFilepathField):
+            elif field_type.annotation in [list[ImageFilepath], list[ImageFilepath] | None]:
                 for image_filepath in field_value:
                     with open(image_filepath, "rb") as f:
                         base64_image_str = base64.b64encode(f.read()).decode("utf-8")
@@ -591,25 +592,23 @@ class PromptFactory:
                     )
 
             # image url (or list of image urls)
-            elif isinstance(field_type, ImageURLField):
+            elif field_type.annotation in [ImageURL, ImageURL | None]:
                 image_messages.append({"role": "user", "type": "image", "content": field_value})
 
-            elif hasattr(field_type, "element_type") and issubclass(field_type.element_type, ImageURLField):
+            elif field_type.annotation in [list[ImageURL], list[ImageURL] | None]:
                 for image_url in field_value:
                     image_messages.append({"role": "user", "type": "image", "content": image_url})
 
             # pre-encoded images (or list of pre-encoded images)
-            elif isinstance(field_type, ImageBase64Field):
-                base64_image_str = field_value.decode("utf-8")
+            elif field_type.annotation in [ImageBase64, ImageBase64 | None]:
                 image_messages.append(
-                    {"role": "user", "type": "image", "content": f"data:image/jpeg;base64,{base64_image_str}"}
+                    {"role": "user", "type": "image", "content": f"data:image/jpeg;base64,{field_value}"}
                 )
 
-            elif hasattr(field_type, "element_type") and issubclass(field_type.element_type, ImageBase64Field):
+            elif field_type.annotation in [list[ImageBase64], list[ImageBase64] | None]:
                 for base64_image in field_value:
-                    base64_image_str = base64_image.decode("utf-8")
                     image_messages.append(
-                        {"role": "user", "type": "image", "content": f"data:image/jpeg;base64,{base64_image_str}"}
+                        {"role": "user", "type": "image", "content": f"data:image/jpeg;base64,{base64_image}"}
                     )
 
         return image_messages
@@ -720,7 +719,7 @@ class PromptFactory:
         # build set of format kwargs
         format_kwargs = {
             field_name: "<bytes>"
-            if isinstance(candidate.get_field_type(field_name), BytesField)
+            if candidate.get_field_type(field_name).annotation in [bytes, bytes | None]
             else candidate[field_name]
             for field_name in input_fields
         }

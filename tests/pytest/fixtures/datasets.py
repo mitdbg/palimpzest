@@ -3,21 +3,24 @@ import os
 import pytest
 
 from palimpzest.core.data.iter_dataset import IterDataset, TextFileDataset
-from palimpzest.core.lib.fields import ImageFilepathField, ListField
-from palimpzest.core.lib.schemas import Number
+from palimpzest.core.lib.schemas import ImageFilepath
 
 ### Raw IterDatasets ###
 real_estate_listing_cols = [
     {"name": "listing", "type": str, "desc": "The name of the listing"},
     {"name": "text_content", "type": str, "desc": "The content of the listing's text description"},
-    {"name": "image_filepaths", "type": ListField(ImageFilepathField), "desc": "A list of the filepaths for each image of the listing"},
+    {"name": "image_filepaths", "type": list[ImageFilepath], "desc": "A list of the filepaths for each image of the listing"},
 ]
 
 class RealEstateListingDataset(IterDataset):
     def __init__(self, listings_dir):
         super().__init__(id="real-estate", schema=real_estate_listing_cols)
         self.listings_dir = listings_dir
-        self.listings = sorted(os.listdir(self.listings_dir))
+        self.listings = [
+            listing
+            for listing in sorted(os.listdir(self.listings_dir))
+            if os.path.isdir(os.path.join(self.listings_dir, listing))
+        ]
 
     def __len__(self):
         return len(self.listings)
@@ -42,7 +45,7 @@ class RealEstateListingDataset(IterDataset):
 
 class CostModelTestDataset(IterDataset):
     def __init__(self):
-        super().__init__(id="test", schema=Number)
+        super().__init__(id="test", schema=[{"name": "value", "type": int, "desc": "A number"}])
         self.numbers = [1, 2, 3]
 
     def __len__(self):

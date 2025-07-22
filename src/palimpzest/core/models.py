@@ -2,16 +2,14 @@ from __future__ import annotations
 
 import time
 from abc import abstractmethod
-from dataclasses import dataclass, field, fields
 from typing import Any
 
-import numpy as np
+from pydantic import BaseModel, Field
 
 
-@dataclass
-class GenerationStats:
+class GenerationStats(BaseModel):
     """
-    Dataclass for storing statistics about the execution of an operator on a single record.
+    Model for storing statistics about the execution of an operator on a single record.
     """
 
     model_name: str | None = None
@@ -50,7 +48,7 @@ class GenerationStats:
 
     def __iadd__(self, other: GenerationStats) -> GenerationStats:
         # self.raw_answers.extend(other.raw_answers)
-        for dataclass_field in [
+        for model_field in [
             "total_input_tokens",
             "total_output_tokens",
             "total_input_cost",
@@ -61,7 +59,7 @@ class GenerationStats:
             "total_llm_calls",
             "total_embedding_llm_calls",
         ]:
-            setattr(self, dataclass_field, getattr(self, dataclass_field) + getattr(other, dataclass_field))
+            setattr(self, model_field, getattr(self, model_field) + getattr(other, model_field))
         return self
 
     def __add__(self, other: GenerationStats) -> GenerationStats:
@@ -89,7 +87,7 @@ class GenerationStats:
             raise ZeroDivisionError("Cannot divide by zero")
         if isinstance(quotient, int):
             quotient = float(quotient)
-        for dataclass_field in [
+        for model_field in [
             "total_input_tokens",
             "total_output_tokens",
             "total_input_cost",
@@ -100,7 +98,7 @@ class GenerationStats:
             "total_llm_calls",
             "total_embedding_llm_calls",
         ]:
-            setattr(self, dataclass_field, getattr(self, dataclass_field) / quotient)
+            setattr(self, model_field, getattr(self, model_field) / quotient)
         return self
 
     def __truediv__(self, quotient: float) -> GenerationStats:
@@ -130,10 +128,9 @@ class GenerationStats:
         return self
 
 
-@dataclass
-class RecordOpStats:
+class RecordOpStats(BaseModel):
     """
-    Dataclass for storing statistics about the execution of an operator on a single record.
+    Model for storing statistics about the execution of an operator on a single record.
     """
 
     ##### REQUIRED FIELDS #####
@@ -141,10 +138,10 @@ class RecordOpStats:
     record_id: str
 
     # identifier for the parent of this record
-    record_parent_id: str
+    record_parent_id: str | None
 
     # idenifier for the source idx of this record
-    record_source_idx: str
+    record_source_idx: str | int
 
     # a dictionary with the record state after being processed by the operator
     record_state: dict[str, Any]
@@ -230,16 +227,12 @@ class RecordOpStats:
     image_operation: bool | None = None
 
     # an OPTIONAL dictionary with more detailed information about this operation;
-    op_details: dict[str, Any] = field(default_factory=dict)
-
-    def to_json(self):
-        return {field.name: getattr(self, field.name) for field in fields(self)}
+    op_details: dict[str, Any] = Field(default_factory=dict)
 
 
-@dataclass
-class OperatorStats:
+class OperatorStats(BaseModel):
     """
-    Dataclass for storing statistics captured within a given operator.
+    Model for storing statistics captured within a given operator.
     """
 
     # the full ID of the physical operation in which these stats were collected
@@ -261,7 +254,7 @@ class OperatorStats:
     total_output_tokens: int = 0
 
     # a list of RecordOpStats processed by the operation
-    record_op_stats_lst: list[RecordOpStats] = field(default_factory=list)
+    record_op_stats_lst: list[RecordOpStats] = Field(default_factory=list)
 
     # the full ID of the physical operator which precedes this one
     source_full_op_id: str | None = None
@@ -270,7 +263,7 @@ class OperatorStats:
     plan_id: str = ""
 
     # an OPTIONAL dictionary with more detailed information about this operation;
-    op_details: dict[str, Any] = field(default_factory=dict)
+    op_details: dict[str, Any] = Field(default_factory=dict)
 
     def __iadd__(self, stats: OperatorStats | RecordOpStats) -> OperatorStats:
         """
@@ -304,22 +297,10 @@ class OperatorStats:
 
         return self
 
-    def to_json(self):
-        return {
-            "full_op_id": self.full_op_id,
-            "op_name": self.op_name,
-            "total_op_time": self.total_op_time,
-            "total_op_cost": self.total_op_cost,
-            "total_input_tokens": self.total_input_tokens,
-            "total_output_tokens": self.total_output_tokens,
-            "record_op_stats_lst": [record_op_stats.to_json() for record_op_stats in self.record_op_stats_lst],
-            "op_details": self.op_details,
-        }
 
-@dataclass
-class BasePlanStats:
+class BasePlanStats(BaseModel):
     """
-    Dataclass for storing statistics captured for an entire plan.
+    Model for storing statistics captured for an entire plan.
 
     This class is subclassed for tracking:
     - PlanStats: the statistics for execution of a PhysicalPlan
@@ -343,13 +324,19 @@ class BasePlanStats:
     # dictionary whose values are OperatorStats objects;
     # PlanStats maps {full_op_id -> OperatorStats}
     # SentinelPlanStats maps {logical_op_id -> {full_op_id -> OperatorStats}}
-    operator_stats: dict = field(default_factory=dict)
+    operator_stats: dict = Field(default_factory=dict)
 
     # total runtime for the plan measured from the start to the end of PhysicalPlan.execute()
     total_plan_time: float = 0.0
 
     # total cost for plan
     total_plan_cost: float = 0.0
+
+    # total input tokens processed by this plan
+    total_input_tokens: int = 0
+
+    # total output tokens processed by this plan
+    total_output_tokens: int = 0
 
     # start time for the plan execution; should be set by calling PlanStats.start()
     start_time: float | None = None
@@ -417,14 +404,7 @@ class BasePlanStats:
         """
         pass
 
-    @abstractmethod
-    def to_json(self) -> dict:
-        """
-        Return a JSON representation of this plan's statistics.
-        """
-        pass
 
-@dataclass
 class PlanStats(BasePlanStats):
     """
     Subclass of BasePlanStats which captures statistics from the execution of a single PhysicalPlan.
@@ -507,19 +487,7 @@ class PlanStats(BasePlanStats):
             stats += f"{idx}. {op_stats.op_name} time={op_stats.total_op_time} cost={op_stats.total_op_cost} \n"
         return stats
 
-    def to_json(self) -> dict:
-        return {
-            "plan_id": self.plan_id,
-            "plan_str": self.plan_str,
-            "operator_stats": {full_op_id: op_stats.to_json() for full_op_id, op_stats in self.operator_stats.items()},
-            "total_plan_time": self.total_plan_time,
-            "total_plan_cost": self.total_plan_cost,
-            "total_input_tokens": self.total_input_tokens,
-            "total_output_tokens": self.total_output_tokens,
-        }
 
-
-@dataclass
 class SentinelPlanStats(BasePlanStats):
     """
     Subclass of BasePlanStats which captures statistics from the execution of a single SentinelPlan.
@@ -616,35 +584,20 @@ class SentinelPlanStats(BasePlanStats):
                 stats += f"    {outer_idx}.{inner_idx}. {op_stats.op_name} time={op_stats.total_op_time} cost={op_stats.total_op_cost} \n"
         return stats
 
-    def to_json(self) -> dict:
-        return {
-            "plan_id": self.plan_id,
-            "plan_str": self.plan_str,
-            "operator_stats": {
-                logical_op_id: {full_op_id: op_stats.to_json() for full_op_id, op_stats in physical_op_stats.items()}
-                for logical_op_id, physical_op_stats in self.operator_stats.items()
-            },
-            "total_plan_time": self.total_plan_time,
-            "total_plan_cost": self.total_plan_cost,
-            "total_input_tokens": self.total_input_tokens,
-            "total_output_tokens": self.total_output_tokens,
-        }
 
-
-@dataclass
-class ExecutionStats:
+class ExecutionStats(BaseModel):
     """
-    Dataclass for storing statistics captured for the entire execution of a workload.
+    Model for storing statistics captured for the entire execution of a workload.
     """
 
     # string for identifying this workload execution
     execution_id: str | None = None
 
     # dictionary of SentinelPlanStats objects (one for each sentinel plan run during execution)
-    sentinel_plan_stats: dict[str, SentinelPlanStats] = field(default_factory=dict)
+    sentinel_plan_stats: dict[str, SentinelPlanStats] = Field(default_factory=dict)
 
     # dictionary of PlanStats objects (one for each plan run during execution)
-    plan_stats: dict[str, PlanStats] = field(default_factory=dict)
+    plan_stats: dict[str, PlanStats] = Field(default_factory=dict)
 
     # total time spent optimizing
     optimization_time: float = 0.0
@@ -674,15 +627,15 @@ class ExecutionStats:
     total_tokens: int = 0
 
     # dictionary of sentinel plan strings; useful for printing executed sentinel plans in demos
-    sentinel_plan_strs: dict[str, str] = field(default_factory=dict)
+    sentinel_plan_strs: dict[str, str] = Field(default_factory=dict)
 
     # dictionary of plan strings; useful for printing executed plans in demos
-    plan_strs: dict[str, str] = field(default_factory=dict)
+    plan_strs: dict[str, str] = Field(default_factory=dict)
 
     # start time for the execution; should be set by calling ExecutionStats.start()
     start_time: float | None = None
 
-    # end time for the optimization; 
+    # end time for the optimization;
     optimization_end_time: float | None = None
 
     def start(self) -> None:
@@ -780,46 +733,13 @@ class ExecutionStats:
             else:
                 raise TypeError(f"Cannot add {type(plan_stats)} to ExecutionStats")
 
-    def clean_json(self, stats: dict):
-        """
-        Convert np.int64 and np.float64 to int and float for all values in stats.
-        """
-        for key, value in stats.items():
-            if isinstance(value, dict):
-                stats[key] = self.clean_json(value)
-            elif isinstance(value, np.int64):
-                stats[key] = int(value)
-            elif isinstance(value, np.float64):
-                stats[key] = float(value)
-        return stats
-
-    def to_json(self):
-        stats = {
-            "execution_id": self.execution_id,
-            "sentinel_plan_stats": {
-                plan_id: plan_stats.to_json() for plan_id, plan_stats in self.sentinel_plan_stats.items()
-            },
-            "plan_stats": {plan_id: plan_stats.to_json() for plan_id, plan_stats in self.plan_stats.items()},
-            "optimization_time": self.optimization_time,
-            "optimization_cost": self.optimization_cost,
-            "plan_execution_time": self.plan_execution_time,
-            "plan_execution_cost": self.plan_execution_cost,
-            "total_execution_time": self.total_execution_time,
-            "total_execution_cost": self.total_execution_cost,
-            "total_input_tokens": self.total_input_tokens,
-            "total_output_tokens": self.total_output_tokens,
-            "total_tokens": self.total_tokens,
-            "sentinel_plan_strs": self.sentinel_plan_strs,
-            "plan_strs": self.plan_strs,
-        }
-        stats = self.clean_json(stats)
-        return stats
+    def to_json(self) -> dict:
+        return self.model_dump(mode="json")
 
 
-@dataclass
-class OperatorCostEstimates:
+class OperatorCostEstimates(BaseModel):
     """
-    Dataclass for storing estimates of key metrics of interest for each operator.
+    Model for storing estimates of key metrics of interest for each operator.
     """
 
     # (estimated) number of records output by this operator
@@ -862,10 +782,10 @@ class OperatorCostEstimates:
         """
         Multiply all fields by a scalar.
         """
-        dct = {field.name: getattr(self, field.name) * multiplier for field in fields(self)}
+        dct = {field_name: getattr(self, field_name) * multiplier for field_name in self.model_fields}
         return OperatorCostEstimates(**dct)
 
-    def __post_init__(self):
+    def model_post_init(self, __context: Any) -> None:
         if self.cardinality_lower_bound is None and self.cardinality_upper_bound is None:
             self.cardinality_lower_bound = self.cardinality
             self.cardinality_upper_bound = self.cardinality
@@ -883,10 +803,9 @@ class OperatorCostEstimates:
             self.quality_upper_bound = self.quality
 
 
-@dataclass
-class PlanCost:
+class PlanCost(BaseModel):
     """
-    Dataclass for storing the (cost, time, quality) estimates of (sub)-plans and their upper and lower bounds.
+    Model for storing the (cost, time, quality) estimates of (sub)-plans and their upper and lower bounds.
     """
 
     # the expression cost
@@ -922,7 +841,7 @@ class PlanCost:
     def __hash__(self):
         return hash(f"{self.cost}-{self.time}-{self.quality}")
 
-    def __post_init__(self):
+    def model_post_init(self, __context: Any) -> None:
         if self.time_lower_bound is None and self.time_upper_bound is None:
             self.time_lower_bound = self.time
             self.time_upper_bound = self.time
@@ -943,15 +862,15 @@ class PlanCost:
         self.cost += other.cost
         self.time += other.time
         self.quality *= other.quality
-        for dataclass_field in ["cost_lower_bound", "cost_upper_bound", "time_lower_bound", "time_upper_bound"]:
-            if getattr(self, dataclass_field) is not None and getattr(other, dataclass_field) is not None:
-                summation = getattr(self, dataclass_field) + getattr(other, dataclass_field)
-                setattr(self, dataclass_field, summation)
+        for model_field in ["cost_lower_bound", "cost_upper_bound", "time_lower_bound", "time_upper_bound"]:
+            if getattr(self, model_field) is not None and getattr(other, model_field) is not None:
+                summation = getattr(self, model_field) + getattr(other, model_field)
+                setattr(self, model_field, summation)
 
-        for dataclass_field in ["quality_lower_bound", "quality_upper_bound"]:
-            if getattr(self, dataclass_field) is not None and getattr(other, dataclass_field) is not None:
-                product = getattr(self, dataclass_field) * getattr(other, dataclass_field)
-                setattr(self, dataclass_field, product)
+        for model_field in ["quality_lower_bound", "quality_upper_bound"]:
+            if getattr(self, model_field) is not None and getattr(other, model_field) is not None:
+                product = getattr(self, model_field) * getattr(other, model_field)
+                setattr(self, model_field, product)
 
         return self
 
@@ -971,7 +890,7 @@ class PlanCost:
                 "time_upper_bound",
             ]
         }
-        for dataclass_field in ["quality", "quality_lower_bound", "quality_upper_bound"]:
-            dct[dataclass_field] = getattr(self, dataclass_field) * getattr(other, dataclass_field)
+        for model_field in ["quality", "quality_lower_bound", "quality_upper_bound"]:
+            dct[model_field] = getattr(self, model_field) * getattr(other, model_field)
 
         return PlanCost(**dct)

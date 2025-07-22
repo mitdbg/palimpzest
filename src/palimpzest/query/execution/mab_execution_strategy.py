@@ -2,8 +2,8 @@ import logging
 
 import numpy as np
 
-from palimpzest.core.data.dataclasses import OperatorStats, SentinelPlanStats
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
+from palimpzest.core.models import OperatorStats, SentinelPlanStats
 from palimpzest.policy import Policy
 from palimpzest.query.execution.execution_strategy import SentinelExecutionStrategy
 from palimpzest.query.operators.filter import FilterOp

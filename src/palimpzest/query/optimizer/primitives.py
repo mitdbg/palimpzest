@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from palimpzest.core.lib.fields import Field
+from pydantic.fields import FieldInfo
+
 from palimpzest.query.operators.logical import LogicalOperator
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.optimizer.plan import PlanCost
@@ -18,9 +19,9 @@ class Expression:
         self,
         operator: LogicalOperator | PhysicalOperator,
         input_group_ids: list[int],
-        input_fields: dict[str, Field],
+        input_fields: dict[str, FieldInfo],
         depends_on_field_names: set[str],
-        generated_fields: dict[str, Field],
+        generated_fields: dict[str, FieldInfo],
         group_id: int | None = None,
     ):
         self.operator = operator
@@ -76,7 +77,7 @@ class Group:
     Maintains a set of logical multi-expressions and physical multi-expressions.
     """
 
-    def __init__(self, logical_expressions: list[Expression], fields: dict[str, Field], properties: dict[str, set[str]]):
+    def __init__(self, logical_expressions: list[Expression], fields: dict[str, FieldInfo], properties: dict[str, set[str]]):
         self.logical_expressions = set(logical_expressions)
         self.physical_expressions = set()
         self.fields = fields

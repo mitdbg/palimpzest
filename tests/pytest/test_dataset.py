@@ -3,7 +3,6 @@ import pytest
 
 from palimpzest.core.data.dataset import Dataset
 from palimpzest.core.data.iter_dataset import MemoryDataset
-from palimpzest.core.lib.schemas import NumericField, StringField
 from palimpzest.query.operators.logical import ConvertScan, FilteredScan
 
 
@@ -20,7 +19,7 @@ def sample_df():
 def test_dataset_initialization(sample_df):
     ds = MemoryDataset("test", sample_df)
     assert isinstance(ds, Dataset)
-    assert ds.schema.field_names() == ['age', 'id', 'name']
+    assert sorted(ds.schema.model_fields) == ['age', 'id', 'name']
 
 
 def test_dataset_filter(sample_df):
@@ -45,14 +44,14 @@ def test_dataset_add_columns(sample_df):
         df['greeting'] = 'Hello ' + df['name']
         return df
     
-    new_ds = ds.add_columns(udf=add_greeting, cols=[{'name': 'greeting', 'type': str}])
+    new_ds = ds.add_columns(udf=add_greeting, cols=[{'name': 'greeting', 'desc': 'Greeting message', 'type': str}])
     assert isinstance(new_ds, Dataset)
     assert isinstance(new_ds._operator, ConvertScan)
     assert new_ds._operator.udf is not None
-    assert new_ds.schema.field_names() == ['age', 'greeting', 'id', 'name']
-    greeting_field = new_ds.schema.field_map()['greeting'] 
-    assert isinstance(greeting_field, StringField)
-    assert greeting_field.desc == 'New column: greeting'
+    assert sorted(new_ds.schema.model_fields) == ['age', 'greeting', 'id', 'name']
+    greeting_field = new_ds.schema.model_fields['greeting'] 
+    assert greeting_field.annotation is str
+    assert greeting_field.description == 'Greeting message'
 
     # Test semantic add_columns
     new_cols = [{'name': 'greeting', 'type': str, 'desc': 'Greeting message'},
@@ -60,14 +59,14 @@ def test_dataset_add_columns(sample_df):
     sem_new_ds = ds.sem_add_columns(new_cols)
     assert isinstance(sem_new_ds, Dataset)
     assert isinstance(sem_new_ds._operator, ConvertScan)
-    assert sem_new_ds.schema.field_names() == ['age', 'greeting', 'id', 'name', 'score']
-    greeting_field = sem_new_ds.schema.field_map()['greeting']
-    assert isinstance(greeting_field, StringField)
-    assert greeting_field.desc == 'Greeting message'
+    assert sorted(sem_new_ds.schema.model_fields) == ['age', 'greeting', 'id', 'name', 'score']
+    greeting_field = sem_new_ds.schema.model_fields['greeting']
+    assert greeting_field.annotation is str
+    assert greeting_field.description == 'Greeting message'
 
-    score_field = sem_new_ds.schema.field_map()['score']
-    assert isinstance(score_field, NumericField)
-    assert score_field.desc == 'Score'
+    score_field = sem_new_ds.schema.model_fields['score']
+    assert score_field.annotation == int | float
+    assert score_field.description == 'Score'
 
     with pytest.raises(ValueError, match="`udf` and `cols` must be provided for add_columns."):
         ds.add_columns(udf=add_greeting, cols=None)
