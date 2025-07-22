@@ -18,10 +18,10 @@ class GroupBySig:
 
     def validate_schema(self, input_schema: BaseModel) -> tuple[bool, str | None]:
         for f in self.group_by_fields:
-            if not hasattr(input_schema, f):
+            if f not in input_schema.model_fields:
                 return (False, "Supplied schema has no field " + f)
         for f in self.agg_fields:
-            if not hasattr(input_schema, f):
+            if f not in input_schema.model_fields:
                 return (False, "Supplied schema has no field " + f)
         return (True, None)
 

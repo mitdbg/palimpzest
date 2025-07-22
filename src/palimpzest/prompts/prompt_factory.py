@@ -206,7 +206,7 @@ class PromptFactory:
         """
         input_fields_desc = ""
         for field_name in input_fields:
-            input_fields_desc += f"- {field_name}: {candidate.get_field_type(field_name)._desc}\n"
+            input_fields_desc += f"- {field_name}: {candidate.get_field_type(field_name).description}\n"
 
         return input_fields_desc[:-1]
 
@@ -601,16 +601,14 @@ class PromptFactory:
 
             # pre-encoded images (or list of pre-encoded images)
             elif field_type.annotation in [ImageBase64, ImageBase64 | None]:
-                base64_image_str = field_value.decode("utf-8")
                 image_messages.append(
-                    {"role": "user", "type": "image", "content": f"data:image/jpeg;base64,{base64_image_str}"}
+                    {"role": "user", "type": "image", "content": f"data:image/jpeg;base64,{field_value}"}
                 )
 
             elif field_type.annotation in [list[ImageBase64], list[ImageBase64] | None]:
                 for base64_image in field_value:
-                    base64_image_str = base64_image.decode("utf-8")
                     image_messages.append(
-                        {"role": "user", "type": "image", "content": f"data:image/jpeg;base64,{base64_image_str}"}
+                        {"role": "user", "type": "image", "content": f"data:image/jpeg;base64,{base64_image}"}
                     )
 
         return image_messages

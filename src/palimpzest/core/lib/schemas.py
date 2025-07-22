@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sys
-from typing import Annotated, Any
+from typing import Any, TypeAliasType
 
 import pandas as pd
 from pydantic import BaseModel, Field, create_model
@@ -16,10 +16,9 @@ PANDAS_DTYPE_TO_PYDANTIC = {
 }
 
 # IMAGE TYPES
-ImageFilepath = Annotated[str, Field(description="The filepath to an image file")]
-ImageBase64 = Annotated[str, Field(description="The base64-encoded contents of an image")]
-ImageURL = Annotated[str, Field(description="The URL of an image")]
-
+ImageFilepath = TypeAliasType('ImageFilepath', str)
+ImageBase64 = TypeAliasType('ImageBase64', str)
+ImageURL = TypeAliasType('ImageURL', str)
 
 def get_schema_field_names(schema: type[BaseModel], id: str | None = None) -> list[str]:
     """Return the field names of a Pydantic model."""

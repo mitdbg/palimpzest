@@ -29,32 +29,32 @@ dog_image_cols = [
 
 def build_sci_paper_plan(dataset):
     """A dataset-independent declarative description of authors of good papers"""
-    return pz.Dataset(dataset).sem_add_columns(sci_paper_cols)
+    return pz.PDFFileDataset(id="science-papers", path=dataset).sem_add_columns(sci_paper_cols)
 
 def build_test_pdf_plan(dataset):
     """This tests whether we can process a PDF file"""
-    return pz.Dataset(dataset)
+    return pz.PDFFileDataset(id="pdf-files", path=dataset)
 
 def build_mit_battery_paper_plan(dataset):
     """A dataset-independent declarative description of authors of good papers"""
-    sci_papers = pz.Dataset(dataset).sem_add_columns(sci_paper_cols)
+    sci_papers = pz.PDFFileDataset(id="science-papers", path=dataset).sem_add_columns(sci_paper_cols)
     battery_papers = sci_papers.sem_filter("The paper is about batteries")
     mit_papers = battery_papers.sem_filter("The paper is from MIT")
     return mit_papers
 
 def build_enron_plan(dataset):
     """Build a plan for processing Enron email data"""
-    return pz.Dataset(dataset).sem_add_columns(email_cols)
+    return pz.TextFileDataset(id="enron-emails", path=dataset).sem_add_columns(email_cols)
 
 def compute_enron_stats(dataset):
     """Compute statistics on Enron email data"""
-    emails = pz.Dataset(dataset).sem_add_columns(email_cols)
+    emails = pz.TextFileDataset(id="enron-emails", path=dataset).sem_add_columns(email_cols)
     subject_line_lengths = emails.sem_add_columns([{"name": "words", "type": int, "desc": "The number of words in the subject field"}])
     return subject_line_lengths
 
 def enron_gby_plan(dataset):
     """Group Enron emails by sender"""
-    emails = pz.Dataset(dataset).sem_add_columns(email_cols)
+    emails = pz.TextFileDataset(id="enron-emails", path=dataset).sem_add_columns(email_cols)
     ops = ["count"]
     fields = ["sender"]
     groupbyfields = ["sender"]
@@ -64,7 +64,7 @@ def enron_gby_plan(dataset):
 
 def enron_count_plan(dataset):
     """Count total Enron emails"""
-    emails = pz.Dataset(dataset).sem_add_columns(email_cols)
+    emails = pz.TextFileDataset(id="enron-emails", path=dataset).sem_add_columns(email_cols)
     ops = ["count"]
     fields = ["sender"]
     groupbyfields = []
@@ -74,7 +74,7 @@ def enron_count_plan(dataset):
 
 def enron_average_count_plan(dataset):
     """Calculate average number of emails per sender"""
-    emails = pz.Dataset(dataset).sem_add_columns(email_cols)
+    emails = pz.TextFileDataset(id="enron-emails", path=dataset).sem_add_columns(email_cols)
     ops = ["count"]
     fields = ["sender"]
     groupbyfields = ["sender"]
@@ -89,20 +89,20 @@ def enron_average_count_plan(dataset):
 
 def enron_limit_plan(dataset, limit=5):
     """Get limited number of Enron emails"""
-    emails = pz.Dataset(dataset).sem_add_columns(email_cols)
+    emails = pz.TextFileDataset(id="enron-emails", path=dataset).sem_add_columns(email_cols)
     limit_data = emails.limit(limit)
     return limit_data
 
 def build_image_plan(dataset):
     """Build a plan for processing dog images"""
-    images = pz.Dataset(dataset)
+    images = pz.ImageFileDataset(id="dog-images", path=dataset)
     filtered_images = images.sem_filter("The image contains one or more dogs")
     dog_images = filtered_images.sem_add_columns(dog_image_cols)
     return dog_images
 
 def build_image_agg_plan(dataset):
     """Build a plan for aggregating dog images by breed"""
-    images = pz.Dataset(dataset)
+    images = pz.ImageFileDataset(id="dog-images", path=dataset)
     filtered_images = images.sem_filter("The image contains one or more dogs")
     dog_images = filtered_images.sem_add_columns(dog_image_cols)
     ops = ["count"]

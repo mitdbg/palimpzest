@@ -28,7 +28,7 @@ def main():
         "--policy",
         type=str,
         help="One of 'mincost', 'mintime', 'maxquality'",
-        default="mincost",
+        default="maxquality",
     )
 
     args = parser.parse_args()

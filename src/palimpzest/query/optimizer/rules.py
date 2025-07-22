@@ -3,8 +3,6 @@ import os
 from copy import deepcopy
 from itertools import combinations
 
-from litellm import completion
-
 from palimpzest.constants import AggFunc, Cardinality, PromptStrategy
 from palimpzest.core.data.context_manager import ContextManager
 from palimpzest.core.lib.schemas import ImageBase64, ImageFilepath, ImageURL
@@ -322,20 +320,18 @@ class LLMConvertBondedRule(ImplementationRule):
                 if field_name.split(".")[-1] in logical_expression.depends_on_field_names
             ]
         )
-        num_image_fields = sum(
-            [
-                field.annotation in IMAGE_FIELD_TYPES
-                for field_name, field in logical_expression.input_fields.items()
-                if field_name.split(".")[-1] in logical_expression.depends_on_field_names
-            ]
-        )
-        list_image_field = any(
-            [
-                field.annotation in IMAGE_LIST_FIELD_TYPES
-                for field_name, field in logical_expression.input_fields.items()
-                if field_name.split(".")[-1] in logical_expression.depends_on_field_names
-            ]
-        )
+        image_fields = [
+            field_name.split(".")[-1]
+            for field_name, field in logical_expression.input_fields.items()
+            if field.annotation in IMAGE_FIELD_TYPES and field_name.split(".")[-1] in logical_expression.depends_on_field_names
+        ]
+        list_image_fields = [
+            field_name.split(".")[-1]
+            for field_name, field in logical_expression.input_fields.items()
+            if field.annotation in IMAGE_LIST_FIELD_TYPES and field_name.split(".")[-1] in logical_expression.depends_on_field_names
+        ]
+        num_image_fields = len(set(image_fields))
+        list_image_field = len(set(list_image_fields)) > 0
 
         physical_expressions = []
         for model in physical_op_params["available_models"]:
@@ -559,20 +555,18 @@ class MixtureOfAgentsConvertRule(ImplementationRule):
         text_models = set(get_models())
 
         # construct set of proposer models and set of aggregator models
-        num_image_fields = sum(
-            [
-                field.annotation in IMAGE_FIELD_TYPES
-                for field_name, field in logical_expression.input_fields.items()
-                if field_name.split(".")[-1] in logical_expression.depends_on_field_names
-            ]
-        )
-        list_image_field = any(
-            [
-                field.annotation in IMAGE_LIST_FIELD_TYPES
-                for field_name, field in logical_expression.input_fields.items()
-                if field_name.split(".")[-1] in logical_expression.depends_on_field_names
-            ]
-        )
+        image_fields = [
+            field_name.split(".")[-1]
+            for field_name, field in logical_expression.input_fields.items()
+            if field.annotation in IMAGE_FIELD_TYPES and field_name.split(".")[-1] in logical_expression.depends_on_field_names
+        ]
+        list_image_fields = [
+            field_name.split(".")[-1]
+            for field_name, field in logical_expression.input_fields.items()
+            if field.annotation in IMAGE_LIST_FIELD_TYPES and field_name.split(".")[-1] in logical_expression.depends_on_field_names
+        ]
+        num_image_fields = len(set(image_fields))
+        list_image_field = len(set(list_image_fields)) > 0
         proposer_model_set, is_image_conversion = text_models, False
         if num_image_fields > 1 or list_image_field:
             proposer_model_set = [model for model in vision_models if not model.is_llama_model()]
@@ -665,20 +659,18 @@ class CriticAndRefineConvertRule(ImplementationRule):
                 if field_name.split(".")[-1] in logical_expression.depends_on_field_names
             ]
         )
-        num_image_fields = sum(
-            [
-                field.annotation in IMAGE_FIELD_TYPES
-                for field_name, field in logical_expression.input_fields.items()
-                if field_name.split(".")[-1] in logical_expression.depends_on_field_names
-            ]
-        )
-        list_image_field = any(
-            [
-                field.annotation in IMAGE_LIST_FIELD_TYPES
-                for field_name, field in logical_expression.input_fields.items()
-                if field_name.split(".")[-1] in logical_expression.depends_on_field_names
-            ]
-        )
+        image_fields = [
+            field_name.split(".")[-1]
+            for field_name, field in logical_expression.input_fields.items()
+            if field.annotation in IMAGE_FIELD_TYPES and field_name.split(".")[-1] in logical_expression.depends_on_field_names
+        ]
+        list_image_fields = [
+            field_name.split(".")[-1]
+            for field_name, field in logical_expression.input_fields.items()
+            if field.annotation in IMAGE_LIST_FIELD_TYPES and field_name.split(".")[-1] in logical_expression.depends_on_field_names
+        ]
+        num_image_fields = len(set(image_fields))
+        list_image_field = len(set(list_image_fields)) > 0
 
         # identify models which can be used for this convert operation
         models = []
@@ -935,20 +927,18 @@ class LLMFilterRule(ImplementationRule):
                 if field_name.split(".")[-1] in logical_expression.depends_on_field_names
             ]
         )
-        num_image_fields = sum(
-            [
-                field.annotation in IMAGE_FIELD_TYPES
-                for field_name, field in logical_expression.input_fields.items()
-                if field_name.split(".")[-1] in logical_expression.depends_on_field_names
-            ]
-        )
-        list_image_field = any(
-            [
-                field.annotation in IMAGE_LIST_FIELD_TYPES
-                for field_name, field in logical_expression.input_fields.items()
-                if field_name.split(".")[-1] in logical_expression.depends_on_field_names
-            ]
-        )
+        image_fields = [
+            field_name.split(".")[-1]
+            for field_name, field in logical_expression.input_fields.items()
+            if field.annotation in IMAGE_FIELD_TYPES and field_name.split(".")[-1] in logical_expression.depends_on_field_names
+        ]
+        list_image_fields = [
+            field_name.split(".")[-1]
+            for field_name, field in logical_expression.input_fields.items()
+            if field.annotation in IMAGE_LIST_FIELD_TYPES and field_name.split(".")[-1] in logical_expression.depends_on_field_names
+        ]
+        num_image_fields = len(set(image_fields))
+        list_image_field = len(set(list_image_fields)) > 0
 
         physical_expressions = []
         for model in physical_op_params["available_models"]:
@@ -1071,9 +1061,12 @@ class AddContextsBeforeComputeRule(ImplementationRule):
         elif os.getenv("TOGETHER_API_KEY"):
             model = "together_ai/togethercomputer/Llama-3.3-70B-Instruct-Turbo"
 
+        # importing litellm here because importing above causes deprecation warning
+        import litellm
+
         # retrieve any additional context which may be useful
         cm = ContextManager()
-        response = completion(
+        response = litellm.completion(
             model=model,
             messages=[{"role": "user", "content": cls.SEARCH_GENERATOR_PROMPT.format(instruction=logical_op.instruction)}]
         )

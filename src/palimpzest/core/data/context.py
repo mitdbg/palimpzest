@@ -5,7 +5,7 @@ import re
 from abc import ABC
 from typing import Callable
 
-import litellm
+# import litellm
 import pandas as pd
 from pydantic import BaseModel
 
