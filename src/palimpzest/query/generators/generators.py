@@ -10,7 +10,6 @@ import re
 import time
 import warnings
 from abc import ABC, abstractmethod
-from collections import Counter
 from copy import deepcopy
 from typing import Any, Generic, TypeVar
 
@@ -33,7 +32,6 @@ from palimpzest.core.models import GenerationStats
 from palimpzest.prompts import PromptFactory
 from palimpzest.query.generators.api_client_factory import APIClientFactory
 from palimpzest.utils.generation_helpers import get_json_from_answer
-from palimpzest.utils.sandbox import API
 
 # DEFINITIONS
 GenerationOutput = tuple[dict, str | None, GenerationStats, list[dict]]
