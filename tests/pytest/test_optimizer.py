@@ -7,7 +7,6 @@ from palimpzest.core.elements.filters import Filter
 from palimpzest.core.lib.schemas import TextFile
 from palimpzest.core.models import OperatorCostEstimates, PlanCost
 from palimpzest.policy import MaxQuality, MinCost, MinTime
-from palimpzest.query.operators.code_synthesis_convert import CodeSynthesisConvert
 from palimpzest.query.operators.convert import LLMConvert, LLMConvertBonded
 from palimpzest.query.operators.filter import LLMFilter, NonLLMFilter
 from palimpzest.query.operators.logical import ConvertScan, FilteredScan
@@ -131,7 +130,6 @@ class TestOptimizer:
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
             optimizer_strategy=opt_strategy,
-            allow_code_synth=False,
             allow_rag_reduction=False,
             allow_mixtures=False,
             allow_critic=False,
@@ -156,14 +154,13 @@ class TestOptimizer:
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
             optimizer_strategy=opt_strategy,
-            allow_code_synth=True,
         )
         physical_plans = optimizer.optimize(plan)
         physical_plan = physical_plans[0]
 
         assert len(physical_plan) == 2
         assert isinstance(physical_plan[0], MarshalAndScanDataOp)
-        assert isinstance(physical_plan[1], CodeSynthesisConvert)
+        assert isinstance(physical_plan[1], LLMConvertBonded)
 
     def test_simple_min_time_convert(self, enron_eval_tiny, email_schema, opt_strategy):
         plan = enron_eval_tiny
@@ -176,14 +173,13 @@ class TestOptimizer:
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
             optimizer_strategy=opt_strategy,
-            allow_code_synth=True,
         )
         physical_plans = optimizer.optimize(plan)
         physical_plan = physical_plans[0]
 
         assert len(physical_plan) == 2
         assert isinstance(physical_plan[0], MarshalAndScanDataOp)
-        assert isinstance(physical_plan[1], CodeSynthesisConvert)
+        assert isinstance(physical_plan[1], LLMConvertBonded)
 
     def test_push_down_filter(self, enron_eval_tiny, email_schema, opt_strategy):
         plan = enron_eval_tiny
@@ -197,7 +193,6 @@ class TestOptimizer:
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
             optimizer_strategy=opt_strategy,
-            allow_code_synth=True,
         )
         physical_plans = optimizer.optimize(plan)
         physical_plan = physical_plans[0]
@@ -205,7 +200,7 @@ class TestOptimizer:
         assert len(physical_plan) == 3
         assert isinstance(physical_plan[0], MarshalAndScanDataOp)
         assert isinstance(physical_plan[1], LLMFilter)
-        assert isinstance(physical_plan[2], CodeSynthesisConvert)
+        assert isinstance(physical_plan[2], LLMConvertBonded)
 
     def test_push_down_two_filters(self, enron_eval_tiny, email_schema, opt_strategy):
         plan = enron_eval_tiny
@@ -220,7 +215,6 @@ class TestOptimizer:
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
             optimizer_strategy=opt_strategy,
-            allow_code_synth=True,
         )
         physical_plans = optimizer.optimize(plan)
         physical_plan = physical_plans[0]
@@ -229,7 +223,7 @@ class TestOptimizer:
         assert isinstance(physical_plan[0], MarshalAndScanDataOp)
         assert isinstance(physical_plan[1], LLMFilter)
         assert isinstance(physical_plan[2], LLMFilter)
-        assert isinstance(physical_plan[3], CodeSynthesisConvert)
+        assert isinstance(physical_plan[3], LLMConvertBonded)
 
     def test_real_estate_logical_reorder(self, real_estate_workload, opt_strategy):
         policy = MinCost()
@@ -239,7 +233,6 @@ class TestOptimizer:
             cost_model=cost_model,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
-            allow_code_synth=False,
             allow_rag_reduction=False,
             allow_mixtures=False,
             allow_critic=False,
@@ -277,7 +270,6 @@ class TestOptimizer:
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
             optimizer_strategy=opt_strategy,
-            allow_code_synth=True,
         )
         physical_plans = optimizer.optimize(plan)
         physical_plan = physical_plans[0]
@@ -291,7 +283,7 @@ class TestOptimizer:
         assert isinstance(physical_plan[5], LLMFilter)
         assert isinstance(physical_plan[6], LLMFilter)
         assert isinstance(physical_plan[7], LLMFilter)
-        assert isinstance(physical_plan[8], CodeSynthesisConvert)
+        assert isinstance(physical_plan[8], LLMConvertBonded)
 
         assert time.time() - start_time < 5, (
             "Optimizer should complete this test within 2 to 5 seconds; if it's failed, something has caused a regression, and you should ping Matthew Russo (mdrusso@mit.edu)"
@@ -419,7 +411,6 @@ class TestParetoOptimizer:
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_3_70B],
             optimizer_strategy=OptimizationStrategyType.PARETO,
-            allow_code_synth=False,
             allow_rag_reduction=False,
             allow_mixtures=False,
             allow_critic=False,

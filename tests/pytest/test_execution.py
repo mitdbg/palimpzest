@@ -5,7 +5,6 @@ from palimpzest.query.execution.parallel_execution_strategy import (
     ParallelExecutionStrategy,
 )
 from palimpzest.query.execution.single_threaded_execution_strategy import SequentialSingleThreadExecutionStrategy
-from palimpzest.query.operators.code_synthesis_convert import CodeSynthesisConvert
 from palimpzest.query.operators.convert import LLMConvertBonded
 from palimpzest.query.operators.filter import LLMFilter
 from palimpzest.query.operators.rag_convert import RAGConvert
@@ -30,13 +29,6 @@ class TestParallelExecution:
             pytest.param("enron-eval-tiny", "llm-filter", "enron-filtered-records", "enron-filter", id="llm-filter"),
             pytest.param(
                 "enron-eval-tiny", "bonded-llm-convert", "enron-all-records", "enron-convert", id="bonded-llm-convert"
-            ),
-            pytest.param(
-                "enron-eval-tiny", 
-                "code-synth-convert",
-                "enron-all-records",
-                "enron-convert",
-                id="code-synth-convert"
             ),
             pytest.param(
                 "enron-eval-tiny", 
@@ -73,7 +65,6 @@ class TestParallelExecution:
         # mock out calls to generators used by the plans which parameterize this test
         mocker.patch.object(LLMFilter, "filter", side_effect=side_effect)
         mocker.patch.object(LLMConvertBonded, "convert", side_effect=side_effect)
-        mocker.patch.object(CodeSynthesisConvert, "convert", side_effect=side_effect)
         mocker.patch.object(RAGConvert, "convert", side_effect=side_effect)
 
         # execute the plan

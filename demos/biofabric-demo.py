@@ -136,7 +136,6 @@ if __name__ == "__main__":
 
     config = pz.QueryProcessorConfig(
         policy=policy,
-        allow_code_synth=False,
         processing_strategy="no_sentinel",
         execution_strategy=executor,
     )

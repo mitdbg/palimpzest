@@ -10,7 +10,6 @@ import re
 import time
 import warnings
 from abc import ABC, abstractmethod
-from collections import Counter
 from copy import deepcopy
 from typing import Any, Generic, TypeVar
 
@@ -33,7 +32,6 @@ from palimpzest.core.models import GenerationStats
 from palimpzest.prompts import PromptFactory
 from palimpzest.query.generators.api_client_factory import APIClientFactory
 from palimpzest.utils.generation_helpers import get_json_from_answer
-from palimpzest.utils.sandbox import API
 
 # DEFINITIONS
 GenerationOutput = tuple[dict, str | None, GenerationStats, list[dict]]
@@ -567,39 +565,3 @@ class TogetherGenerator(BaseGenerator[str | list[str], str]):
     def _get_answer_log_probs(self, completion: ChatCompletionResponse, **kwargs) -> list[float]:
         """Extract the log probabilities from the completion object."""
         return completion.choices[0].logprobs
-
-
-### CODE SYNTHESIS EXECUTION ###
-def code_execution(api: API, code: str, candidate_dict: dict[str, Any], verbose: bool = False):
-    inputs = {field_name: candidate_dict[field_name] for field_name in api.inputs}
-    response = api.api_execute(code, inputs)
-    pred = response["response"] if response["status"] and response["response"] else None
-    return pred
-
-
-def code_ensemble_execution(
-    api: API, code_ensemble: dict[str, str], candidate_dict: dict[str, Any], verbose: bool = True
-) -> GenerationOutput:
-    start_time = time.time()
-    try:
-        preds = list()
-        for _, code in code_ensemble.items():
-            pred = code_execution(api, code, candidate_dict)
-            preds.append(pred)
-
-        preds = [pred for pred in preds if pred is not None]
-
-        if len(preds) == 1:
-            majority_response = preds[0]
-            exec_stats = GenerationStats(fn_call_duration_secs=time.time() - start_time)
-            return majority_response, None, exec_stats
-
-        if len(preds) > 0:
-            majority_response = Counter(preds).most_common(1)[0][0]
-            exec_stats = GenerationStats(fn_call_duration_secs=time.time() - start_time)
-            return majority_response, None, exec_stats
-
-    except Exception:
-        pass
-
-    return None, None, GenerationStats(fn_call_duration_secs=time.time() - start_time)

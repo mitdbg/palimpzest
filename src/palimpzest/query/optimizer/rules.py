@@ -8,7 +8,6 @@ from palimpzest.core.data.context_manager import ContextManager
 from palimpzest.core.lib.schemas import ImageBase64, ImageFilepath, ImageURL
 from palimpzest.prompts import CONTEXT_SEARCH_PROMPT
 from palimpzest.query.operators.aggregate import ApplyGroupByOp, AverageAggregateOp, CountAggregateOp
-from palimpzest.query.operators.code_synthesis_convert import CodeSynthesisConvertSingle
 from palimpzest.query.operators.compute import SmolAgentsCompute
 from palimpzest.query.operators.convert import LLMConvertBonded, NonLLMConvert
 from palimpzest.query.operators.critique_and_refine_convert import CriticAndRefineConvert
@@ -365,82 +364,6 @@ class LLMConvertBondedRule(ImplementationRule):
         logger.debug(f"Done substituting LLMConvertBondedRule for {logical_expression}")
 
         return deduped_physical_expressions
-
-
-class CodeSynthesisConvertRule(ImplementationRule):
-    """
-    Base rule for code synthesis convert operators; the physical convert class
-    (CodeSynthesisConvertSingle) is provided by sub-class rules.
-
-    NOTE: we provide the physical convert class(es) in their own sub-classed rules to make
-    it easier to allow/disallow groups of rules at the Optimizer level.
-    """
-
-    physical_convert_class = None  # overriden by sub-classes
-
-    @classmethod
-    def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
-        logical_op = logical_expression.operator
-        is_image_conversion = any(
-            [
-                field.annotation in IMAGE_FIELD_TYPES
-                for field_name, field in logical_expression.input_fields.items()
-                if field_name.split(".")[-1] in logical_expression.depends_on_field_names
-            ]
-        )
-        is_match = (
-            isinstance(logical_op, ConvertScan)
-            and not is_image_conversion
-            and logical_op.cardinality != Cardinality.ONE_TO_MANY
-            and logical_op.udf is None
-        )
-        logger.debug(f"CodeSynthesisConvertRule matches_pattern: {is_match} for {logical_expression}")
-        return is_match
-
-    @classmethod
-    def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
-        logger.debug(f"Substituting CodeSynthesisConvertRule for {logical_expression}")
-
-        logical_op = logical_expression.operator
-
-        # get initial set of parameters for physical op
-        op_kwargs = logical_op.get_logical_op_params()
-        op_kwargs.update(
-            {
-                "verbose": physical_op_params["verbose"],
-                "logical_op_id": logical_op.get_logical_op_id(),
-                "logical_op_name": logical_op.logical_op_name(),
-            }
-        )
-
-        # construct multi-expression
-        op = cls.physical_convert_class(
-            exemplar_generation_model=physical_op_params["champion_model"],
-            code_synth_model=physical_op_params["code_champion_model"],
-            fallback_model=physical_op_params["fallback_model"],
-            prompt_strategy=PromptStrategy.COT_QA,
-            **op_kwargs,
-        )
-        expression = PhysicalExpression(
-            operator=op,
-            input_group_ids=logical_expression.input_group_ids,
-            input_fields=logical_expression.input_fields,
-            depends_on_field_names=logical_expression.depends_on_field_names,
-            generated_fields=logical_expression.generated_fields,
-            group_id=logical_expression.group_id,
-        )
-        deduped_physical_expressions = set([expression])
-        logger.debug(f"Done substituting CodeSynthesisConvertRule for {logical_expression}")
-
-        return deduped_physical_expressions
-
-
-class CodeSynthesisConvertSingleRule(CodeSynthesisConvertRule):
-    """
-    Substitute a logical expression for a ConvertScan with a (single) code synthesis physical implementation.
-    """
-
-    physical_convert_class = CodeSynthesisConvertSingle
 
 
 class RAGConvertRule(ImplementationRule):

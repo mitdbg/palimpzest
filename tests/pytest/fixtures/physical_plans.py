@@ -5,7 +5,6 @@ from palimpzest.constants import Cardinality, Model
 from palimpzest.core.data.iter_dataset import MemoryDataset
 from palimpzest.core.elements.filters import Filter
 from palimpzest.core.lib.schemas import File, TextFile
-from palimpzest.query.operators.code_synthesis_convert import CodeSynthesisConvertSingle
 from palimpzest.query.operators.convert import LLMConvertBonded
 from palimpzest.query.operators.filter import LLMFilter, NonLLMFilter
 from palimpzest.query.operators.rag_convert import RAGConvert
@@ -61,21 +60,6 @@ def bonded_llm_convert_plan(email_schema, enron_eval_tiny):
     plan = PhysicalPlan(operators=[scan_op, convert_op_llm])
     return plan
 
-
-@pytest.fixture
-def code_synth_convert_plan(email_schema, enron_eval_tiny):
-    scan_op = MarshalAndScanDataOp(output_schema=TextFile, datasource=enron_eval_tiny, logical_op_id="scan1")
-    convert_op_llm = CodeSynthesisConvertSingle(
-        input_schema=TextFile,
-        output_schema=email_schema,
-        exemplar_generation_model=Model.GPT_4o,
-        code_synth_model=Model.GPT_4o,
-        fallback_model=Model.GPT_4o_MINI,
-        cache_across_plans=False,
-        logical_op_id="code_synth_convert1",
-    )
-    plan = PhysicalPlan(operators=[scan_op, convert_op_llm])
-    return plan
 
 @pytest.fixture
 def rag_convert_plan(email_schema, enron_eval_tiny):

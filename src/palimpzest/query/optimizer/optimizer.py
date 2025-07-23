@@ -26,7 +26,6 @@ from palimpzest.query.optimizer.optimizer_strategy_type import OptimizationStrat
 from palimpzest.query.optimizer.plan import PhysicalPlan
 from palimpzest.query.optimizer.primitives import Group, LogicalExpression
 from palimpzest.query.optimizer.rules import (
-    CodeSynthesisConvertRule,
     CriticAndRefineConvertRule,
     LLMConvertBondedRule,
     MixtureOfAgentsConvertRule,
@@ -40,7 +39,7 @@ from palimpzest.query.optimizer.tasks import (
     OptimizeLogicalExpression,
     OptimizePhysicalExpression,
 )
-from palimpzest.utils.model_helpers import get_champion_model, get_code_champion_model, get_fallback_model
+from palimpzest.utils.model_helpers import get_champion_model, get_fallback_model
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +74,6 @@ class Optimizer:
         available_models: list[Model],
         verbose: bool = False,
         allow_bonded_query: bool = True,
-        allow_code_synth: bool = False,
         allow_rag_reduction: bool = False,
         allow_mixtures: bool = True,
         allow_critic: bool = False,
@@ -115,7 +113,6 @@ class Optimizer:
         # and remove all optimizations (except for bonded queries)
         if optimizer_strategy == OptimizationStrategyType.NONE:
             self.allow_bonded_query = True
-            self.allow_code_synth = False
             self.allow_rag_reduction = False
             self.allow_mixtures = False
             self.allow_critic = False
@@ -126,7 +123,6 @@ class Optimizer:
         self.verbose = verbose
         self.available_models = available_models
         self.allow_bonded_query = allow_bonded_query
-        self.allow_code_synth = allow_code_synth
         self.allow_rag_reduction = allow_rag_reduction
         self.allow_mixtures = allow_mixtures
         self.allow_critic = allow_critic
@@ -140,11 +136,6 @@ class Optimizer:
                 rule
                 for rule in self.implementation_rules
                 if rule not in [LLMConvertBondedRule]
-            ]
-
-        if not self.allow_code_synth:
-            self.implementation_rules = [
-                rule for rule in self.implementation_rules if not issubclass(rule, CodeSynthesisConvertRule)
             ]
 
         if not self.allow_rag_reduction:
@@ -178,7 +169,6 @@ class Optimizer:
             "verbose": self.verbose,
             "available_models": self.available_models,
             "champion_model": get_champion_model(self.available_models),
-            "code_champion_model": get_code_champion_model(self.available_models),
             "fallback_model": get_fallback_model(self.available_models),
         }
 
@@ -189,7 +179,6 @@ class Optimizer:
             verbose=self.verbose,
             available_models=self.available_models,
             allow_bonded_query=self.allow_bonded_query,
-            allow_code_synth=self.allow_code_synth,
             allow_rag_reduction=self.allow_rag_reduction,
             allow_mixtures=self.allow_mixtures,
             allow_critic=self.allow_critic,

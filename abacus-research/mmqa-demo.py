@@ -509,7 +509,6 @@ if __name__ == "__main__":
             Model.GPT_4o_MINI,
         ],
         allow_bonded_query=True,
-        allow_code_synth=False,
         allow_critic=True,
         allow_mixtures=True,
         allow_rag_reduction=True,

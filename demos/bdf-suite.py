@@ -85,7 +85,6 @@ def extract_supplemental(processing_strategy, execution_strategy, optimizer_stra
 
     config = pz.QueryProcessorConfig(
         policy=policy,
-        allow_code_synth=False,
         processing_strategy=processing_strategy,
         execution_strategy=execution_strategy,
         optimizer_strategy=optimizer_strategy,
@@ -112,7 +111,6 @@ def integrate_tables(processing_strategy, execution_strategy, optimizer_strategy
 
     config = pz.QueryProcessorConfig(
         policy=policy,
-        allow_code_synth=False,
         processing_strategy=processing_strategy,
         execution_strategy=execution_strategy,
         optimizer_strategy=optimizer_strategy,
@@ -138,7 +136,6 @@ def extract_references(processing_strategy, execution_strategy, optimizer_strate
 
     config = pz.QueryProcessorConfig(
         policy=policy,
-        allow_code_synth=False,
         processing_strategy=processing_strategy,
         execution_strategy=execution_strategy,
         optimizer_strategy=optimizer_strategy,
@@ -176,7 +173,6 @@ if run_pz:
     policy = pz.MaxQuality()
     config = pz.QueryProcessorConfig(
         policy=policy,
-        allow_code_synth=False,
         processing_strategy="streaming",
         execution_strategy="sequential",
         optimizer_strategy="pareto",

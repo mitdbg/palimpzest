@@ -6,12 +6,6 @@ from palimpzest.query.optimizer.rules import (
     BasicSubstitutionRule as _BasicSubstitutionRule,
 )
 from palimpzest.query.optimizer.rules import (
-    CodeSynthesisConvertRule as _CodeSynthesisConvertRule,
-)
-from palimpzest.query.optimizer.rules import (
-    CodeSynthesisConvertSingleRule as _CodeSynthesisConvertSingleRule,
-)
-from palimpzest.query.optimizer.rules import (
     CriticAndRefineConvertRule as _CriticAndRefineConvertRule,
 )
 from palimpzest.query.optimizer.rules import (
@@ -55,8 +49,6 @@ ALL_RULES = [
     _AddContextsBeforeComputeRule,
     _AggregateRule,
     _BasicSubstitutionRule,
-    _CodeSynthesisConvertRule,
-    _CodeSynthesisConvertSingleRule,
     _CriticAndRefineConvertRule,
     _ImplementationRule,
     _LLMConvertBondedRule,
@@ -76,7 +68,7 @@ IMPLEMENTATION_RULES = [
     rule
     for rule in ALL_RULES
     if issubclass(rule, _ImplementationRule)
-    and rule not in [_CodeSynthesisConvertRule, _ImplementationRule]
+    and rule not in [_ImplementationRule]
 ]
 
 TRANSFORMATION_RULES = [

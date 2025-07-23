@@ -16,7 +16,6 @@ import pandas as pd
 from palimpzest.constants import MODEL_CARDS, NAIVE_BYTES_PER_RECORD, GPT_4o_MODEL_CARD, Model
 from palimpzest.core.models import OperatorCostEstimates, PlanCost, RecordOpStats, SentinelPlanStats
 from palimpzest.query.operators.aggregate import ApplyGroupByOp, AverageAggregateOp, CountAggregateOp
-from palimpzest.query.operators.code_synthesis_convert import CodeSynthesisConvert
 from palimpzest.query.operators.convert import LLMConvert
 from palimpzest.query.operators.filter import LLMFilter, NonLLMFilter
 from palimpzest.query.operators.limit import LimitScanOp
@@ -547,20 +546,11 @@ class CostModel(BaseCostModel):
                 op_estimates.quality = sample_op_estimates[full_op_id][model_name]["quality"]
 
             elif isinstance(operator, LLMConvert):
-                # NOTE: code synthesis does not have a model attribute
                 model_name = operator.model.value if hasattr(operator, "model") else None
                 op_estimates.cardinality = source_op_estimates.cardinality * sample_op_estimates[full_op_id][model_name]["selectivity"]
                 op_estimates.time_per_record = sample_op_estimates[full_op_id][model_name]["time_per_record"]
                 op_estimates.cost_per_record = sample_op_estimates[full_op_id][model_name]["cost_per_record"]
                 op_estimates.quality = sample_op_estimates[full_op_id][model_name]["quality"]
-
-                # NOTE: if code synth. fails, this will turn into ConventionalQuery calls to GPT-3.5,
-                #       which would wildly mess up estimate of time and cost per-record
-                # do code synthesis adjustment
-                if isinstance(operator, CodeSynthesisConvert):
-                    op_estimates.time_per_record = 1e-5
-                    op_estimates.cost_per_record = 1e-4
-                    op_estimates.quality = op_estimates.quality * (GPT_4o_MODEL_CARD["code"] / 100.0)
 
                 # rag convert adjustment
                 if isinstance(operator, RAGConvert):
