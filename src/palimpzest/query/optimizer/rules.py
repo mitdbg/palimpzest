@@ -17,7 +17,6 @@ from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.operators.logical import (
     Aggregate,
     BaseScan,
-    CacheScan,
     ComputeOperator,
     ContextScan,
     ConvertScan,
@@ -34,7 +33,7 @@ from palimpzest.query.operators.mixture_of_agents_convert import MixtureOfAgents
 from palimpzest.query.operators.project import ProjectOp
 from palimpzest.query.operators.rag_convert import RAGConvert
 from palimpzest.query.operators.retrieve import RetrieveOp
-from palimpzest.query.operators.scan import CacheScanDataOp, ContextScanOp, MarshalAndScanDataOp
+from palimpzest.query.operators.scan import ContextScanOp, MarshalAndScanDataOp
 from palimpzest.query.operators.search import (
     SmolAgentsCustomManagedSearch,  # SmolAgentsManagedSearch  # SmolAgentsSearch
 )
@@ -1097,7 +1096,6 @@ class BasicSubstitutionRule(ImplementationRule):
 
     LOGICAL_OP_CLASS_TO_PHYSICAL_OP_CLASS_MAP = {
         BaseScan: MarshalAndScanDataOp,
-        CacheScan: CacheScanDataOp,
         # ComputeOperator: SmolAgentsCompute,
         SearchOperator: SmolAgentsCustomManagedSearch, # SmolAgentsManagedSearch, # SmolAgentsSearch,
         ContextScan: ContextScanOp,

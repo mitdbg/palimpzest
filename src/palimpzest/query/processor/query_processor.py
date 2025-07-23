@@ -28,7 +28,6 @@ class QueryProcessor:
         num_samples: int | None = None,
         val_datasource: Dataset | None = None,
         scan_start_idx: int = 0,
-        cache: bool = False,
         verbose: bool = False,
         progress: bool = True,
         max_workers: int | None = None,
@@ -51,7 +50,6 @@ class QueryProcessor:
         self.num_samples = num_samples
         self.val_datasource = val_datasource
         self.scan_start_idx = scan_start_idx
-        self.cache = cache
         self.verbose = verbose
         self.progress = progress
         self.max_workers = max_workers

@@ -150,17 +150,11 @@ class AllSamplingExecutionStrategy(SentinelExecutionStrategy):
             # update plan stats
             plan_stats.add_record_op_stats(all_record_op_stats)
 
-            # add records (which are not filtered) to the cache, if allowed
-            self._add_records_to_cache(logical_op_id, all_records)
-
             # FUTURE TODO: simply set input based on source_idx_to_target_record_set (b/c we won't have scores computed)
             # provide the champion record sets as inputs to the next logical operator
             if op_idx + 1 < len(plan):
                 next_logical_op_id = plan.logical_op_ids[op_idx + 1]
                 op_sets[next_logical_op_id].update_inputs(source_idx_to_record_sets)
-
-        # close the cache
-        self._close_cache(plan.logical_op_ids)
 
         # finalize plan stats
         plan_stats.finish()

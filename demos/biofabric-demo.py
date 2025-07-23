@@ -80,7 +80,7 @@ def print_table(output):
 if __name__ == "__main__":
     start_time = time.time()
     parser = argparse.ArgumentParser(description="Run a simple demo")
-    parser.add_argument("--verbose", action="store_true", help="Do not use cached results", default=True)
+    parser.add_argument("--verbose", action="store_true", help="print outputs during execution", default=False)
     parser.add_argument("--from_xls", action="store_true", help="Start from pre-downloaded excel files", default=False)
     parser.add_argument("--experiment", type=str, help="The experiment to run", default="matching")
     parser.add_argument("--policy", type=str, help="The policy to use", default="cost")
@@ -136,7 +136,6 @@ if __name__ == "__main__":
 
     config = pz.QueryProcessorConfig(
         policy=policy,
-        cache=False,
         allow_code_synth=False,
         processing_strategy="no_sentinel",
         execution_strategy=executor,

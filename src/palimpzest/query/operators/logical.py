@@ -132,7 +132,6 @@ class Aggregate(LogicalOperator):
     def __init__(
         self,
         agg_func: AggFunc,
-        target_cache_id: str | None = None,
         *args,
         **kwargs,
     ):
@@ -146,7 +145,6 @@ class Aggregate(LogicalOperator):
 
         super().__init__(*args, output_schema=output_schema, **kwargs)
         self.agg_func = agg_func
-        self.target_cache_id = target_cache_id
 
     def __str__(self):
         return f"{self.__class__.__name__}(function: {str(self.agg_func.value)})"
@@ -161,7 +159,6 @@ class Aggregate(LogicalOperator):
         logical_op_params = super().get_logical_op_params()
         logical_op_params = {
             "agg_func": self.agg_func,
-            "target_cache_id": self.target_cache_id,
             **logical_op_params,
         }
 
@@ -222,26 +219,6 @@ class ContextScan(LogicalOperator):
         return logical_op_params
 
 
-class CacheScan(LogicalOperator):
-    """A CacheScan is a logical operator that represents a scan of a cached Set."""
-
-    def __init__(self, datasource: dataset.Dataset, output_schema: type[BaseModel]):
-        super().__init__(output_schema=output_schema)
-        self.datasource = datasource
-
-    def __str__(self):
-        return f"CacheScan({self.datasource},{self.output_schema})"
-
-    def get_logical_id_params(self) -> dict:
-        return super().get_logical_id_params()
-
-    def get_logical_op_params(self) -> dict:
-        logical_op_params = super().get_logical_op_params()
-        logical_op_params = {"datasource": self.datasource, **logical_op_params}
-
-        return logical_op_params
-
-
 class ConvertScan(LogicalOperator):
     """A ConvertScan is a logical operator that represents a scan of a particular input Dataset, with conversion applied."""
 
@@ -250,7 +227,6 @@ class ConvertScan(LogicalOperator):
         cardinality: Cardinality = Cardinality.ONE_TO_ONE,
         udf: Callable | None = None,
         desc: str | None = None,
-        target_cache_id: str | None = None,
         *args,
         **kwargs,
     ):
@@ -258,7 +234,6 @@ class ConvertScan(LogicalOperator):
         self.cardinality = cardinality
         self.udf = udf
         self.desc = desc
-        self.target_cache_id = target_cache_id
 
     def __str__(self):
         return f"ConvertScan({self.input_schema} -> {str(self.output_schema)},{str(self.desc)})"
@@ -279,7 +254,6 @@ class ConvertScan(LogicalOperator):
             "cardinality": self.cardinality,
             "udf": self.udf,
             "desc": self.desc,
-            "target_cache_id": self.target_cache_id,
             **logical_op_params,
         }
 
@@ -292,13 +266,11 @@ class FilteredScan(LogicalOperator):
     def __init__(
         self,
         filter: Filter,
-        target_cache_id: str | None = None,
         *args,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
         self.filter = filter
-        self.target_cache_id = target_cache_id
 
     def __str__(self):
         return f"FilteredScan({str(self.output_schema)}, {str(self.filter)})"
@@ -316,7 +288,6 @@ class FilteredScan(LogicalOperator):
         logical_op_params = super().get_logical_op_params()
         logical_op_params = {
             "filter": self.filter,
-            "target_cache_id": self.target_cache_id,
             **logical_op_params,
         }
 
@@ -327,7 +298,6 @@ class GroupByAggregate(LogicalOperator):
     def __init__(
         self,
         group_by_sig: GroupBySig,
-        target_cache_id: str | None = None,
         *args,
         **kwargs,
     ):
@@ -338,7 +308,6 @@ class GroupByAggregate(LogicalOperator):
         if not valid:
             raise TypeError(error)
         self.group_by_sig = group_by_sig
-        self.target_cache_id = target_cache_id
 
     def __str__(self):
         return f"GroupBy({self.group_by_sig.serialize()})"
@@ -353,7 +322,6 @@ class GroupByAggregate(LogicalOperator):
         logical_op_params = super().get_logical_op_params()
         logical_op_params = {
             "group_by_sig": self.group_by_sig,
-            "target_cache_id": self.target_cache_id,
             **logical_op_params,
         }
 
@@ -361,10 +329,9 @@ class GroupByAggregate(LogicalOperator):
 
 
 class LimitScan(LogicalOperator):
-    def __init__(self, limit: int, target_cache_id: str | None = None, *args, **kwargs):
+    def __init__(self, limit: int, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.limit = limit
-        self.target_cache_id = target_cache_id
 
     def __str__(self):
         return f"LimitScan({str(self.input_schema)}, {str(self.output_schema)})"
@@ -379,7 +346,6 @@ class LimitScan(LogicalOperator):
         logical_op_params = super().get_logical_op_params()
         logical_op_params = {
             "limit": self.limit,
-            "target_cache_id": self.target_cache_id,
             **logical_op_params,
         }
 
@@ -387,10 +353,9 @@ class LimitScan(LogicalOperator):
 
 
 class Project(LogicalOperator):
-    def __init__(self, project_cols: list[str], target_cache_id: str | None = None, *args, **kwargs):
+    def __init__(self, project_cols: list[str], *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.project_cols = project_cols
-        self.target_cache_id = target_cache_id
 
     def __str__(self):
         return f"Project({self.input_schema}, {self.project_cols})"
@@ -405,7 +370,6 @@ class Project(LogicalOperator):
         logical_op_params = super().get_logical_op_params()
         logical_op_params = {
             "project_cols": self.project_cols,
-            "target_cache_id": self.target_cache_id,
             **logical_op_params,
         }
 
@@ -422,7 +386,6 @@ class RetrieveScan(LogicalOperator):
         search_attr,
         output_attrs,
         k,
-        target_cache_id: str = None,
         *args,
         **kwargs,
     ):
@@ -432,7 +395,6 @@ class RetrieveScan(LogicalOperator):
         self.search_attr = search_attr
         self.output_attrs = output_attrs
         self.k = k
-        self.target_cache_id = target_cache_id
 
     def __str__(self):
         return f"RetrieveScan({self.input_schema} -> {str(self.output_schema)},{str(self.desc)})"
@@ -459,7 +421,6 @@ class RetrieveScan(LogicalOperator):
             "search_attr": self.search_attr,
             "output_attrs": self.output_attrs,
             "k": self.k,
-            "target_cache_id": self.target_cache_id,
             **logical_op_params,
         }
 
@@ -474,13 +435,11 @@ class MapScan(LogicalOperator):
     def __init__(
         self,
         udf: Callable | None = None,
-        target_cache_id: str | None = None,
         *args,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
         self.udf = udf
-        self.target_cache_id = target_cache_id
 
     def __str__(self):
         return f"MapScan({self.output_schema}, {self.udf.__name__})"
@@ -498,7 +457,6 @@ class MapScan(LogicalOperator):
         logical_op_params = super().get_logical_op_params()
         logical_op_params = {
             "udf": self.udf,
-            "target_cache_id": self.target_cache_id,
             **logical_op_params,
         }
 
@@ -511,11 +469,10 @@ class ComputeOperator(LogicalOperator):
     on a given Context.
     """
 
-    def __init__(self, context_id: str, instruction: str, target_cache_id: str | None = None, *args, **kwargs):
+    def __init__(self, context_id: str, instruction: str, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.context_id = context_id
         self.instruction = instruction
-        self.target_cache_id = target_cache_id
 
     def __str__(self):
         return f"ComputeOperator(id={self.context_id}, instr={self.instruction:20s})"
@@ -535,7 +492,6 @@ class ComputeOperator(LogicalOperator):
         logical_op_params = {
             "context_id": self.context_id,
             "instruction": self.instruction,
-            "target_cache_id": self.target_cache_id,
             **logical_op_params,
         }
 
@@ -547,11 +503,10 @@ class SearchOperator(LogicalOperator):
     on a given Context.
     """
 
-    def __init__(self, context_id: str, search_query: str, target_cache_id: str | None = None, *args, **kwargs):
+    def __init__(self, context_id: str, search_query: str, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.context_id = context_id
         self.search_query = search_query
-        self.target_cache_id = target_cache_id
 
     def __str__(self):
         return f"SearchOperator(id={self.context_id}, search_query={self.search_query:20s})"
@@ -571,7 +526,6 @@ class SearchOperator(LogicalOperator):
         logical_op_params = {
             "context_id": self.context_id,
             "search_query": self.search_query,
-            "target_cache_id": self.target_cache_id,
             **logical_op_params,
         }
 

@@ -21,7 +21,6 @@ class QueryProcessorConfig:
     policy: Policy = field(default_factory=MaxQuality)
     scan_start_idx: int = field(default=0)
     num_samples: int = field(default=None)
-    cache: bool = field(default=False)  # NOTE: until we properly implement caching, let's set the default to False
     verbose: bool = field(default=False)
     progress: bool = field(default=True)
     available_models: list[Model] | None = field(default=None)
@@ -50,7 +49,6 @@ class QueryProcessorConfig:
             "policy": self.policy,
             "scan_start_idx": self.scan_start_idx,
             "num_samples": self.num_samples,
-            "cache": self.cache,
             "verbose": self.verbose,
             "progress": self.progress,
             "available_models": self.available_models,
