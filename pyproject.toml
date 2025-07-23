@@ -10,8 +10,9 @@ authors = [
 ]
 dependencies = [
     "beautifulsoup4>=4.13.4",
-    "chromadb>=0.6.3",
+    "chromadb>=1.0.15",
     "colorama>=0.4.6",
+    "datasets>=4.0.0",
     "fastapi~=0.115.0",
     "gradio>=5.26.0",
     "numpy==2.0.2",
