@@ -97,10 +97,5 @@ def get_fallback_model(available_models, vision=False):
     return get_champion_model(available_models, vision)
 
 
-def get_code_champion_model(available_models):
-    # NOTE: for now, assume same champion as get_champion_model()
-    return get_champion_model(available_models, vision=False)
-
-
 def get_champion_model_name(available_models, vision=False):
     return get_champion_model(available_models, vision).value

@@ -169,7 +169,6 @@ def execute_task(task, dataset, policy, verbose=False, profile=False, processing
     config = pz.QueryProcessorConfig(
         policy=policy,
         verbose=verbose,
-        allow_code_synth=False,
         processing_strategy=processing_strategy,
         execution_strategy=execution_strategy,
         optimizer_strategy=optimizer_strategy,

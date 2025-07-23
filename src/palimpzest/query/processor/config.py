@@ -29,7 +29,6 @@ class QueryProcessorConfig:
 
     allow_bonded_query: bool = field(default=True)
     allow_model_selection: bool = field(default=True)
-    allow_code_synth: bool = field(default=False)
     allow_rag_reduction: bool = field(default=True)
     allow_mixtures: bool = field(default=True)
     allow_critic: bool = field(default=True)
@@ -55,7 +54,6 @@ class QueryProcessorConfig:
             "max_workers": self.max_workers,
             "allow_bonded_query": self.allow_bonded_query,
             "allow_model_selection": self.allow_model_selection,
-            "allow_code_synth": self.allow_code_synth,
             "allow_rag_reduction": self.allow_rag_reduction,
             "allow_mixtures": self.allow_mixtures,
             "allow_critic": self.allow_critic,

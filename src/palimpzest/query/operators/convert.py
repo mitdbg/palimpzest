@@ -335,7 +335,6 @@ class LLMConvert(ConvertOp):
         est_num_output_tokens = NAIVE_EST_NUM_OUTPUT_TOKENS
 
         # get est. of conversion time per record from model card;
-        # NOTE: model will only be None for code synthesis, which uses GPT-3.5 as fallback
         model_name = self.model.value if getattr(self, "model", None) is not None else Model.GPT_4o_MINI.value
         model_conversion_time_per_record = MODEL_CARDS[model_name]["seconds_per_output_token"] * est_num_output_tokens
 

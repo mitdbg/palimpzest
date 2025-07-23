@@ -8,7 +8,6 @@ from palimpzest.prompts.agent_prompts import (
     FINAL_ANSWER_POST_MESSAGES_PROMPT,
     FINAL_ANSWER_PRE_MESSAGES_PROMPT,
 )
-from palimpzest.prompts.code_synthesis_prompts import ADVICEGEN_PROMPT, CODEGEN_PROMPT, EXAMPLE_PROMPT
 from palimpzest.prompts.context_search import CONTEXT_SEARCH_PROMPT
 from palimpzest.prompts.prompt_factory import PromptFactory
 from palimpzest.prompts.util_phrases import (
@@ -28,10 +27,6 @@ __all__ = [
     "DATA_DISCOVERY_AGENT_UPDATE_PLAN_PRE_MESSAGES_PROMPT",
     "FINAL_ANSWER_POST_MESSAGES_PROMPT",
     "FINAL_ANSWER_PRE_MESSAGES_PROMPT",
-    # code synthesis prompts
-    "ADVICEGEN_PROMPT",
-    "CODEGEN_PROMPT",
-    "EXAMPLE_PROMPT",
     # context search
     "CONTEXT_SEARCH_PROMPT",
     # prompt factory

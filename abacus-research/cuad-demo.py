@@ -660,7 +660,6 @@ def main():
         max_workers=64,
         available_models=models,
         allow_bonded_query=True,
-        allow_code_synth=False,
         allow_critic=True,
         allow_mixtures=True,
         allow_rag_reduction=True,
