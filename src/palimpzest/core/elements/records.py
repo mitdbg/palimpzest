@@ -164,7 +164,7 @@ class DataRecord:
         cardinality_idx: int | None = None,
     ) -> DataRecord:
         # project_cols must be None or contain at least one column
-        assert project_cols is None or len(project_cols) > 1, "must have at least one column if using projection"
+        assert project_cols is None or len(project_cols) >= 1, "must have at least one column if using projection"
 
         # if project_cols is None, then the new schema is a union of the provided schema and parent_record.schema;
         # otherwise, it's a ProjectSchema
