@@ -20,7 +20,7 @@ from palimpzest.query.processor.query_processor_factory import QueryProcessorFac
         pytest.param(ParallelExecutionStrategy, id="parallel"),
     ]
 )
-class TestParallelExecutionNoCache:
+class TestParallelExecution:
 
     @pytest.mark.parametrize(
         argnames=("dataset", "physical_plan", "expected_records", "side_effect"),

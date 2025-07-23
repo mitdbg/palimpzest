@@ -579,9 +579,6 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
                 # update plan stats
                 plan_stats.add_record_op_stats(new_record_op_stats)
 
-                # add records (which are not filtered) to the cache, if allowed
-                self._add_records_to_cache(logical_op_id, new_records)
-
                 # FUTURE TODO: simply set input based on source_idx_to_target_record_set (b/c we won't have scores computed)
                 # provide the champion record sets as inputs to the next logical operator
                 if op_idx + 1 < len(plan):
@@ -592,9 +589,6 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
                 op_frontiers[logical_op_id].update_frontier(logical_op_id, plan_stats)
 
             # FUTURE TODO: score op quality based on final outputs
-
-        # close the cache
-        self._close_cache(plan.logical_op_ids)
 
         # finalize plan stats
         plan_stats.finish()

@@ -127,31 +127,6 @@ class MarshalAndScanDataOp(ScanPhysicalOp):
         )
 
 
-class CacheScanDataOp(ScanPhysicalOp):
-    def naive_cost_estimates(
-        self,
-        source_op_cost_estimates: OperatorCostEstimates,
-        input_record_size_in_bytes: int | float,
-    ):
-        # get inputs needed for naive cost estimation
-        # TODO: we should rename cardinality --> "multiplier" or "selectivity" one-to-one / one-to-many
-
-        # estimate time spent reading each record
-        per_record_size_kb = input_record_size_in_bytes / 1024.0
-        time_per_record = LOCAL_SCAN_TIME_PER_KB * per_record_size_kb
-
-        # estimate output cardinality
-        cardinality = source_op_cost_estimates.cardinality
-
-        # for now, assume no cost per record for reading from cache
-        return OperatorCostEstimates(
-            cardinality=cardinality,
-            time_per_record=time_per_record,
-            cost_per_record=0,
-            quality=1.0,
-        )
-
-
 class ContextScanOp(PhysicalOperator):
     """
     Physical operator which facillitates the loading of a Context for processing.
@@ -183,7 +158,7 @@ class ContextScanOp(PhysicalOperator):
         # estimate time spent reading each record
         time_per_record = LOCAL_SCAN_TIME_PER_KB * 1.0
 
-        # for now, assume no cost per record for reading from cache
+        # for now, assume no cost per record for reading data
         return OperatorCostEstimates(
             cardinality=1.0,
             time_per_record=time_per_record,

@@ -73,7 +73,6 @@ class Optimizer:
         policy: Policy,
         cost_model: CostModel,
         available_models: list[Model],
-        cache: bool = False,
         verbose: bool = False,
         allow_bonded_query: bool = True,
         allow_code_synth: bool = False,
@@ -124,7 +123,6 @@ class Optimizer:
             self.available_models = [available_models[0]]
 
         # store optimization hyperparameters
-        self.cache = cache
         self.verbose = verbose
         self.available_models = available_models
         self.allow_bonded_query = allow_bonded_query
@@ -188,7 +186,6 @@ class Optimizer:
         optimizer = Optimizer(
             policy=self.policy,
             cost_model=CostModel(),
-            cache=self.cache,
             verbose=self.verbose,
             available_models=self.available_models,
             allow_bonded_query=self.allow_bonded_query,

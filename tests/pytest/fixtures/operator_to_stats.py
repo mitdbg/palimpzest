@@ -26,7 +26,7 @@ def get_three_converts_logical_and_full_op_ids(three_converts_workload, enron_ev
 
     # get full op ids for first convert operators
     depends_on = set(get_schema_field_names(scan_logical_op.output_schema, id=scan_node_id))
-    first_convert_logical_op = ConvertScan(input_schema=TextFile, output_schema=email_schema, depends_on=list(depends_on), target_cache_id=first_convert_node_id)
+    first_convert_logical_op = ConvertScan(input_schema=TextFile, output_schema=email_schema, depends_on=list(depends_on))
     first_convert_logical_op_id = first_convert_logical_op.get_logical_op_id()
     first_convert_gpt4o_full_op_id = LLMConvertBonded(logical_op_id=first_convert_logical_op_id, output_schema=email_schema, input_schema=TextFile, model=Model.GPT_4o, depends_on=list(depends_on)).get_full_op_id()
     first_convert_gpt4o_mini_full_op_id = LLMConvertBonded(logical_op_id=first_convert_logical_op_id, output_schema=email_schema, input_schema=TextFile, model=Model.GPT_4o_MINI, depends_on=list(depends_on)).get_full_op_id()
@@ -35,7 +35,7 @@ def get_three_converts_logical_and_full_op_ids(three_converts_workload, enron_ev
     # get full op ids for second convert operators
     depends_on.update(get_schema_field_names(first_convert_logical_op.output_schema, id=first_convert_node_id))
     second_output_schema = union_schemas([email_schema, foobar_schema])
-    second_convert_logical_op = ConvertScan(input_schema=email_schema, output_schema=second_output_schema, depends_on=list(depends_on), target_cache_id=second_convert_node_id)
+    second_convert_logical_op = ConvertScan(input_schema=email_schema, output_schema=second_output_schema, depends_on=list(depends_on))
     second_convert_logical_op_id = second_convert_logical_op.get_logical_op_id()
     second_convert_gpt4o_full_op_id = LLMConvertBonded(logical_op_id=second_convert_logical_op_id, output_schema=second_output_schema, input_schema=email_schema, model=Model.GPT_4o, depends_on=list(depends_on)).get_full_op_id()
     second_convert_gpt4o_mini_full_op_id = LLMConvertBonded(logical_op_id=second_convert_logical_op_id, output_schema=second_output_schema, input_schema=email_schema, model=Model.GPT_4o_MINI, depends_on=list(depends_on)).get_full_op_id()
@@ -44,7 +44,7 @@ def get_three_converts_logical_and_full_op_ids(three_converts_workload, enron_ev
     # get full op ids for third convert operators
     depends_on.update(get_schema_field_names(second_convert_logical_op.output_schema, id=second_convert_node_id))
     third_output_schema = union_schemas([second_output_schema, baz_schema])
-    third_convert_logical_op = ConvertScan(input_schema=second_output_schema, output_schema=third_output_schema, depends_on=list(depends_on), target_cache_id=third_convert_node_id)
+    third_convert_logical_op = ConvertScan(input_schema=second_output_schema, output_schema=third_output_schema, depends_on=list(depends_on))
     third_convert_logical_op_id = third_convert_logical_op.get_logical_op_id()
     third_convert_gpt4o_full_op_id = LLMConvertBonded(logical_op_id=third_convert_logical_op_id, output_schema=third_output_schema, input_schema=second_output_schema, model=Model.GPT_4o, depends_on=list(depends_on)).get_full_op_id()
     third_convert_gpt4o_mini_full_op_id = LLMConvertBonded(logical_op_id=third_convert_logical_op_id, output_schema=third_output_schema, input_schema=second_output_schema, model=Model.GPT_4o_MINI, depends_on=list(depends_on)).get_full_op_id()
@@ -208,7 +208,7 @@ def get_one_filter_one_convert_logical_and_full_op_ids(one_filter_one_convert_wo
 
     # get full op ids for first filter operator
     depends_on = set(get_schema_field_names(scan_logical_op.output_schema, id=scan_node_id))
-    first_filter_logical_op = FilteredScan(input_schema=TextFile, output_schema=TextFile, filter=Filter("filter1"), depends_on=list(depends_on), target_cache_id=first_filter_node_id)
+    first_filter_logical_op = FilteredScan(input_schema=TextFile, output_schema=TextFile, filter=Filter("filter1"), depends_on=list(depends_on))
     first_filter_logical_op_id = first_filter_logical_op.get_logical_op_id()
     first_filter_gpt4o_full_op_id = LLMFilter(logical_op_id=first_filter_logical_op_id, output_schema=TextFile, input_schema=TextFile, filter=Filter("filter1"), model=Model.GPT_4o, depends_on=list(depends_on)).get_full_op_id()
     first_filter_gpt4o_mini_full_op_id = LLMFilter(logical_op_id=first_filter_logical_op_id, output_schema=TextFile, input_schema=TextFile, filter=Filter("filter1"), model=Model.GPT_4o_MINI, depends_on=list(depends_on)).get_full_op_id()
@@ -217,7 +217,7 @@ def get_one_filter_one_convert_logical_and_full_op_ids(one_filter_one_convert_wo
     # get full op ids for first convert operator
     depends_on = depends_on.union(set(get_schema_field_names(first_filter_logical_op.output_schema, id=first_filter_node_id)))
     output_schema = union_schemas([TextFile, email_schema])
-    first_convert_logical_op = ConvertScan(input_schema=TextFile, output_schema=output_schema, depends_on=list(depends_on), target_cache_id=first_convert_node_id)
+    first_convert_logical_op = ConvertScan(input_schema=TextFile, output_schema=output_schema, depends_on=list(depends_on))
     first_convert_logical_op_id = first_convert_logical_op.get_logical_op_id()
     first_convert_gpt4o_full_op_id = LLMConvertBonded(logical_op_id=first_convert_logical_op_id, output_schema=output_schema, input_schema=TextFile, model=Model.GPT_4o, depends_on=list(depends_on)).get_full_op_id()
     first_convert_gpt4o_mini_full_op_id = LLMConvertBonded(logical_op_id=first_convert_logical_op_id, output_schema=output_schema, input_schema=TextFile, model=Model.GPT_4o_MINI, depends_on=list(depends_on)).get_full_op_id()
@@ -276,7 +276,7 @@ def get_two_converts_two_filters_logical_and_full_op_ids(two_converts_two_filter
 
     # get full op ids for first convert operators
     depends_on = set(get_schema_field_names(scan_logical_op.output_schema, id=scan_node_id))
-    first_convert_logical_op = ConvertScan(input_schema=TextFile, output_schema=email_schema, depends_on=list(depends_on), target_cache_id=first_convert_node_id)
+    first_convert_logical_op = ConvertScan(input_schema=TextFile, output_schema=email_schema, depends_on=list(depends_on))
     first_convert_logical_op_id = first_convert_logical_op.get_logical_op_id()
     first_convert_gpt4o_full_op_id = LLMConvertBonded(logical_op_id=first_convert_logical_op_id, output_schema=email_schema, input_schema=TextFile, model=Model.GPT_4o, depends_on=list(depends_on)).get_full_op_id()
     first_convert_gpt4o_mini_full_op_id = LLMConvertBonded(logical_op_id=first_convert_logical_op_id, output_schema=email_schema, input_schema=TextFile, model=Model.GPT_4o_MINI, depends_on=list(depends_on)).get_full_op_id()
@@ -285,7 +285,7 @@ def get_two_converts_two_filters_logical_and_full_op_ids(two_converts_two_filter
     # get full op ids for second convert operators
     depends_on.update(get_schema_field_names(first_convert_logical_op.output_schema, id=first_convert_node_id))
     output_schema = union_schemas([email_schema, foobar_schema])
-    second_convert_logical_op = ConvertScan(input_schema=email_schema, output_schema=output_schema, depends_on=list(depends_on), target_cache_id=second_convert_node_id)
+    second_convert_logical_op = ConvertScan(input_schema=email_schema, output_schema=output_schema, depends_on=list(depends_on))
     second_convert_logical_op_id = second_convert_logical_op.get_logical_op_id()
     second_convert_gpt4o_full_op_id = LLMConvertBonded(logical_op_id=second_convert_logical_op_id, output_schema=output_schema, input_schema=email_schema, model=Model.GPT_4o, depends_on=list(depends_on)).get_full_op_id()
     second_convert_gpt4o_mini_full_op_id = LLMConvertBonded(logical_op_id=second_convert_logical_op_id, output_schema=output_schema, input_schema=email_schema, model=Model.GPT_4o_MINI, depends_on=list(depends_on)).get_full_op_id()
@@ -293,7 +293,7 @@ def get_two_converts_two_filters_logical_and_full_op_ids(two_converts_two_filter
 
     # get full op ids for first filter operators
     depends_on = [field for field in get_schema_field_names(first_convert_logical_op.output_schema, id=first_convert_node_id) if "sender" in field]
-    first_filter_logical_op = FilteredScan(input_schema=output_schema, output_schema=output_schema, filter=Filter("filter1"), depends_on=list(depends_on), target_cache_id=first_filter_node_id)
+    first_filter_logical_op = FilteredScan(input_schema=output_schema, output_schema=output_schema, filter=Filter("filter1"), depends_on=list(depends_on))
     first_filter_logical_op_id = first_filter_logical_op.get_logical_op_id()
     first_filter_gpt4o_full_op_id = LLMFilter(logical_op_id=first_filter_logical_op_id, output_schema=output_schema, input_schema=output_schema, filter=Filter("filter1"), model=Model.GPT_4o, depends_on=list(depends_on)).get_full_op_id()
     first_filter_gpt4o_mini_full_op_id = LLMFilter(logical_op_id=first_filter_logical_op_id, output_schema=output_schema, input_schema=output_schema, filter=Filter("filter1"), model=Model.GPT_4o_MINI, depends_on=list(depends_on)).get_full_op_id()
@@ -301,7 +301,7 @@ def get_two_converts_two_filters_logical_and_full_op_ids(two_converts_two_filter
 
     # get full op ids for second filter operators
     depends_on = [field for field in get_schema_field_names(first_convert_logical_op.output_schema, id=first_convert_node_id) if "subject" in field]
-    second_filter_logical_op = FilteredScan(input_schema=output_schema, output_schema=output_schema, filter=Filter("filter2"), depends_on=list(depends_on), target_cache_id=second_filter_node_id)
+    second_filter_logical_op = FilteredScan(input_schema=output_schema, output_schema=output_schema, filter=Filter("filter2"), depends_on=list(depends_on))
     second_filter_logical_op_id = second_filter_logical_op.get_logical_op_id()
     second_filter_gpt4o_full_op_id = LLMFilter(logical_op_id=second_filter_logical_op_id, output_schema=output_schema, input_schema=output_schema, filter=Filter("filter2"), model=Model.GPT_4o, depends_on=list(depends_on)).get_full_op_id()
     second_filter_gpt4o_mini_full_op_id = LLMFilter(logical_op_id=second_filter_logical_op_id, output_schema=output_schema, input_schema=output_schema, filter=Filter("filter2"), model=Model.GPT_4o_MINI, depends_on=list(depends_on)).get_full_op_id()

@@ -57,9 +57,6 @@ class QueryProcessorFactory:
     def _config_validation_and_normalization(cls, config: QueryProcessorConfig):
         if config.policy is None:
             raise ValueError("Policy is required for optimizer")
-
-        if config.cache:
-            raise ValueError("cache=True is not supported yet")
         
         # only one of progress or verbose can be set; we will default to progress=True
         if config.progress and config.verbose:

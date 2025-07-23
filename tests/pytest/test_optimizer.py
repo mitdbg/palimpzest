@@ -26,7 +26,6 @@ class TestPrimitives:
             output_schema=TextFile,
             filter=Filter("filter1"),
             depends_on=[],
-            target_cache_id="filter1",
         )
         LogicalExpression(
             operator=filter1_op,
@@ -41,7 +40,6 @@ class TestPrimitives:
             output_schema=TextFile,
             filter=Filter("filter2"),
             depends_on=[],
-            target_cache_id="filter2",
         )
         filter2_expr = LogicalExpression(
             operator=filter2_op,
@@ -56,7 +54,6 @@ class TestPrimitives:
             output_schema=email_schema,
             cardinality=Cardinality.ONE_TO_ONE,
             depends_on=[],
-            target_cache_id="convert1",
         )
         convert_expr = LogicalExpression(
             operator=convert_op,
@@ -113,7 +110,6 @@ class TestOptimizer:
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
-            cache=False,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
             optimizer_strategy=opt_strategy,
@@ -132,7 +128,6 @@ class TestOptimizer:
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
-            cache=False,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
             optimizer_strategy=opt_strategy,
@@ -158,7 +153,6 @@ class TestOptimizer:
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
-            cache=False,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
             optimizer_strategy=opt_strategy,
@@ -179,7 +173,6 @@ class TestOptimizer:
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
-            cache=False,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
             optimizer_strategy=opt_strategy,
@@ -201,7 +194,6 @@ class TestOptimizer:
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
-            cache=False,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
             optimizer_strategy=opt_strategy,
@@ -225,7 +217,6 @@ class TestOptimizer:
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
-            cache=False,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
             optimizer_strategy=opt_strategy,
@@ -246,7 +237,6 @@ class TestOptimizer:
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
-            cache=False,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
             allow_code_synth=False,
@@ -284,7 +274,6 @@ class TestOptimizer:
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
-            cache=False,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
             optimizer_strategy=opt_strategy,
@@ -427,7 +416,6 @@ class TestParetoOptimizer:
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
-            cache=False,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_3_70B],
             optimizer_strategy=OptimizationStrategyType.PARETO,

@@ -25,7 +25,6 @@ class BaseExecutionStrategy:
                  scan_start_idx: int = 0, 
                  max_workers: int | None = None,
                  num_samples: int | None = None,
-                 cache: bool = False,
                  verbose: bool = False,
                  progress: bool = True,
                  *args,
@@ -33,25 +32,9 @@ class BaseExecutionStrategy:
         self.scan_start_idx = scan_start_idx
         self.max_workers = max_workers
         self.num_samples = num_samples
-        self.cache = cache
         self.verbose = verbose
         self.progress = progress
 
-
-    def _add_records_to_cache(self, target_cache_id: str, records: list[DataRecord]) -> None:
-        """Add each record (which isn't filtered) to the cache for the given target_cache_id."""
-        if self.cache:
-            for record in records:
-                if getattr(record, "passed_operator", True):
-                    # self.datadir.append_cache(target_cache_id, record)
-                    pass
-
-    def _close_cache(self, target_cache_ids: list[str]) -> None:
-        """Close the cache for each of the given target_cache_ids"""
-        if self.cache:
-            for target_cache_id in target_cache_ids:  # noqa: B007
-                # self.datadir.close_cache(target_cache_id)
-                pass
 
 class ExecutionStrategy(BaseExecutionStrategy, ABC):
     """Base strategy for executing query plans. Defines how to execute a PhysicalPlan.
