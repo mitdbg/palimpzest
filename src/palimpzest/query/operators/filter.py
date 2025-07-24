@@ -17,7 +17,7 @@ from palimpzest.constants import (
 from palimpzest.core.elements.filters import Filter
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.core.models import GenerationStats, OperatorCostEstimates, RecordOpStats
-from palimpzest.query.generators.generators import generator_factory
+from palimpzest.query.generators.generators import Generator
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.utils.model_helpers import get_vision_models
 
@@ -181,7 +181,7 @@ class LLMFilter(FilterOp):
         super().__init__(*args, **kwargs)
         self.model = model
         self.prompt_strategy = prompt_strategy
-        self.generator = generator_factory(model, prompt_strategy, Cardinality.ONE_TO_ONE, self.verbose)
+        self.generator = Generator(model, prompt_strategy, Cardinality.ONE_TO_ONE, self.verbose)
 
     def get_id_params(self):
         id_params = super().get_id_params()
