@@ -7,7 +7,7 @@ from pydantic.fields import FieldInfo
 from palimpzest.constants import MODEL_CARDS, Model, PromptStrategy
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.models import GenerationStats, OperatorCostEstimates
-from palimpzest.query.generators.generators import generator_factory
+from palimpzest.query.generators.generators import Generator
 from palimpzest.query.operators.convert import LLMConvert
 
 # TYPE DEFINITIONS
@@ -37,8 +37,8 @@ class CriticAndRefineConvert(LLMConvert):
             raise ValueError(f"Unsupported prompt strategy: {self.prompt_strategy}")
 
         # create generators
-        self.critic_generator = generator_factory(self.critic_model, self.critic_prompt_strategy, self.cardinality, self.verbose)
-        self.refine_generator = generator_factory(self.refine_model, self.refinement_prompt_strategy, self.cardinality, self.verbose)
+        self.critic_generator = Generator(self.critic_model, self.critic_prompt_strategy, self.cardinality, self.verbose)
+        self.refine_generator = Generator(self.refine_model, self.refinement_prompt_strategy, self.cardinality, self.verbose)
 
     def __str__(self):
         op = super().__str__()

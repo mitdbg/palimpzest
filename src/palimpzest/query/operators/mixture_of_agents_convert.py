@@ -5,7 +5,7 @@ from pydantic.fields import FieldInfo
 from palimpzest.constants import MODEL_CARDS, Model, PromptStrategy
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.models import GenerationStats, OperatorCostEstimates
-from palimpzest.query.generators.generators import generator_factory
+from palimpzest.query.generators.generators import Generator
 from palimpzest.query.operators.convert import LLMConvert
 
 # TYPE DEFINITIONS
@@ -38,10 +38,10 @@ class MixtureOfAgentsConvert(LLMConvert):
 
         # create generators
         self.proposer_generators = [
-            generator_factory(model, self.proposer_prompt_strategy, self.cardinality, self.verbose)
+            Generator(model, self.proposer_prompt_strategy, self.cardinality, self.verbose)
             for model in proposer_models
         ]
-        self.aggregator_generator = generator_factory(aggregator_model, self.aggregator_prompt_strategy, self.cardinality, self.verbose)
+        self.aggregator_generator = Generator(aggregator_model, self.aggregator_prompt_strategy, self.cardinality, self.verbose)
 
     def __str__(self):
         op = super().__str__()

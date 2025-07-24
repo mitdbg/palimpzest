@@ -17,7 +17,7 @@ from palimpzest.constants import (
 )
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.core.models import GenerationStats, OperatorCostEstimates, RecordOpStats
-from palimpzest.query.generators.generators import generator_factory
+from palimpzest.query.generators.generators import Generator
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.utils.model_helpers import get_vision_models
 
@@ -290,7 +290,7 @@ class LLMConvert(ConvertOp):
         self.model = model
         self.prompt_strategy = prompt_strategy
         if model is not None:
-            self.generator = generator_factory(model, prompt_strategy, self.cardinality, self.verbose)
+            self.generator = Generator(model, prompt_strategy, self.cardinality, self.verbose)
 
     def __str__(self):
         op = super().__str__()

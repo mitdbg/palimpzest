@@ -10,15 +10,15 @@ class Model(str, Enum):
     which requires invoking an LLM. It does NOT specify whether the model need be executed
     remotely or locally (if applicable).
     """
-    LLAMA3_2_3B = "meta-llama/Llama-3.2-3B-Instruct-Turbo"
-    LLAMA3_1_8B = "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo"
-    LLAMA3_3_70B = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
-    LLAMA3_2_90B_V = "meta-llama/Llama-3.2-90B-Vision-Instruct-Turbo"
-    MIXTRAL = "mistralai/Mixtral-8x7B-Instruct-v0.1"
-    DEEPSEEK_V3 = "deepseek-ai/DeepSeek-V3"
-    DEEPSEEK_R1_DISTILL_QWEN_1_5B = "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"
-    GPT_4o = "gpt-4o-2024-08-06"
-    GPT_4o_MINI = "gpt-4o-mini-2024-07-18"
+    LLAMA3_2_3B = "together_ai/meta-llama/Llama-3.2-3B-Instruct-Turbo"
+    LLAMA3_1_8B = "together_ai/meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo"
+    LLAMA3_3_70B = "together_ai/meta-llama/Llama-3.3-70B-Instruct-Turbo"
+    LLAMA3_2_90B_V = "together_ai/meta-llama/Llama-3.2-90B-Vision-Instruct-Turbo"
+    MIXTRAL = "together_ai/mistralai/Mixtral-8x7B-Instruct-v0.1"
+    DEEPSEEK_V3 = "together_ai/deepseek-ai/DeepSeek-V3"
+    DEEPSEEK_R1_DISTILL_QWEN_1_5B = "together_ai/deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"
+    GPT_4o = "openai/gpt-4o-2024-08-06"
+    GPT_4o_MINI = "openai/gpt-4o-mini-2024-07-18"
     TEXT_EMBEDDING_3_SMALL = "text-embedding-3-small"
     CLIP_VIT_B_32 = "clip-ViT-B-32"
     # o1 = "o1-2024-12-17"
@@ -39,11 +39,7 @@ class Model(str, Enum):
         return "clip" in self.value.lower()
 
     def is_together_model(self):
-        is_llama_model = self.is_llama_model()
-        is_mixtral_model = self.is_mixtral_model()
-        is_deepseek_model = self.is_deepseek_model()
-        is_clip_model = self.is_clip_model()
-        return is_llama_model or is_mixtral_model or is_deepseek_model or is_clip_model
+        return "together_ai" in self.value.lower() or self.is_clip_model()
 
     def is_gpt_4o_model(self):
         return "gpt-4o" in self.value.lower()
@@ -55,10 +51,7 @@ class Model(str, Enum):
         return "text-embedding" in self.value.lower()
 
     def is_openai_model(self):
-        is_gpt4_model = self.is_gpt_4o_model()
-        is_o1_model = self.is_o1_model()
-        is_text_embedding_model = self.is_text_embedding_model()
-        return is_gpt4_model or is_o1_model or is_text_embedding_model
+        return "openai" in self.value.lower() or self.is_text_embedding_model()
 
     def is_vision_model(self):
         vision_models = [
@@ -74,13 +67,6 @@ class Model(str, Enum):
         is_text_embedding_model = self.is_text_embedding_model()
         return is_clip_model or is_text_embedding_model
 
-class APIClient(str, Enum):
-    """
-    APIClient describes the API client to be used when invoking an LLM.
-    """
-
-    OPENAI = "openai"
-    TOGETHER = "together"
 
 class PromptStrategy(str, Enum):
     """
