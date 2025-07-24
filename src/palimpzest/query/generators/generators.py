@@ -35,14 +35,6 @@ InputType = TypeVar("InputType")
 
 logger = logging.getLogger(__name__)
 
-def get_api_key(key: str) -> str:
-    # get API key from environment or throw an exception if it's not set
-    if key not in os.environ:
-        raise ValueError("key not found in environment variables")
-
-    return os.environ[key]
-
-
 def get_json_from_answer(answer: str, model: Model, cardinality: Cardinality) -> dict[str, Any]:
     """
     This function parses an LLM response which is supposed to output a JSON object
@@ -105,7 +97,7 @@ def get_json_from_answer(answer: str, model: Model, cardinality: Cardinality) ->
     # finally, parse and return the JSON object; errors are handled by the caller
     return json.loads(answer)
 
-
+# TODO: push parallelism of generations into LiteLLM rather than threadpool in executor
 # TODO: make sure answer parsing works with custom prompts / parsers (can defer this)
 class Generator(Generic[ContextType, InputType]):
     """
