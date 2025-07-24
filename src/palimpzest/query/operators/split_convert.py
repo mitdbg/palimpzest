@@ -12,7 +12,7 @@ from palimpzest.constants import (
 )
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.models import GenerationStats, OperatorCostEstimates
-from palimpzest.query.generators.generators import generator_factory
+from palimpzest.query.generators.generators import Generator
 from palimpzest.query.operators.convert import LLMConvert
 
 
@@ -21,8 +21,8 @@ class SplitConvert(LLMConvert):
         super().__init__(*args, **kwargs)
         self.num_chunks = num_chunks
         self.min_size_to_chunk = min_size_to_chunk
-        self.split_generator = generator_factory(self.model, PromptStrategy.SPLIT_PROPOSER, self.cardinality, self.verbose)
-        self.split_merge_generator = generator_factory(self.model, PromptStrategy.SPLIT_MERGER, self.cardinality, self.verbose)
+        self.split_generator = Generator(self.model, PromptStrategy.SPLIT_PROPOSER, self.cardinality, self.verbose)
+        self.split_merge_generator = Generator(self.model, PromptStrategy.SPLIT_MERGER, self.cardinality, self.verbose)
 
         # crude adjustment factor for naive estimation in no-sentinel setting
         self.naive_quality_adjustment = 0.6

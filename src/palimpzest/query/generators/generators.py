@@ -4,25 +4,21 @@ This file contains the Generator classes and generator factory.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
-import re
 import time
 import warnings
-from abc import ABC, abstractmethod
 from copy import deepcopy
 from typing import Any, Generic, TypeVar
 
+import litellm
+import regex as re  # Use regex instead of re to used variable length lookbehind
 from colorama import Fore, Style
-from openai import OpenAI
-from openai.types.chat.chat_completion import ChatCompletion
 from pydantic.fields import FieldInfo
-from together import Together
-from together.types.chat_completions import ChatCompletionResponse
 
 from palimpzest.constants import (
     MODEL_CARDS,
-    APIClient,
     Cardinality,
     Model,
     PromptStrategy,
@@ -30,8 +26,6 @@ from palimpzest.constants import (
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.models import GenerationStats
 from palimpzest.prompts import PromptFactory
-from palimpzest.query.generators.api_client_factory import APIClientFactory
-from palimpzest.utils.generation_helpers import get_json_from_answer
 
 # DEFINITIONS
 GenerationOutput = tuple[dict, str | None, GenerationStats, list[dict]]
@@ -41,21 +35,6 @@ InputType = TypeVar("InputType")
 
 logger = logging.getLogger(__name__)
 
-def generator_factory(
-    model: Model, prompt_strategy: PromptStrategy, cardinality: Cardinality, verbose: bool = False
-) -> BaseGenerator:
-    """
-    Factory function to return the correct generator based on the model, strategy, and cardinality.
-    """
-    if model.is_openai_model():
-        return OpenAIGenerator(model, prompt_strategy, cardinality, verbose)
-
-    elif model.is_together_model():
-        return TogetherGenerator(model, prompt_strategy, cardinality, verbose)
-
-    raise Exception(f"Unsupported model: {model}")
-
-
 def get_api_key(key: str) -> str:
     # get API key from environment or throw an exception if it's not set
     if key not in os.environ:
@@ -64,8 +43,71 @@ def get_api_key(key: str) -> str:
     return os.environ[key]
 
 
+def get_json_from_answer(answer: str, model: Model, cardinality: Cardinality) -> dict[str, Any]:
+    """
+    This function parses an LLM response which is supposed to output a JSON object
+    and optimistically searches for the substring containing the JSON object.
+    """
+    # model-specific trimming for LLAMA3 responses
+    if model.is_llama_model():
+        answer = answer.split("---")[0]
+        answer = answer.replace("True", "true")
+        answer = answer.replace("False", "false")
+
+    # split off context / excess, which models sometimes output after answer
+    answer = answer.split("Context:")[0]
+    answer = answer.split("# this is the answer")[0]
+
+    # trim the answer to only include the JSON dictionary
+    if cardinality == Cardinality.ONE_TO_ONE:
+        if not answer.strip().startswith("{"):
+            # Find the start index of the actual JSON string assuming the prefix is followed by the JSON dictionary
+            start_index = answer.find("{")
+            if start_index != -1:
+                # Remove the prefix and any leading characters before the JSON starts
+                answer = answer[start_index:]
+
+        if not answer.strip().endswith("}"):
+            # Find the end index of the actual JSON string assuming the suffix is preceded by the JSON dictionary
+            end_index = answer.rfind("}")
+            if end_index != -1:
+                # Remove the suffix and any trailing characters after the JSON ends
+                answer = answer[: end_index + 1]
+
+    # otherwise, trim the answer to only include the JSON array
+    else:
+        if not answer.strip().startswith("["):
+            # Find the start index of the actual JSON string assuming the prefix is followed by the JSON array
+            start_index = answer.find("[")
+            if start_index != -1:
+                # Remove the prefix and any leading characters before the JSON starts
+                answer = answer[start_index:]
+
+        if not answer.strip().endswith("]"):
+            # Find the end index of the actual JSON string
+            # assuming the suffix is preceded by the JSON object/array
+            end_index = answer.rfind("]")
+            if end_index != -1:
+                # Remove the suffix and any trailing characters after the JSON ends
+                answer = answer[: end_index + 1]
+
+    # Handle weird escaped values. I am not sure why the model
+    # is returning these, but the JSON parser can't take them
+    answer = answer.replace(r"\_", "_")
+    answer = answer.replace("\\n", "\n")
+    # Remove https and http prefixes to not conflict with comment detection
+    # Handle comments in the JSON response. Use regex from // until end of line
+    answer = re.sub(r"(?<!https?:)\/\/.*?$", "", answer, flags=re.MULTILINE)
+    answer = re.sub(r",\n.*\.\.\.$", "", answer, flags=re.MULTILINE)
+    # Sanitize newlines in the JSON response
+    answer = answer.replace("\n", " ")
+
+    # finally, parse and return the JSON object; errors are handled by the caller
+    return json.loads(answer)
+
+
 # TODO: make sure answer parsing works with custom prompts / parsers (can defer this)
-class BaseGenerator(Generic[ContextType, InputType], ABC):
+class Generator(Generic[ContextType, InputType]):
     """
     Abstract base class for Generators.
     """
@@ -76,92 +118,13 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
         prompt_strategy: PromptStrategy,
         cardinality: Cardinality = Cardinality.ONE_TO_ONE,
         verbose: bool = False,
-        system_role: str = "system",
     ):
         self.model = model
         self.model_name = model.value
         self.cardinality = cardinality
         self.prompt_strategy = prompt_strategy
         self.verbose = verbose
-        self.system_role = system_role
         self.prompt_factory = PromptFactory(prompt_strategy, model, cardinality)
-
-    @abstractmethod
-    def _get_client_or_model(self, **kwargs) -> Any:
-        """Returns a client (or local model) which can be invoked to perform the generation."""
-        pass
-
-    @abstractmethod
-    def _generate_completion(self, client_or_model: Any, payload: dict, **kwargs) -> Any:
-        """Generates a completion object using the client (or local model)."""
-        pass
-
-    @abstractmethod
-    def _get_completion_text(self, completion: Any, **kwargs) -> Any:
-        """Extract the completion text from the completion object."""
-        pass
-
-    @abstractmethod
-    def _get_usage(self, completion: Any, **kwargs) -> Any:
-        """Extract the usage statistics from the completion object."""
-        pass
-
-    @abstractmethod
-    def _get_finish_reason(self, completion: Any, **kwargs) -> Any:
-        """Extract the finish reason from the completion object."""
-        pass
-
-    @abstractmethod
-    def _get_answer_log_probs(self, completion: Any, **kwargs) -> Any:
-        """Extract the log probabilities from the completion object."""
-        pass
-
-    def _generate_payload(self, messages: list[dict], **kwargs) -> dict:
-        """
-        Generates the payload which will be fed into the client (or local model).
-
-        Each message will be a dictionary with the following format:
-        {
-            "role": "user" | "system",
-            "type": "text" | "image",
-            "content": str
-        }
-        """
-        # get basic parameters
-        model = self.model_name
-        temperature = kwargs.get("temperature", 0.0)
-
-        # construct messages and add system prompt if present
-        chat_messages, user_content = [], []
-        for message in messages:
-            # flush user content into a message and add system message
-            if message["role"] == "system":
-                if len(user_content) > 0:
-                    chat_messages.append({"role": "user", "content": user_content})
-                    user_content = []
-
-                chat_messages.append({"role": self.system_role, "content": message["content"]})
-
-            # add user content for text messages
-            elif message["role"] == "user" and message["type"] == "text":
-                user_content.append({"type": "text", "text": message["content"]})
-
-            # add user content for image messages
-            elif message["role"] == "user" and message["type"] == "image":
-                user_content.append({"type": "image_url", "image_url": {"url": message["content"]}})
-
-        # flush any remaining user content into a final message
-        if len(user_content) > 0:
-            chat_messages.append({"role": "user", "content": user_content})
-
-        # construct and return payload
-        payload = {
-            "model": model,
-            "temperature": temperature,
-            "messages": chat_messages,
-        }
-
-        return payload
 
     def _parse_reasoning(self, completion_text: str, **kwargs) -> str:
         """Extract the reasoning for the generated output from the completion object."""
@@ -323,7 +286,6 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
 
     def __call__(self, candidate: DataRecord, fields: dict[str, FieldInfo] | None, json_output: bool=True, **kwargs) -> GenerationOutput:
         """Take the input record (`candidate`), generate the output `fields`, and return the generated output."""
-        client = self._get_client_or_model()
         logger.debug(f"Generating for candidate {candidate} with fields {fields}")
 
         # fields can only be None if the user provides an answer parser
@@ -340,14 +302,12 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
         # generate a list of messages which can be used to construct a payload
         messages = self.prompt_factory.create_messages(candidate, fields, **kwargs)
 
-        # create the chat payload
-        chat_payload = self._generate_payload(messages, **kwargs)
-
         # generate the text completion
         start_time = time.time()
         completion = None
         try:
-            completion = self._generate_completion(client, chat_payload, **kwargs)
+            completion_kwargs = {"temperature": kwargs.get("temperature", 0.0)}
+            completion = litellm.completion(model=self.model_name, messages=messages, **completion_kwargs)
             end_time = time.time()
             logger.debug(f"Generated completion in {end_time - start_time:.2f} seconds")
         # if there's an error generating the completion, we have to return an empty answer
@@ -371,15 +331,13 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
         # parse usage statistics and create the GenerationStats
         generation_stats = None
         if completion is not None:
-            usage = self._get_usage(completion, **kwargs)
-            # finish_reason = self._get_finish_reason(completion, **kwargs)
-            # answer_log_probs = self._get_answer_log_probs(completion, **kwargs)
+            usage = completion.usage.dict()
 
             # get cost per input/output token for the model and parse number of input and output tokens
             usd_per_input_token = MODEL_CARDS[self.model_name]["usd_per_input_token"]
             usd_per_output_token = MODEL_CARDS[self.model_name]["usd_per_output_token"]
-            input_tokens = usage["input_tokens"]
-            output_tokens = usage["output_tokens"]
+            input_tokens = usage["prompt_tokens"]
+            output_tokens = usage["completion_tokens"]
 
             generation_stats = GenerationStats(
                 model_name=self.model_name,
@@ -391,16 +349,10 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
                 total_output_cost=output_tokens * usd_per_output_token,
                 cost_per_record=input_tokens * usd_per_input_token + output_tokens * usd_per_output_token,
                 total_llm_calls=1,
-                # "system_prompt": system_prompt,
-                # "prompt": prompt,
-                # "usage": usage,
-                # "finish_reason": finish_reason,
-                # "answer_log_probs": answer_log_probs,
-                # "answer": answer,
             )
 
         # pretty print prompt + full completion output for debugging
-        completion_text = self._get_completion_text(completion, **kwargs)
+        completion_text = completion.choices[0].message.content
         prompt = ""
         for message in messages:
             if message["role"] == "user":
@@ -442,126 +394,3 @@ class BaseGenerator(Generic[ContextType, InputType], ABC):
 
         logger.debug(f"Generated field answers: {field_answers}")
         return field_answers, reasoning, generation_stats, messages
-
-
-class OpenAIGenerator(BaseGenerator[str | list[str], str]):
-    """
-    Class for generating text using the OpenAI chat API.
-    """
-
-    def __init__(
-        self,
-        model: Model,
-        prompt_strategy: PromptStrategy,
-        cardinality: Cardinality = Cardinality.ONE_TO_ONE,
-        verbose: bool = False,
-    ):
-        # assert that model is an OpenAI model
-        assert model.is_openai_model()
-        super().__init__(model, prompt_strategy, cardinality, verbose, "developer")
-
-    def _get_client_or_model(self, **kwargs) -> OpenAI:
-        """Returns a client (or local model) which can be invoked to perform the generation."""
-        return APIClientFactory.get_client(APIClient.OPENAI, get_api_key("OPENAI_API_KEY"))
-
-    def _generate_completion(self, client: OpenAI, payload: dict, **kwargs) -> ChatCompletion:
-        """Generates a completion object using the client (or local model)."""
-        return client.chat.completions.create(**payload)
-
-    def _get_completion_text(self, completion: ChatCompletion, **kwargs) -> str:
-        """Extract the completion text from the completion object."""
-        return completion.choices[0].message.content
-
-    def _get_usage(self, completion: ChatCompletion, **kwargs) -> dict:
-        """Extract the usage statistics from the completion object."""
-        return {
-            "input_tokens": completion.usage.prompt_tokens,
-            "output_tokens": completion.usage.completion_tokens,
-        }
-
-    def _get_finish_reason(self, completion: ChatCompletion, **kwargs) -> str:
-        """Extract the finish reason from the completion object."""
-        return completion.choices[0].finish_reason
-
-    def _get_answer_log_probs(self, completion: ChatCompletion, **kwargs) -> list[float]:
-        """Extract the log probabilities from the completion object."""
-        return completion.choices[0].logprobs
-
-
-class TogetherGenerator(BaseGenerator[str | list[str], str]):
-    """
-    Class for generating text using the Together chat API.
-    """
-
-    def __init__(
-        self,
-        model: Model,
-        prompt_strategy: PromptStrategy,
-        cardinality: Cardinality = Cardinality.ONE_TO_ONE,
-        verbose: bool = False,
-    ):
-        # assert that model is a model offered by Together
-        assert model.is_together_model()
-        super().__init__(model, prompt_strategy, cardinality, verbose, "system")
-
-    def _generate_payload(self, messages: list[dict], **kwargs) -> dict:
-        """
-        Generates the payload which will be fed into the client (or local model).
-
-        Each message will be a dictionary with the following format:
-        {
-            "role": "user" | "system",
-            "type": "text" | "image",
-            "content": str
-        }
-
-        For LLAMA3, the payload needs to be in a {"role": <role>, "content": <content>} format.
-        """
-        # for other models, use our standard payload generation
-        if not self.model.is_llama_model():
-            return super()._generate_payload(messages, **kwargs)
-
-        # get basic parameters
-        model = self.model_name
-        temperature = kwargs.get("temperature", 0.0)
-
-        # construct messages in simple {"role": <role>, "content": <content>} format
-        chat_messages = []
-        for message in messages:
-            chat_messages.append({"role": message["role"], "content": message["content"]})
-
-        # construct and return payload
-        payload = {
-            "model": model,
-            "temperature": temperature,
-            "messages": chat_messages,
-        }
-
-        return payload
-
-    def _get_client_or_model(self, **kwargs) -> Together:
-        """Returns a client (or local model) which can be invoked to perform the generation."""
-        return APIClientFactory.get_client(APIClient.TOGETHER, get_api_key("TOGETHER_API_KEY"))
-
-    def _generate_completion(self, client: Together, payload: dict, **kwargs) -> ChatCompletionResponse:
-        """Generates a completion object using the client (or local model)."""
-        return client.chat.completions.create(**payload)
-
-    def _get_completion_text(self, completion: ChatCompletionResponse, **kwargs) -> str:
-        """Extract the completion text from the completion object."""
-        return completion.choices[0].message.content
-
-    def _get_usage(self, completion: ChatCompletionResponse, **kwargs) -> dict:
-        """Extract the usage statistics from the completion object."""
-        return {
-            "input_tokens": completion.usage.prompt_tokens,
-            "output_tokens": completion.usage.completion_tokens,
-        }
-
-    def _get_finish_reason(self, completion: ChatCompletionResponse, **kwargs) -> str:
-        """Extract the finish reason from the completion object."""
-        return completion.choices[0].finish_reason.value
-
-    def _get_answer_log_probs(self, completion: ChatCompletionResponse, **kwargs) -> list[float]:
-        """Extract the log probabilities from the completion object."""
-        return completion.choices[0].logprobs
