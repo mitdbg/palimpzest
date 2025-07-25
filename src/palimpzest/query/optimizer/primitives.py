@@ -43,6 +43,7 @@ class Expression:
     def __eq__(self, other):
         return self.operator == other.operator and self.input_group_ids == other.input_group_ids
 
+    # TODO: make this a proper useful __str__; use id() or some other mechanism for signaling unique Expression
     def __str__(self):
         op_id = self.operator.get_logical_op_id() if isinstance(self.operator, LogicalOperator) else self.operator.get_full_op_id()
         return str(tuple(sorted(self.input_group_ids)) + (op_id, str(self.__class__.__name__)))

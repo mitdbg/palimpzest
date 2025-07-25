@@ -21,7 +21,7 @@ from palimpzest.query.optimizer import (
     IMPLEMENTATION_RULES,
     TRANSFORMATION_RULES,
 )
-from palimpzest.query.optimizer.cost_model import CostModel
+from palimpzest.query.optimizer.cost_model import BaseCostModel, SampleBasedCostModel
 from palimpzest.query.optimizer.optimizer_strategy_type import OptimizationStrategyType
 from palimpzest.query.optimizer.plan import PhysicalPlan
 from palimpzest.query.optimizer.primitives import Group, LogicalExpression
@@ -70,7 +70,7 @@ class Optimizer:
     def __init__(
         self,
         policy: Policy,
-        cost_model: CostModel,
+        cost_model: BaseCostModel,
         available_models: list[Model],
         verbose: bool = False,
         allow_bonded_query: bool = True,
@@ -161,7 +161,7 @@ class Optimizer:
         logger.info(f"Initialized Optimizer with verbose={self.verbose}")
         logger.debug(f"Initialized Optimizer with params: {self.__dict__}")
 
-    def update_cost_model(self, cost_model: CostModel):
+    def update_cost_model(self, cost_model: BaseCostModel):
         self.cost_model = cost_model
 
     def get_physical_op_params(self):
@@ -175,7 +175,7 @@ class Optimizer:
     def deepcopy_clean(self):
         optimizer = Optimizer(
             policy=self.policy,
-            cost_model=CostModel(),
+            cost_model=SampleBasedCostModel(),
             verbose=self.verbose,
             available_models=self.available_models,
             allow_bonded_query=self.allow_bonded_query,

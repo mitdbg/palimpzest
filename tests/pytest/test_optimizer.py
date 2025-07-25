@@ -12,7 +12,7 @@ from palimpzest.query.operators.filter import LLMFilter, NonLLMFilter
 from palimpzest.query.operators.logical import ConvertScan, FilteredScan
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.scan import MarshalAndScanDataOp, ScanPhysicalOp
-from palimpzest.query.optimizer.cost_model import CostModel
+from palimpzest.query.optimizer.cost_model import SampleBasedCostModel
 from palimpzest.query.optimizer.optimizer import Optimizer
 from palimpzest.query.optimizer.optimizer_strategy_type import OptimizationStrategyType
 from palimpzest.query.optimizer.primitives import Group, LogicalExpression
@@ -105,7 +105,7 @@ class TestOptimizer:
     def test_basic_functionality(self, enron_eval_tiny, opt_strategy):
         plan = enron_eval_tiny
         policy = MaxQuality()
-        cost_model = CostModel(sample_execution_data=[])
+        cost_model = SampleBasedCostModel()
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
@@ -123,7 +123,7 @@ class TestOptimizer:
         plan = enron_eval_tiny
         plan = plan.sem_add_columns(email_schema)
         policy = MaxQuality()
-        cost_model = CostModel(sample_execution_data=[])
+        cost_model = SampleBasedCostModel()
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
@@ -147,7 +147,7 @@ class TestOptimizer:
         plan = enron_eval_tiny
         plan = plan.sem_add_columns(email_schema)
         policy = MinCost()
-        cost_model = CostModel(sample_execution_data=[])
+        cost_model = SampleBasedCostModel()
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
@@ -166,7 +166,7 @@ class TestOptimizer:
         plan = enron_eval_tiny
         plan = plan.sem_add_columns(email_schema)
         policy = MinTime()
-        cost_model = CostModel(sample_execution_data=[])
+        cost_model = SampleBasedCostModel()
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
@@ -186,7 +186,7 @@ class TestOptimizer:
         plan = plan.sem_add_columns(email_schema)
         plan = plan.sem_filter("some text filter", depends_on=["contents"])
         policy = MinCost()
-        cost_model = CostModel(sample_execution_data=[])
+        cost_model = SampleBasedCostModel()
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
@@ -208,7 +208,7 @@ class TestOptimizer:
         plan = plan.sem_filter("some text filter", depends_on=["contents"])
         plan = plan.sem_filter("another text filter", depends_on=["contents"])
         policy = MinCost()
-        cost_model = CostModel(sample_execution_data=[])
+        cost_model = SampleBasedCostModel()
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
@@ -227,7 +227,7 @@ class TestOptimizer:
 
     def test_real_estate_logical_reorder(self, real_estate_workload, opt_strategy):
         policy = MinCost()
-        cost_model = CostModel(sample_execution_data=[])
+        cost_model = SampleBasedCostModel()
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
@@ -263,7 +263,7 @@ class TestOptimizer:
         plan = plan.sem_filter("filter6", depends_on=["contents"])
         plan = plan.sem_filter("filter7", depends_on=["contents"])
         policy = MinCost()
-        cost_model = CostModel(sample_execution_data=[])
+        cost_model = SampleBasedCostModel()
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,

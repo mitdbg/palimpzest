@@ -132,8 +132,8 @@ if __name__ == "__main__":
     optimizer_strategy = "pareto"
     exp_name = f"biodex-priors-{optimizer_strategy}-seed{seed}-cascades" # NOTE: unique to cascades run
 
-    if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None:
-        print("WARNING: Both OPENAI_API_KEY and TOGETHER_API_KEY are unset")
+    if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None and os.getenv("ANTHROPIC_API_KEY") is None:
+        print("WARNING: OPENAI_API_KEY, TOGETHER_API_KEY, and ANTHROPIC_API_KEY are unset")
 
     # create data source
     dataset = BiodexDataset(

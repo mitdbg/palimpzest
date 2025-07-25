@@ -88,7 +88,6 @@ class QueryProcessor:
         # return the output records and plan stats
         return records, [plan_stats]
 
-    # TODO: consider to support dry_run.
     @abstractmethod
     def execute(self) -> DataRecordCollection:
         raise NotImplementedError("Abstract method to be overwritten by sub-classes")

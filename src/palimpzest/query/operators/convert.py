@@ -19,7 +19,6 @@ from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.core.models import GenerationStats, OperatorCostEstimates, RecordOpStats
 from palimpzest.query.generators.generators import Generator
 from palimpzest.query.operators.physical import PhysicalOperator
-from palimpzest.utils.model_helpers import get_vision_models
 
 
 class ConvertOp(PhysicalOperator, ABC):
@@ -321,7 +320,7 @@ class LLMConvert(ConvertOp):
         return None if self.model is None else self.model.value
 
     def is_image_conversion(self) -> bool:
-        return self.model in get_vision_models()
+        return self.prompt_strategy is PromptStrategy.COT_QA_IMAGE
 
     def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         """

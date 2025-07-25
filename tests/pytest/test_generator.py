@@ -1,3 +1,5 @@
+import os
+
 import pytest
 from pydantic import BaseModel, Field
 
@@ -20,7 +22,16 @@ def output_schema():
         answer: str = Field(description="The one-word answer to the question.")
     return Answer
 
-@pytest.mark.parametrize("model", [Model.GPT_4o_MINI, Model.DEEPSEEK_V3, Model.LLAMA3_2_3B, Model.MIXTRAL])
+@pytest.mark.parametrize(
+    "model",
+    [
+        pytest.param(Model.GPT_4o_MINI, marks=pytest.mark.skipif(os.getenv("OPENAI_API_KEY") is None, reason="OPENAI_API_KEY not present")),
+        pytest.param(Model.DEEPSEEK_V3, marks=pytest.mark.skipif(os.getenv("TOGETHER_API_KEY") is None, reason="TOGETHER_API_KEY not present")),
+        pytest.param(Model.LLAMA3_2_3B, marks=pytest.mark.skipif(os.getenv("TOGETHER_API_KEY") is None, reason="TOGETHER_API_KEY not present")),
+        pytest.param(Model.MIXTRAL, marks=pytest.mark.skipif(os.getenv("TOGETHER_API_KEY") is None, reason="TOGETHER_API_KEY not present")),
+        pytest.param(Model.CLAUDE_3_5_HAIKU, marks=pytest.mark.skipif(os.getenv("ANTHROPIC_API_KEY") is None, reason="ANTHROPIC_API_KEY not present")),
+    ]
+)
 def test_generator(model, question, output_schema):
     generator = Generator(model, PromptStrategy.COT_QA)
     output, _, gen_stats, _ = generator(question, output_schema.model_fields, **{"output_schema": output_schema})
