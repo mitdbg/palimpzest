@@ -316,10 +316,10 @@ class ImplementationRule(Rule):
             return True
 
         # multi-modal input and multi-modal supporting model
-        if cls._is_multi_modal_operation(logical_expression) and model.is_multimodal_model():
+        if cls._is_multi_modal_operation(logical_expression) and model.is_multimodal_model():  # noqa: SIM103
             return True
 
-        raise ValueError(f"Unhandled case for model and input:\nModel: {model}\nInput: {str(logical_expression)}")
+        return False
 
     @classmethod
     def _get_fixed_op_kwargs(cls, logical_expression: LogicalExpression, runtime_kwargs: dict) -> dict:
@@ -397,7 +397,7 @@ class ImplementationRule(Rule):
             )
             physical_expressions.append(expression)
 
-        return set([expression])
+        return set(physical_expressions)
 
 
 class NonLLMConvertRule(ImplementationRule):
@@ -493,7 +493,7 @@ class MixtureOfAgentsConvertRule(ImplementationRule):
         # create variable physical operator kwargs for each model which can implement this logical_expression
         proposer_model_set = {model for model in runtime_kwargs["available_models"] if cls._model_matches_input(model, logical_expression)}
         aggregator_model_set = {model for model in runtime_kwargs["available_models"] if model.is_text_model()}
-        proposer_prompt_strategy = PromptStrategy.COT_MOA_PROPOSER_IMAGE if cls._is_image_operation() else PromptStrategy.COT_MOA_PROPOSER
+        proposer_prompt_strategy = PromptStrategy.COT_MOA_PROPOSER_IMAGE if cls._is_image_operation(logical_expression) else PromptStrategy.COT_MOA_PROPOSER
         variable_op_kwargs = [
             {
                 "proposer_models": list(proposer_models),

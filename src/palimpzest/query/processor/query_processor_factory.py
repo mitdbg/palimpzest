@@ -88,7 +88,7 @@ class QueryProcessorFactory:
         # get available models
         available_models = getattr(config, 'available_models', [])
         if available_models is None or len(available_models) == 0:
-            available_models = get_models(include_vision=True)
+            available_models = get_models()
         config.available_models = available_models
 
         return config

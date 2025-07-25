@@ -3,36 +3,7 @@ import os
 from palimpzest.constants import Model
 
 
-def get_vision_models() -> list[Model]:
-    """
-    Return the set of vision models which the system has access to based on the set of environment variables.
-    """
-    models = []
-    if os.getenv("OPENAI_API_KEY") is not None:
-        openai_vision_models = [
-            model for model in Model
-            if model.is_openai_model() and model.is_vision_model()
-        ]
-        models.extend(openai_vision_models)
-
-    if os.getenv("TOGETHER_API_KEY") is not None:
-        together_vision_models = [
-            model for model in Model
-            if model.is_together_model() and model.is_vision_model()
-        ]
-        models.extend(together_vision_models)
-
-    if os.getenv("ANTHROPIC_API_KEY") is not None:
-        anthropic_vision_models = [
-            model for model in Model
-            if model.is_anthropic_model() and model.is_vision_model()
-        ]
-        models.extend(anthropic_vision_models)
-
-    return models
-
-
-def get_models(include_vision: bool = False, include_embedding: bool = False) -> list[Model]:
+def get_models(include_embedding: bool = False) -> list[Model]:
     """
     Return the set of models which the system has access to based on the set environment variables.
     """
@@ -47,10 +18,6 @@ def get_models(include_vision: bool = False, include_embedding: bool = False) ->
 
     if os.getenv("TOGETHER_API_KEY") is not None:
         together_models = [model for model in Model if model.is_together_model()]
-        if not include_vision:
-            together_models = [
-                model for model in together_models if not model.is_vision_model()
-            ]
         if not include_embedding:
             together_models = [
                 model for model in together_models if not model.is_embedding_model()
@@ -59,19 +26,11 @@ def get_models(include_vision: bool = False, include_embedding: bool = False) ->
 
     if os.getenv("ANTHROPIC_API_KEY") is not None:
         anthropic_models = [model for model in Model if model.is_anthropic_model()]
-        if not include_vision:
-            anthropic_models = [
-                model for model in anthropic_models if not model.is_vision_model()
-            ]
         if not include_embedding:
             anthropic_models = [
                 model for model in anthropic_models if not model.is_embedding_model()
             ]
         models.extend(anthropic_models)
-
-    if include_vision:
-        vision_models = get_vision_models()
-        models.extend(vision_models)
 
     return models
 
