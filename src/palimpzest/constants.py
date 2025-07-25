@@ -21,6 +21,7 @@ class Model(str, Enum):
     GPT_4o_MINI = "openai/gpt-4o-mini-2024-07-18"
     TEXT_EMBEDDING_3_SMALL = "text-embedding-3-small"
     CLIP_VIT_B_32 = "clip-ViT-B-32"
+    CLAUDE_3_5_SONNET = "anthropic/claude-3-5-sonnet-latest"
     # o1 = "o1-2024-12-17"
 
     def __repr__(self):
@@ -370,6 +371,15 @@ CLIP_VIT_B_32_MODEL_CARD = {
     ##### Agg. Benchmark #####
     "overall": 63.3,  # NOTE: ImageNet top-1 accuracy
 }
+CLAUDE_3_5_SONNET_MODEL_CARD = {
+    ##### Cost in USD #####
+    "usd_per_input_token": 3.0 / 1e6,
+    "usd_per_output_token": 15.0 / 1e6,
+    ##### Time #####
+    "seconds_per_output_token": 0.0127,
+    ##### Agg. Benchmark #####
+    "overall": 76.12,
+}
 
 
 MODEL_CARDS = {
@@ -385,6 +395,7 @@ MODEL_CARDS = {
     # Model.o1.value: o1_MODEL_CARD,
     Model.TEXT_EMBEDDING_3_SMALL.value: TEXT_EMBEDDING_3_SMALL_MODEL_CARD,
     Model.CLIP_VIT_B_32.value: CLIP_VIT_B_32_MODEL_CARD,
+    Model.CLAUDE_3_5_SONNET.value: CLAUDE_3_5_SONNET_MODEL_CARD
 }
 
 

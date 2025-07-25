@@ -2,11 +2,15 @@ import argparse
 import json
 import os
 
-import litellm
 import pandas as pd
+from colorama import Fore, Style
+from pydantic import BaseModel, Field
 from smolagents import CodeAgent, LiteLLMModel, tool
 
-import palimpzest as pz
+# import palimpzest as pz
+from palimpzest.constants import Model, PromptStrategy
+from palimpzest.core.elements.records import DataRecord
+from palimpzest.core.lib.schemas import TextFile, create_schema_from_fields
 from palimpzest.query.generators.generators import Generator
 
 
@@ -74,26 +78,39 @@ def sem_filter(filepath: str, predicate: str) -> bool:
     with open(filepath) as f:
         contents = f.read()
 
-    # call prompt factory to get messages
-    messages = [] # TODO
-    generator = Generator()
-    out = litellm.completion(model="anthropic/claude-3-5-sonnet", messages=messages)
+    # create data record for file
+    dr = DataRecord(schema=TextFile, source_idx=0)
+    dr.filename = os.path.basename(filepath)
+    dr.contents = contents
 
+    # create output schema
+    class Answer(BaseModel):
+        passed_operator: bool = Field(description="Whether the record passed the filter operation")
+
+    # call generator
+    generator = Generator(Model.GPT_4o, PromptStrategy.COT_BOOL)
+    gen_kwargs = {"filter_condition": predicate}
+    output, _, _, _ = generator(dr, Answer.model_fields, **gen_kwargs)
+    # output, _, _, _, prompt, completion_text = generator(dr, Answer.model_fields, **gen_kwargs)
+    # print(f"PROMPT:\n{prompt}")
+    # print(Fore.GREEN + f"{completion_text}\n" + Style.RESET_ALL)
+
+    return output["passed_operator"]
 
 
 @tool
-def sem_map(filepath: str, fields: dict[str, str]) -> dict:
+def sem_map(filepath: str, fields: list[dict]) -> dict:
     """
-    This tool takes a file path and a dictionary of fields to compute as input and returns
-    the dictionary mapping each field to its computed value. The input dictionary should
-    contain a mapping from the field name to a description of the field.
+    This tool takes a file path and a list of dictionaries representing fields to compute as input
+    and returns the dictionary mapping each field to its computed value. The input dictionary should
+    contain key-value pairs for the `name`, `type`, and `description` of each field.
 
     For example, the tool could be invoked as follows to extract the title and abstract of a paper:
     ```
-    fields = {
-        "title": "the title of the paper",
-        "abstract": "the paper's abstract",
-    }
+    fields = [
+        {"name": "title", "type": str, "description": "the title of the paper"},
+        {"name": "abstract", "type": str, "description": "the paper's abstract"},
+    ]
     out = sem_map("path/to/paper.txt", fields)
     print(f"Title: {out['title']}")
     print(f"Abstract: {out['abstract']}")
@@ -106,19 +123,36 @@ def sem_map(filepath: str, fields: dict[str, str]) -> dict:
     Returns:
         dict: Dictionary mapping each field to its computed value
     """
-    # TODO
-    pass
+    with open(filepath) as f:
+        contents = f.read()
+
+    # create data record for file
+    dr = DataRecord(schema=TextFile, source_idx=0)
+    dr.filename = os.path.basename(filepath)
+    dr.contents = contents
+
+    # create output schema
+    output_schema = create_schema_from_fields(fields)
+
+    # call generator
+    generator = Generator(Model.GPT_4o, PromptStrategy.COT_QA)
+    gen_kwargs = {"output_schema": output_schema}
+    output, _, _, _ = generator(dr, output_schema.model_fields, **gen_kwargs)
+    # output, _, _, _, _, _ = generator(dr, output_schema.model_fields, **gen_kwargs)
+    output = {k: v[0] for k, v in output.items()}
+
+    return output
 
 
-def run_agents(model_id="anthropic/claude-3-7-sonnet-latest"):
+def run_agents(model_id="anthropic/claude-3-5-sonnet-latest", api_key=None):
+    if api_key is None:
+        api_key = os.getenv("TIM_ANTHROPIC_API_KEY")
+
     # ask the agent the question
-    question = "Compute the sender and subject of every email which refers to the Raptor, Deathstar, Chewco, and/or Fat Boy investments, and is not quoting articles or other sources outside of Enron"
+    question = "Compute the sender, subject, and summary of every email which refers to the Raptor, Deathstar, Chewco, and/or Fat Boy investments, and is not quoting articles or other sources outside of Enron"
     agent = CodeAgent(
-        tools=[list_filepaths, read_file],
-        model=LiteLLMModel(
-            model_id=model_id,
-            api_key=os.getenv("TIM_ANTHROPIC_API_KEY"),
-        ),
+        tools=[list_filepaths, read_file, sem_filter, sem_map],
+        model=LiteLLMModel(model_id=model_id, api_key=api_key),
         max_steps=20,
         planning_interval=4,
         add_base_tools=False,
@@ -135,15 +169,15 @@ def run_agents(model_id="anthropic/claude-3-7-sonnet-latest"):
     return response, input_tokens, output_tokens, input_cost, output_cost
 
 
-def run_pz():
-    ds = pz.Dataset("testdata/enron-eval-medium")
-    ds = ds.search(
-        "The list of emails which refer to the Raptor, Deathstar, Chewco, and/or Fat Boy investments, that are not quoting articles or other sources outside of Enron"
-    )
-    ds = ds.compute(
-        "The sender and subject of each email"
-    )
-    return ds.run()
+# def run_pz():
+#     ds = pz.Dataset("testdata/enron-eval-medium")
+#     ds = ds.search(
+#         "The list of emails which refer to the Raptor, Deathstar, Chewco, and/or Fat Boy investments, that are not quoting articles or other sources outside of Enron"
+#     )
+#     ds = ds.compute(
+#         "The sender and subject of each email"
+#     )
+#     return ds.run()
 
 
 if __name__ == "__main__":
@@ -153,10 +187,11 @@ if __name__ == "__main__":
 
     # execute script
     if args.mode == "pz":
-        output = run_pz()
-        output.to_df().to_csv("pz-email-output.csv", index=False)
+        # output = run_pz()
+        # output.to_df().to_csv("pz-email-output.csv", index=False)
+        pass
     else:
-        response, input_tokens, output_tokens, input_cost, output_cost = run_agents()
+        response, input_tokens, output_tokens, input_cost, output_cost = run_agents(model_id="openai/gpt-4o", api_key=os.getenv("OPENAI_API_KEY"))
         response_dict = {
             "response": response,
             "input_tokens": input_tokens,
@@ -164,5 +199,5 @@ if __name__ == "__main__":
             "input_cost": input_cost,
             "output_cost": output_cost,
         }
-        with open("agents-email-output.csv", "w") as f:
+        with open("agents-email-output.json", "w") as f:
             json.dump(response_dict, f)
