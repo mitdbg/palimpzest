@@ -146,12 +146,13 @@ def sem_map(filepath: str, fields: list[dict]) -> dict:
 
 def run_agents(model_id="anthropic/claude-3-5-sonnet-latest", api_key=None):
     if api_key is None:
-        api_key = os.getenv("TIM_ANTHROPIC_API_KEY")
+        api_key = os.getenv("ANTHROPIC_API_KEY")
 
     # ask the agent the question
-    question = "Compute the sender, subject, and summary of every email which refers to the Raptor, Deathstar, Chewco, and/or Fat Boy investments, and is not quoting articles or other sources outside of Enron"
+    # question = "Compute the sender, subject, and summary of every email which refers to the Raptor, Deathstar, Chewco, and/or Fat Boy investments, and is not quoting articles or other sources outside of Enron"
+    question = "Compute the sender and subject of every email which refers to the Raptor, Deathstar, Chewco, and/or Fat Boy investments, and is not quoting articles or other sources outside of Enron"
     agent = CodeAgent(
-        tools=[list_filepaths, read_file, sem_filter, sem_map],
+        tools=[list_filepaths, read_file], #, sem_filter, sem_map],
         model=LiteLLMModel(model_id=model_id, api_key=api_key),
         max_steps=20,
         planning_interval=4,
