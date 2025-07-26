@@ -3,7 +3,7 @@ import os
 from copy import deepcopy
 from itertools import combinations
 
-from palimpzest.constants import AggFunc, Cardinality, PromptStrategy
+from palimpzest.constants import AggFunc, Model, PromptStrategy
 from palimpzest.core.data.context_manager import ContextManager
 from palimpzest.core.lib.schemas import ImageBase64, ImageFilepath, ImageURL
 from palimpzest.prompts import CONTEXT_SEARCH_PROMPT
@@ -29,6 +29,7 @@ from palimpzest.query.operators.logical import (
 )
 from palimpzest.query.operators.map import MapOp
 from palimpzest.query.operators.mixture_of_agents_convert import MixtureOfAgentsConvert
+from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.project import ProjectOp
 from palimpzest.query.operators.rag_convert import RAGConvert
 from palimpzest.query.operators.retrieve import RetrieveOp
@@ -38,12 +39,10 @@ from palimpzest.query.operators.search import (
 )
 from palimpzest.query.operators.split_convert import SplitConvert
 from palimpzest.query.optimizer.primitives import Expression, Group, LogicalExpression, PhysicalExpression
-from palimpzest.utils.model_helpers import get_models, get_vision_models
 
 logger = logging.getLogger(__name__)
 
 # DEFINITIONS
-IMAGE_FIELD_TYPES = [ImageBase64, ImageFilepath, ImageURL, ImageBase64 | None, ImageFilepath | None, ImageURL | None]
 IMAGE_LIST_FIELD_TYPES = [
     list[ImageBase64],
     list[ImageFilepath],
@@ -51,6 +50,10 @@ IMAGE_LIST_FIELD_TYPES = [
     list[ImageBase64] | None,
     list[ImageFilepath] | None,
     list[ImageURL] | None,
+]
+IMAGE_FIELD_TYPES = IMAGE_LIST_FIELD_TYPES + [
+    ImageBase64, ImageFilepath, ImageURL,
+    ImageBase64 | None, ImageFilepath | None, ImageURL | None,
 ]
 
 class Rule:
@@ -62,12 +65,12 @@ class Rule:
     def get_rule_id(cls):
         return cls.__name__
 
-    @staticmethod
-    def matches_pattern(logical_expression: LogicalExpression) -> bool:
+    @classmethod
+    def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
         raise NotImplementedError("Calling this method from an abstract base class.")
 
-    @staticmethod
-    def substitute(logical_expression: LogicalExpression, **kwargs) -> set[Expression]:
+    @classmethod
+    def substitute(cls, logical_expression: LogicalExpression, **kwargs: dict) -> set[Expression]:
         raise NotImplementedError("Calling this method from an abstract base class.")
 
 
@@ -78,9 +81,9 @@ class TransformationRule(Rule):
     which are created during the substitution.
     """
 
-    @staticmethod
+    @classmethod
     def substitute(
-        logical_expression: LogicalExpression, groups: dict[int, Group], expressions: dict[int, Expression], **kwargs
+        cls, logical_expression: LogicalExpression, groups: dict[int, Group], expressions: dict[int, Expression], **kwargs
     ) -> tuple[set[LogicalExpression], set[Group]]:
         """
         This function applies the transformation rule to the logical expression, which
@@ -100,15 +103,15 @@ class PushDownFilter(TransformationRule):
     most expensive operator in the input group.
     """
 
-    @staticmethod
-    def matches_pattern(logical_expression: Expression) -> bool:
+    @classmethod
+    def matches_pattern(cls, logical_expression: Expression) -> bool:
         is_match = isinstance(logical_expression.operator, FilteredScan)
         logger.debug(f"PushDownFilter matches_pattern: {is_match} for {logical_expression}")
         return is_match
 
-    @staticmethod
+    @classmethod
     def substitute(
-        logical_expression: LogicalExpression, groups: dict[int, Group], expressions: dict[int, Expression], **kwargs
+        cls, logical_expression: LogicalExpression, groups: dict[int, Group], expressions: dict[int, Expression], **kwargs: dict
     ) -> tuple[set[LogicalExpression], set[Group]]:
         logger.debug(f"Substituting PushDownFilter for {logical_expression}")
 
@@ -160,8 +163,8 @@ class PushDownFilter(TransformationRule):
                 group_id, group = None, None
 
                 # if the expression already exists, lookup the group_id and group
-                if new_filter_expr.get_expr_id() in expressions:
-                    group_id = expressions[new_filter_expr.get_expr_id()].group_id
+                if new_filter_expr.expr_id in expressions:
+                    group_id = expressions[new_filter_expr.expr_id].group_id
                     new_filter_expr.set_group_id(group_id)
                     group = groups[group_id]
 
@@ -230,7 +233,164 @@ class ImplementationRule(Rule):
     Base class for implementation rules which convert a logical expression to a physical expression.
     """
 
-    pass
+    @classmethod
+    def _get_image_fields(cls, logical_expression: LogicalExpression) -> set[str]:
+        """Returns the set of fields which have an image (or list[image]) type."""
+        return set([
+            field_name.split(".")[-1]
+            for field_name, field in logical_expression.input_fields.items()
+            if field.annotation in IMAGE_FIELD_TYPES and field_name.split(".")[-1] in logical_expression.depends_on_field_names
+        ])
+
+    @classmethod
+    def _get_list_image_fields(cls, logical_expression: LogicalExpression) -> set[str]:
+        """Returns the set of fields which have a list[image] type."""
+        return set([
+            field_name.split(".")[-1]
+            for field_name, field in logical_expression.input_fields.items()
+            if field.annotation in IMAGE_LIST_FIELD_TYPES and field_name.split(".")[-1] in logical_expression.depends_on_field_names
+        ])
+
+    @classmethod
+    def _is_image_only_operation(cls, logical_expression: LogicalExpression) -> bool:
+        """Returns True if the logical_expression processes only image input(s) and False otherwise."""
+        return all([
+            field.annotation in IMAGE_FIELD_TYPES
+            for field_name, field in logical_expression.input_fields.items()
+            if field_name.split(".")[-1] in logical_expression.depends_on_field_names
+        ])
+
+    @classmethod
+    def _is_image_operation(cls, logical_expression: LogicalExpression) -> bool:
+        """Returns True if the logical_expression processes image input(s) and False otherwise."""
+        return any([
+            field.annotation in IMAGE_FIELD_TYPES
+            for field_name, field in logical_expression.input_fields.items()
+            if field_name.split(".")[-1] in logical_expression.depends_on_field_names
+        ])
+
+    @classmethod
+    def _is_text_only_operation(cls, logical_expression: LogicalExpression) -> bool:
+        """Returns True if the logical_expression processes only text input(s) and False otherwise."""
+        return all([
+            field.annotation not in IMAGE_FIELD_TYPES
+            for field_name, field in logical_expression.input_fields.items()
+            if field_name.split(".")[-1] in logical_expression.depends_on_field_names
+        ])
+
+    @classmethod
+    def _is_text_operation(cls, logical_expression: LogicalExpression) -> bool:
+        """Returns True if the logical_expression processes text input(s) and False otherwise."""
+        return any([
+            field.annotation not in IMAGE_FIELD_TYPES
+            for field_name, field in logical_expression.input_fields.items()
+            if field_name.split(".")[-1] in logical_expression.depends_on_field_names
+        ])
+
+    @classmethod
+    def _is_multi_modal_operation(cls, logical_expression: LogicalExpression) -> bool:
+        """Returns True if the logical_expression processes only image input(s) and False otherwise."""
+        return cls._is_image_operation(logical_expression) and cls._is_text_operation(logical_expression)
+
+    @classmethod
+    def _model_matches_input(cls, model: Model, logical_expression: LogicalExpression) -> bool:
+        """Returns True if the model is capable of processing the input and False otherwise."""
+        # compute how many image fields are in the input, and whether any fields are list[image] fields
+        num_image_fields = len(cls._get_image_fields(logical_expression))
+        has_list_image_field = len(cls._get_list_image_fields(logical_expression)) > 0
+
+        # corner-case: for now, all operators use text or vision models for processing inputs to __call__
+        if model.is_embedding_model():
+            return False
+
+        # corner-case: Llama vision models cannot handle multiple image inputs (at least using Together)
+        if model.is_llama_model() and model.is_vision_model() and (num_image_fields > 1 or has_list_image_field):
+            return False
+
+        # text-only input and text supporting model
+        if cls._is_text_only_operation(logical_expression) and model.is_text_model():
+            return True
+
+        # image-only input and image supporting model
+        if cls._is_image_only_operation(logical_expression) and model.is_vision_model():
+            return True
+
+        # multi-modal input and multi-modal supporting model
+        if cls._is_multi_modal_operation(logical_expression) and model.is_multimodal_model():  # noqa: SIM103
+            return True
+
+        return False
+
+    @classmethod
+    def _get_fixed_op_kwargs(cls, logical_expression: LogicalExpression, runtime_kwargs: dict) -> dict:
+        """Get the fixed set of physical op kwargs provided by the logical expression and the runtime keyword arguments."""
+        # get logical operator 
+        logical_op = logical_expression.operator
+
+        # set initial set of parameters for physical op
+        op_kwargs = logical_op.get_logical_op_params()
+        op_kwargs.update(
+            {
+                "verbose": runtime_kwargs["verbose"],
+                "logical_op_id": logical_op.get_logical_op_id(),
+                "logical_op_name": logical_op.logical_op_name(),
+            }
+        )
+
+        return op_kwargs
+
+    @classmethod
+    def _perform_substitution(
+        cls,
+        logical_expression: LogicalExpression,
+        physical_op_class: type[PhysicalOperator],
+        runtime_kwargs: dict,
+        variable_op_kwargs: list[dict] | dict | None = None,
+    ) -> set[PhysicalExpression]:
+        """
+        This performs basic substitution logic which proceeds in four steps:
+
+            1. The basic kwargs for the physical operator are computed using the logical operator
+               and runtime kwargs.
+            2. If variable kwargs are provided, then they are merged with the basic kwargs and one
+               instance of the physical operator is created for each dictionary of variable kwargs.
+            3. A physical expression is created for each physical operator instance.
+            4. The unique set of physical expressions is returned.
+
+        Args:
+            logical_expression (LogicalExpression): The logical expression containing a logical operator.
+            physical_op_class (type[PhysicalOperator]): The class of the physical operator we wish to construct.
+            runtime_kwargs (dict): Keyword arguments which are provided at runtime.
+            variable_op_kwargs (list[dict] | dict | None): A (list of) variable kwargs to customize each
+                physical operator instance.
+
+        Returns:
+            set[PhysicalExpression]: The unique set of physical expressions produced by initializing the
+                physical_op_class with the provided keyword arguments.
+        """
+        # get physical operator kwargs which are fixed for each instance of the physical operator
+        fixed_op_kwargs = cls._get_fixed_op_kwargs(logical_expression, runtime_kwargs)
+
+        # make variable_op_kwargs a list of dictionaries
+        if variable_op_kwargs is None:
+            variable_op_kwargs = [{}]
+        elif isinstance(variable_op_kwargs, dict):
+            variable_op_kwargs = [variable_op_kwargs]
+
+        # construct physical operators for each set of kwargs
+        physical_expressions = []
+        for var_op_kwargs in variable_op_kwargs:
+            # get kwargs for this physical operator instance
+            op_kwargs = {**fixed_op_kwargs, **var_op_kwargs}
+
+            # construct the physical operator
+            op = physical_op_class(**op_kwargs)
+
+            # construct physical expression and add to list of expressions
+            expression = PhysicalExpression.from_op_and_logical_expr(op, logical_expression)
+            physical_expressions.append(expression)
+
+        return set(physical_expressions)
 
 
 class NonLLMConvertRule(ImplementationRule):
@@ -245,36 +405,9 @@ class NonLLMConvertRule(ImplementationRule):
         return is_match
 
     @classmethod
-    def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
+    def substitute(cls, logical_expression: LogicalExpression, **runtime_kwargs) -> set[PhysicalExpression]:
         logger.debug(f"Substituting NonLLMConvertRule for {logical_expression}")
-
-        logical_op = logical_expression.operator
-
-        # get initial set of parameters for physical op
-        op_kwargs = logical_op.get_logical_op_params()
-        op_kwargs.update(
-            {
-                "verbose": physical_op_params["verbose"],
-                "logical_op_id": logical_op.get_logical_op_id(),
-                "logical_op_name": logical_op.logical_op_name(),
-            }
-        )
-
-        # construct multi-expression
-        op = NonLLMConvert(**op_kwargs)
-        expression = PhysicalExpression(
-            operator=op,
-            input_group_ids=logical_expression.input_group_ids,
-            input_fields=logical_expression.input_fields,
-            depends_on_field_names=logical_expression.depends_on_field_names,
-            generated_fields=logical_expression.generated_fields,
-            group_id=logical_expression.group_id,
-        )
-
-        deduped_physical_expressions = set([expression])
-        logger.debug(f"Done substituting NonLLMConvertRule for {logical_expression}")
-
-        return deduped_physical_expressions
+        return cls._perform_substitution(logical_expression, NonLLMConvert, runtime_kwargs)
 
 
 class LLMConvertBondedRule(ImplementationRule):
@@ -289,81 +422,15 @@ class LLMConvertBondedRule(ImplementationRule):
         return is_match
 
     @classmethod
-    def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
+    def substitute(cls, logical_expression: LogicalExpression, **runtime_kwargs) -> set[PhysicalExpression]:
         logger.debug(f"Substituting LLMConvertBondedRule for {logical_expression}")
 
-        logical_op = logical_expression.operator
+        # create variable physical operator kwargs for each model which can implement this logical_expression
+        models = [model for model in runtime_kwargs["available_models"] if cls._model_matches_input(model, logical_expression)]
+        prompt_strategy = PromptStrategy.COT_QA_IMAGE if cls._is_image_operation(logical_expression) else PromptStrategy.COT_QA
+        variable_op_kwargs = [{"model": model, "prompt_strategy": prompt_strategy} for model in models]
 
-        # get initial set of parameters for physical op
-        op_kwargs = logical_op.get_logical_op_params()
-        op_kwargs.update(
-            {
-                "verbose": physical_op_params["verbose"],
-                "logical_op_id": logical_op.get_logical_op_id(),
-                "logical_op_name": logical_op.logical_op_name(),
-            }
-        )
-
-        # identify models which can be used strictly for text or strictly for images
-        vision_models = set(get_vision_models())
-        text_models = set(get_models())
-        pure_text_models = {model for model in text_models if model not in vision_models}
-        pure_vision_models = {model for model in vision_models if model not in text_models}
-
-        # compute attributes about this convert operation
-        is_image_conversion = any(
-            [
-                field.annotation in IMAGE_FIELD_TYPES
-                for field_name, field in logical_expression.input_fields.items()
-                if field_name.split(".")[-1] in logical_expression.depends_on_field_names
-            ]
-        )
-        image_fields = [
-            field_name.split(".")[-1]
-            for field_name, field in logical_expression.input_fields.items()
-            if field.annotation in IMAGE_FIELD_TYPES and field_name.split(".")[-1] in logical_expression.depends_on_field_names
-        ]
-        list_image_fields = [
-            field_name.split(".")[-1]
-            for field_name, field in logical_expression.input_fields.items()
-            if field.annotation in IMAGE_LIST_FIELD_TYPES and field_name.split(".")[-1] in logical_expression.depends_on_field_names
-        ]
-        num_image_fields = len(set(image_fields))
-        list_image_field = len(set(list_image_fields)) > 0
-
-        physical_expressions = []
-        for model in physical_op_params["available_models"]:
-            # skip this model if:
-            # 1. this is a pure vision model and we're not doing an image conversion, or
-            # 2. this is a pure text model and we're doing an image conversion, or
-            # 3. this is a vision model hosted by Together (i.e. LLAMA3 vision) and there is more than one image field
-            first_criteria = model in pure_vision_models and not is_image_conversion
-            second_criteria = model in pure_text_models and is_image_conversion
-            third_criteria = model.is_llama_model() and model.is_vision_model() and (num_image_fields > 1 or list_image_field)
-            fourth_criteria = model.is_embedding_model()
-            if first_criteria or second_criteria or third_criteria or fourth_criteria:
-                continue
-
-            # construct multi-expression
-            op = LLMConvertBonded(
-                model=model,
-                prompt_strategy=PromptStrategy.COT_QA_IMAGE if is_image_conversion else PromptStrategy.COT_QA,
-                **op_kwargs,
-            )
-            expression = PhysicalExpression(
-                operator=op,
-                input_group_ids=logical_expression.input_group_ids,
-                input_fields=logical_expression.input_fields,
-                depends_on_field_names=logical_expression.depends_on_field_names,
-                generated_fields=logical_expression.generated_fields,
-                group_id=logical_expression.group_id,
-            )
-            physical_expressions.append(expression)
-
-        deduped_physical_expressions = set(physical_expressions)
-        logger.debug(f"Done substituting LLMConvertBondedRule for {logical_expression}")
-
-        return deduped_physical_expressions
+        return cls._perform_substitution(logical_expression, LLMConvertBonded, runtime_kwargs, variable_op_kwargs)
 
 
 class RAGConvertRule(ImplementationRule):
@@ -377,68 +444,24 @@ class RAGConvertRule(ImplementationRule):
     @classmethod
     def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
         logical_op = logical_expression.operator
-        is_image_conversion = any(
-            [
-                field.annotation in IMAGE_FIELD_TYPES
-                for field_name, field in logical_expression.input_fields.items()
-                if field_name.split(".")[-1] in logical_expression.depends_on_field_names
-            ]
-        )
-        is_match = isinstance(logical_op, ConvertScan) and not is_image_conversion and logical_op.udf is None
+        is_match = isinstance(logical_op, ConvertScan) and cls._is_text_only_operation(logical_expression) and logical_op.udf is None
         logger.debug(f"RAGConvertRule matches_pattern: {is_match} for {logical_expression}")
         return is_match
 
     @classmethod
-    def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
+    def substitute(cls, logical_expression: LogicalExpression, **runtime_kwargs) -> set[PhysicalExpression]:
         logger.debug(f"Substituting RAGConvertRule for {logical_expression}")
 
-        logical_op = logical_expression.operator
+        # create variable physical operator kwargs for each model which can implement this logical_expression
+        models = [model for model in runtime_kwargs["available_models"] if cls._model_matches_input(model, logical_expression)]
+        variable_op_kwargs = [
+            {"model": model, "prompt_strategy": PromptStrategy.COT_QA, "num_chunks_per_field": num_chunks_per_field, "chunk_size": chunk_size}
+            for model in models
+            for num_chunks_per_field in cls.num_chunks_per_fields
+            for chunk_size in cls.chunk_sizes
+        ]
 
-        # get initial set of parameters for physical op
-        op_kwargs = logical_op.get_logical_op_params()
-        op_kwargs.update(
-            {
-                "verbose": physical_op_params["verbose"],
-                "logical_op_id": logical_op.get_logical_op_id(),
-                "logical_op_name": logical_op.logical_op_name(),
-            }
-        )
-
-        # identify models which can be used strictly for text or strictly for images
-        vision_models = set(get_vision_models())
-        text_models = set(get_models())
-        pure_vision_models = {model for model in vision_models if model not in text_models}
-
-        physical_expressions = []
-        for model in physical_op_params["available_models"]:
-            # skip this model if this is a pure image model or embedding model
-            if model in pure_vision_models or model.is_embedding_model():
-                continue
-
-            for num_chunks_per_field in cls.num_chunks_per_fields:
-                for chunk_size in cls.chunk_sizes:
-                    # construct multi-expression
-                    op = RAGConvert(
-                        model=model,
-                        prompt_strategy=PromptStrategy.COT_QA,
-                        num_chunks_per_field=num_chunks_per_field,
-                        chunk_size=chunk_size,
-                        **op_kwargs,
-                    )
-                    expression = PhysicalExpression(
-                        operator=op,
-                        input_group_ids=logical_expression.input_group_ids,
-                        input_fields=logical_expression.input_fields,
-                        depends_on_field_names=logical_expression.depends_on_field_names,
-                        generated_fields=logical_expression.generated_fields,
-                        group_id=logical_expression.group_id,
-                    )
-                    physical_expressions.append(expression)
-
-        logger.debug(f"Done substituting RAGConvertRule for {logical_expression}")
-        deduped_physical_expressions = set(physical_expressions)
-
-        return deduped_physical_expressions
+        return cls._perform_substitution(logical_expression, RAGConvert, runtime_kwargs, variable_op_kwargs)
 
 
 class MixtureOfAgentsConvertRule(ImplementationRule):
@@ -457,86 +480,28 @@ class MixtureOfAgentsConvertRule(ImplementationRule):
         return is_match
 
     @classmethod
-    def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
+    def substitute(cls, logical_expression: LogicalExpression, **runtime_kwargs) -> set[PhysicalExpression]:
         logger.debug(f"Substituting MixtureOfAgentsConvertRule for {logical_expression}")
 
-        logical_op = logical_expression.operator
-
-        # get initial set of parameters for physical op
-        op_kwargs: dict = logical_op.get_logical_op_params()
-        op_kwargs.update(
+        # create variable physical operator kwargs for each model which can implement this logical_expression
+        proposer_model_set = {model for model in runtime_kwargs["available_models"] if cls._model_matches_input(model, logical_expression)}
+        aggregator_model_set = {model for model in runtime_kwargs["available_models"] if model.is_text_model()}
+        proposer_prompt_strategy = PromptStrategy.COT_MOA_PROPOSER_IMAGE if cls._is_image_operation(logical_expression) else PromptStrategy.COT_MOA_PROPOSER
+        variable_op_kwargs = [
             {
-                "verbose": physical_op_params["verbose"],
-                "logical_op_id": logical_op.get_logical_op_id(),
-                "logical_op_name": logical_op.logical_op_name(),
+                "proposer_models": list(proposer_models),
+                "temperatures": [temp] * len(proposer_models),
+                "aggregator_model": aggregator_model,
+                "proposer_prompt_strategy": proposer_prompt_strategy,
+                "aggregator_prompt_strategy": PromptStrategy.COT_MOA_AGG,
             }
-        )
-
-        # identify models which can be used strictly for text or strictly for images
-        vision_models = set(get_vision_models())
-        text_models = set(get_models())
-
-        # construct set of proposer models and set of aggregator models
-        image_fields = [
-            field_name.split(".")[-1]
-            for field_name, field in logical_expression.input_fields.items()
-            if field.annotation in IMAGE_FIELD_TYPES and field_name.split(".")[-1] in logical_expression.depends_on_field_names
+            for k in cls.num_proposer_models
+            for temp in cls.temperatures
+            for proposer_models in combinations(proposer_model_set, k)
+            for aggregator_model in aggregator_model_set
         ]
-        list_image_fields = [
-            field_name.split(".")[-1]
-            for field_name, field in logical_expression.input_fields.items()
-            if field.annotation in IMAGE_LIST_FIELD_TYPES and field_name.split(".")[-1] in logical_expression.depends_on_field_names
-        ]
-        num_image_fields = len(set(image_fields))
-        list_image_field = len(set(list_image_fields)) > 0
-        proposer_model_set, is_image_conversion = text_models, False
-        if num_image_fields > 1 or list_image_field:
-            proposer_model_set = [model for model in vision_models if not model.is_llama_model()]
-            is_image_conversion = True
-        elif num_image_fields == 1:
-            proposer_model_set = vision_models
-            is_image_conversion = True
-        aggregator_model_set = text_models
 
-        # filter un-available models out of sets
-        proposer_model_set = {model for model in proposer_model_set if model in physical_op_params["available_models"]}
-        aggregator_model_set = {
-            model for model in aggregator_model_set if model in physical_op_params["available_models"]
-        }
-
-        # construct MixtureOfAgentsConvert operations for various numbers of proposer models
-        # and for every combination of proposer models and aggregator model
-        physical_expressions = []
-        for k in cls.num_proposer_models:
-            for temp in cls.temperatures:
-                for proposer_models in combinations(proposer_model_set, k):
-                    for aggregator_model in aggregator_model_set:
-                        # construct multi-expression
-                        op = MixtureOfAgentsConvert(
-                            proposer_models=list(proposer_models),
-                            temperatures=[temp] * len(proposer_models),
-                            aggregator_model=aggregator_model,
-                            proposer_prompt=op_kwargs.get("prompt"),
-                            proposer_prompt_strategy=PromptStrategy.COT_MOA_PROPOSER_IMAGE
-                            if is_image_conversion
-                            else PromptStrategy.COT_MOA_PROPOSER,
-                            aggregator_prompt_strategy=PromptStrategy.COT_MOA_AGG,
-                            **op_kwargs,
-                        )
-                        expression = PhysicalExpression(
-                            operator=op,
-                            input_group_ids=logical_expression.input_group_ids,
-                            input_fields=logical_expression.input_fields,
-                            depends_on_field_names=logical_expression.depends_on_field_names,
-                            generated_fields=logical_expression.generated_fields,
-                            group_id=logical_expression.group_id,
-                        )
-                        physical_expressions.append(expression)
-
-        logger.debug(f"Done substituting MixtureOfAgentsConvertRule for {logical_expression}")
-        deduped_physical_expressions = set(physical_expressions)
-
-        return deduped_physical_expressions
+        return cls._perform_substitution(logical_expression, MixtureOfAgentsConvert, runtime_kwargs, variable_op_kwargs)
 
 
 class CriticAndRefineConvertRule(ImplementationRule):
@@ -552,92 +517,20 @@ class CriticAndRefineConvertRule(ImplementationRule):
         return is_match
 
     @classmethod
-    def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
+    def substitute(cls, logical_expression: LogicalExpression, **runtime_kwargs) -> set[PhysicalExpression]:
         logger.debug(f"Substituting CriticAndRefineConvertRule for {logical_expression}")
 
-        logical_op = logical_expression.operator
-
-        # Get initial parameters for physical operator
-        op_kwargs = logical_op.get_logical_op_params()
-        op_kwargs.update(
-            {
-                "verbose": physical_op_params["verbose"],
-                "logical_op_id": logical_op.get_logical_op_id(),
-                "logical_op_name": logical_op.logical_op_name(),
-            }
-        )
-
-        # identify models which can be used strictly for text or strictly for images
-        vision_models = set(get_vision_models())
-        text_models = set(get_models())
-        pure_text_models = {model for model in text_models if model not in vision_models}
-        pure_vision_models = {model for model in vision_models if model not in text_models}
-
-        # compute attributes about this convert operation
-        is_image_conversion = any(
-            [
-                field.annotation in IMAGE_FIELD_TYPES
-                for field_name, field in logical_expression.input_fields.items()
-                if field_name.split(".")[-1] in logical_expression.depends_on_field_names
-            ]
-        )
-        image_fields = [
-            field_name.split(".")[-1]
-            for field_name, field in logical_expression.input_fields.items()
-            if field.annotation in IMAGE_FIELD_TYPES and field_name.split(".")[-1] in logical_expression.depends_on_field_names
+        # create variable physical operator kwargs for each model which can implement this logical_expression
+        models = [model for model in runtime_kwargs["available_models"] if cls._model_matches_input(model, logical_expression)]
+        prompt_strategy = PromptStrategy.COT_QA_IMAGE if cls._is_image_operation(logical_expression) else PromptStrategy.COT_QA
+        variable_op_kwargs = [
+            {"model": model, "critic_model": critic_model, "refine_model": refine_model, "prompt_strategy": prompt_strategy}
+            for model in models
+            for critic_model in models
+            for refine_model in models
         ]
-        list_image_fields = [
-            field_name.split(".")[-1]
-            for field_name, field in logical_expression.input_fields.items()
-            if field.annotation in IMAGE_LIST_FIELD_TYPES and field_name.split(".")[-1] in logical_expression.depends_on_field_names
-        ]
-        num_image_fields = len(set(image_fields))
-        list_image_field = len(set(list_image_fields)) > 0
 
-        # identify models which can be used for this convert operation
-        models = []
-        for model in physical_op_params["available_models"]:
-            # skip this model if:
-            # 1. this is a pure vision model and we're not doing an image conversion, or
-            # 2. this is a pure text model and we're doing an image conversion, or
-            # 3. this is a vision model hosted by Together (i.e. LLAMA3 vision) and there is more than one image field
-            first_criteria = model in pure_vision_models and not is_image_conversion
-            second_criteria = model in pure_text_models and is_image_conversion
-            third_criteria = model.is_llama_model() and model.is_vision_model() and (num_image_fields > 1 or list_image_field)
-            fourth_criteria = model.is_embedding_model()
-            if first_criteria or second_criteria or third_criteria or fourth_criteria:
-                continue
-
-            models.append(model)
-
-        # TODO: heuristic(s) to narrow the space of critic and refine models we consider using class attributes
-        # construct CriticAndRefineConvert operations for every combination of model, critic model, and refinement model
-        physical_expressions = []
-        for model in models:
-            for critic_model in models:
-                for refine_model in models:
-                    # construct multi-expression
-                    op = CriticAndRefineConvert(
-                        model=model,
-                        prompt_strategy=PromptStrategy.COT_QA_IMAGE if is_image_conversion else PromptStrategy.COT_QA,
-                        critic_model=critic_model,
-                        refine_model=refine_model,
-                        **op_kwargs,
-                    )
-                    expression = PhysicalExpression(
-                        operator=op,
-                        input_group_ids=logical_expression.input_group_ids,
-                        input_fields=logical_expression.input_fields,
-                        depends_on_field_names=logical_expression.depends_on_field_names,
-                        generated_fields=logical_expression.generated_fields,
-                        group_id=logical_expression.group_id,
-                    )
-                    physical_expressions.append(expression)
-
-        logger.debug(f"Done substituting CriticAndRefineConvertRule for {logical_expression}")
-        deduped_physical_expressions = set(physical_expressions)
-
-        return deduped_physical_expressions
+        return cls._perform_substitution(logical_expression, CriticAndRefineConvert, runtime_kwargs, variable_op_kwargs)
 
 
 class SplitConvertRule(ImplementationRule):
@@ -650,67 +543,24 @@ class SplitConvertRule(ImplementationRule):
     @classmethod
     def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
         logical_op = logical_expression.operator
-        is_image_conversion = any(
-            [
-                field.annotation in IMAGE_FIELD_TYPES
-                for field_name, field in logical_expression.input_fields.items()
-                if field_name.split(".")[-1] in logical_expression.depends_on_field_names
-            ]
-        )
-        is_match = isinstance(logical_op, ConvertScan) and not is_image_conversion and logical_op.udf is None
+        is_match = isinstance(logical_op, ConvertScan) and cls._is_text_only_operation() and logical_op.udf is None
         logger.debug(f"SplitConvertRule matches_pattern: {is_match} for {logical_expression}")
         return is_match
 
     @classmethod
-    def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
+    def substitute(cls, logical_expression: LogicalExpression, **runtime_kwargs) -> set[PhysicalExpression]:
         logger.debug(f"Substituting SplitConvertRule for {logical_expression}")
 
-        logical_op = logical_expression.operator
+        # create variable physical operator kwargs for each model which can implement this logical_expression
+        models = [model for model in runtime_kwargs["available_models"] if cls._model_matches_input(model, logical_expression)]
+        variable_op_kwargs = [
+            {"model": model, "min_size_to_chunk": min_size_to_chunk, "num_chunks": num_chunks}
+            for model in models
+            for min_size_to_chunk in cls.min_size_to_chunk
+            for num_chunks in cls.num_chunks
+        ]
 
-        # get initial set of parameters for physical op
-        op_kwargs = logical_op.get_logical_op_params()
-        op_kwargs.update(
-            {
-                "verbose": physical_op_params["verbose"],
-                "logical_op_id": logical_op.get_logical_op_id(),
-                "logical_op_name": logical_op.logical_op_name(),
-            }
-        )
-
-        # identify models which can be used strictly for text or strictly for images
-        vision_models = set(get_vision_models())
-        text_models = set(get_models())
-        pure_vision_models = {model for model in vision_models if model not in text_models}
-
-        physical_expressions = []
-        for model in physical_op_params["available_models"]:
-            # skip this model if this is a pure image model or an embedding model
-            if model in pure_vision_models or model.is_embedding_model():
-                continue
-
-            for min_size_to_chunk in cls.min_size_to_chunk:
-                for num_chunks in cls.num_chunks:
-                    # construct multi-expression
-                    op = SplitConvert(
-                        model=model,
-                        num_chunks=num_chunks,
-                        min_size_to_chunk=min_size_to_chunk,
-                        **op_kwargs,
-                    )
-                    expression = PhysicalExpression(
-                        operator=op,
-                        input_group_ids=logical_expression.input_group_ids,
-                        input_fields=logical_expression.input_fields,
-                        depends_on_field_names=logical_expression.depends_on_field_names,
-                        generated_fields=logical_expression.generated_fields,
-                        group_id=logical_expression.group_id,
-                    )
-                    physical_expressions.append(expression)
-
-        logger.debug(f"Done substituting SplitConvertRule for {logical_expression}")
-        deduped_physical_expressions = set(physical_expressions)
-
-        return deduped_physical_expressions
+        return cls._perform_substitution(logical_expression, SplitConvert, runtime_kwargs, variable_op_kwargs)
 
 
 class RetrieveRule(ImplementationRule):
@@ -726,42 +576,14 @@ class RetrieveRule(ImplementationRule):
         return is_match
 
     @classmethod
-    def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
+    def substitute(cls, logical_expression: LogicalExpression, **runtime_kwargs) -> set[PhysicalExpression]:
         logger.debug(f"Substituting RetrieveRule for {logical_expression}")
 
-        logical_op = logical_expression.operator
+        # create variable physical operator kwargs for each model which can implement this logical_expression
+        ks = cls.k_budgets if logical_expression.operator.k == -1 else [logical_expression.operator.k]
+        variable_op_kwargs = [{"k": k} for k in ks]
 
-        physical_expressions = []
-        ks = cls.k_budgets if logical_op.k == -1 else [logical_op.k]
-        for k in ks:
-            # get initial set of parameters for physical op
-            op_kwargs = logical_op.get_logical_op_params()
-            op_kwargs.update(
-                {
-                    "verbose": physical_op_params["verbose"],
-                    "logical_op_id": logical_op.get_logical_op_id(),
-                    "logical_op_name": logical_op.logical_op_name(),
-                    "k": k,
-                }
-            )
-
-            # construct multi-expression
-            op = RetrieveOp(**op_kwargs)
-            expression = PhysicalExpression(
-                operator=op,
-                input_group_ids=logical_expression.input_group_ids,
-                input_fields=logical_expression.input_fields,
-                depends_on_field_names=logical_expression.depends_on_field_names,
-                generated_fields=logical_expression.generated_fields,
-                group_id=logical_expression.group_id,
-            )
-
-            physical_expressions.append(expression)
-
-        logger.debug(f"Done substituting RetrieveRule for {logical_expression}")
-        deduped_physical_expressions = set(physical_expressions)
-
-        return deduped_physical_expressions
+        return cls._perform_substitution(logical_expression, RetrieveOp, runtime_kwargs, variable_op_kwargs)
 
 
 class NonLLMFilterRule(ImplementationRule):
@@ -769,8 +591,8 @@ class NonLLMFilterRule(ImplementationRule):
     Substitute a logical expression for a FilteredScan with a non-llm filter physical implementation.
     """
 
-    @staticmethod
-    def matches_pattern(logical_expression: LogicalExpression) -> bool:
+    @classmethod
+    def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
         is_match = (
             isinstance(logical_expression.operator, FilteredScan)
             and logical_expression.operator.filter.filter_fn is not None
@@ -778,33 +600,10 @@ class NonLLMFilterRule(ImplementationRule):
         logger.debug(f"NonLLMFilterRule matches_pattern: {is_match} for {logical_expression}")
         return is_match
 
-    @staticmethod
-    def substitute(logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
+    @classmethod
+    def substitute(cls, logical_expression: LogicalExpression, **runtime_kwargs) -> set[PhysicalExpression]:
         logger.debug(f"Substituting NonLLMFilterRule for {logical_expression}")
-
-        logical_op = logical_expression.operator
-        op_kwargs = logical_op.get_logical_op_params()
-        op_kwargs.update(
-            {
-                "verbose": physical_op_params["verbose"],
-                "logical_op_id": logical_op.get_logical_op_id(),
-                "logical_op_name": logical_op.logical_op_name(),
-            }
-        )
-        op = NonLLMFilter(**op_kwargs)
-
-        expression = PhysicalExpression(
-            operator=op,
-            input_group_ids=logical_expression.input_group_ids,
-            input_fields=logical_expression.input_fields,
-            depends_on_field_names=logical_expression.depends_on_field_names,
-            generated_fields=logical_expression.generated_fields,
-            group_id=logical_expression.group_id,
-        )
-        logger.debug(f"Done substituting NonLLMFilterRule for {logical_expression}")
-        deduped_physical_expressions = set([expression])
-
-        return deduped_physical_expressions
+        return cls._perform_substitution(logical_expression, NonLLMFilter, runtime_kwargs)
 
 
 class LLMFilterRule(ImplementationRule):
@@ -812,8 +611,8 @@ class LLMFilterRule(ImplementationRule):
     Substitute a logical expression for a FilteredScan with an llm filter physical implementation.
     """
 
-    @staticmethod
-    def matches_pattern(logical_expression: LogicalExpression) -> bool:
+    @classmethod
+    def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
         is_match = (
             isinstance(logical_expression.operator, FilteredScan)
             and logical_expression.operator.filter.filter_condition is not None
@@ -821,80 +620,16 @@ class LLMFilterRule(ImplementationRule):
         logger.debug(f"LLMFilterRule matches_pattern: {is_match} for {logical_expression}")
         return is_match
 
-    @staticmethod
-    def substitute(logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
+    @classmethod
+    def substitute(cls, logical_expression: LogicalExpression, **runtime_kwargs) -> set[PhysicalExpression]:
         logger.debug(f"Substituting LLMFilterRule for {logical_expression}")
 
-        logical_op = logical_expression.operator
-        op_kwargs = logical_op.get_logical_op_params()
-        op_kwargs.update(
-            {
-                "verbose": physical_op_params["verbose"],
-                "logical_op_id": logical_op.get_logical_op_id(),
-                "logical_op_name": logical_op.logical_op_name(),
-            }
-        )
+        # create variable physical operator kwargs for each model which can implement this logical_expression
+        models = [model for model in runtime_kwargs["available_models"] if cls._model_matches_input(model, logical_expression)]
+        prompt_strategy = PromptStrategy.COT_BOOL_IMAGE if cls._is_image_operation(logical_expression) else PromptStrategy.COT_BOOL
+        variable_op_kwargs = [{"model": model, "prompt_strategy": prompt_strategy} for model in models]
 
-        # identify models which can be used strictly for text or strictly for images
-        vision_models = set(get_vision_models())
-        text_models = set(get_models())
-        pure_text_models = {model for model in text_models if model not in vision_models}
-        pure_vision_models = {model for model in vision_models if model not in text_models}
-
-        # compute attributes about this filter operation
-        is_image_filter = any(
-            [
-                field.annotation in IMAGE_FIELD_TYPES
-                for field_name, field in logical_expression.input_fields.items()
-                if field_name.split(".")[-1] in logical_expression.depends_on_field_names
-            ]
-        )
-        image_fields = [
-            field_name.split(".")[-1]
-            for field_name, field in logical_expression.input_fields.items()
-            if field.annotation in IMAGE_FIELD_TYPES and field_name.split(".")[-1] in logical_expression.depends_on_field_names
-        ]
-        list_image_fields = [
-            field_name.split(".")[-1]
-            for field_name, field in logical_expression.input_fields.items()
-            if field.annotation in IMAGE_LIST_FIELD_TYPES and field_name.split(".")[-1] in logical_expression.depends_on_field_names
-        ]
-        num_image_fields = len(set(image_fields))
-        list_image_field = len(set(list_image_fields)) > 0
-
-        physical_expressions = []
-        for model in physical_op_params["available_models"]:
-            # skip this model if:
-            # 1. this is a pure vision model and we're not doing an image filter, or
-            # 2. this is a pure text model and we're doing an image filter, or
-            # 3. this is a vision model hosted by Together (i.e. LLAMA3 vision) and there is more than one image field
-            first_criteria = model in pure_vision_models and not is_image_filter
-            second_criteria = model in pure_text_models and is_image_filter
-            third_criteria = model.is_llama_model() and model.is_vision_model() and (num_image_fields > 1 or list_image_field)
-            fourth_criteria = model.is_embedding_model()
-            if first_criteria or second_criteria or third_criteria or fourth_criteria:
-                continue
-
-            # construct multi-expression
-            op = LLMFilter(
-                model=model,
-                prompt_strategy=PromptStrategy.COT_BOOL_IMAGE if is_image_filter else PromptStrategy.COT_BOOL,
-                **op_kwargs,
-            )
-            expression = PhysicalExpression(
-                operator=op,
-                input_group_ids=logical_expression.input_group_ids,
-                input_fields=logical_expression.input_fields,
-                depends_on_field_names=logical_expression.depends_on_field_names,
-                generated_fields=logical_expression.generated_fields,
-                group_id=logical_expression.group_id,
-            )
-            physical_expressions.append(expression)
-
-        logger.debug(f"Done substituting LLMFilterRule for {logical_expression}")
-        deduped_physical_expressions = set(physical_expressions)
-
-        return deduped_physical_expressions
+        return cls._perform_substitution(logical_expression, LLMFilter, runtime_kwargs, variable_op_kwargs)
 
 
 class AggregateRule(ImplementationRule):
@@ -902,47 +637,27 @@ class AggregateRule(ImplementationRule):
     Substitute the logical expression for an aggregate with its physical counterpart.
     """
 
-    @staticmethod
-    def matches_pattern(logical_expression: LogicalExpression) -> bool:
+    @classmethod
+    def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
         is_match = isinstance(logical_expression.operator, Aggregate)
         logger.debug(f"AggregateRule matches_pattern: {is_match} for {logical_expression}")
         return is_match
 
-    @staticmethod
-    def substitute(logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
+    @classmethod
+    def substitute(cls, logical_expression: LogicalExpression, **runtime_kwargs) -> set[PhysicalExpression]:
         logger.debug(f"Substituting AggregateRule for {logical_expression}")
 
-        logical_op = logical_expression.operator
-        op_kwargs = logical_op.get_logical_op_params()
-        op_kwargs.update(
-            {
-                "verbose": physical_op_params["verbose"],
-                "logical_op_id": logical_op.get_logical_op_id(),
-                "logical_op_name": logical_op.logical_op_name(),
-            }
-        )
-
-        op = None
-        if logical_op.agg_func == AggFunc.COUNT:
-            op = CountAggregateOp(**op_kwargs)
-        elif logical_op.agg_func == AggFunc.AVERAGE:
-            op = AverageAggregateOp(**op_kwargs)
+        # get the physical op class based on the aggregation function
+        physical_op_class = None
+        if logical_expression.operator.agg_func == AggFunc.COUNT:
+            physical_op_class = CountAggregateOp
+        elif logical_expression.operator.agg_func == AggFunc.AVERAGE:
+            physical_op_class = AverageAggregateOp
         else:
-            raise Exception(f"Cannot support aggregate function: {logical_op.agg_func}")
+            raise Exception(f"Cannot support aggregate function: {logical_expression.operator.agg_func}")
 
-        expression = PhysicalExpression(
-            operator=op,
-            input_group_ids=logical_expression.input_group_ids,
-            input_fields=logical_expression.input_fields,
-            depends_on_field_names=logical_expression.depends_on_field_names,
-            generated_fields=logical_expression.generated_fields,
-            group_id=logical_expression.group_id,
-        )
-
-        logger.debug(f"Done substituting AggregateRule for {logical_expression}")
-        deduped_physical_expressions = set([expression])
-
-        return deduped_physical_expressions
+        # perform the substitution
+        return cls._perform_substitution(logical_expression, physical_op_class, runtime_kwargs)
 
 
 class AddContextsBeforeComputeRule(ImplementationRule):
@@ -961,27 +676,17 @@ class AddContextsBeforeComputeRule(ImplementationRule):
         return is_match
 
     @classmethod
-    def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
+    def substitute(cls, logical_expression: LogicalExpression, **runtime_kwargs) -> set[PhysicalExpression]:
         logger.debug(f"Substituting AddContextsBeforeComputeRule for {logical_expression}")
-
-        logical_op: ComputeOperator = logical_expression.operator
-        op_kwargs = logical_op.get_logical_op_params()
-        op_kwargs.update(
-            {
-                "verbose": physical_op_params["verbose"],
-                "logical_op_id": logical_op.get_logical_op_id(),
-                "logical_op_name": logical_op.logical_op_name(),
-            }
-        )
 
         # load an LLM to generate a short search query
         model = None
         if os.getenv("OPENAI_API_KEY"):
-            model = "gpt-4o-mini"
+            model = "openai/gpt-4o-mini"
         elif os.getenv("ANTHROPIC_API_KEY"):
-            model = "claude-3-5-sonnet-latest"
+            model = "anthropic/claude-3-5-sonnet-20241022"
         elif os.getenv("TOGETHER_API_KEY"):
-            model = "together_ai/togethercomputer/Llama-3.3-70B-Instruct-Turbo"
+            model = "together_ai/meta-llama/Llama-3.3-70B-Instruct-Turbo"
 
         # importing litellm here because importing above causes deprecation warning
         import litellm
@@ -990,26 +695,12 @@ class AddContextsBeforeComputeRule(ImplementationRule):
         cm = ContextManager()
         response = litellm.completion(
             model=model,
-            messages=[{"role": "user", "content": cls.SEARCH_GENERATOR_PROMPT.format(instruction=logical_op.instruction)}]
+            messages=[{"role": "user", "content": cls.SEARCH_GENERATOR_PROMPT.format(instruction=logical_expression.operator.instruction)}]
         )
         query = response.choices[0].message.content
-        additional_contexts = cm.search_context(query, k=cls.k, where={"materialized": True})
-        op_kwargs["additional_contexts"] = additional_contexts
-        op = SmolAgentsCompute(**op_kwargs)
+        variable_op_kwargs = {"additional_contexts": cm.search_context(query, k=cls.k, where={"materialized": True})}
+        return cls._perform_substitution(logical_expression, SmolAgentsCompute, runtime_kwargs, variable_op_kwargs)
 
-        expression = PhysicalExpression(
-            operator=op,
-            input_group_ids=logical_expression.input_group_ids,
-            input_fields=logical_expression.input_fields,
-            depends_on_field_names=logical_expression.depends_on_field_names,
-            generated_fields=logical_expression.generated_fields,
-            group_id=logical_expression.group_id,
-        )
-
-        logger.debug(f"Done substituting AddContextsBeforeComputeRule for {logical_expression}")
-        deduped_physical_expressions = set([expression])
-
-        return deduped_physical_expressions
 
 class BasicSubstitutionRule(ImplementationRule):
     """
@@ -1036,31 +727,7 @@ class BasicSubstitutionRule(ImplementationRule):
         return is_match
 
     @classmethod
-    def substitute(cls, logical_expression: LogicalExpression, **physical_op_params) -> set[PhysicalExpression]:
+    def substitute(cls, logical_expression: LogicalExpression, **runtime_kwargs) -> set[PhysicalExpression]:
         logger.debug(f"Substituting BasicSubstitutionRule for {logical_expression}")
-
-        logical_op = logical_expression.operator
-        op_kwargs = logical_op.get_logical_op_params()
-        op_kwargs.update(
-            {
-                "verbose": physical_op_params["verbose"],
-                "logical_op_id": logical_op.get_logical_op_id(),
-                "logical_op_name": logical_op.logical_op_name(),
-            }
-        )
-        physical_op_class = cls.LOGICAL_OP_CLASS_TO_PHYSICAL_OP_CLASS_MAP[logical_op.__class__]
-        op = physical_op_class(**op_kwargs)
-
-        expression = PhysicalExpression(
-            operator=op,
-            input_group_ids=logical_expression.input_group_ids,
-            input_fields=logical_expression.input_fields,
-            depends_on_field_names=logical_expression.depends_on_field_names,
-            generated_fields=logical_expression.generated_fields,
-            group_id=logical_expression.group_id,
-        )
-
-        logger.debug(f"Done substituting BasicSubstitutionRule for {logical_expression}")
-        deduped_physical_expressions = set([expression])
-
-        return deduped_physical_expressions
+        physical_op_class = cls.LOGICAL_OP_CLASS_TO_PHYSICAL_OP_CLASS_MAP[logical_expression.operator.__class__]
+        return cls._perform_substitution(logical_expression, physical_op_class, runtime_kwargs)

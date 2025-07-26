@@ -58,7 +58,7 @@ class QueryProcessor:
 
         self.available_models = available_models
         if self.available_models is None or len(self.available_models) == 0:
-            self.available_models = get_models(include_vision=True)
+            self.available_models = get_models()
 
         if self.verbose:
             print("Available models: ", self.available_models)
@@ -88,7 +88,6 @@ class QueryProcessor:
         # return the output records and plan stats
         return records, [plan_stats]
 
-    # TODO: consider to support dry_run.
     @abstractmethod
     def execute(self) -> DataRecordCollection:
         raise NotImplementedError("Abstract method to be overwritten by sub-classes")

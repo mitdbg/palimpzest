@@ -10,7 +10,6 @@ import pandas as pd
 
 import palimpzest as pz
 from palimpzest.constants import Model
-from palimpzest.core.lib.fields import ListField, StringField
 
 cuad_categories = [
     {
@@ -592,7 +591,7 @@ def build_cuad_query(dataset, mode):
             desc = (
                 f"Extract the text spans (if they exist) from the contract corresponding to {category['Description']}"
             )
-            cols.append({"name": category["Category"], "type": ListField(StringField), "desc": desc})
+            cols.append({"name": category["Category"], "type": list[str], "desc": desc})
 
         desc = "Extract the text spans (if they exist) from the contract."
         ds = ds.sem_add_columns(cols, desc=desc, depends_on=["contract"])
@@ -602,7 +601,7 @@ def build_cuad_query(dataset, mode):
                 f"Extract the text spans (if they exist) from the contract corresponding to {category['Description']}"
             )
             ds = ds.sem_add_columns(
-                [{"name": category["Category"], "type": ListField(StringField), "desc": desc}],
+                [{"name": category["Category"], "type": list[str], "desc": desc}],
                 desc=category["Description"],
                 depends_on=["contract"],
             )
@@ -611,8 +610,8 @@ def build_cuad_query(dataset, mode):
 
 
 def main():
-    if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None:
-        print("WARNING: Both OPENAI_API_KEY and TOGETHER_API_KEY are unset")
+    if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None and os.getenv("ANTHROPIC_API_KEY") is None:
+        print("WARNING: OPENAI_API_KEY, TOGETHER_API_KEY, and ANTHROPIC_API_KEY are unset")
 
     args = parse_arguments()
 
