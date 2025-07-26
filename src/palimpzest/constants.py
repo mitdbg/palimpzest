@@ -21,6 +21,9 @@ class Model(str, Enum):
     GPT_4o_MINI = "openai/gpt-4o-mini-2024-07-18"
     TEXT_EMBEDDING_3_SMALL = "text-embedding-3-small"
     CLIP_VIT_B_32 = "clip-ViT-B-32"
+    CLAUDE_3_5_SONNET = "anthropic/claude-3-5-sonnet-20241022"
+    CLAUDE_3_7_SONNET = "anthropic/claude-3-7-sonnet-20250219"
+    CLAUDE_3_5_HAIKU = "anthropic/claude-3-5-haiku-20241022"
     # o1 = "o1-2024-12-17"
 
     def __repr__(self):
@@ -53,19 +56,21 @@ class Model(str, Enum):
     def is_openai_model(self):
         return "openai" in self.value.lower() or self.is_text_embedding_model()
 
+    def is_anthropic_model(self):
+        return "anthropic" in self.value.lower()
+
+    def is_text_model(self):
+        non_text_models = [Model.LLAMA3_2_90B_V, Model.CLIP_VIT_B_32, Model.TEXT_EMBEDDING_3_SMALL]
+        return self not in non_text_models
+
     def is_vision_model(self):
-        vision_models = [
-            "meta-llama/Llama-3.2-90B-Vision-Instruct-Turbo",
-            "gpt-4o-2024-08-06",
-            "gpt-4o-mini-2024-07-18",
-            "o1-2024-12-17",
-        ]
-        return self.value in vision_models
+        return self in [Model.LLAMA3_2_90B_V, Model.GPT_4o, Model.GPT_4o_MINI]
+
+    def is_multimodal_model(self):
+        return self in [Model.GPT_4o, Model.GPT_4o_MINI]
 
     def is_embedding_model(self):
-        is_clip_model = self.is_clip_model()
-        is_text_embedding_model = self.is_text_embedding_model()
-        return is_clip_model or is_text_embedding_model
+        return self in [Model.CLIP_VIT_B_32, Model.TEXT_EMBEDDING_3_SMALL]
 
 
 class PromptStrategy(str, Enum):
@@ -370,7 +375,33 @@ CLIP_VIT_B_32_MODEL_CARD = {
     ##### Agg. Benchmark #####
     "overall": 63.3,  # NOTE: ImageNet top-1 accuracy
 }
-
+CLAUDE_3_5_SONNET_MODEL_CARD = {
+    ##### Cost in USD #####
+    "usd_per_input_token": 3.0 / 1e6,
+    "usd_per_output_token": 15.0 / 1e6,
+    ##### Time #####
+    "seconds_per_output_token": 0.0127,
+    ##### Agg. Benchmark #####
+    "overall": 76.12,
+}
+CLAUDE_3_7_SONNET_MODEL_CARD = {
+    ##### Cost in USD #####
+    "usd_per_input_token": 3.0 / 1e6,
+    "usd_per_output_token": 15.0 / 1e6,
+    ##### Time #####
+    "seconds_per_output_token": 0.0130,
+    ##### Agg. Benchmark #####
+    "overall": 77.00,  # hard-coding to be slightly better than Claude 3.5 Sonnet
+}
+CLAUDE_3_5_HAIKU_MODEL_CARD = {
+    ##### Cost in USD #####
+    "usd_per_input_token": 0.8 / 1e6,
+    "usd_per_output_token": 4.0 / 1e6,
+    ##### Time #####
+    "seconds_per_output_token": 0.0152,
+    ##### Agg. Benchmark #####
+    "overall": 70.00,  # hard-coding to be slightly worse than Claude 3.5 Sonnet
+}
 
 MODEL_CARDS = {
     Model.LLAMA3_2_3B.value: LLAMA3_2_3B_INSTRUCT_MODEL_CARD,
@@ -385,6 +416,9 @@ MODEL_CARDS = {
     # Model.o1.value: o1_MODEL_CARD,
     Model.TEXT_EMBEDDING_3_SMALL.value: TEXT_EMBEDDING_3_SMALL_MODEL_CARD,
     Model.CLIP_VIT_B_32.value: CLIP_VIT_B_32_MODEL_CARD,
+    Model.CLAUDE_3_5_SONNET.value: CLAUDE_3_5_SONNET_MODEL_CARD,
+    Model.CLAUDE_3_7_SONNET.value: CLAUDE_3_7_SONNET_MODEL_CARD,
+    Model.CLAUDE_3_5_HAIKU.value: CLAUDE_3_5_HAIKU_MODEL_CARD,
 }
 
 

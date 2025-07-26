@@ -1,10 +1,6 @@
 import pytest
 
 from palimpzest.policy import MaxQuality
-from palimpzest.query.execution.parallel_execution_strategy import (
-    ParallelExecutionStrategy,
-)
-from palimpzest.query.execution.single_threaded_execution_strategy import SequentialSingleThreadExecutionStrategy
 from palimpzest.query.operators.convert import LLMConvertBonded
 from palimpzest.query.operators.filter import LLMFilter
 from palimpzest.query.operators.rag_convert import RAGConvert
@@ -15,11 +11,13 @@ from palimpzest.query.processor.query_processor_factory import QueryProcessorFac
 @pytest.mark.parametrize(
     argnames=("execution_strategy",),
     argvalues=[
-        pytest.param(SequentialSingleThreadExecutionStrategy, id="seq-single-thread"),
-        pytest.param(ParallelExecutionStrategy, id="parallel"),
+        pytest.param("sequential", id="seq-single-thread"),
+        pytest.param("pipelined", id="pipelined-single-thread"),
+        pytest.param("parallel", id="parallel"),
+        pytest.param("sequential_parallel", id="seq-parallel")
     ]
 )
-class TestParallelExecution:
+class TestExecution:
 
     @pytest.mark.parametrize(
         argnames=("dataset", "physical_plan", "expected_records", "side_effect"),
@@ -59,7 +57,7 @@ class TestParallelExecution:
         This test executes the given
         """
         # create processor
-        config = QueryProcessorConfig(processing_strategy="no_sentinel", policy=MaxQuality())
+        config = QueryProcessorConfig(processing_strategy="no_sentinel", execution_strategy=execution_strategy, policy=MaxQuality())
         processor = QueryProcessorFactory.create_processor(dataset, config)
 
         # mock out calls to generators used by the plans which parameterize this test

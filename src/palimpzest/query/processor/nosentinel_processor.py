@@ -11,7 +11,6 @@ class NoSentinelQueryProcessor(QueryProcessor):
     Query processor that uses naive cost estimates to select the best plan.
     """
 
-    # TODO: Consider to support dry_run.
     def execute(self) -> DataRecordCollection:
         logger.info("Executing NoSentinelQueryProcessor")
 

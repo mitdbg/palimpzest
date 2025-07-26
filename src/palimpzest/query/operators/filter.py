@@ -19,7 +19,6 @@ from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.core.models import GenerationStats, OperatorCostEstimates, RecordOpStats
 from palimpzest.query.generators.generators import Generator
 from palimpzest.query.operators.physical import PhysicalOperator
-from palimpzest.utils.model_helpers import get_vision_models
 
 
 class FilterOp(PhysicalOperator, ABC):
@@ -207,7 +206,7 @@ class LLMFilter(FilterOp):
         return self.model.value
 
     def is_image_filter(self) -> bool:
-        return self.model in get_vision_models()
+        return self.prompt_strategy is PromptStrategy.COT_BOOL_IMAGE
 
     def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates):
         # estimate number of input tokens from source

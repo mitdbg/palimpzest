@@ -1,5 +1,4 @@
 import pytest
-from pydantic import BaseModel, Field
 
 from palimpzest.constants import Cardinality, Model
 from palimpzest.core.data.iter_dataset import MemoryDataset
@@ -101,34 +100,6 @@ def one_to_many_convert_plan(real_estate_listing_files_schema, room_real_estate_
     )
     plan = PhysicalPlan(operators=[scan_op, convert_op_llm])
     return plan
-
-
-@pytest.fixture
-def simple_plan_factory():
-    def simple_plan_generator(convert_model, filter_model):
-        class FooSchema(BaseModel):
-            foo: str = Field(description="foo")
-
-        datasource = MemoryDataset(id="test", vals=[1, 2, 3, 4, 5, 6])
-        scan_op = MarshalAndScanDataOp(output_schema=File, datasource=datasource, logical_op_id="scan1")
-        convert_op_llm = LLMConvertBonded(
-            input_schema=File,
-            output_schema=FooSchema,
-            model=convert_model,
-            logical_op_id="convert1",
-        )
-        filter = Filter("bar")
-        filter_op = LLMFilter(
-            input_schema=FooSchema,
-            output_schema=FooSchema,
-            filter=filter,
-            model=filter_model,
-            logical_op_id="filter1",
-        )
-        plan = PhysicalPlan(operators=[scan_op, convert_op_llm, filter_op])
-        return plan
-
-    return simple_plan_generator
 
 
 @pytest.fixture

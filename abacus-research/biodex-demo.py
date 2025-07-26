@@ -276,8 +276,8 @@ if __name__ == "__main__":
         policy = pz.MinTimeAtFixedQuality(min_quality=args.quality)
     print(f"USING POLICY: {policy}")
 
-    if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None:
-        print("WARNING: Both OPENAI_API_KEY and TOGETHER_API_KEY are unset")
+    if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None and os.getenv("ANTHROPIC_API_KEY") is None:
+        print("WARNING: OPENAI_API_KEY, TOGETHER_API_KEY, and ANTHROPIC_API_KEY are unset")
 
     # create data source
     dataset = BiodexDataset(

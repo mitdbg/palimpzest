@@ -120,14 +120,15 @@ class OptimizeLogicalExpression(Task):
 
     def perform(
         self,
-        transformation_rules: list[TransformationRule],
-        implementation_rules: list[ImplementationRule],
+        transformation_rules: list[type[TransformationRule]],
+        implementation_rules: list[type[ImplementationRule]],
         context: dict[str, Any] | None = None,
     ) -> list[Task]:
         logger.debug(f"Optimizing logical expression {self.logical_expression}")
-        # if we're exploring, only apply transformation rules
         if context is None:
             context = {}
+
+        # if we're exploring, only apply transformation rules
         rules = transformation_rules if self.exploring else transformation_rules + implementation_rules
 
         # filter out rules that have already been applied to logical expression
@@ -170,7 +171,7 @@ class ApplyRule(Task):
     - schedule OptimizePhysicalExpression tasks
     """
 
-    def __init__(self, rule: Rule, logical_expression: Expression, exploring: bool = False):
+    def __init__(self, rule: type[Rule], logical_expression: Expression, exploring: bool = False):
         self.rule = rule
         self.logical_expression = logical_expression
         self.exploring = exploring
@@ -183,15 +184,12 @@ class ApplyRule(Task):
         **physical_op_params,
     ) -> tuple[list[Task], int]:
         logger.debug(f"Applying rule {self.rule} to logical expression {self.logical_expression}")
-        
-        # check if rule has already been applied to this logical expression; return [] if so
         if context is None:
             context = {}
+
+        # check if rule has already been applied to this logical expression; return [] if so
         if self.rule.get_rule_id() in self.logical_expression.rules_applied:
             return []
-
-        # MAYBE ?TODO?: iterate over bindings for logical expression and rule?
-        #               perhaps some rules can be applied more than once to an expression?
 
         # get the group of the logical expression
         group_id = self.logical_expression.group_id
@@ -206,8 +204,8 @@ class ApplyRule(Task):
             )
 
             # filter out any expressions which are duplicates (i.e. they've been previously computed)
-            new_expressions = [expr for expr in new_expressions if expr.get_expr_id() not in expressions]
-            expressions.update({expr.get_expr_id(): expr for expr in new_expressions})
+            new_expressions = [expr for expr in new_expressions if expr.expr_id not in expressions]
+            expressions.update({expr.expr_id: expr for expr in new_expressions})
 
             # add all new groups to the groups mapping
             for group in new_groups:
@@ -234,11 +232,11 @@ class ApplyRule(Task):
         else:
             # apply implementation rule
             new_expressions = self.rule.substitute(self.logical_expression, **physical_op_params)
-            new_expressions = [expr for expr in new_expressions if expr.get_expr_id() not in expressions]
+            new_expressions = [expr for expr in new_expressions if expr.expr_id not in expressions]
             costed_full_op_ids = context['costed_full_op_ids']
             if costed_full_op_ids is not None:
                 new_expressions = [expr for expr in new_expressions if expr.operator.get_full_op_id() in costed_full_op_ids]
-            expressions.update({expr.get_expr_id(): expr for expr in new_expressions})
+            expressions.update({expr.expr_id: expr for expr in new_expressions})
             group.physical_expressions.update(new_expressions)
 
             # create new task

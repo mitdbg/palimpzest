@@ -7,7 +7,7 @@ import numpy as np
 from PIL import Image
 
 import palimpzest as pz
-from palimpzest.core.lib.fields import ImageFilepathField, ListField
+from palimpzest.core.lib.schemas import ImageFilepath
 from palimpzest.utils.udfs import xls_to_tables
 
 # Addresses far from MIT; we use a simple lookup like this to make the
@@ -73,7 +73,7 @@ case_data_cols = [
 real_estate_listing_cols = [
     {"name": "listing", "type": str, "desc": "The name of the listing"},
     {"name": "text_content", "type": str, "desc": "The content of the listing's text description"},
-    {"name": "image_filepaths", "type": ListField(ImageFilepathField), "desc": "A list of the filepaths for each image of the listing"},
+    {"name": "image_filepaths", "type": list[ImageFilepath], "desc": "A list of the filepaths for each image of the listing"},
 ]
 
 real_estate_text_cols = [
@@ -93,16 +93,6 @@ table_cols = [
     {"name": "filename", "type": str, "desc": "The name of the file the table was extracted from"}
 ]
 
-
-# class RealEstateListingFiles(Schema):
-#     """The source text and image data for a real estate listing."""
-
-#     listing = StringField(desc="The name of the listing")
-#     text_content = StringField(desc="The content of the listing's text description")
-#     image_filepaths = ListField(
-#         element_type=ImageFilepathField,
-#         desc="A list of the filepaths for each image of the listing",
-#     )
 
 class RealEstateListingDataset(pz.IterDataset):
     def __init__(self, listings_dir):
@@ -184,8 +174,8 @@ if __name__ == "__main__":
         print("Policy not supported for this demo")
         exit(1)
 
-    if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None:
-        print("WARNING: Both OPENAI_API_KEY and TOGETHER_API_KEY are unset")
+    if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None and os.getenv("ANTHROPIC_API_KEY") is None:
+        print("WARNING: OPENAI_API_KEY, TOGETHER_API_KEY, and ANTHROPIC_API_KEY are unset")
 
     # create pz plan
     if workload == "enron":

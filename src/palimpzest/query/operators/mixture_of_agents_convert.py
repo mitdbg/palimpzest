@@ -21,7 +21,6 @@ class MixtureOfAgentsConvert(LLMConvert):
         aggregator_model: Model,
         proposer_prompt_strategy: PromptStrategy = PromptStrategy.COT_MOA_PROPOSER,
         aggregator_prompt_strategy: PromptStrategy = PromptStrategy.COT_MOA_AGG,
-        proposer_prompt: str | None = None,
         *args,
         **kwargs,
     ):
@@ -34,7 +33,6 @@ class MixtureOfAgentsConvert(LLMConvert):
         self.aggregator_model = aggregator_model
         self.proposer_prompt_strategy = proposer_prompt_strategy
         self.aggregator_prompt_strategy = aggregator_prompt_strategy
-        self.proposer_prompt = proposer_prompt
 
         # create generators
         self.proposer_generators = [

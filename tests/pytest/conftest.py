@@ -1,14 +1,11 @@
 import pytest
 
-from palimpzest.constants import Model
 from palimpzest.policy import MaxQuality, MaxQualityAtFixedCost, MinCost, MinCostAtFixedQuality
 
 pytest_plugins = [
     "fixtures.champion_outputs",
-    "fixtures.cost_est_data",
     "fixtures.datasets",
     "fixtures.execution_data",
-    "fixtures.expected_cost_est_results",
     "fixtures.expected_physical_plans",
     "fixtures.expected_qualities",
     "fixtures.expected_records",
@@ -76,7 +73,6 @@ def physical_plan(
     rag_convert_plan,
     image_convert_plan,
     one_to_many_convert_plan,
-    simple_plan_factory,
 ):
     physical_plan_id = request.param
     physical_plan_id_to_physical_plan = {
@@ -87,33 +83,6 @@ def physical_plan(
         "rag-convert": rag_convert_plan,
         "image-convert": image_convert_plan,
         "one-to-many-convert": one_to_many_convert_plan,
-        "cost-est-simple-plan-gpt4-gpt4": simple_plan_factory(
-            convert_model=Model.GPT_4o, filter_model=Model.GPT_4o,
-        ),
-        "cost-est-simple-plan-gpt4-gpt4m": simple_plan_factory(
-            convert_model=Model.GPT_4o, filter_model=Model.GPT_4o_MINI,
-        ),
-        "cost-est-simple-plan-gpt4-mixtral": simple_plan_factory(
-            convert_model=Model.GPT_4o, filter_model=Model.MIXTRAL,
-        ),
-        "cost-est-simple-plan-gpt4m-gpt4": simple_plan_factory(
-            convert_model=Model.GPT_4o_MINI, filter_model=Model.GPT_4o,
-        ),
-        "cost-est-simple-plan-gpt4m-gpt4m": simple_plan_factory(
-            convert_model=Model.GPT_4o_MINI, filter_model=Model.GPT_4o_MINI,
-        ),
-        "cost-est-simple-plan-gpt4m-mixtral": simple_plan_factory(
-            convert_model=Model.GPT_4o_MINI, filter_model=Model.MIXTRAL,
-        ),
-        "cost-est-simple-plan-mixtral-gpt4": simple_plan_factory(
-            convert_model=Model.MIXTRAL, filter_model=Model.GPT_4o,
-        ),
-        "cost-est-simple-plan-mixtral-gpt4m": simple_plan_factory(
-            convert_model=Model.MIXTRAL, filter_model=Model.GPT_4o_MINI,
-        ),
-        "cost-est-simple-plan-mixtral-mixtral": simple_plan_factory(
-            convert_model=Model.MIXTRAL, filter_model=Model.MIXTRAL,
-        ),
     }
     return physical_plan_id_to_physical_plan[physical_plan_id]
 
@@ -227,45 +196,6 @@ def side_effect(
         "real-estate-one-to-many-convert": real_estate_one_to_many_convert,
     }
     return side_effect_id_to_side_effect[side_effect_id]
-
-
-@pytest.fixture
-def expected_cost_est_results(
-    request,
-    simple_plan_expected_results_factory,
-):
-    cost_est_results_id = request.param
-    cost_est_results_id_to_cost_est_results = {
-        "cost-est-simple-plan-gpt4-gpt4": simple_plan_expected_results_factory(
-            convert_model=Model.GPT_4o, filter_model=Model.GPT_4o,
-        ),
-        "cost-est-simple-plan-gpt4-gpt4m": simple_plan_expected_results_factory(
-            convert_model=Model.GPT_4o, filter_model=Model.GPT_4o_MINI,
-        ),
-        "cost-est-simple-plan-gpt4-mixtral": simple_plan_expected_results_factory(
-            convert_model=Model.GPT_4o, filter_model=Model.MIXTRAL,
-        ),
-        "cost-est-simple-plan-gpt4m-gpt4": simple_plan_expected_results_factory(
-            convert_model=Model.GPT_4o_MINI, filter_model=Model.GPT_4o,
-        ),
-        "cost-est-simple-plan-gpt4m-gpt4m": simple_plan_expected_results_factory(
-            convert_model=Model.GPT_4o_MINI, filter_model=Model.GPT_4o_MINI,
-        ),
-        "cost-est-simple-plan-gpt4m-mixtral": simple_plan_expected_results_factory(
-            convert_model=Model.GPT_4o_MINI, filter_model=Model.MIXTRAL,
-        ),
-        "cost-est-simple-plan-mixtral-gpt4": simple_plan_expected_results_factory(
-            convert_model=Model.MIXTRAL, filter_model=Model.GPT_4o,
-        ),
-        "cost-est-simple-plan-mixtral-gpt4m": simple_plan_expected_results_factory(
-            convert_model=Model.MIXTRAL, filter_model=Model.GPT_4o_MINI,
-        ),
-        "cost-est-simple-plan-mixtral-mixtral": simple_plan_expected_results_factory(
-            convert_model=Model.MIXTRAL, filter_model=Model.MIXTRAL,
-        ),
-    }
-
-    return cost_est_results_id_to_cost_est_results[cost_est_results_id]
 
 
 @pytest.fixture
