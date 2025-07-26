@@ -287,7 +287,7 @@ class Optimizer:
         logical_expression.set_group_id(group.group_id)
 
         # add the expression and group to the optimizer's expressions and groups and return
-        self.expressions[logical_expression.get_expr_id()] = logical_expression
+        self.expressions[logical_expression.expr_id] = logical_expression
         self.groups[group.group_id] = group
         logger.debug(f"Constructed group tree for dataset_nodes: {dataset_nodes}")
         logger.debug(f"Group: {group.group_id}, {all_fields}, {all_properties}")

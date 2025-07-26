@@ -163,8 +163,8 @@ class PushDownFilter(TransformationRule):
                 group_id, group = None, None
 
                 # if the expression already exists, lookup the group_id and group
-                if new_filter_expr.get_expr_id() in expressions:
-                    group_id = expressions[new_filter_expr.get_expr_id()].group_id
+                if new_filter_expr.expr_id in expressions:
+                    group_id = expressions[new_filter_expr.expr_id].group_id
                     new_filter_expr.set_group_id(group_id)
                     group = groups[group_id]
 
@@ -387,14 +387,7 @@ class ImplementationRule(Rule):
             op = physical_op_class(**op_kwargs)
 
             # construct physical expression and add to list of expressions
-            expression = PhysicalExpression(
-                operator=op,
-                input_group_ids=logical_expression.input_group_ids,
-                input_fields=logical_expression.input_fields,
-                depends_on_field_names=logical_expression.depends_on_field_names,
-                generated_fields=logical_expression.generated_fields,
-                group_id=logical_expression.group_id,
-            )
+            expression = PhysicalExpression.from_op_and_logical_expr(op, logical_expression)
             physical_expressions.append(expression)
 
         return set(physical_expressions)

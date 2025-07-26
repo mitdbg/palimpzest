@@ -4,6 +4,7 @@ from pydantic.fields import FieldInfo
 
 from palimpzest.query.operators.logical import LogicalOperator
 from palimpzest.query.operators.physical import PhysicalOperator
+from palimpzest.query.optimizer import rules
 from palimpzest.query.optimizer.plan import PlanCost
 from palimpzest.utils.hash_helpers import hash_for_id
 
@@ -40,27 +41,35 @@ class Expression:
         # and the input plan cost for which that pareto-optimal plan cost is attainable
         self.pareto_optimal_plan_costs: list[tuple[PlanCost, PlanCost]] | None = None
 
-    def __eq__(self, other):
-        return self.operator == other.operator and self.input_group_ids == other.input_group_ids
+        # compute the expression id
+        self.expr_id = self._compute_expr_id()
 
-    # TODO: make this a proper useful __str__; use id() or some other mechanism for signaling unique Expression
+    def __eq__(self, other):
+        return self.expr_id == other.expr_id
+
     def __str__(self):
-        op_id = self.operator.get_logical_op_id() if isinstance(self.operator, LogicalOperator) else self.operator.get_full_op_id()
-        return str(tuple(sorted(self.input_group_ids)) + (op_id, str(self.__class__.__name__)))
+        expr_str = f"{self.__class__.__name__}(group_id={self.group_id}, expr_id={self.expr_id})"
+        expr_str += f"\n  - input_group_ids: {self.input_group_ids}"
+        expr_str += f"\n  - input_fields: {self.input_fields}"
+        expr_str += f"\n  - depends_on_field_names: {self.depends_on_field_names}"
+        expr_str += f"\n  - generated_fields: {self.generated_fields}"
+        expr_str += f"\n  - operator:\n{str(self.operator)}"
+        return expr_str
 
     def __hash__(self):
-        hash_str = self.__str__()
+        op_id = self.operator.get_logical_op_id() if isinstance(self.operator, LogicalOperator) else self.operator.get_full_op_id()
+        hash_str = str(tuple(sorted(self.input_group_ids)) + (op_id, str(self.__class__.__name__)))
         hash_id = int(hash_for_id(hash_str), 16)
         return hash_id
 
-    def add_applied_rule(self, rule):
+    def _compute_expr_id(self) -> int:
+        return self.__hash__()
+
+    def add_applied_rule(self, rule: type[rules.Rule]):
         self.rules_applied.add(rule.get_rule_id())
 
     def set_group_id(self, group_id: int) -> None:
         self.group_id = group_id
-
-    def get_expr_id(self) -> int:
-        return self.__hash__()
 
 
 class LogicalExpression(Expression):
@@ -68,7 +77,18 @@ class LogicalExpression(Expression):
 
 
 class PhysicalExpression(Expression):
-    pass
+    
+    @classmethod
+    def from_op_and_logical_expr(cls, op: PhysicalOperator, logical_expression: LogicalExpression) -> PhysicalExpression:
+        """Construct a PhysicalExpression given a physical operator and a logical expression."""
+        return cls(
+            operator=op,
+            input_group_ids=logical_expression.input_group_ids,
+            input_fields=logical_expression.input_fields,
+            depends_on_field_names=logical_expression.depends_on_field_names,
+            generated_fields=logical_expression.generated_fields,
+            group_id=logical_expression.group_id,
+        )
 
 
 class Group:
@@ -92,12 +112,12 @@ class Group:
         self.properties = properties
 
         # compute the group id
-        self.group_id = self.compute_group_id()
+        self.group_id = self._compute_group_id()
 
     def set_explored(self):
         self.explored = True
 
-    def compute_group_id(self) -> int:
+    def _compute_group_id(self) -> int:
         # sort field names
         sorted_fields = sorted(self.fields.keys())
 
