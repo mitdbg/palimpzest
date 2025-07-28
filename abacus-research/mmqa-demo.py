@@ -87,7 +87,7 @@ class MMQADataset(pz.IterDataset):
         shuffle: bool = False,
         seed: int = 42,
     ):
-        super().__init__(mmqa_entry_cols)
+        super().__init__(id=f"mmqa-{split}", schema=mmqa_entry_cols)
 
         # read the appropriate dataset
         dataset = []
@@ -393,7 +393,7 @@ if __name__ == "__main__":
     )
 
     # create validation data source
-    val_datasource = MMQADataset(
+    train_dataset = MMQADataset(
         split="train",
         num_samples=val_examples,
         shuffle=True,
@@ -473,8 +473,7 @@ if __name__ == "__main__":
         return {"supporting_images": results, "supporting_image_ids": result_ids}
 
     # construct plan
-    plan = pz.Dataset(dataset)
-    plan = plan.retrieve(
+    plan = dataset.retrieve(
         index=text_index,
         search_func=text_search_func,
         search_attr="question",
@@ -497,7 +496,6 @@ if __name__ == "__main__":
     # execute pz plan
     config = pz.QueryProcessorConfig(
         policy=policy,
-        val_datasource=val_datasource,
         processing_strategy=processing_strategy,
         optimizer_strategy="pareto",
         sentinel_execution_strategy=sentinel_execution_strategy,
@@ -513,16 +511,14 @@ if __name__ == "__main__":
         allow_mixtures=True,
         allow_rag_reduction=True,
         progress=progress,
-    )
-
-    data_record_collection = plan.run(
-        config=config,
         k=k,
         j=j,
         sample_budget=sample_budget,
         seed=seed,
         exp_name=exp_name,
     )
+
+    data_record_collection = plan.run(config=config, train_dataset=train_dataset, validator=pz.Validator(None))
 
     print(data_record_collection.to_df())
     data_record_collection.to_df().to_csv(f"opt-profiling-data/{exp_name}-output.csv", index=False)

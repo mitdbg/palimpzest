@@ -405,7 +405,7 @@ class CUADDataset(pz.IterDataset):
             {"name": "title", "type": str, "desc": "The title of the the contract to be analyzed"},
             {"name": "contract", "type": str, "desc": "The content of the the contract to be analyzed"},
         ]
-        super().__init__(input_cols)
+        super().__init__(id=f"cuad-{split}", schema=input_cols)
 
         # convert the dataset into a list of dictionaries where each row is for a single contract
         include_labels = split == "train"
@@ -509,7 +509,6 @@ def parse_arguments():
 
 def build_cuad_query(dataset, mode):
     assert mode in ["one-convert", "separate-converts"]
-    ds = pz.Dataset(dataset)
 
     if mode == "one-convert":
         cols = []
@@ -520,19 +519,19 @@ def build_cuad_query(dataset, mode):
             cols.append({"name": category["Category"], "type": list[str], "desc": desc})
 
         desc = "Extract the text spans (if they exist) from the contract."
-        ds = ds.sem_add_columns(cols, desc=desc, depends_on=["contract"])
+        dataset = dataset.sem_add_columns(cols, desc=desc, depends_on=["contract"])
     elif mode == "separate-converts":
         for category in cuad_categories:
             desc = (
                 f"Extract the text spans (if they exist) from the contract corresponding to {category['Description']}"
             )
-            ds = ds.sem_add_columns(
+            dataset = dataset.sem_add_columns(
                 [{"name": category["Category"], "type": list[str], "desc": desc}],
                 desc=category["Description"],
                 depends_on=["contract"],
             )
 
-    return ds
+    return dataset
 
 
 def main():
@@ -546,7 +545,7 @@ def main():
 
     # Create a data reader for the CUAD dataset
     dataset = CUADDataset(split="test", num_contracts=1)
-    val_datasource = CUADDataset(split="train", num_contracts=5)
+    train_dataset = CUADDataset(split="train", num_contracts=5)
     print("Created data reader")
 
     # Build and run the CUAD query
@@ -557,9 +556,10 @@ def main():
     execution_strategy = "parallel"
     sentinel_execution_strategy = "all"
     optimizer_strategy = "pareto"
+    seed = 0
+    exp_name = f"cuad-priors-{optimizer_strategy}-seed{seed}"
     config = pz.QueryProcessorConfig(
         verbose=False,
-        val_datasource=val_datasource,
         processing_strategy=processing_strategy,
         optimizer_strategy=optimizer_strategy,
         sentinel_execution_strategy=sentinel_execution_strategy,
@@ -581,17 +581,13 @@ def main():
         allow_mixtures=True,
         allow_rag_reduction=True,
         progress=True,
-    )
-    seed = 0
-    exp_name = f"cuad-priors-{optimizer_strategy}-seed{seed}"
-    data_record_collection = query.run(
-        config=config,
         k=-1,
         j=-1,
         sample_budget=1014*5,
         seed=seed,
         exp_name=exp_name,
     )
+    data_record_collection = query.optimize_and_run(config=config, train_dataset=train_dataset, validator=pz.Validator(None))
     print("Query execution completed")
 
     # save statistics

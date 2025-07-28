@@ -23,6 +23,7 @@ from palimpzest.query.operators.logical import (
 )
 from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.utils.hash_helpers import hash_for_serialized_dict
+from palimpzest.validator.validator import BaseValidator
 
 
 # TODO?: remove `schema` from `Dataset` and access it from `operator`?
@@ -152,7 +153,7 @@ class Dataset:
     def copy(self):
         return Dataset(
             sources=None if self._sources is None else [source.copy() for source in self._sources],
-            operator=self._operator,
+            operator=self._operator.copy(),
             schema=self._schema,
         )
 
@@ -379,4 +380,16 @@ class Dataset:
         if policy is not None:
             kwargs["policy"] = policy
 
-        return QueryProcessorFactory.create_and_run_processor(self, config, **kwargs)
+        return QueryProcessorFactory.create_and_run_processor(self, config)
+
+    def optimize_and_run(self, train_dataset: Dataset, validator: BaseValidator, config: QueryProcessorConfig | None = None, **kwargs):
+        """Optimize the PZ program using the train_dataset and validator before running the optimized plan."""
+        # TODO: this import currently needs to be here to avoid a circular import; we should fix this in a subsequent PR
+        from palimpzest.query.processor.query_processor_factory import QueryProcessorFactory
+
+        # as syntactic sugar, we will allow some keyword arguments to parameterize our policies
+        policy = construct_policy_from_kwargs(**kwargs)
+        if policy is not None:
+            kwargs["policy"] = policy
+
+        return QueryProcessorFactory.create_and_run_processor(self, config, train_dataset, validator)

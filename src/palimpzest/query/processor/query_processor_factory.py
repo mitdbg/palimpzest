@@ -12,6 +12,7 @@ from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.query.processor.processing_strategy_type import ProcessingStrategyType
 from palimpzest.query.processor.query_processor import QueryProcessor
 from palimpzest.utils.model_helpers import get_models
+from palimpzest.validator.validator import BaseValidator
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +55,7 @@ class QueryProcessorFactory:
         return config
 
     @classmethod
-    def _config_validation_and_normalization(cls, config: QueryProcessorConfig):
+    def _config_validation_and_normalization(cls, config: QueryProcessorConfig, train_dataset: Dataset | None, validator : BaseValidator | None):
         if config.policy is None:
             raise ValueError("Policy is required for optimizer")
         
@@ -63,12 +64,15 @@ class QueryProcessorFactory:
             print("WARNING: Both `progress` and `verbose` are set to True, but only one can be True at a time; defaulting to `progress=True`")
             config.verbose = False
 
+        # boolean flag for whether we're performing optimization or not
+        optimization = train_dataset is not None and validator is not None
+
         # handle "auto" defaults for processing and sentinel execution strategies
         if config.processing_strategy == "auto":
-            config.processing_strategy = "no_sentinel" if config.val_datasource is None else "sentinel"
+            config.processing_strategy = "sentinel" if optimization else "no_sentinel"
 
         if config.sentinel_execution_strategy == "auto":
-            config.sentinel_execution_strategy = None if config.val_datasource is None else "mab"
+            config.sentinel_execution_strategy = "mab" if optimization else None
 
         # convert the config values for processing, execution, and optimization strategies to enums
         config = cls._normalize_strategies(config)
@@ -78,8 +82,8 @@ class QueryProcessorFactory:
             raise ValueError(f"Unsupported `execution_strategy` {config.execution_strategy} for `processing_strategy` {config.processing_strategy}.")
 
         # check that validation data is provided for sentinel execution
-        if config.val_datasource is None and config.processing_strategy.is_sentinel_strategy():
-            raise ValueError("`val_datasource` is required for SENTINEL processing strategies")
+        if not optimization and config.processing_strategy.is_sentinel_strategy():
+            raise ValueError("`train_dataset` is required for SENTINEL processing strategies")
 
         # check that sentinel execution is provided for sentinel processor
         if config.sentinel_execution_strategy is None and config.processing_strategy.is_sentinel_strategy():
@@ -106,7 +110,7 @@ class QueryProcessorFactory:
         return execution_strategy_cls(**config.to_dict())
 
     @classmethod
-    def _create_sentinel_execution_strategy(cls, config: QueryProcessorConfig) -> SentinelExecutionStrategy:
+    def _create_sentinel_execution_strategy(cls, config: QueryProcessorConfig, train_dataset: Dataset | None, validator : BaseValidator | None) -> SentinelExecutionStrategy:
         """
         Creates an execution strategy based on the configuration.
         """
@@ -114,14 +118,15 @@ class QueryProcessorFactory:
             return None
 
         sentinel_execution_strategy_cls = config.sentinel_execution_strategy.value
-        return sentinel_execution_strategy_cls(**config.to_dict())
+        return sentinel_execution_strategy_cls(train_dataset=train_dataset, validator=validator, **config.to_dict())
 
     @classmethod
     def create_processor(
         cls,
         dataset: Dataset,
         config: QueryProcessorConfig | None = None,
-        **kwargs
+        train_dataset: Dataset | None = None,
+        validator: BaseValidator | None = None,
     ) -> QueryProcessor:
         """
         Creates a QueryProcessor with specified processing and execution strategies.
@@ -135,23 +140,27 @@ class QueryProcessorFactory:
             config = QueryProcessorConfig()
 
         # apply any additional keyword arguments to the config and validate its contents
-        config.update(**kwargs)
-        config = cls._config_validation_and_normalization(config)
+        config = cls._config_validation_and_normalization(config, train_dataset, validator)
 
         # create the optimizer, execution strateg(ies), and processor
         optimizer = cls._create_optimizer(config)
         config.execution_strategy = cls._create_execution_strategy(config)
-        config.sentinel_execution_strategy = cls._create_sentinel_execution_strategy(config)
+        config.sentinel_execution_strategy = cls._create_sentinel_execution_strategy(config, train_dataset, validator)
         processor_cls = config.processing_strategy.value
-        processor = processor_cls(dataset, optimizer, **config.to_dict())
+        processor = processor_cls(dataset, optimizer, train_dataset=train_dataset, validator=validator, **config.to_dict())
 
         return processor
 
     @classmethod
-    def create_and_run_processor(cls, dataset: Dataset, config: QueryProcessorConfig | None = None, **kwargs) -> DataRecordCollection:
-        # TODO(Jun): Consider to use cache here.
+    def create_and_run_processor(
+        cls,
+        dataset: Dataset,
+        config: QueryProcessorConfig | None = None,
+        train_dataset: Dataset | None = None,
+        validator: BaseValidator | None = None,
+    ) -> DataRecordCollection:
         logger.info(f"Creating processor for dataset: {dataset}")
-        processor = cls.create_processor(dataset=dataset, config=config, **kwargs)
+        processor = cls.create_processor(dataset, config, train_dataset, validator)
         logger.info(f"Created processor: {processor}")
 
         return processor.execute()

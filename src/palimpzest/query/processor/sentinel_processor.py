@@ -22,8 +22,8 @@ class SentinelQueryProcessor(QueryProcessor):
         """
         # if we're using validation data, get the set of expected output records
         expected_outputs = {}
-        for source_idx in range(len(self.val_datasource)):
-            expected_output = self.val_datasource[source_idx]
+        for source_idx in range(len(self.train_dataset)):
+            expected_output = self.train_dataset[source_idx]
             expected_outputs[source_idx] = expected_output
 
         # execute sentinel plan; returns sentinel_plan_stats
@@ -39,7 +39,7 @@ class SentinelQueryProcessor(QueryProcessor):
 
         # create copy of dataset, but change its root Dataset(s) to the validation Dataset(s)
         dataset = self.dataset.copy()
-        dataset._set_data_source(self.val_datasource)
+        dataset._set_data_source(self.train_dataset.id, self.train_dataset)
 
         # get the sentinel plan for the given dataset
         sentinel_plans = optimizer.optimize(dataset)
@@ -49,7 +49,7 @@ class SentinelQueryProcessor(QueryProcessor):
 
     def execute(self) -> DataRecordCollection:
         # for now, enforce that we are using validation data; we can relax this after paper submission
-        if self.val_datasource is None:
+        if self.train_dataset is None:
             raise Exception("Make sure you are using validation data with SentinelQueryProcessor")
         logger.info(f"Executing {self.__class__.__name__}")
 

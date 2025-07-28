@@ -406,7 +406,7 @@ class CUADDataset(pz.IterDataset):
             {"name": "title", "type": str, "desc": "The title of the the contract to be analyzed"},
             {"name": "contract", "type": str, "desc": "The content of the the contract to be analyzed"},
         ]
-        super().__init__(input_cols)
+        super().__init__(id=f"cuad-{split}", schema=input_cols)
 
         # convert the dataset into a list of dictionaries where each row is for a single contract
         include_labels = split == "train"
@@ -571,7 +571,6 @@ def parse_arguments():
 
 def build_cuad_query(dataset, mode):
     assert mode in ["one-convert", "separate-converts"]
-    ds = pz.Dataset(dataset)
 
     if mode == "one-convert":
         cols = []
@@ -582,19 +581,19 @@ def build_cuad_query(dataset, mode):
             cols.append({"name": category["Category"], "type": list[str], "desc": desc})
 
         desc = "Extract the text spans (if they exist) from the contract."
-        ds = ds.sem_add_columns(cols, desc=desc, depends_on=["contract"])
+        dataset = dataset.sem_add_columns(cols, desc=desc, depends_on=["contract"])
     elif mode == "separate-converts":
         for category in cuad_categories:
             desc = (
                 f"Extract the text spans (if they exist) from the contract corresponding to {category['Description']}"
             )
-            ds = ds.sem_add_columns(
+            dataset = dataset.sem_add_columns(
                 [{"name": category["Category"], "type": list[str], "desc": desc}],
                 desc=category["Description"],
                 depends_on=["contract"],
             )
 
-    return ds
+    return dataset
 
 
 def main():
@@ -608,7 +607,7 @@ def main():
 
     # Create a data reader for the CUAD dataset
     dataset = CUADDataset(split="test", num_contracts=100, seed=args.seed)
-    val_datasource = CUADDataset(split="train", num_contracts=25, seed=args.seed)
+    train_dataset = CUADDataset(split="train", num_contracts=25, seed=args.seed)
     print("Created data reader")
 
     # Build and run the CUAD query
@@ -621,10 +620,23 @@ def main():
 
     sentinel_strategy = args.sentinel_execution_strategy
     optimizer_strategy = args.optimizer_strategy
+    seed = args.seed
+    k = args.k
+    j = args.j
+    sample_budget = args.sample_budget
+    exp_name = (
+        f"cuad-strategy-{optimizer_strategy}-k{k}-j{j}-budget{sample_budget}-seed{seed}"
+        if args.exp_name is None
+        else args.exp_name
+    )
+    priors = None
+    if args.priors_file is not None:
+        with open(args.priors_file) as f:
+            priors = json.load(f)
+
     config = pz.QueryProcessorConfig(
         policy=policy,
         verbose=False,
-        val_datasource=val_datasource,
         processing_strategy="sentinel",
         optimizer_strategy=optimizer_strategy,
         sentinel_execution_strategy=sentinel_strategy,
@@ -643,31 +655,16 @@ def main():
         allow_mixtures=True,
         allow_rag_reduction=True,
         progress=True,
-    )
-    seed = args.seed
-    k = args.k
-    j = args.j
-    sample_budget = args.sample_budget
-    exp_name = (
-        f"cuad-strategy-{optimizer_strategy}-k{k}-j{j}-budget{sample_budget}-seed{seed}"
-        if args.exp_name is None
-        else args.exp_name
-    )
-    priors = None
-    if args.priors_file is not None:
-        with open(args.priors_file) as f:
-            priors = json.load(f)
-
-    print(f"EXPERIMENT NAME: {exp_name}")
-    data_record_collection = query.run(
-        config=config,
+        seed=seed,
         k=k,
         j=j,
         sample_budget=sample_budget,
-        seed=seed,
         exp_name=exp_name,
         priors=priors,
     )
+
+    print(f"EXPERIMENT NAME: {exp_name}")
+    data_record_collection = query.run(config=config, train_dataset=train_dataset, validator=pz.Validator(None))
     print("Query execution completed")
 
     # save statistics

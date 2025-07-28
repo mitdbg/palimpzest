@@ -17,6 +17,7 @@ from palimpzest.query.operators.retrieve import RetrieveOp
 from palimpzest.query.operators.scan import ContextScanOp, ScanPhysicalOp
 from palimpzest.query.optimizer.plan import PhysicalPlan, SentinelPlan
 from palimpzest.utils.progress import PZSentinelProgressManager
+from palimpzest.validator.validator import BaseValidator
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +76,8 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
     """
     def __init__(
         self,
-        val_datasource: Dataset,
+        train_dataset: Dataset,
+        validator: BaseValidator,
         k: int,
         j: int,
         sample_budget: int,
@@ -88,7 +90,8 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
-        self.val_datasource = val_datasource
+        self.train_dataset = train_dataset
+        self.validator = validator
         self.k = k
         self.j = j
         self.sample_budget = sample_budget

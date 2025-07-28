@@ -570,7 +570,7 @@ class PromptFactory:
             list[dict]: The image messages for the chat payload.
         """
         # create a message for each image in an input field with an image (or list of image) type
-        image_messages = []
+        image_content = []
         for field_name in input_fields:
             field_value = candidate[field_name]
             field_type = candidate.get_field_type(field_name)
@@ -579,39 +579,39 @@ class PromptFactory:
             if field_type.annotation in [ImageFilepath, ImageFilepath | None]:
                 with open(field_value, "rb") as f:
                     base64_image_str = base64.b64encode(f.read()).decode("utf-8")
-                image_messages.append(
-                    {"role": "user", "type": "image", "content": f"data:image/jpeg;base64,{base64_image_str}"}
+                image_content.append(
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image_str}"}}
                 )
 
             elif field_type.annotation in [list[ImageFilepath], list[ImageFilepath] | None]:
                 for image_filepath in field_value:
                     with open(image_filepath, "rb") as f:
                         base64_image_str = base64.b64encode(f.read()).decode("utf-8")
-                    image_messages.append(
-                        {"role": "user", "type": "image", "content": f"data:image/jpeg;base64,{base64_image_str}"}
+                    image_content.append(
+                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image_str}"}}
                     )
 
             # image url (or list of image urls)
             elif field_type.annotation in [ImageURL, ImageURL | None]:
-                image_messages.append({"role": "user", "type": "image", "content": field_value})
+                image_content.append({"type": "image_url", "image_url": {"url": field_value}})
 
             elif field_type.annotation in [list[ImageURL], list[ImageURL] | None]:
                 for image_url in field_value:
-                    image_messages.append({"role": "user", "type": "image", "content": image_url})
+                    image_content.append({"type": "image_url", "image_url": {"url": image_url}})
 
             # pre-encoded images (or list of pre-encoded images)
             elif field_type.annotation in [ImageBase64, ImageBase64 | None]:
-                image_messages.append(
-                    {"role": "user", "type": "image", "content": f"data:image/jpeg;base64,{field_value}"}
+                image_content.append(
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{field_value}"}}
                 )
 
             elif field_type.annotation in [list[ImageBase64], list[ImageBase64] | None]:
                 for base64_image in field_value:
-                    image_messages.append(
-                        {"role": "user", "type": "image", "content": f"data:image/jpeg;base64,{base64_image}"}
+                    image_content.append(
+                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
                     )
 
-        return image_messages
+        return [{"role": "user", "type": "image", "content": image_content}]
 
     def _get_system_prompt(self, **format_kwargs) -> str | None:
         """

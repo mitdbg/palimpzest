@@ -5,16 +5,12 @@ import re
 from abc import ABC
 from typing import Callable
 
-# import litellm
 import pandas as pd
 from pydantic import BaseModel
 
-from palimpzest.constants import Cardinality, Model, PromptStrategy
 from palimpzest.core.data import context_manager
 from palimpzest.core.data.dataset import Dataset
-from palimpzest.core.elements.records import DataRecord
-from palimpzest.core.lib.schemas import TextFile, create_schema_from_fields, union_schemas
-from palimpzest.prompts.prompt_factory import PromptFactory
+from palimpzest.core.lib.schemas import create_schema_from_fields, union_schemas
 from palimpzest.query.operators.logical import ComputeOperator, ContextScan, LogicalOperator, SearchOperator
 from palimpzest.utils.hash_helpers import hash_for_id
 
@@ -245,32 +241,3 @@ class TextFileContext(Context):
             content = file.read()
 
         return content
-
-    # def tool_sem_filter(self, path: str, question: str) -> bool:
-    #     """
-    #     This tool takes a filepath (`path`) and a True/False `question` about the file as input
-    #     and returns True if the answer to the question is True, and False otherwise.
-
-    #     Args:
-    #         path (str): The path to the file to read.
-    #         question (str): The true/false question to ask about the file
-
-    #     Returns:
-    #         bool: True if the question about the file is True, and False otherwise.
-    #     """
-    #     # TODO: handle images
-    #     # create DataRecord with file content
-    #     dr = DataRecord(schema=TextFile, source_idx=0)
-    #     dr.filename = os.path.basename(path)
-    #     dr.contents = self.tool_read_filepath(path)
-
-    #     # call prompt factory to generate messages
-    #     prompt_factory = PromptFactory(PromptStrategy.COT_BOOL, Model.GPT_4o_MINI, Cardinality.ONE_TO_ONE)
-    #     messages = prompt_factory.create_messages(dr, ["answer"], **{"filter_condition": question})
-
-    #     # generate output with litellm
-    #     output = litellm.completion(model="openai/gpt-4o-mini-2024-07-18", messages=messages)
-    #     output = output.choices[0].message.content
-
-    #     # parse output
-    #     return self._parse_filter_answer(output)["passed_operator"]

@@ -9,6 +9,7 @@ from palimpzest.query.execution.execution_strategy import ExecutionStrategy, Sen
 from palimpzest.query.optimizer.optimizer import Optimizer
 from palimpzest.utils.hash_helpers import hash_for_id
 from palimpzest.utils.model_helpers import get_models
+from palimpzest.validator.validator import BaseValidator
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +27,8 @@ class QueryProcessor:
         execution_strategy: ExecutionStrategy,
         sentinel_execution_strategy: SentinelExecutionStrategy | None,
         num_samples: int | None = None,
-        val_datasource: Dataset | None = None,
+        train_dataset: Dataset | None = None,
+        validator: BaseValidator | None = None,
         scan_start_idx: int = 0,
         verbose: bool = False,
         progress: bool = True,
@@ -48,7 +50,8 @@ class QueryProcessor:
         self.sentinel_execution_strategy = sentinel_execution_strategy
 
         self.num_samples = num_samples
-        self.val_datasource = val_datasource
+        self.train_dataset = train_dataset
+        self.validator = validator
         self.scan_start_idx = scan_start_idx
         self.verbose = verbose
         self.progress = progress

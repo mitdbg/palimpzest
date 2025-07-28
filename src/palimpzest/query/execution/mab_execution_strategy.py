@@ -607,7 +607,7 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
         plan_stats.start()
 
         # shuffle the indices of records to sample
-        total_num_samples = len(self.val_datasource)
+        total_num_samples = len(self.train_dataset)
         shuffled_source_indices = [int(idx) for idx in np.arange(total_num_samples)]
         self.rng.shuffle(shuffled_source_indices)
 

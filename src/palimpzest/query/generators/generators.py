@@ -323,7 +323,7 @@ class Generator(Generic[ContextType, InputType]):
         # parse usage statistics and create the GenerationStats
         generation_stats = None
         if completion is not None:
-            usage = completion.usage.dict()
+            usage = completion.usage.model_dump()
 
             # get cost per input/output token for the model and parse number of input and output tokens
             usd_per_input_token = MODEL_CARDS[self.model_name]["usd_per_input_token"]

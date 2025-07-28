@@ -24,6 +24,7 @@ from palimpzest.policy import (
     Policy,
 )
 from palimpzest.query.processor.config import QueryProcessorConfig
+from palimpzest.validator.validator import Validator
 
 # Initialize the root logger
 logging.getLogger(__name__).addHandler(logging.NullHandler())
@@ -54,6 +55,6 @@ __all__ = [
     "Policy",
     # query
     "QueryProcessorConfig",
-    # sets
-    "Dataset",
+    # validator
+    "Validator",
 ]

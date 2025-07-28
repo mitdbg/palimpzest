@@ -111,6 +111,7 @@ class Policy:
             "config": self.get_dict()
         }, indent=2)
 
+
 class MaxQuality(Policy):
     """
     This policy has no constraints and computes the best plan as the one with

@@ -29,7 +29,7 @@ class BiodexDataset(pz.IterDataset):
         shuffle: bool = False,
         seed: int = 42,
     ):
-        super().__init__(biodex_entry_cols)
+        super().__init__(id=f"biodex-{split}", schema=biodex_entry_cols)
 
         self.dataset = datasets.load_dataset("BioDEX/BioDEX-Reactions", split=split).to_pandas()
         if shuffle:
@@ -144,7 +144,7 @@ if __name__ == "__main__":
     )
 
     # create validation data source
-    val_datasource = BiodexDataset(
+    train_dataset = BiodexDataset(
         split="train",
         num_samples=5,
         shuffle=True,
@@ -152,7 +152,7 @@ if __name__ == "__main__":
     )
 
     # construct plan
-    plan = pz.Dataset(dataset)
+    plan = dataset
     plan = plan.sem_add_columns(biodex_reactions_cols)
 
     # only use final op quality
@@ -160,7 +160,6 @@ if __name__ == "__main__":
 
     # execute pz plan
     config = pz.QueryProcessorConfig(
-        val_datasource=val_datasource,
         processing_strategy=processing_strategy,
         optimizer_strategy=optimizer_strategy,
         sentinel_execution_strategy=sentinel_execution_strategy,
@@ -184,16 +183,14 @@ if __name__ == "__main__":
         allow_mixtures=True,
         allow_rag_reduction=True,
         progress=progress,
-    )
-
-    data_record_collection = plan.run(
-        config=config,
         k=-1,
         j=-1,
         sample_budget=5*1014,
         seed=seed,
         exp_name=exp_name,
     )
+
+    data_record_collection = plan.run(config=config, train_dataset=train_dataset, validator=pz.Validator(None))
 
     print(data_record_collection.to_df())
     data_record_collection.to_df().to_csv(f"priors-data/{exp_name}-output.csv", index=False)

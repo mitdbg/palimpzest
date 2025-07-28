@@ -168,8 +168,8 @@ class Aggregate(LogicalOperator):
 class BaseScan(LogicalOperator):
     """A BaseScan is a logical operator that represents a scan of a particular root Dataset."""
 
-    def __init__(self, datasource: dataset.Dataset, output_schema: type[BaseModel]):
-        super().__init__(output_schema=output_schema)
+    def __init__(self, datasource: dataset.Dataset, output_schema: type[BaseModel], *args, **kwargs):
+        super().__init__(*args, output_schema=output_schema, **kwargs)
         self.datasource = datasource
 
     def __str__(self):
@@ -196,8 +196,8 @@ class BaseScan(LogicalOperator):
 class ContextScan(LogicalOperator):
     """A ContextScan is a logical operator that loads the context for a particular root Dataset."""
 
-    def __init__(self, context: context.Context, output_schema: type[BaseModel]):
-        super().__init__(output_schema=output_schema)
+    def __init__(self, context: context.Context, output_schema: type[BaseModel], *args, **kwargs):
+        super().__init__(*args, output_schema=output_schema, **kwargs)
         self.context = context
 
     def __str__(self):

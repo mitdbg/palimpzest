@@ -108,7 +108,7 @@ class AllSamplingExecutionStrategy(SentinelExecutionStrategy):
     def _get_source_indices(self):
         """Get the list of source indices which the sentinel plan should execute over."""
         # create list of all source indices and shuffle it
-        total_num_samples = len(self.val_datasource)
+        total_num_samples = len(self.train_dataset)
         source_indices = list(np.arange(total_num_samples))
 
         return source_indices
