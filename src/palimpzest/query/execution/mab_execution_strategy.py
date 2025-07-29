@@ -239,7 +239,7 @@ class OpFrontier:
         op_input_pairs = [
             (op, input)
             for op, source_idx in op_source_idx_pairs
-            for input in self.source_idx_to_input[source_idx]
+            for input in self.source_idx_to_input.get(source_idx, [])
         ]
 
         return op_input_pairs
