@@ -1,18 +1,18 @@
-import logging
-
 import numpy as np
 
+from palimpzest.core.data.dataset import Dataset
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.core.models import OperatorStats, SentinelPlanStats
 from palimpzest.policy import Policy
 from palimpzest.query.execution.execution_strategy import SentinelExecutionStrategy
-from palimpzest.query.operators.filter import FilterOp
+from palimpzest.query.operators.convert import LLMConvert
+from palimpzest.query.operators.filter import FilterOp, LLMFilter
 from palimpzest.query.operators.physical import PhysicalOperator
+from palimpzest.query.operators.retrieve import RetrieveOp
 from palimpzest.query.operators.scan import ContextScanOp, ScanPhysicalOp
 from palimpzest.query.optimizer.plan import SentinelPlan
 from palimpzest.utils.progress import create_progress_manager
 
-logger = logging.getLogger(__name__)
 
 class OpFrontier:
     """
@@ -236,6 +236,7 @@ class OpFrontier:
                     op_source_idx_pairs.append((op, source_idx))
 
         # fetch the corresponding (op, input) pairs
+
         op_input_pairs = [
             (op, input)
             for op, source_idx in op_source_idx_pairs
@@ -482,17 +483,73 @@ class OpFrontier:
             self.source_idx_to_input[source_idx] = input
 
 
-# TODO: post-submission we will need to modify this to:
-# - submit all inputs for aggregate operators
-# - handle limits
-class MABExecutionStrategy(SentinelExecutionStrategy):
-    """
-    This class implements the Multi-Armed Bandit (MAB) execution strategy for SentinelQueryProcessors.
+class ValidatorExecutionStrategy(SentinelExecutionStrategy):
+    def _compute_quality(self, record_set: DataRecordSet) -> DataRecordSet:
+        """
+        Compute the quality for the given `record_set` by comparing it to the `target_record_set`.
 
-    NOTE: the number of samples will slightly exceed the sample_budget if the number of operator
-    calls does not perfectly match the sample_budget. This may cause some minor discrepancies with
-    the progress manager as a result.
-    """
+        Update the record_set by assigning the quality to each entry in its record_op_stats and
+        returning the updated record_set.
+        """
+        # if this operation failed
+        if len(record_set) == 0:
+            record_set.record_op_stats[0].quality = 0.0
+            return record_set
+
+        # use validator to judge outputs
+        return self.validator.eval_fn(record_set)
+
+    def _score_quality(
+        self,
+        physical_op_cls: type[PhysicalOperator],
+        source_idx_to_record_sets: dict[int, list[DataRecordSet]],
+    ) -> dict[int, list[DataRecordSet]]:
+        """
+        NOTE: This approach to cost modeling does not work directly for aggregation queries;
+              for these queries, we would ask the user to provide validation data for the step immediately
+              before a final aggregation
+
+        NOTE: This function currently assumes that one-to-many converts do NOT create duplicate outputs.
+        This assumption would break if, for example, we extracted the breed of every dog in an image.
+        If there were two golden retrievers and a bernoodle in an image and we extracted:
+
+            {"image": "file1.png", "breed": "Golden Retriever"}
+            {"image": "file1.png", "breed": "Golden Retriever"}
+            {"image": "file1.png", "breed": "Bernedoodle"}
+
+        This function would currently give perfect accuracy to the following output:
+
+            {"image": "file1.png", "breed": "Golden Retriever"}
+            {"image": "file1.png", "breed": "Bernedoodle"}
+
+        Even though it is missing one of the golden retrievers.
+        """
+        # extract information about the logical operation performed at this stage of the sentinel plan;
+        # NOTE: we can infer these fields from context clues, but in the long-term we should have a more
+        #       principled way of getting these directly from attributes either stored in the sentinel_plan
+        #       or in the PhysicalOperator
+        is_perfect_quality_op = (
+            not issubclass(physical_op_cls, LLMConvert)
+            and not issubclass(physical_op_cls, LLMFilter)
+            and not issubclass(physical_op_cls, RetrieveOp)
+        )
+
+        # compute quality of each output computed by this operator
+        for _, record_sets in source_idx_to_record_sets.items():
+            # if this operation does not involve an LLM, every record_op_stats object gets perfect quality
+            if is_perfect_quality_op:
+                for record_set in record_sets:
+                    for record_op_stats in record_set.record_op_stats:
+                        record_op_stats.quality = 1.0
+                continue
+
+            # for each record_set produced by an operation, compute its quality
+            for record_set in record_sets:
+                record_set = self._compute_quality(record_set)
+
+        # return the quality annotated record sets
+        return source_idx_to_record_sets
+
     def _get_max_quality_op(self, logical_op_id: str, op_frontiers: dict[str, OpFrontier], plan_stats: SentinelPlanStats) -> PhysicalOperator:
         """
         Returns the operator in the frontier with the highest (estimated) quality.
@@ -520,13 +577,8 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
 
         return max_quality_op
 
-    def _execute_sentinel_plan(
-            self,
-            plan: SentinelPlan,
-            op_frontiers: dict[str, OpFrontier],
-            expected_outputs: dict[int, dict] | None,
-            plan_stats: SentinelPlanStats,
-        ) -> SentinelPlanStats:
+
+    def _execute_sentinel_plan(self, sentinel_plan: SentinelPlan, op_frontiers: dict[str, OpFrontier], plan_stats: SentinelPlanStats, dataset: Dataset) -> SentinelPlanStats:
         # sample records and operators and update the frontiers
         samples_drawn = 0
         while samples_drawn < self.sample_budget:
@@ -537,7 +589,7 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
                 source_indices_to_sample.update(source_indices)
 
             # execute operator sets in sequence
-            for op_idx, (logical_op_id, op_set) in enumerate(plan):
+            for op_idx, (logical_op_id, op_set) in enumerate(sentinel_plan):
                 # use the execution cache to determine the maximum quality operator for this logical_op_id
                 max_quality_op = self._get_max_quality_op(logical_op_id, op_frontiers, plan_stats)
 
@@ -554,10 +606,6 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
                 source_idx_to_record_set_tuples, num_llm_ops = self._execute_op_set(frontier_op_input_pairs)
                 samples_drawn += num_llm_ops
 
-                # FUTURE TODO: have this return the highest quality record set simply based on our posterior (or prior) belief on operator quality
-                # get the target record set for each source_idx
-                source_idx_to_target_record_set = self._get_target_record_sets(logical_op_id, source_idx_to_record_set_tuples, expected_outputs)
-
                 # FUTURE TODO: move this outside of the loop (i.e. assume we only get quality label(s) after executing full program)
                 # score the quality of each generated output
                 physical_op_cls = op_set[0].__class__
@@ -565,7 +613,7 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
                     source_idx: [record_set for record_set, _, _ in record_set_tuples]
                     for source_idx, record_set_tuples in source_idx_to_record_set_tuples.items()
                 }
-                source_idx_to_all_record_sets = self._score_quality(physical_op_cls, source_idx_to_all_record_sets, source_idx_to_target_record_set)
+                source_idx_to_all_record_sets = self._score_quality(physical_op_cls, source_idx_to_all_record_sets)
 
                 # flatten the lists of newly computed records and record_op_stats
                 source_idx_to_new_record_sets = {
@@ -581,8 +629,8 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
 
                 # FUTURE TODO: simply set input based on source_idx_to_target_record_set (b/c we won't have scores computed)
                 # provide the champion record sets as inputs to the next logical operator
-                if op_idx + 1 < len(plan):
-                    next_logical_op_id = plan.logical_op_ids[op_idx + 1]
+                if op_idx + 1 < len(sentinel_plan):
+                    next_logical_op_id = sentinel_plan.logical_op_ids[op_idx + 1]
                     op_frontiers[next_logical_op_id].update_inputs(source_idx_to_all_record_sets)
 
                 # update the (pareto) frontier for each set of operators
@@ -595,30 +643,29 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
 
         return plan_stats
 
-
-    def execute_sentinel_plan(self, plan: SentinelPlan, expected_outputs: dict[int, dict] | None):
-        # for now, assert that the first operator in the plan is a ScanPhysicalOp
-        assert all(isinstance(op, (ContextScanOp, ScanPhysicalOp)) for op in plan.operator_sets[0]), "First operator in physical plan must be a scan operator"
-        logger.info(f"Executing plan {plan.plan_id} with {self.max_workers} workers")
-        logger.info(f"Plan Details: {plan}")
-
+    def execute_sentinel_plan(self, sentinel_plan: SentinelPlan, dataset: Dataset) -> SentinelPlanStats:
         # initialize plan stats
-        plan_stats = SentinelPlanStats.from_plan(plan)
+        plan_stats = SentinelPlanStats.from_plan(sentinel_plan)
         plan_stats.start()
 
+        # TODO: join
+        source_dataset = dataset._sources[0]
+        while not source_dataset.is_root:
+            source_dataset = source_dataset._sources[0]
+
         # shuffle the indices of records to sample
-        total_num_samples = len(self.train_dataset)
+        total_num_samples = len(source_dataset)
         shuffled_source_indices = [int(idx) for idx in np.arange(total_num_samples)]
         self.rng.shuffle(shuffled_source_indices)
 
         # initialize frontier for each logical operator
         op_frontiers = {
             logical_op_id: OpFrontier(op_set, shuffled_source_indices, self.k, self.j, self.seed, self.policy, self.priors)
-            for logical_op_id, op_set in plan
+            for logical_op_id, op_set in sentinel_plan
         }
 
         # initialize and start the progress manager
-        self.progress_manager = create_progress_manager(plan, sample_budget=self.sample_budget, progress=self.progress)
+        self.progress_manager = create_progress_manager(sentinel_plan, sample_budget=self.sample_budget, progress=self.progress)
         self.progress_manager.start()
 
         # NOTE: we must handle progress manager outside of _exeecute_sentinel_plan to ensure that it is shut down correctly;
@@ -626,13 +673,11 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
         #       the progress manager cannot get a handle to the console 
         try:
             # execute sentinel plan by sampling records and operators
-            plan_stats = self._execute_sentinel_plan(plan, op_frontiers, expected_outputs, plan_stats)
+            plan_stats = self._execute_sentinel_plan(sentinel_plan, op_frontiers, plan_stats, dataset)
 
         finally:
             # finish progress tracking
             self.progress_manager.finish()
 
-        logger.info(f"Done executing sentinel plan: {plan.plan_id}")
-        logger.debug(f"Plan stats: (plan_cost={plan_stats.total_plan_cost}, plan_time={plan_stats.total_plan_time})")
-
         return plan_stats
+

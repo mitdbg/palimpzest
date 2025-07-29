@@ -317,6 +317,7 @@ class DataRecordSet:
             data_records: list[DataRecord],
             record_op_stats: list[RecordOpStats],
             field_to_score_fn: dict[str, str | callable] | None = None,
+            input_data_record: DataRecord | None = None,
         ):
         # check that all data_records are derived from the same parent record
         if len(data_records) > 0:
@@ -330,6 +331,7 @@ class DataRecordSet:
         self.parent_id = data_records[0].parent_id if len(data_records) > 0 else None
         self.source_idx = data_records[0].source_idx if len(data_records) > 0 else None
         self.schema = data_records[0].schema if len(data_records) > 0 else None
+        self.input_data_record = input_data_record
 
         # set statistics for generating these records
         self.record_op_stats = record_op_stats

@@ -1,5 +1,13 @@
 # from abc import ABC, abstractmethod
+import json
 from typing import Callable
+
+import litellm
+
+from palimpzest.constants import Cardinality, Model, PromptStrategy
+from palimpzest.core.elements.records import DataRecordSet
+from palimpzest.prompts import VALIDATOR_PROMPT, PromptFactory
+from palimpzest.query.generators.generators import get_json_from_answer
 
 
 class BaseValidator:
@@ -16,8 +24,58 @@ class BaseValidator:
     TODO: allow Validator to come with its own source Dataset(s)
     TODO: try to eliminate need for source_idx
     """
-    def __init__(self, eval_fn: Callable) -> None:
-        self.eval_fn = eval_fn
+    def __init__(self, eval_fn: Callable | None = None) -> None:
+        self.eval_fn = self.default_eval_fn if eval_fn is None else eval_fn
+
+    def default_eval_fn(self, record_set: DataRecordSet) -> DataRecordSet:
+        """
+        Compute the quality for each record_op_stats object in the given record_set.
+        """
+        # TODO: COT_BOOL_IMAGE; COT_QA_IMAGE; Cardinality and Model
+        # isolate the record_op_stats
+        record_op_stats = record_set.record_op_stats
+
+        # create prompt factory
+        prompt_strategy = PromptStrategy.COT_BOOL if record_op_stats[0].generated_fields is None else PromptStrategy.COT_QA
+        factory = PromptFactory(prompt_strategy, Model.GPT_4o, Cardinality.ONE_TO_ONE)
+
+        # get the input messages; strip out the system message(s)
+        output_fields = ["passed_operator"] if record_op_stats[0].generated_fields is None else record_set.record_op_stats[0].generated_fields
+        msg_kwargs = {"filter_condition": record_op_stats[0].filter_str} if record_op_stats[0].generated_fields is None else {"output_schema": record_set.schema}
+        messages = factory.create_messages(record_set.input_data_record, output_fields, **msg_kwargs)
+        input_messages = [msg for msg in messages if msg["role"] != "system"]
+
+        outputs = []
+        for record_op_stats in record_set.record_op_stats:
+            output_dict = (
+                {"passed_operator": record_op_stats.passed_operator}
+                if record_op_stats.generated_fields is None
+                else {k: v for k, v in record_op_stats.record_state.items() if k in record_op_stats.generated_fields}
+            )
+            output_dict["record_id"] = record_op_stats.record_id
+            outputs.append(output_dict)
+
+        outputs = json.dumps(outputs, indent=2)
+        outputs_message = f"OUTPUTS:\n--------\n{outputs}\n\nEVALUATION: "
+
+        # invoke the judge
+        try:
+            val_messages = [{"role": "system", "content": VALIDATOR_PROMPT}] + input_messages + [{"role": "user", "content": outputs_message}]
+            completion = litellm.completion(model="openai/gpt-4o", messages=val_messages)
+            completion_text = completion.choices[0].message.content
+
+            # parse the evaluation
+            output: list[dict] = get_json_from_answer(completion_text, Model.GPT_4o, Cardinality.ONE_TO_MANY)
+            for record_eval_dict in output:
+                for record_op_stats in record_set.record_op_stats:
+                    if record_eval_dict["record_id"] == record_op_stats.record_id:
+                        record_eval_dict.pop("record_id")
+                        record_op_stats.quality = sum(record_eval_dict.values()) / len(record_eval_dict)
+        except:
+            for record_op_stats in record_set.record_op_stats:
+                record_op_stats.quality = 0.5
+
+        return record_set
 
 
 class Validator(BaseValidator):

@@ -51,12 +51,13 @@ if __name__ == "__main__":
         policy=pz.MaxQuality(),
         execution_strategy="parallel",
         k=5,
-        j=3,
-        sample_budget=50,
+        j=6,
+        sample_budget=100,
         max_workers=20,
         progress=True,
     )
-    output = plan.optimize_and_run(train_dataset=train_dataset, validator=pz.Validator(None), config=config)
+    # output = plan.optimize_and_run(train_dataset=train_dataset, validator=pz.Validator(None), config=config)
+    output = plan.optimize_and_run(train_dataset=None, validator=pz.Validator(None), config=config)
 
     # print output dataframe
     print(output.to_df())

@@ -425,6 +425,7 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
                 source_idx = get_source_idx(input)
 
                 # add record_set to mapping from source_idx --> record_sets
+                record_set.input_data_record = input
                 source_idx_to_record_sets_and_ops[source_idx].append((record_set, operator, True))
 
         return source_idx_to_record_sets_and_ops, num_llm_ops

@@ -21,13 +21,17 @@ class SentinelQueryProcessor(QueryProcessor):
         on each record.
         """
         # if we're using validation data, get the set of expected output records
-        expected_outputs = {}
-        for source_idx in range(len(self.train_dataset)):
-            expected_output = self.train_dataset[source_idx]
-            expected_outputs[source_idx] = expected_output
+        if self.train_dataset is not None:
+            expected_outputs = {}
+            for source_idx in range(len(self.train_dataset)):
+                expected_output = self.train_dataset[source_idx]
+                expected_outputs[source_idx] = expected_output
 
-        # execute sentinel plan; returns sentinel_plan_stats
-        return self.sentinel_execution_strategy.execute_sentinel_plan(sentinel_plan, expected_outputs)
+            # execute sentinel plan; returns sentinel_plan_stats
+            return self.sentinel_execution_strategy.execute_sentinel_plan(sentinel_plan, expected_outputs)
+
+        else:
+            return self.sentinel_execution_strategy.execute_sentinel_plan(sentinel_plan, self.dataset)
 
     def _create_sentinel_plan(self) -> SentinelPlan:
         """
@@ -39,7 +43,8 @@ class SentinelQueryProcessor(QueryProcessor):
 
         # create copy of dataset, but change its root Dataset(s) to the validation Dataset(s)
         dataset = self.dataset.copy()
-        dataset._set_data_source(self.train_dataset.id, self.train_dataset)
+        if self.train_dataset is not None:
+            dataset._set_data_source(self.train_dataset.id, self.train_dataset)
 
         # get the sentinel plan for the given dataset
         sentinel_plans = optimizer.optimize(dataset)
@@ -49,8 +54,7 @@ class SentinelQueryProcessor(QueryProcessor):
 
     def execute(self) -> DataRecordCollection:
         # for now, enforce that we are using validation data; we can relax this after paper submission
-        if self.train_dataset is None:
-            raise Exception("Make sure you are using validation data with SentinelQueryProcessor")
+        assert self.train_dataset is not None or self.validator is not None, "Make sure you are using validation data with SentinelQueryProcessor"
         logger.info(f"Executing {self.__class__.__name__}")
 
         # create execution stats

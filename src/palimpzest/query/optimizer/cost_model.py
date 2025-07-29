@@ -65,6 +65,11 @@ class SampleBasedCostModel:
             for full_op_id in full_op_id_to_stats
         ])
 
+        # if there is a logical operator with no samples; add all of its op ids to costed_full_op_ids;
+        # this will lead to the cost model applying the naive cost estimates for all physical op ids
+        # in this logical operator (I think?)
+        # TODO
+
         logger.info(f"Initialized SampleBasedCostModel with verbose={self.verbose}")
         logger.debug(f"Initialized SampleBasedCostModel with params: {self.__dict__}")
 
@@ -190,7 +195,9 @@ class SampleBasedCostModel:
 
     def __call__(self, operator: PhysicalOperator, source_op_estimates: OperatorCostEstimates | None = None) -> PlanCost:
         # for non-sentinel execution, we use naive estimates
-        if self.operator_to_stats is None:
+        full_op_id = operator.get_full_op_id()
+        logical_op_id = operator.logical_op_id
+        if self.operator_to_stats is None or logical_op_id not in self.operator_to_stats:
             return self._compute_naive_plan_cost(operator, source_op_estimates)
 
         # NOTE: some physical operators may not have any sample execution data in this cost model;
@@ -198,8 +205,6 @@ class SampleBasedCostModel:
         #       we will have execution data for each operator passed into __call__; nevertheless, we
         #       still perform a sanity check
         # look up physical and logical op ids associated with this physical operator
-        full_op_id = operator.get_full_op_id()
-        logical_op_id = operator.logical_op_id
         physical_op_to_stats = self.operator_to_stats.get(logical_op_id)
         assert physical_op_to_stats is not None, f"No execution data for logical operator: {str(operator)}"
         assert physical_op_to_stats.get(full_op_id) is not None, f"No execution data for physical operator: {str(operator)}"

@@ -10,6 +10,7 @@ from palimpzest.query.execution.single_threaded_execution_strategy import (
     PipelinedSingleThreadExecutionStrategy,
     SequentialSingleThreadExecutionStrategy,
 )
+from palimpzest.query.execution.validator_execution_strategy import ValidatorExecutionStrategy
 
 
 class ExecutionStrategyType(Enum):
@@ -22,3 +23,4 @@ class ExecutionStrategyType(Enum):
 class SentinelExecutionStrategyType(Enum):
     MAB = MABExecutionStrategy
     ALL = AllSamplingExecutionStrategy
+    VALIDATOR = ValidatorExecutionStrategy

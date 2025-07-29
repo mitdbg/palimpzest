@@ -7,6 +7,7 @@ from typing import Callable
 
 import pandas as pd
 from pydantic import BaseModel
+from smolagents import CodeAgent, LiteLLMModel
 
 from palimpzest.core.data import context_manager
 from palimpzest.core.data.dataset import Dataset
@@ -14,6 +15,99 @@ from palimpzest.core.lib.schemas import create_schema_from_fields, union_schemas
 from palimpzest.query.operators.logical import ComputeOperator, ContextScan, LogicalOperator, SearchOperator
 from palimpzest.utils.hash_helpers import hash_for_id
 
+PZ_INSTRUCTION = """\n\nYou are a CodeAgent who is a specialist at writing declarative AI programs with the Palimpzest (PZ) library.
+
+Palimpzest is a programming framework which provides you with **semantic operators** (e.g. semantic maps, semantic filters, etc.)
+which are like their traditional counterparts, except they can execute instructions provided in natural language.
+
+For example, if you wanted to write a program to extract the title and abstract from a directory of papers,
+you could write the following in PZ:
+```
+import palimpzest as pz
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Define columns for semantic map (sem_add_columns) operation; each column is specified
+# with a dictionary containing the following keys:
+# - "name": the name of the field to compute
+# - "type": the type of the field to compute
+# - "description": the natural language description of the field
+paper_cols = [
+    {"name": "title", "type": str, "description": "the title of the paper"},
+    {"name": "abstract", "type": str, "description": "the paper's abstract"},
+]
+
+# construct the data processing pipeline with PZ
+ds = pz.TextFileDataset(id="papers", path="path/to/papers")
+ds = ds.sem_add_columns(cols)
+
+# optimize and execute the PZ program
+validator = pz.Validator()
+config = pz.QueryProcessorConfig(
+    policy=pz.MaxQuality(),
+    execution_strategy="parallel",
+    max_workers=20,
+    progress=True,
+)
+output = ds.optimize_and_run(config=config, validator=validator)
+
+# write the output to a CSV and print the output CSV filepath so the user knows where to find it
+output_filepath = "pz_program_output.csv"
+output.to_df().to_csv(output_filepath, index=False)
+print(f"Results at: {output_filepath}")
+```
+
+To initialize a dataset in PZ, simply provide the path to a directory to `pz.TextFileDirectory()`
+(if your data contains text-based files). For example:
+```
+import palimpzest as pz
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+ds = pz.TextFileDataset(id="files", path="path/to/files")
+```
+
+Palimpzest has two primary **semantic operators** which you can use to construct data processing pipelines:
+- sem_filter(predicate: str): executes a semantic filter specified by the natural language predicate on a given PZ dataset
+- sem_add_columns(cols: list[dict]): executes a semantic map to compute the `cols` on a given PZ dataset
+
+As a second example, consider the following PZ program which filters for papers about batteries that are from MIT
+and computes a summary for each one:
+```
+import palimpzest as pz
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+# construct the PZ program
+ds = pz.TextFileDataset(id="papers", path="path/to/research-papers")
+ds = ds.sem_filter("The paper is about batteries")
+ds = ds.sem_filter("The paper is from MIT")
+ds = ds.sem_add_columns([{"name": "summary", "type": str, "description": "A summary of the paper"}])
+
+# optimize and execute the PZ program
+validator = pz.Validator()
+config = pz.QueryProcessorConfig(
+    policy=pz.MaxQuality(),
+    execution_strategy="parallel",
+    max_workers=20,
+    progress=True,
+)
+output = ds.optimize_and_run(config=config, validator=validator)
+
+# write the output to a CSV and print the output CSV filepath so the user knows where to find it
+output_filepath = "pz_program_output.csv"
+output.to_df().to_csv(output_filepath, index=False)
+print(f"Results at: {output_filepath}")
+```
+
+Be sure to always execute your program using the `.optimize_and_run()` format shown above and always write your output to CSV and print where you wrote it!
+"""
 
 class Context(Dataset, ABC):
     """
@@ -211,33 +305,83 @@ class TextFileContext(Context):
 
         return field_answers
 
-    def tool_list_filepaths(self) -> list[str]:
-        """
-        This tool returns the list of all of the filepaths which the `Context` has access to.
+    # def tool_list_filepaths(self) -> list[str]:
+    #     """
+    #     This tool returns the list of all of the filepaths which the `Context` has access to.
 
-        Args:
-            None
+    #     Args:
+    #         None
         
-        Returns:
-            list[str]: A list of file paths for all files in the `Context`.
-        """
-        return self.filepaths
+    #     Returns:
+    #         list[str]: A list of file paths for all files in the `Context`.
+    #     """
+    #     return self.filepaths
 
-    def tool_read_filepath(self, path: str) -> str:
+    # def tool_read_filepath(self, path: str) -> str:
+    #     """
+    #     This tool takes a filepath (`path`) as input and returns the content of the file as a string.
+    #     It handles both CSV files and html / regular text files. It does not handle images.
+
+    #     Args:
+    #         path (str): The path to the file to read.
+
+    #     Returns:
+    #         str: The content of the file as a string.
+    #     """
+    #     if path.endswith(".csv"):
+    #         return pd.read_csv(path, encoding="ISO-8859-1").to_string(index=False)
+
+    #     with open(path, encoding='utf-8') as file:
+    #         content = file.read()
+
+    #     return content
+
+    def tool_execute_semantic_operators(self, instruction: str) -> str:
         """
-        This tool takes a filepath (`path`) as input and returns the content of the file as a string.
-        It handles both CSV files and html / regular text files. It does not handle images.
+        This tool takes an `instruction` as input and invokes an expert to write a semantic data processing pipeline
+        to execute the instruction. The tool returns the path to a CSV file which contains the output of the pipeline.
+
+        For example, the tool could be invoked as follows to extract the title and abstract from a dataset of research papers:
+        ```
+        instruction = "Write a program to extract the title and abstract from each research paper"
+        result_csv_filepath = tool_execute_semantic_operators(instruction)
+        ```
 
         Args:
-            path (str): The path to the file to read.
+            dir: The path to the directory containing the data to process
+            instruction: The instruction specifying the semantic data processing pipeline that you need to execute.
 
         Returns:
-            str: The content of the file as a string.
+            str: the filepath to the CSV containing the output from running the data processing pipeline.
         """
-        if path.endswith(".csv"):
-            return pd.read_csv(path, encoding="ISO-8859-1").to_string(index=False)
+        from smolagents import tool
+        @tool
+        def tool_list_filepaths() -> list[str]:
+            """
+            This tool returns the list of all of the filepaths which the `Context` has access to.
 
-        with open(path, encoding='utf-8') as file:
-            content = file.read()
+            NOTE: You may want to execute this before writing your PZ program to determine where the data lives.
 
-        return content
+            Args:
+                None
+            
+            Returns:
+                list[str]: A list of file paths for all files in the `Context`.
+            """
+            return self.filepaths
+
+        agent = CodeAgent(
+            model=LiteLLMModel(model_id="anthropic/claude-3-7-sonnet-20250219", api_key=os.getenv("ANTHROPIC_API_KEY")),
+            tools=[tool_list_filepaths],
+            max_steps=20,
+            planning_interval=4,
+            add_base_tools=False,
+            return_full_result=True,
+            additional_authorized_imports=["dotenv", "palimpzest"],
+            instructions=PZ_INSTRUCTION,
+        )
+        full_instr = f"Data dir: {dir}\nInstruction: {instruction}"
+        result = agent.run(full_instr)
+        response = result.output
+
+        return response

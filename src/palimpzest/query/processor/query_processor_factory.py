@@ -65,14 +65,15 @@ class QueryProcessorFactory:
             config.verbose = False
 
         # boolean flag for whether we're performing optimization or not
-        optimization = train_dataset is not None and validator is not None
+        optimization = train_dataset is not None or validator is not None
+        val_based_opt = train_dataset is None and validator is not None
 
         # handle "auto" defaults for processing and sentinel execution strategies
         if config.processing_strategy == "auto":
             config.processing_strategy = "sentinel" if optimization else "no_sentinel"
 
         if config.sentinel_execution_strategy == "auto":
-            config.sentinel_execution_strategy = "mab" if optimization else None
+            config.sentinel_execution_strategy = ("validator" if val_based_opt else "mab") if optimization else None
 
         # convert the config values for processing, execution, and optimization strategies to enums
         config = cls._normalize_strategies(config)
@@ -83,7 +84,7 @@ class QueryProcessorFactory:
 
         # check that validation data is provided for sentinel execution
         if not optimization and config.processing_strategy.is_sentinel_strategy():
-            raise ValueError("`train_dataset` is required for SENTINEL processing strategies")
+            raise ValueError("`train_dataset` and/or `validator` is required for SENTINEL processing strategies")
 
         # check that sentinel execution is provided for sentinel processor
         if config.sentinel_execution_strategy is None and config.processing_strategy.is_sentinel_strategy():
