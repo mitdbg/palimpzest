@@ -3,11 +3,12 @@ import json
 import os
 
 import pandas as pd
-from colorama import Fore, Style
+
+# from colorama import Fore, Style
 from pydantic import BaseModel, Field
 from smolagents import CodeAgent, LiteLLMModel, tool
 
-# import palimpzest as pz
+import palimpzest as pz
 from palimpzest.constants import Model, PromptStrategy
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.lib.schemas import TextFile, create_schema_from_fields
@@ -170,15 +171,16 @@ def run_agents(model_id="anthropic/claude-3-5-sonnet-latest", api_key=None):
     return response, input_tokens, output_tokens, input_cost, output_cost
 
 
-# def run_pz():
-#     ds = pz.Dataset("testdata/enron-eval-medium")
-#     ds = ds.search(
-#         "The list of emails which refer to the Raptor, Deathstar, Chewco, and/or Fat Boy investments, that are not quoting articles or other sources outside of Enron"
-#     )
-#     ds = ds.compute(
-#         "The sender and subject of each email"
-#     )
-#     return ds.run()
+def run_pz():
+    ds = pz.TextFileContext("testdata/enron-eval-medium", "enron-data", "250 emails from Enron employees")
+    ds = ds.compute(
+        "Compute the sender, subject, and summary of every email which refers to the Raptor, Deathstar, Chewco, and/or Fat Boy investments, and is not quoting articles or other sources outside of Enron"
+    )
+    config = pz.QueryProcessorConfig(
+        policy=pz.MaxQuality(),
+        progress=False,
+    )
+    return ds.run(config=config)
 
 
 if __name__ == "__main__":
@@ -188,9 +190,9 @@ if __name__ == "__main__":
 
     # execute script
     if args.mode == "pz":
-        # output = run_pz()
-        # output.to_df().to_csv("pz-email-output.csv", index=False)
-        pass
+        output = run_pz()
+        output.to_df().to_csv("pz-email-output.csv", index=False)
+
     else:
         response, input_tokens, output_tokens, input_cost, output_cost = run_agents(model_id="openai/gpt-4o", api_key=os.getenv("OPENAI_API_KEY"))
         response_dict = {
