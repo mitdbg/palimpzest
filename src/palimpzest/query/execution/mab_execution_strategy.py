@@ -2,13 +2,13 @@ import logging
 
 import numpy as np
 
-from palimpzest.core.data.dataclasses import OperatorStats, SentinelPlanStats
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
+from palimpzest.core.models import OperatorStats, SentinelPlanStats
 from palimpzest.policy import Policy
 from palimpzest.query.execution.execution_strategy import SentinelExecutionStrategy
 from palimpzest.query.operators.filter import FilterOp
 from palimpzest.query.operators.physical import PhysicalOperator
-from palimpzest.query.operators.scan import ScanPhysicalOp
+from palimpzest.query.operators.scan import ContextScanOp, ScanPhysicalOp
 from palimpzest.query.optimizer.plan import SentinelPlan
 from palimpzest.utils.progress import create_progress_manager
 
@@ -50,7 +50,7 @@ class OpFrontier:
         self.full_op_id_to_sources_processed = {op.get_full_op_id(): set() for op in op_set}
 
         # set the initial inputs for this logical operator
-        is_scan_op = isinstance(op_set[0], ScanPhysicalOp)
+        is_scan_op = isinstance(op_set[0], (ContextScanOp, ScanPhysicalOp))
         self.source_idx_to_input = {source_idx: [source_idx] for source_idx in self.source_indices} if is_scan_op else {}
 
         # boolean indication of whether this is a logical filter
@@ -579,9 +579,6 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
                 # update plan stats
                 plan_stats.add_record_op_stats(new_record_op_stats)
 
-                # add records (which are not filtered) to the cache, if allowed
-                self._add_records_to_cache(logical_op_id, new_records)
-
                 # FUTURE TODO: simply set input based on source_idx_to_target_record_set (b/c we won't have scores computed)
                 # provide the champion record sets as inputs to the next logical operator
                 if op_idx + 1 < len(plan):
@@ -593,9 +590,6 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
 
             # FUTURE TODO: score op quality based on final outputs
 
-        # close the cache
-        self._close_cache(plan.logical_op_ids)
-
         # finalize plan stats
         plan_stats.finish()
 
@@ -604,7 +598,7 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
 
     def execute_sentinel_plan(self, plan: SentinelPlan, expected_outputs: dict[int, dict] | None):
         # for now, assert that the first operator in the plan is a ScanPhysicalOp
-        assert all(isinstance(op, ScanPhysicalOp) for op in plan.operator_sets[0]), "First operator in physical plan must be a ScanPhysicalOp"
+        assert all(isinstance(op, (ContextScanOp, ScanPhysicalOp)) for op in plan.operator_sets[0]), "First operator in physical plan must be a scan operator"
         logger.info(f"Executing plan {plan.plan_id} with {self.max_workers} workers")
         logger.info(f"Plan Details: {plan}")
 

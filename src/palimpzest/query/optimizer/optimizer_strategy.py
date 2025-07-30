@@ -49,7 +49,7 @@ class GreedyStrategy(OptimizationStrategy):
         # get the best physical expression for this group
         best_phys_expr = groups[group_id].best_physical_expression
 
-        # if this expression has no inputs (i.e. it is a BaseScan or CacheScan),
+        # if this expression has no inputs (i.e. it is a BaseScan),
         # create and return the physical plan
         if len(best_phys_expr.input_group_ids) == 0:
             return PhysicalPlan(operators=[best_phys_expr.operator], plan_cost=best_phys_expr.plan_cost)
@@ -85,7 +85,7 @@ class ParetoStrategy(OptimizationStrategy):
         # construct list of pareto optimal plans
         pareto_optimal_plans = []
         for phys_expr in pareto_optimal_phys_exprs:
-            # if this expression has no inputs (i.e. it is a BaseScan or CacheScan),
+            # if this expression has no inputs (i.e. it is a BaseScan),
             # create and return the physical plan
             if len(phys_expr.input_group_ids) == 0:
                 for plan_cost, _ in phys_expr.pareto_optimal_plan_costs:
@@ -150,7 +150,7 @@ class SentinelStrategy(OptimizationStrategy):
         phys_exprs = groups[group_id].physical_expressions
         phys_op_set = [expr.operator for expr in phys_exprs]
 
-        # if this expression has no inputs (i.e. it is a BaseScan or CacheScan),
+        # if this expression has no inputs (i.e. it is a BaseScan),
         # create and return the physical plan
         best_phys_expr = groups[group_id].best_physical_expression
         if len(best_phys_expr.input_group_ids) == 0:

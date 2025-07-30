@@ -10,7 +10,6 @@ import pandas as pd
 
 import palimpzest as pz
 from palimpzest.constants import Model
-from palimpzest.core.lib.fields import ListField, StringField
 
 cuad_categories = [
     {
@@ -395,7 +394,7 @@ def compute_precision_recall(label_df, preds_df):
 
     return precision, recall
 
-class CUADDataReader(pz.DataReader):
+class CUADDataset(pz.IterDataset):
     def __init__(self, num_contracts: int = 1, split: str = "train", seed: int=42):
         self.num_contracts = num_contracts
         self.split = split
@@ -518,7 +517,7 @@ def build_cuad_query(dataset, mode):
             desc = (
                 f"Extract the text spans (if they exist) from the contract corresponding to {category['Description']}"
             )
-            cols.append({"name": category["Category"], "type": ListField(StringField), "desc": desc})
+            cols.append({"name": category["Category"], "type": list[str], "desc": desc})
 
         desc = "Extract the text spans (if they exist) from the contract."
         ds = ds.sem_add_columns(cols, desc=desc, depends_on=["contract"])
@@ -528,7 +527,7 @@ def build_cuad_query(dataset, mode):
                 f"Extract the text spans (if they exist) from the contract corresponding to {category['Description']}"
             )
             ds = ds.sem_add_columns(
-                [{"name": category["Category"], "type": ListField(StringField), "desc": desc}],
+                [{"name": category["Category"], "type": list[str], "desc": desc}],
                 desc=category["Description"],
                 depends_on=["contract"],
             )
@@ -537,8 +536,8 @@ def build_cuad_query(dataset, mode):
 
 
 def main():
-    if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None:
-        print("WARNING: Both OPENAI_API_KEY and TOGETHER_API_KEY are unset")
+    if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None and os.getenv("ANTHROPIC_API_KEY") is None:
+        print("WARNING: OPENAI_API_KEY, TOGETHER_API_KEY, and ANTHROPIC_API_KEY are unset")
 
     args = parse_arguments()
 
@@ -546,12 +545,12 @@ def main():
     os.makedirs("opt-profiling-data", exist_ok=True)
 
     # Create a data reader for the CUAD dataset
-    data_reader = CUADDataReader(split="test", num_contracts=1)
-    val_data_reader = CUADDataReader(split="train", num_contracts=5)
+    dataset = CUADDataset(split="test", num_contracts=1)
+    val_datasource = CUADDataset(split="train", num_contracts=5)
     print("Created data reader")
 
     # Build and run the CUAD query
-    query = build_cuad_query(data_reader, args.mode)
+    query = build_cuad_query(dataset, args.mode)
     print("Built query; Starting query execution")
 
     processing_strategy = "sentinel"
@@ -560,7 +559,7 @@ def main():
     optimizer_strategy = "pareto"
     config = pz.QueryProcessorConfig(
         verbose=False,
-        val_datasource=val_data_reader,
+        val_datasource=val_datasource,
         processing_strategy=processing_strategy,
         optimizer_strategy=optimizer_strategy,
         sentinel_execution_strategy=sentinel_execution_strategy,
@@ -578,7 +577,6 @@ def main():
             Model.DEEPSEEK_R1_DISTILL_QWEN_1_5B,
         ],
         allow_bonded_query=True,
-        allow_code_synth=False,
         allow_critic=True,
         allow_mixtures=True,
         allow_rag_reduction=True,

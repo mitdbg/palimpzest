@@ -17,7 +17,7 @@ from chromadb.utils.embedding_functions.openai_embedding_function import (
 
 import palimpzest as pz
 from palimpzest.constants import Model
-from palimpzest.core.lib.fields import ImageBase64Field, ListField
+from palimpzest.core.lib.schemas import ImageBase64
 
 mmqa_entry_cols = [
     {"name": "qid", "type": str, "desc": "The id of the MMQA question"},
@@ -36,7 +36,7 @@ mmqa_table_cols = [
 
 mmqa_image_cols = [
     {"name": "supporting_image_ids", "type": list[str], "desc": "A list of image ids whose images may support the question."},
-    {"name": "supporting_images", "type": ListField(ImageBase64Field), "desc": "A list of images which may support the question."},
+    {"name": "supporting_images", "type": list[ImageBase64], "desc": "A list of images which may support the question."},
 ]
 
 mmqa_answer_cols = [
@@ -79,7 +79,7 @@ def get_json_from_answer(answer: str):
     return json.loads(answer)
 
 
-class MMQAReader(pz.DataReader):
+class MMQADataset(pz.IterDataset):
     def __init__(
         self,
         num_samples: int = 5,
@@ -223,10 +223,10 @@ class MMQAReader(pz.DataReader):
             item["labels"] = self.compute_label(entry)
 
             # add scoring functions for list fields
-            item["score_fn"]["answers"] = MMQAReader.f1
-            item["score_fn"]["supporting_text_ids"] = MMQAReader.recall
-            item["score_fn"]["supporting_table_ids"] = MMQAReader.recall
-            item["score_fn"]["supporting_image_ids"] = MMQAReader.recall
+            item["score_fn"]["answers"] = MMQADataset.f1
+            item["score_fn"]["supporting_text_ids"] = MMQADataset.recall
+            item["score_fn"]["supporting_table_ids"] = MMQADataset.recall
+            item["score_fn"]["supporting_image_ids"] = MMQADataset.recall
 
         return item
 
@@ -381,11 +381,11 @@ if __name__ == "__main__":
         policy = pz.MinTimeAtFixedQuality(min_quality=args.quality)
     print(f"USING POLICY: {policy}")
 
-    if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None:
-        print("WARNING: Both OPENAI_API_KEY and TOGETHER_API_KEY are unset")
+    if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None and os.getenv("ANTHROPIC_API_KEY") is None:
+        print("WARNING: OPENAI_API_KEY, TOGETHER_API_KEY, and ANTHROPIC_API_KEY are unset")
 
     # create data source
-    datareader = MMQAReader(
+    dataset = MMQADataset(
         split="dev",
         num_samples=100,
         shuffle=True,
@@ -393,7 +393,7 @@ if __name__ == "__main__":
     )
 
     # create validation data source
-    val_datasource = MMQAReader(
+    val_datasource = MMQADataset(
         split="train",
         num_samples=val_examples,
         shuffle=True,
@@ -473,7 +473,7 @@ if __name__ == "__main__":
         return {"supporting_images": results, "supporting_image_ids": result_ids}
 
     # construct plan
-    plan = pz.Dataset(datareader)
+    plan = pz.Dataset(dataset)
     plan = plan.retrieve(
         index=text_index,
         search_func=text_search_func,
@@ -497,7 +497,6 @@ if __name__ == "__main__":
     # execute pz plan
     config = pz.QueryProcessorConfig(
         policy=policy,
-        cache=False,
         val_datasource=val_datasource,
         processing_strategy=processing_strategy,
         optimizer_strategy="pareto",
@@ -510,7 +509,6 @@ if __name__ == "__main__":
             Model.GPT_4o_MINI,
         ],
         allow_bonded_query=True,
-        allow_code_synth=False,
         allow_critic=True,
         allow_mixtures=True,
         allow_rag_reduction=True,

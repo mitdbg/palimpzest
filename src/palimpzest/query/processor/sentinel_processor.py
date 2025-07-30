@@ -1,7 +1,7 @@
 import logging
 
-from palimpzest.core.data.dataclasses import ExecutionStats, SentinelPlanStats
 from palimpzest.core.elements.records import DataRecordCollection
+from palimpzest.core.models import ExecutionStats, SentinelPlanStats
 from palimpzest.query.optimizer.cost_model import SampleBasedCostModel
 from palimpzest.query.optimizer.optimizer_strategy_type import OptimizationStrategyType
 from palimpzest.query.optimizer.plan import SentinelPlan
@@ -37,7 +37,7 @@ class SentinelQueryProcessor(QueryProcessor):
         optimizer = self.optimizer.deepcopy_clean()
         optimizer.update_strategy(OptimizationStrategyType.SENTINEL)
 
-        # create copy of dataset, but change its data source to the validation data source
+        # create copy of dataset, but change its root Dataset(s) to the validation Dataset(s)
         dataset = self.dataset.copy()
         dataset._set_data_source(self.val_datasource)
 

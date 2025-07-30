@@ -1,11 +1,6 @@
 import pytest
 
 from palimpzest.policy import MaxQuality
-from palimpzest.query.execution.parallel_execution_strategy import (
-    ParallelExecutionStrategy,
-)
-from palimpzest.query.execution.single_threaded_execution_strategy import SequentialSingleThreadExecutionStrategy
-from palimpzest.query.operators.code_synthesis_convert import CodeSynthesisConvert
 from palimpzest.query.operators.convert import LLMConvertBonded
 from palimpzest.query.operators.filter import LLMFilter
 from palimpzest.query.operators.rag_convert import RAGConvert
@@ -16,27 +11,22 @@ from palimpzest.query.processor.query_processor_factory import QueryProcessorFac
 @pytest.mark.parametrize(
     argnames=("execution_strategy",),
     argvalues=[
-        pytest.param(SequentialSingleThreadExecutionStrategy, id="seq-single-thread"),
-        pytest.param(ParallelExecutionStrategy, id="parallel"),
+        pytest.param("sequential", id="seq-single-thread"),
+        pytest.param("pipelined", id="pipelined-single-thread"),
+        pytest.param("parallel", id="parallel"),
+        pytest.param("sequential_parallel", id="seq-parallel")
     ]
 )
-class TestParallelExecutionNoCache:
+class TestExecution:
 
     @pytest.mark.parametrize(
-        argnames=("datareader", "physical_plan", "expected_records", "side_effect"),
+        argnames=("dataset", "physical_plan", "expected_records", "side_effect"),
         argvalues=[
             pytest.param("enron-eval-tiny", "scan-only", "enron-all-records", None, id="scan-only"),
             pytest.param("enron-eval-tiny", "non-llm-filter", "enron-filtered-records", None, id="non-llm-filter"),
             pytest.param("enron-eval-tiny", "llm-filter", "enron-filtered-records", "enron-filter", id="llm-filter"),
             pytest.param(
                 "enron-eval-tiny", "bonded-llm-convert", "enron-all-records", "enron-convert", id="bonded-llm-convert"
-            ),
-            pytest.param(
-                "enron-eval-tiny", 
-                "code-synth-convert",
-                "enron-all-records",
-                "enron-convert",
-                id="code-synth-convert"
             ),
             pytest.param(
                 "enron-eval-tiny", 
@@ -62,19 +52,17 @@ class TestParallelExecutionNoCache:
         ],
         indirect=True,
     )
-    def test_execute_full_plan(self, mocker, execution_strategy, datareader, physical_plan, expected_records, side_effect):
+    def test_execute_full_plan(self, mocker, execution_strategy, dataset, physical_plan, expected_records, side_effect):
         """
         This test executes the given
         """
-        # NOTE: supplying datareader in place of dataset is a bit of a band-aid but it works
         # create processor
-        config = QueryProcessorConfig(processing_strategy="no_sentinel", policy=MaxQuality())
-        processor = QueryProcessorFactory.create_processor(datareader, config)
+        config = QueryProcessorConfig(processing_strategy="no_sentinel", execution_strategy=execution_strategy, policy=MaxQuality())
+        processor = QueryProcessorFactory.create_processor(dataset, config)
 
         # mock out calls to generators used by the plans which parameterize this test
         mocker.patch.object(LLMFilter, "filter", side_effect=side_effect)
         mocker.patch.object(LLMConvertBonded, "convert", side_effect=side_effect)
-        mocker.patch.object(CodeSynthesisConvert, "convert", side_effect=side_effect)
         mocker.patch.object(RAGConvert, "convert", side_effect=side_effect)
 
         # execute the plan
@@ -82,7 +70,7 @@ class TestParallelExecutionNoCache:
 
         # check that we get the expected set of output records
         def get_id(record):
-            return record.listing if "RealEstate" in datareader.__class__.__name__ else record.filename
+            return record.listing if "RealEstate" in dataset.__class__.__name__ else record.filename
 
         assert len(output_records) == len(expected_records)
         assert sorted(map(get_id, output_records)) == sorted(map(get_id, expected_records))

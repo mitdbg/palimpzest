@@ -1,7 +1,7 @@
 import logging
 
-from palimpzest.core.data.dataclasses import ExecutionStats
 from palimpzest.core.elements.records import DataRecordCollection
+from palimpzest.core.models import ExecutionStats
 from palimpzest.query.processor.query_processor import QueryProcessor
 
 logger = logging.getLogger(__name__)
@@ -11,7 +11,6 @@ class NoSentinelQueryProcessor(QueryProcessor):
     Query processor that uses naive cost estimates to select the best plan.
     """
 
-    # TODO: Consider to support dry_run.
     def execute(self) -> DataRecordCollection:
         logger.info("Executing NoSentinelQueryProcessor")
 

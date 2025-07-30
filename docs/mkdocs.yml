@@ -12,15 +12,16 @@ nav:
 
   - User Guide:
     - user-guide/overview.md
-    - How to Read Your Own Data: user-guide/datareaders.md
+    - Defining Your Own Dataset: user-guide/dataset.md
     - PZ Operator Overview: user-guide/operators.md
     - Getting Started with Optimization: user-guide/optimization.md
 
   - Documentation:
     - api/overview.md
-    - Dataset: api/dataset.md
     - Data:
-      - DataReader: api/data/datareader.md
+      - Dataset: api/data/dataset.md
+      - IterDataset: api/data/iter-dataset.md
+      - Context: api/data/context.md
       - DataRecord: api/data/datarecord.md
       - DataRecordCollection: api/data/datarecordcollection.md
     - Operators:

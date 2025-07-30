@@ -5,19 +5,21 @@ from collections.abc import Generator
 from typing import Any
 
 import pandas as pd
+from pydantic import BaseModel
+from pydantic.fields import FieldInfo
 
-from palimpzest.core.data.dataclasses import ExecutionStats, PlanStats, RecordOpStats
-from palimpzest.core.lib.fields import Field
-from palimpzest.core.lib.schemas import Schema
+from palimpzest.core.data import context
+from palimpzest.core.lib.schemas import ImageBase64, create_schema_from_df, project, union_schemas
+from palimpzest.core.models import ExecutionStats, PlanStats, RecordOpStats
 from palimpzest.utils.hash_helpers import hash_for_id
 
 
 class DataRecord:
-    """A DataRecord is a single record of data matching some Schema."""
+    """A DataRecord is a single record of data matching some schema defined by a BaseModel."""
 
     def __init__(
         self,
-        schema: Schema,
+        schema: BaseModel,
         source_idx: int,
         parent_id: str | None = None,
         cardinality_idx: int | None = None,
@@ -29,12 +31,13 @@ class DataRecord:
         self.schema = schema
 
         # mapping from field names to Field objects; effectively a mapping from a field name to its type        
-        self.field_types: dict[str, Field] = schema.field_map()
+        self.field_types: dict[str, FieldInfo] = schema.model_fields
 
         # mapping from field names to their values
         self.field_values: dict[str, Any] = {}
 
-        # the index in the DataReader from which this DataRecord is derived
+        # TODO: handle multiple sources
+        # the index in the root Dataset from which this DataRecord is derived
         self.source_idx = int(source_idx)
 
         # the id of the parent record(s) from which this DataRecord is derived
@@ -103,8 +106,7 @@ class DataRecord:
         return self.__str__(truncate=None)
 
     def __eq__(self, other):
-        return isinstance(other, DataRecord) and self.field_values == other.field_values and self.schema.get_desc() == other.schema.get_desc()
-
+        return isinstance(other, DataRecord) and self.field_values == other.field_values and self.schema == other.schema
 
     def __hash__(self):
         return hash(self.to_json_str(bytes_to_str=True))
@@ -118,7 +120,7 @@ class DataRecord:
         return list(self.field_values.keys())
 
 
-    def get_field_type(self, field_name: str) -> Field:
+    def get_field_type(self, field_name: str) -> FieldInfo:
         return self.field_types[field_name]
 
 
@@ -158,19 +160,22 @@ class DataRecord:
 
     @staticmethod
     def from_parent(
-        schema: Schema,
+        schema: BaseModel,
         parent_record: DataRecord,
         project_cols: list[str] | None = None,
         cardinality_idx: int | None = None,
     ) -> DataRecord:
-        # project_cols must be None or contain at least one column
-        assert project_cols is None or len(project_cols) >= 1, "must have at least one column if using projection"
-
         # if project_cols is None, then the new schema is a union of the provided schema and parent_record.schema;
+        # if project_cols is an empty list, then the new schema is simply the provided schema
         # otherwise, it's a ProjectSchema
-        new_schema = schema.union(parent_record.schema)
-        if project_cols is not None:
-            new_schema = new_schema.project(project_cols)
+        new_schema = None
+        if project_cols is None:
+            new_schema = union_schemas([schema, parent_record.schema])
+        elif project_cols == []:
+            new_schema = schema
+        else:
+            new_schema = union_schemas([schema, parent_record.schema])
+            new_schema = project(new_schema, project_cols)
 
         # make new record which has parent_record as its parent (and the same source_idx)
         new_dr = DataRecord(
@@ -194,7 +199,7 @@ class DataRecord:
 
     @staticmethod
     def from_agg_parents(
-        schema: Schema,
+        schema: BaseModel,
         parent_records: DataRecordSet,
         project_cols: list[str] | None = None,
         cardinality_idx: int | None = None,
@@ -205,8 +210,8 @@ class DataRecord:
 
     @staticmethod
     def from_join_parents(
-        left_schema: Schema,
-        right_schema: Schema,
+        left_schema: BaseModel,
+        right_schema: BaseModel,
         left_parent_record: DataRecord,
         right_parent_record: DataRecord,
         project_cols: list[str] | None = None,
@@ -217,12 +222,12 @@ class DataRecord:
 
 
     @staticmethod
-    def from_df(df: pd.DataFrame, schema: Schema | None = None) -> list[DataRecord]:
+    def from_df(df: pd.DataFrame, schema: BaseModel | None = None) -> list[DataRecord]:
         """Create a list of DataRecords from a pandas DataFrame
         
         Args:
             df (pd.DataFrame): Input DataFrame
-            schema (Schema, optional): Schema for the DataRecords. If None, will be derived from DataFrame  
+            schema (BaseModel, optional): Schema for the DataRecords. If None, will be derived from DataFrame  
         
         Returns:
             list[DataRecord]: List of DataRecord instances
@@ -232,14 +237,13 @@ class DataRecord:
 
         records = []
         if schema is None:
-            schema = Schema.from_df(df)
+            schema = create_schema_from_df(df)
 
-        field_map = schema.field_map()
         for source_idx, row in df.iterrows():
             row_dict = row.to_dict()
             record = DataRecord(schema=schema, source_idx=source_idx)
             record.field_values = row_dict
-            record.field_types = {field_name: field_map[field_name] for field_name in row_dict}
+            record.field_types = {field_name: schema.model_fields[field_name] for field_name in row_dict}
             records.append(record)
 
         return records
@@ -253,6 +257,12 @@ class DataRecord:
         if project_cols is not None and len(project_cols) > 0:
             fields = [field for field in fields if field in project_cols]
 
+        # convert Context --> str
+        for record in records:
+            for k in fields:
+                if isinstance(record[k], context.Context):
+                    record[k] = record[k].description
+
         return pd.DataFrame([
             {k: record[k] for k in fields}
             for record in records
@@ -261,25 +271,27 @@ class DataRecord:
     def to_json_str(self, include_bytes: bool = True, bytes_to_str: bool = False, project_cols: list[str] | None = None):
         """Return a JSON representation of this DataRecord"""
         record_dict = self.to_dict(include_bytes, bytes_to_str, project_cols)
-        record_dict = {
-            field_name: self.schema.field_to_json(field_name, field_value)
-            for field_name, field_value in record_dict.items()
-        }
         return json.dumps(record_dict, indent=2)
 
     def to_dict(self, include_bytes: bool = True, bytes_to_str: bool = False, project_cols: list[str] | None = None):
         """Return a dictionary representation of this DataRecord"""
         # TODO(chjun): In case of numpy types, the json.dumps will fail. Convert to native types.
         # Better ways to handle this.
-        dct = pd.Series(self.field_values).to_dict()
+        field_values = {
+            k: v.description
+            if isinstance(v, context.Context) else v
+            for k, v in self.field_values.items()
+        }
+        dct = pd.Series(field_values).to_dict()
 
         if project_cols is not None and len(project_cols) > 0:
             project_field_names = set(field.split(".")[-1] for field in project_cols)
             dct = {k: v for k, v in dct.items() if k in project_field_names}
 
         if not include_bytes:
-            for k, v in dct.items():
-                if isinstance(v, bytes) or (isinstance(v, list) and len(v) > 0 and  any([isinstance(elt, bytes) for elt in v])):
+            for k in dct:
+                field_type = self.field_types[k]
+                if field_type.annotation in [bytes, ImageBase64, list[bytes], list[ImageBase64]]:
                     dct[k] = "<bytes>"
 
         if bytes_to_str:
