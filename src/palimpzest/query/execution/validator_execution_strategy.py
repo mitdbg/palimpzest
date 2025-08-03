@@ -1,13 +1,17 @@
 import numpy as np
 
+from palimpzest.constants import MODEL_CARDS
 from palimpzest.core.data.dataset import Dataset
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.core.models import OperatorStats, SentinelPlanStats
 from palimpzest.policy import Policy
 from palimpzest.query.execution.execution_strategy import SentinelExecutionStrategy
-from palimpzest.query.operators.convert import LLMConvert
+from palimpzest.query.operators.convert import LLMConvert, LLMConvertBonded
+from palimpzest.query.operators.critique_and_refine_convert import CriticAndRefineConvert
 from palimpzest.query.operators.filter import FilterOp, LLMFilter
+from palimpzest.query.operators.mixture_of_agents_convert import MixtureOfAgentsConvert
 from palimpzest.query.operators.physical import PhysicalOperator
+from palimpzest.query.operators.rag_convert import RAGConvert
 from palimpzest.query.operators.retrieve import RetrieveOp
 from palimpzest.query.operators.scan import ContextScanOp, ScanPhysicalOp
 from palimpzest.query.optimizer.plan import SentinelPlan
@@ -122,15 +126,38 @@ class OpFrontier:
         
         return op_id_to_pareto_distance
 
+    def _compute_naive_priors(self, op_set: list[PhysicalOperator]) -> dict[str, dict]:
+        """Compute the naive prior for each op in the op_set and return the priors as a dictionary."""
+        naive_priors = {}
+        for op in op_set:
+            model_names = []
+            if isinstance(op, (LLMConvertBonded, RAGConvert, LLMFilter)):
+                model_names = [op.model.value]
+            elif isinstance(op, MixtureOfAgentsConvert):
+                model_names = [model.value for model in op.proposer_models] + [op.aggregator_model.value]
+            elif isinstance(op, CriticAndRefineConvert):
+                model_names = [op.model.value, op.critic_model.value, op.refine_model.value]
+        
+            model_qualities = list(map(lambda model_name: MODEL_CARDS[model_name]['overall']/100.0, model_names))
+            model_costs = list(map(
+                lambda model_name: MODEL_CARDS[model_name]['usd_per_input_token'] + MODEL_CARDS[model_name]['usd_per_output_token'],
+                model_names
+            ))
+            model_times = list(map(lambda model_name: MODEL_CARDS[model_name]['seconds_per_output_token'], model_names))
+            naive_priors[op.get_op_id()] = {
+                "quality": np.mean(model_qualities),
+                "cost": np.sum(model_costs),
+                "time": np.sum(model_times),
+            }
+
+        return naive_priors
+
     def _get_op_index_order(self, op_set: list[PhysicalOperator], seed: int) -> list[int]:
         """
         Returns a list of indices for the operators in the op_set.
         """
         if self.priors is None or any([op_id not in self.priors for op_id in map(lambda op: op.get_op_id(), op_set)]):
-            rng = np.random.default_rng(seed=seed)
-            op_indices = np.arange(len(op_set))
-            rng.shuffle(op_indices)
-            return op_indices
+            self.priors = self._compute_naive_priors(op_set)
 
         # NOTE: self.priors is a dictionary with format:
         # {op_id: {"quality": quality, "cost": cost, "time": time}}
@@ -470,7 +497,7 @@ class OpFrontier:
         # create and return final DataRecordSet
         return DataRecordSet(out_records, out_record_op_stats)
 
-    def update_inputs(self, source_idx_to_record_sets: dict[int, DataRecordSet]):
+    def update_inputs(self, source_idx_to_record_sets: dict[int, list[DataRecordSet]]):
         """
         Update the inputs for this logical operator based on the outputs of the previous logical operator.
         """
@@ -478,31 +505,26 @@ class OpFrontier:
             input = []
             max_quality_record_set = self.pick_highest_quality_output(record_sets)
             for record in max_quality_record_set:
-                input.append(record if record.passed_operator else None)
+                # input.append(record if record.passed_operator else None)
+                input.append(record)
 
             self.source_idx_to_input[source_idx] = input
 
 
 class ValidatorExecutionStrategy(SentinelExecutionStrategy):
-    def _compute_quality(self, record_set: DataRecordSet) -> DataRecordSet:
+    def _compute_quality(self, record_set_tuples: list[tuple[DataRecordSet, PhysicalOperator]]) -> list[tuple[DataRecordSet, PhysicalOperator]]:
         """
-        Compute the quality for the given `record_set` by comparing it to the `target_record_set`.
+        Compute the quality for the given `record_set_tuples`.
 
-        Update the record_set by assigning the quality to each entry in its record_op_stats and
-        returning the updated record_set.
+        Update each record_set by assigning the quality to each entry in its record_op_stats.
         """
-        # if this operation failed
-        if len(record_set) == 0:
-            record_set.record_op_stats[0].quality = 0.0
-            return record_set
-
         # use validator to judge outputs
-        return self.validator.eval_fn(record_set)
+        return self.validator.eval_fn(record_set_tuples)
 
     def _score_quality(
         self,
         physical_op_cls: type[PhysicalOperator],
-        source_idx_to_record_sets: dict[int, list[DataRecordSet]],
+        source_idx_to_record_sets: dict[int, list[tuple[DataRecordSet, PhysicalOperator]]],
     ) -> dict[int, list[DataRecordSet]]:
         """
         NOTE: This approach to cost modeling does not work directly for aggregation queries;
@@ -535,17 +557,18 @@ class ValidatorExecutionStrategy(SentinelExecutionStrategy):
         )
 
         # compute quality of each output computed by this operator
-        for _, record_sets in source_idx_to_record_sets.items():
+        for _, record_set_tuples in source_idx_to_record_sets.items():
             # if this operation does not involve an LLM, every record_op_stats object gets perfect quality
             if is_perfect_quality_op:
-                for record_set in record_sets:
+                for record_set, _ in record_set_tuples:
                     for record_op_stats in record_set.record_op_stats:
                         record_op_stats.quality = 1.0
                 continue
 
             # for each record_set produced by an operation, compute its quality
-            for record_set in record_sets:
-                record_set = self._compute_quality(record_set)
+            record_set_tuples = self._compute_quality(record_set_tuples)
+            # for record_set, op in record_sets:
+            #     record_set = self._compute_quality(record_set, op)
 
         # return the quality annotated record sets
         return source_idx_to_record_sets
@@ -610,7 +633,7 @@ class ValidatorExecutionStrategy(SentinelExecutionStrategy):
                 # score the quality of each generated output
                 physical_op_cls = op_set[0].__class__
                 source_idx_to_all_record_sets = {
-                    source_idx: [record_set for record_set, _, _ in record_set_tuples]
+                    source_idx: [(record_set, op) for record_set, op, _ in record_set_tuples]
                     for source_idx, record_set_tuples in source_idx_to_record_set_tuples.items()
                 }
                 source_idx_to_all_record_sets = self._score_quality(physical_op_cls, source_idx_to_all_record_sets)
@@ -631,6 +654,10 @@ class ValidatorExecutionStrategy(SentinelExecutionStrategy):
                 # provide the champion record sets as inputs to the next logical operator
                 if op_idx + 1 < len(sentinel_plan):
                     next_logical_op_id = sentinel_plan.logical_op_ids[op_idx + 1]
+                    source_idx_to_all_record_sets = {
+                        source_idx: [record_set for record_set, _ in record_set_tuples]
+                        for source_idx, record_set_tuples in source_idx_to_all_record_sets.items()
+                    }
                     op_frontiers[next_logical_op_id].update_inputs(source_idx_to_all_record_sets)
 
                 # update the (pareto) frontier for each set of operators
@@ -658,6 +685,7 @@ class ValidatorExecutionStrategy(SentinelExecutionStrategy):
         shuffled_source_indices = [int(idx) for idx in np.arange(total_num_samples)]
         self.rng.shuffle(shuffled_source_indices)
 
+        # CHECK: see if demo works at this point
         # initialize frontier for each logical operator
         op_frontiers = {
             logical_op_id: OpFrontier(op_set, shuffled_source_indices, self.k, self.j, self.seed, self.policy, self.priors)

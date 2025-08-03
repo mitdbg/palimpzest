@@ -5,7 +5,6 @@ import re
 from abc import ABC
 from typing import Callable
 
-import pandas as pd
 from pydantic import BaseModel
 from smolagents import CodeAgent, LiteLLMModel
 
@@ -52,6 +51,9 @@ config = pz.QueryProcessorConfig(
     progress=True,
 )
 output = ds.optimize_and_run(config=config, validator=validator)
+
+# write the execution stats to json
+output.execution_stats.to_json("pz_program_stats.json")
 
 # write the output to a CSV and print the output CSV filepath so the user knows where to find it
 output_filepath = "pz_program_output.csv"
@@ -100,13 +102,19 @@ config = pz.QueryProcessorConfig(
 )
 output = ds.optimize_and_run(config=config, validator=validator)
 
+# write the execution stats to json
+output.execution_stats.to_json("pz_program_stats.json")
+
 # write the output to a CSV and print the output CSV filepath so the user knows where to find it
 output_filepath = "pz_program_output.csv"
 output.to_df().to_csv(output_filepath, index=False)
 print(f"Results at: {output_filepath}")
 ```
 
-Be sure to always execute your program using the `.optimize_and_run()` format shown above and always write your output to CSV and print where you wrote it!
+Be sure to always:
+- execute your program using the `.optimize_and_run()` format shown above
+- call `output.execution_stats.to_json("pz_program_stats.json")` to write execution statistics to disk
+- write your output to CSV and print where you wrote it!
 """
 
 class Context(Dataset, ABC):
@@ -348,7 +356,6 @@ class TextFileContext(Context):
         ```
 
         Args:
-            dir: The path to the directory containing the data to process
             instruction: The instruction specifying the semantic data processing pipeline that you need to execute.
 
         Returns:
@@ -371,17 +378,16 @@ class TextFileContext(Context):
             return self.filepaths
 
         agent = CodeAgent(
-            model=LiteLLMModel(model_id="anthropic/claude-3-7-sonnet-20250219", api_key=os.getenv("ANTHROPIC_API_KEY")),
+            model=LiteLLMModel(model_id="openai/o1", api_key=os.getenv("ANTHROPIC_API_KEY")),
             tools=[tool_list_filepaths],
             max_steps=20,
             planning_interval=4,
             add_base_tools=False,
             return_full_result=True,
-            additional_authorized_imports=["dotenv", "palimpzest"],
+            additional_authorized_imports=["dotenv", "json", "palimpzest", "pandas"],
             instructions=PZ_INSTRUCTION,
         )
-        full_instr = f"Data dir: {dir}\nInstruction: {instruction}"
-        result = agent.run(full_instr)
+        result = agent.run(instruction)
         response = result.output
 
         return response

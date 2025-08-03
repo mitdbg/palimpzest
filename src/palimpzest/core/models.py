@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import time
 from abc import abstractmethod
 from typing import Any
@@ -733,8 +734,12 @@ class ExecutionStats(BaseModel):
             else:
                 raise TypeError(f"Cannot add {type(plan_stats)} to ExecutionStats")
 
-    def to_json(self) -> dict:
-        return self.model_dump(mode="json")
+    def to_json(self, filepath: str | None) -> dict | None:
+        if filepath is None:
+            return self.model_dump(mode="json")
+
+        with open(filepath, "w") as f:
+            json.dump(self.model_dump(mode="json"), f)
 
 
 class OperatorCostEstimates(BaseModel):

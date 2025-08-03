@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+import time
 
 import pandas as pd
 
@@ -150,10 +151,10 @@ def run_agents(model_id="anthropic/claude-3-5-sonnet-latest", api_key=None):
         api_key = os.getenv("ANTHROPIC_API_KEY")
 
     # ask the agent the question
-    # question = "Compute the sender, subject, and summary of every email which refers to the Raptor, Deathstar, Chewco, and/or Fat Boy investments, and is not quoting articles or other sources outside of Enron"
-    question = "Compute the sender and subject of every email which refers to the Raptor, Deathstar, Chewco, and/or Fat Boy investments, and is not quoting articles or other sources outside of Enron"
+    question = "Compute the sender, subject, and summary of every email which refers to the Raptor, Deathstar, Chewco, and/or Fat Boy investments, and is not quoting articles or other sources outside of Enron"
+    # question = "Compute the sender and subject of every email which refers to the Raptor, Deathstar, Chewco, and/or Fat Boy investments, and is not quoting articles or other sources outside of Enron"
     agent = CodeAgent(
-        tools=[list_filepaths, read_file], #, sem_filter, sem_map],
+        tools=[list_filepaths, read_file, sem_filter, sem_map],
         model=LiteLLMModel(model_id=model_id, api_key=api_key),
         max_steps=20,
         planning_interval=4,
@@ -174,7 +175,7 @@ def run_agents(model_id="anthropic/claude-3-5-sonnet-latest", api_key=None):
 def run_pz():
     ds = pz.TextFileContext("testdata/enron-eval-medium", "enron-data", "250 emails from Enron employees")
     ds = ds.compute(
-        "Compute the sender, subject, and summary of every email which refers to the Raptor, Deathstar, Chewco, and/or Fat Boy investments, and is not quoting articles or other sources outside of Enron"
+        "Compute the sender, subject, and summary of every email which refers to the Raptor, Deathstar, Chewco, and/or Fat Boy investments, and is not quoting text from an article or source outside of Enron"
     )
     config = pz.QueryProcessorConfig(
         policy=pz.MaxQuality(),
@@ -187,6 +188,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Email demo script")
     parser.add_argument("--mode", type=str, required=True, help="Mode to run the script in")
     args = parser.parse_args()
+
+    start_time = time.time()
 
     # execute script
     if args.mode == "pz":
@@ -204,3 +207,5 @@ if __name__ == "__main__":
         }
         with open("agents-email-output.json", "w") as f:
             json.dump(response_dict, f)
+
+    print(f"TOTAL TIME: {time.time() - start_time:.2f}")

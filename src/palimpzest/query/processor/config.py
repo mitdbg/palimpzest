@@ -35,8 +35,8 @@ class QueryProcessorConfig(BaseModel):
 
     # sentinel optimization flags
     k: int = Field(default=5)
-    j: int = Field(default=3)
-    sample_budget: int = Field(default=50)
+    j: int = Field(default=5)
+    sample_budget: int = Field(default=100)
     seed: int = Field(default=42)
     exp_name: str | None = Field(default=None)
     priors: dict | None = Field(default=None)

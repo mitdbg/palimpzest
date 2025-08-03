@@ -45,6 +45,7 @@ class SmolAgentsCompute(PhysicalOperator):
         self.additional_contexts = [] if additional_contexts is None else additional_contexts
         # self.model_id = "anthropic/claude-3-7-sonnet-latest"
         self.model_id = "openai/gpt-4o-mini-2024-07-18"
+        # self.model_id = "openai/gpt-4o-2024-08-06"
         api_key = os.getenv("ANTHROPIC_API_KEY") if "anthropic" in self.model_id else os.getenv("OPENAI_API_KEY")
         self.model = LiteLLMModel(model_id=self.model_id, api_key=api_key)
 
@@ -148,6 +149,7 @@ class SmolAgentsCompute(PhysicalOperator):
             add_base_tools=False,
             instructions=instructions,
             return_full_result=True,
+            additional_authorized_imports=["pandas"],
         )
         result = agent.run(self.instruction)
         # NOTE: you can see the system prompt with `agent.memory.system_prompt.system_prompt`

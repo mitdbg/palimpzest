@@ -305,6 +305,7 @@ class Generator(Generic[ContextType, InputType]):
         # if there's an error generating the completion, we have to return an empty answer
         # and can only account for the time spent performing the failed generation
         except Exception as e:
+            print(f"Error generating completion: {e}")
             logger.error(f"Error generating completion: {e}")
             field_answers = (
                 {"passed_operator": False}
