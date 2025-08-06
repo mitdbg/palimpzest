@@ -20,7 +20,7 @@ def main():
     parser.add_argument("--join-dataset", type=str, help="Path to the join dataset (if needed)", default=None)
     parser.add_argument("--task", type=str, help="The task to run")
     parser.add_argument(
-        "--execution_strategy",
+        "--execution-strategy",
         type=str,
         help="The execution strategy to use. One of sequential, pipelined, parallel",
         default="sequential",

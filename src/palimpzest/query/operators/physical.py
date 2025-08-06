@@ -116,10 +116,7 @@ class PhysicalOperator:
         # get op name and op parameters which are relevant for computing the id
         op_name = self.op_name()
         id_params = self.get_id_params()
-        id_params = {
-            k: str(v) if k != "output_schema" else sorted(v.model_fields)
-            for k, v in id_params.items()
-        }
+        id_params = {k: str(v) for k, v in id_params.items()}
 
         # compute, set, and return the op_id
         hash_str = json.dumps({"op_name": op_name, **id_params}, sort_keys=True)

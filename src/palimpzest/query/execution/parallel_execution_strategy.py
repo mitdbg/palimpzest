@@ -280,34 +280,38 @@ class SequentialParallelExecutionStrategy(ExecutionStrategy):
             # 2. the final limit operation has completed (we break out of the loop if this happens)
             final_op = plan.operator
             for topo_idx, operator in enumerate(plan):
+                source_unique_full_op_ids = (
+                    [f"source_{operator.get_full_op_id()}"]
+                    if isinstance(operator, (ContextScanOp, ScanPhysicalOp))
+                    else plan.get_source_unique_full_op_ids(topo_idx, operator)
+                )
                 unique_full_op_id = f"{topo_idx}-{operator.get_full_op_id()}"
-                source_unique_full_op_ids = plan.get_source_unique_full_op_ids(topo_idx, operator)
-                input_queue = input_queues[unique_full_op_id]
 
                 # if this operator is an aggregate, process all the records in the input queue
                 if isinstance(operator, AggregateOp):
                     source_unique_full_op_id = source_unique_full_op_ids[0]
-                    num_inputs = len(input_queue[unique_full_op_id][source_unique_full_op_id])
+                    num_inputs = len(input_queues[unique_full_op_id][source_unique_full_op_id])
                     input_records = [input_queues[unique_full_op_id][source_unique_full_op_id].pop(0) for _ in range(num_inputs)]
                     future = executor.submit(operator, input_records)
                     future_queues[unique_full_op_id].append(future)
 
                 # if this operator is a join, process all pairs of records from the two input queues
                 elif isinstance(operator, JoinOp):
-                    left_full_source_op_id = source_unique_full_op_ids[0]
-                    left_num_inputs = len(input_queues[unique_full_op_id][left_full_source_op_id])
-                    left_input_records = [input_queues[unique_full_op_id][left_full_source_op_id].pop(0) for _ in range(left_num_inputs)]
+                    left_unique_full_source_op_id = source_unique_full_op_ids[0]
+                    left_num_inputs = len(input_queues[unique_full_op_id][left_unique_full_source_op_id])
+                    left_input_records = [input_queues[unique_full_op_id][left_unique_full_source_op_id].pop(0) for _ in range(left_num_inputs)]
 
-                    right_full_source_op_id = source_unique_full_op_ids[1]
-                    right_num_inputs = len(input_queues[unique_full_op_id][right_full_source_op_id])
-                    right_input_records = [input_queues[unique_full_op_id][right_full_source_op_id].pop(0) for _ in range(right_num_inputs)]
+                    right_unique_full_source_op_id = source_unique_full_op_ids[1]
+                    right_num_inputs = len(input_queues[unique_full_op_id][right_unique_full_source_op_id])
+                    right_input_records = [input_queues[unique_full_op_id][right_unique_full_source_op_id].pop(0) for _ in range(right_num_inputs)]
 
                     future = executor.submit(operator, left_input_records, right_input_records)
                     future_queues[unique_full_op_id].append(future)
 
                 else:
-                    while len(input_queue) > 0:
-                        input_record = input_queue.pop(0)
+                    source_unique_full_op_id = source_unique_full_op_ids[0]
+                    while len(input_queues[unique_full_op_id][source_unique_full_op_id]) > 0:
+                        input_record = input_queues[unique_full_op_id][source_unique_full_op_id].pop(0)
                         future = executor.submit(operator, input_record)
                         future_queues[unique_full_op_id].append(future)
 

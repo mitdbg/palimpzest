@@ -185,10 +185,14 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
         while self._any_queue_not_empty(input_queues):
             for topo_idx, operator in enumerate(plan):
                 # if this operator does not have enough inputs to execute, then skip it
+                source_unique_full_op_ids = (
+                    [f"source_{operator.get_full_op_id()}"]
+                    if isinstance(operator, (ContextScanOp, ScanPhysicalOp))
+                    else plan.get_source_unique_full_op_ids(topo_idx, operator)
+                )
                 unique_full_op_id = f"{topo_idx}-{operator.get_full_op_id()}"
-                source_unique_full_op_ids = plan.get_source_unique_full_op_ids(topo_idx, operator)
 
-                num_inputs = sum(len(inputs) for inputs in input_queues[unique_full_op_id].values())
+                num_inputs = sum(len(input_queues[unique_full_op_id][source_unique_full_op_id]) for source_unique_full_op_id in source_unique_full_op_ids)
                 agg_op_not_ready = isinstance(operator, AggregateOp) and not self._upstream_ops_finished(plan, topo_idx, operator, input_queues)
                 join_op_not_ready = isinstance(operator, JoinOp) and not self._upstream_ops_finished(plan, topo_idx, operator, input_queues)
                 if num_inputs == 0 or agg_op_not_ready or join_op_not_ready:
@@ -229,7 +233,8 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
 
                 # otherwise, process the next record in the input queue for this operator
                 else:
-                    input_record = input_queues[unique_full_op_id].pop(0)
+                    source_unique_full_op_id = source_unique_full_op_ids[0]
+                    input_record = input_queues[unique_full_op_id][source_unique_full_op_id].pop(0)
                     record_set = operator(input_record)
                     records = record_set.data_records
                     record_op_stats = record_set.record_op_stats
@@ -245,7 +250,7 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
                 output_records = [record for record in records if record.passed_operator]
                 next_unique_full_op_id = plan.get_next_unique_full_op_id(topo_idx, operator)
                 if next_unique_full_op_id is not None:
-                    input_queues[next_unique_full_op_id].extend(output_records)
+                    input_queues[next_unique_full_op_id][unique_full_op_id].extend(output_records)
                 else:
                     final_output_records.extend(output_records)
 

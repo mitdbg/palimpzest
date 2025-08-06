@@ -283,8 +283,8 @@ class PhysicalPlan(Plan):
             return cls(operator=ops[0], subplans=None, plan_cost=plan_cost)
 
         # recursively build subplans
-        subplan = cls._from_ops(ops[1:], plan_cost=plan_cost)
-        return cls(operator=ops[0], subplans=[subplan], plan_cost=plan_cost)
+        subplan = cls._from_ops(ops[:-1], plan_cost=plan_cost)
+        return cls(operator=ops[-1], subplans=[subplan], plan_cost=plan_cost)
 
 
 class SentinelPlan(Plan):

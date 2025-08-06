@@ -44,11 +44,11 @@ def test_physical_operator_init():
 
 def test_physical_operator_equality():
     """Test equality comparison between PhysicalOperators"""
-    op1 = PhysicalOperator(output_schema=SimpleSchema)
-    op2 = PhysicalOperator(output_schema=SimpleSchemaTwo)
-    op3 = PhysicalOperator(output_schema=SimpleSchemaTwo, verbose=True)
+    op1 = PhysicalOperator(logical_op_id="abc", output_schema=SimpleSchema)
+    op2 = PhysicalOperator(logical_op_id="abc", output_schema=SimpleSchema)
+    op3 = PhysicalOperator(logical_op_id="def", output_schema=SimpleSchemaTwo)
 
-    assert op1 != op2
+    assert op1 == op2
     assert op1 == op1
     assert op1 == op1.copy()
     assert op2 != op3
