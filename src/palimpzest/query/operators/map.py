@@ -45,8 +45,8 @@ class MapOp(PhysicalOperator):
         # create RecordOpStats object
         record_op_stats = RecordOpStats(
             record_id=record.id,
-            record_parent_id=record.parent_id,
-            record_source_idx=record.source_idx,
+            record_parent_ids=record.parent_ids,
+            record_source_indices=record.source_indices,
             record_state=record.to_dict(include_bytes=False),
             full_op_id=self.get_full_op_id(),
             logical_op_id=self.logical_op_id,

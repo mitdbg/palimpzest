@@ -5,6 +5,8 @@ from typing import Any
 
 from palimpzest.core.models import PlanCost
 from palimpzest.policy import Policy
+from palimpzest.query.execution.execution_strategy_type import ExecutionStrategyType
+from palimpzest.query.operators.join import JoinOp
 from palimpzest.query.optimizer.cost_model import BaseCostModel
 from palimpzest.query.optimizer.optimizer_strategy_type import OptimizationStrategyType
 from palimpzest.query.optimizer.primitives import Expression, Group
@@ -410,8 +412,9 @@ class OptimizePhysicalExpression(Task):
         if context is None:
             context = {}
 
-        # get the optimizer strategy (type) from the context
+        # get the optimizer strategy (type) and the execution strategy (type) from the context
         optimizer_strategy: OptimizationStrategyType = context['optimizer_strategy']
+        execution_strategy: ExecutionStrategyType = context['execution_strategy']
 
         # return if we've already computed the cost of this physical expression
         if optimizer_strategy.is_pareto() and self.physical_expression.pareto_optimal_plan_costs is not None:
@@ -420,57 +423,90 @@ class OptimizePhysicalExpression(Task):
         if optimizer_strategy.is_not_pareto() and self.physical_expression.plan_cost is not None:
             return []
 
-        # for expressions with an input group, compute the input plan cost(s)
-        best_input_plan_cost = PlanCost(cost=0, time=0, quality=1)
-        input_plan_costs = [PlanCost(cost=0, time=0, quality=1)]
+        # for expressions with input group(s), compute the input plan cost(s)
+        best_input_plan_costs = {}
+        pareto_optimal_input_plan_costs = {}
         if len(self.physical_expression.input_group_ids) > 0:
-            # get the input group
-            input_group_id = self.physical_expression.input_group_ids[0]  # TODO: need to handle joins
-            input_group = groups[input_group_id]
-
-            # compute the input plan cost or list of input plan costs
             new_tasks = []
-            if optimizer_strategy.is_not_pareto() and input_group.best_physical_expression is not None:
-                # TODO: apply policy constraint here
-                best_input_plan_cost = input_group.best_physical_expression.plan_cost
+            for input_group_id in self.physical_expression.input_group_ids:
+                # get the input group
+                input_group = groups[input_group_id]
 
-            elif optimizer_strategy.is_pareto() and input_group.pareto_optimal_physical_expressions is not None:
-                # TODO: apply policy constraint here
-                input_plan_costs = []
-                for pareto_physical_expression in input_group.pareto_optimal_physical_expressions:
-                    plan_costs = list(map(lambda tup: tup[0], pareto_physical_expression.pareto_optimal_plan_costs))
-                    input_plan_costs.extend(plan_costs)
+                # compute the input plan cost or list of input plan costs
+                if optimizer_strategy.is_not_pareto() and input_group.best_physical_expression is not None:
+                    # TODO: apply policy constraint here
+                    best_input_plan_costs[input_group_id] = input_group.best_physical_expression.plan_cost
 
-                # NOTE: this list will not necessarily be pareto-optimal, as a plan cost on the pareto frontier of
-                # one pareto_optimal_physical_expression might be dominated by the plan cost on another physical
-                # expression's pareto frontier; we handle this below by taking the pareto frontier of all_possible_plan_costs
-                # de-duplicate equivalent plan costs; we will still reconstruct plans with equivalent cost in optimizer.py
-                input_plan_costs = list(set(input_plan_costs))
+                elif optimizer_strategy.is_pareto() and input_group.pareto_optimal_physical_expressions is not None:
+                    # TODO: apply policy constraint here
+                    input_plan_costs = []
+                    for pareto_physical_expression in input_group.pareto_optimal_physical_expressions:
+                        plan_costs = list(map(lambda tup: tup[0], pareto_physical_expression.pareto_optimal_plan_costs))
+                        input_plan_costs.extend(plan_costs)
 
-            else:
-                task = OptimizeGroup(input_group_id)
-                new_tasks.append(task)
+                    # NOTE: this list will not necessarily be pareto-optimal, as a plan cost on the pareto frontier of
+                    # one pareto_optimal_physical_expression might be dominated by the plan cost on another physical
+                    # expression's pareto frontier; we handle this below by taking the pareto frontier of all_possible_plan_costs
+                    # de-duplicate equivalent plan costs; we will still reconstruct plans with equivalent cost in optimizer.py
+                    pareto_optimal_input_plan_costs[input_group_id] = list(set(input_plan_costs))
+
+                else:
+                    task = OptimizeGroup(input_group_id)
+                    new_tasks.append(task)
 
             # if not all input groups have been costed, we need to compute these first and then retry this task
             if len(new_tasks) > 0:
                 return [self] + new_tasks
 
+        # once all input groups have been costed, compute the cost of this physical expression
         group = groups[self.physical_expression.group_id]
         if optimizer_strategy.is_pareto():
             # compute all possible plan costs for this physical expression given the pareto optimal input plan costs
             all_possible_plan_costs = []
-            for input_plan_cost in input_plan_costs:
-                op_plan_cost = cost_model(self.physical_expression.operator, input_plan_cost.op_estimates)
+            if isinstance(self.physical_expression.operator, JoinOp):
+                assert len(self.physical_expression.input_group_ids) == 2, "Join operator must have exactly two input groups."
 
-                # compute the total cost for this physical expression by summing its operator's PlanCost
-                # with the input groups' total PlanCost; also set the op_estimates for this expression's operator
-                full_plan_cost = op_plan_cost + input_plan_cost
-                full_plan_cost.op_estimates = op_plan_cost.op_estimates
-                all_possible_plan_costs.append((full_plan_cost, input_plan_cost))
+                # get the best input plan costs for both inputs
+                left_input_group_id, right_input_group_id = self.physical_expression.input_group_ids
+                left_best_input_plan_cost = pareto_optimal_input_plan_costs[left_input_group_id]
+                right_best_input_plan_cost = pareto_optimal_input_plan_costs[right_input_group_id]
+                for left_input_plan_cost in left_best_input_plan_cost:
+                    for right_input_plan_cost in right_best_input_plan_cost:
+                        # compute the cost of this operator given the input plan costs
+                        op_plan_cost = cost_model(
+                            self.physical_expression.operator,
+                            left_input_plan_cost.op_estimates,
+                            right_input_plan_cost.op_estimates,
+                        )
+
+                        # compute the total cost for this physical expression by summing its operator's PlanCost
+                        # with the input groups' total PlanCost; also set the op_estimates for this expression's operator
+                        execution_strategy = "parallel" if execution_strategy.is_fully_parallel() else "sequential"
+                        full_plan_cost = op_plan_cost.join_add(left_input_plan_cost, right_input_plan_cost, execution_strategy)
+                        full_plan_cost.op_estimates = op_plan_cost.op_estimates
+                        all_possible_plan_costs.append((full_plan_cost, (left_input_plan_cost, right_input_plan_cost)))
+
+            else:
+                assert len(self.physical_expression.input_group_ids) < 2, "Non-join operator must have zero or one input groups."
+
+                input_plan_costs = [PlanCost(cost=0, time=0, quality=1)]
+                if len(self.physical_expression.input_group_ids) == 1:
+                    input_group_id = self.physical_expression.input_group_ids[0]
+                    input_plan_costs = pareto_optimal_input_plan_costs[input_group_id]
+
+                # get the pareto-optimal input plan costs for the single input
+                for input_plan_cost in input_plan_costs:
+                    op_plan_cost = cost_model(self.physical_expression.operator, input_plan_cost.op_estimates)
+
+                    # compute the total cost for this physical expression by summing its operator's PlanCost
+                    # with the input groups' total PlanCost; also set the op_estimates for this expression's operator
+                    full_plan_cost = op_plan_cost + input_plan_cost
+                    full_plan_cost.op_estimates = op_plan_cost.op_estimates
+                    all_possible_plan_costs.append((full_plan_cost, (input_plan_cost, None)))
 
             # reduce the set of possible plan costs to the subset which are pareto-optimal
             pareto_optimal_plan_costs = []
-            for idx, (plan_cost, input_plan_cost) in enumerate(all_possible_plan_costs):
+            for idx, (plan_cost, input_plan_cost_tuple) in enumerate(all_possible_plan_costs):
                 pareto_optimal = True
 
                 # check if any other_expr dominates expr
@@ -485,7 +521,7 @@ class OptimizePhysicalExpression(Task):
 
                 # add expr to pareto frontier if it's not dominated
                 if pareto_optimal:
-                    pareto_optimal_plan_costs.append((plan_cost, input_plan_cost))
+                    pareto_optimal_plan_costs.append((plan_cost, input_plan_cost_tuple))
 
             # set the pareto frontier of plan costs which can be obtained by this physical expression
             self.physical_expression.pareto_optimal_plan_costs = pareto_optimal_plan_costs
@@ -494,13 +530,48 @@ class OptimizePhysicalExpression(Task):
             group = self.update_pareto_optimal_physical_expressions(group, policy)
 
         else:
-            # otherwise, compute the cost of this operator given the optimal input plan cost
-            op_plan_cost = cost_model(self.physical_expression.operator, best_input_plan_cost.op_estimates)
 
-            # compute the total cost for this physical expression by summing its operator's PlanCost
-            # with the input groups' total PlanCost; also set the op_estimates for this expression's operator
-            full_plan_cost = op_plan_cost + best_input_plan_cost
-            full_plan_cost.op_estimates = op_plan_cost.op_estimates
+            # otherwise, compute the cost of this operator given the optimal input plan cost(s)
+            full_plan_cost = None
+            if isinstance(self.physical_expression.operator, JoinOp):
+                assert len(self.physical_expression.input_group_ids) == 2, "Join operator must have exactly two input groups."
+
+                # get the best input plan costs for both inputs
+                left_input_group_id, right_input_group_id = self.physical_expression.input_group_ids
+                left_best_input_plan_cost = best_input_plan_costs[left_input_group_id]
+                right_best_input_plan_cost = best_input_plan_costs[right_input_group_id]
+
+                # compute the cost of this operator given the best input plan costs
+                op_plan_cost = cost_model(
+                    self.physical_expression.operator,
+                    left_best_input_plan_cost.op_estimates,
+                    right_best_input_plan_cost.op_estimates,
+                )
+
+                # compute the total cost for this physical expression by summing its operator's PlanCost
+                # with the input groups' total PlanCost; also set the op_estimates for this expression's operator
+                execution_strategy = "parallel" if execution_strategy.is_fully_parallel() else "sequential"
+                full_plan_cost = op_plan_cost.join_add(left_best_input_plan_cost, right_best_input_plan_cost, execution_strategy)
+                full_plan_cost.op_estimates = op_plan_cost.op_estimates
+
+            else:
+                assert len(self.physical_expression.input_group_ids) < 2, "Non-join operator must have zero or one input groups."
+
+                # get the best input plan cost for the single input
+                best_input_plan_cost = PlanCost(cost=0, time=0, quality=1)
+                if len(self.physical_expression.input_group_ids) == 1:
+                    input_group_id = self.physical_expression.input_group_ids[0]
+                    best_input_plan_cost = best_input_plan_costs[input_group_id]
+
+                # compute the cost of this operator given the best input plan cost
+                op_plan_cost = cost_model(self.physical_expression.operator, best_input_plan_cost.op_estimates)
+
+                # compute the total cost for this physical expression by summing its operator's PlanCost
+                # with the input groups' total PlanCost; also set the op_estimates for this expression's operator
+                full_plan_cost = op_plan_cost + best_input_plan_cost
+                full_plan_cost.op_estimates = op_plan_cost.op_estimates
+
+            # set the plan cost for this physical expression
             self.physical_expression.plan_cost = full_plan_cost
 
             # update the best physical expression for the group

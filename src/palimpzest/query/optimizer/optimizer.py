@@ -9,9 +9,11 @@ from palimpzest.constants import Model
 from palimpzest.core.data.dataset import Dataset
 from palimpzest.core.lib.schemas import get_schema_field_names
 from palimpzest.policy import Policy
+from palimpzest.query.execution.execution_strategy_type import ExecutionStrategyType
 from palimpzest.query.operators.logical import (
     ComputeOperator,
     FilteredScan,
+    JoinOp,
     LimitScan,
     MapScan,
     Project,
@@ -79,6 +81,7 @@ class Optimizer:
         allow_critic: bool = False,
         allow_split_merge: bool = False,
         optimizer_strategy: OptimizationStrategyType = OptimizationStrategyType.PARETO,
+        execution_strategy: ExecutionStrategyType = ExecutionStrategyType.PARALLEL,
         use_final_op_quality: bool = False, # TODO: make this func(plan) -> final_quality
         **kwargs,
     ):
@@ -128,6 +131,7 @@ class Optimizer:
         self.allow_critic = allow_critic
         self.allow_split_merge = allow_split_merge
         self.optimizer_strategy = optimizer_strategy
+        self.execution_strategy = execution_strategy
         self.use_final_op_quality = use_final_op_quality
 
         # prune implementation rules based on boolean flags
@@ -184,6 +188,7 @@ class Optimizer:
             allow_critic=self.allow_critic,
             allow_split_merge=self.allow_split_merge,
             optimizer_strategy=self.optimizer_strategy,
+            execution_strategy=self.execution_strategy,
             use_final_op_quality=self.use_final_op_quality,
         )
         return optimizer
@@ -193,19 +198,31 @@ class Optimizer:
         optimizer_strategy_cls = optimizer_strategy.value
         self.strategy = optimizer_strategy_cls()
 
-    def construct_group_tree(self, dataset_nodes: list[Dataset]) -> tuple[list[int], dict[str, FieldInfo], dict[str, set[str]]]:
-        logger.debug(f"Constructing group tree for dataset_nodes: {dataset_nodes}")
-        # get node
-        node = dataset_nodes[-1]
-
+    def construct_group_tree(self, dataset: Dataset) -> tuple[int, dict[str, FieldInfo], dict[str, set[str]]]:
+        logger.debug(f"Constructing group tree for dataset: {dataset}")
         ### convert node --> Group ###
         # create the op for the given node
-        op = node._operator
+        op = dataset._operator
 
-        # compute the input group ids and fields for this node
-        input_group_ids, input_group_fields, input_group_properties = (
-            self.construct_group_tree(dataset_nodes[:-1]) if len(dataset_nodes) > 1 else ([], {}, {})
-        )
+        # compute the input group id(s) and field(s) for this node
+        if len(dataset._sources) == 0:
+            input_group_ids, input_group_fields, input_group_properties = ([], {}, {})
+        elif len(dataset._sources) == 1:
+            input_group_id, input_group_fields, input_group_properties = self.construct_group_tree(dataset._sources[0])
+            input_group_ids = [input_group_id]
+        elif len(dataset._sources) == 2:
+            left_input_group_id, left_input_group_fields, left_input_group_properties = self.construct_group_tree(dataset._sources[0])
+            right_input_group_id, right_input_group_fields, right_input_group_properties = self.construct_group_tree(dataset._sources[1])
+            input_group_ids = [left_input_group_id, right_input_group_id]
+            input_group_fields = {**left_input_group_fields, **right_input_group_fields}
+            input_group_properties = deepcopy(left_input_group_properties)
+            for k, v in right_input_group_properties.items():
+                if k in input_group_properties:
+                    input_group_properties[k].update(v)
+                else:
+                    input_group_properties[k] = deepcopy(v)
+        else:
+            raise NotImplementedError("Constructing group trees for datasets with more than 2 sources is not supported.")
 
         # compute the fields added by this operation and all fields
         input_group_short_field_names = list(
@@ -213,14 +230,14 @@ class Optimizer:
         )
         new_fields = {
             field_name: op.output_schema.model_fields[field_name.split(".")[-1]]
-            for field_name in get_schema_field_names(op.output_schema, id=node.id)
-            if (field_name not in input_group_short_field_names) or (hasattr(node._operator, "udf") and node._operator.udf is not None)
+            for field_name in get_schema_field_names(op.output_schema, id=dataset.id)
+            if (field_name not in input_group_short_field_names) or (hasattr(op, "udf") and op.udf is not None)
         }
         all_fields = {**input_group_fields, **new_fields}
 
         # compute the set of (short) field names this operation depends on
         depends_on_field_names = (
-            {} if node.is_root else {field_name.split(".")[-1] for field_name in node._operator.depends_on}
+            {} if dataset.is_root else {field_name.split(".")[-1] for field_name in op.depends_on}
         )
 
         # compute all properties including this operations'
@@ -233,6 +250,12 @@ class Optimizer:
                 all_properties["filters"].add(op_filter_str)
             else:
                 all_properties["filters"] = set([op_filter_str])
+
+        if isinstance(op, JoinOp):
+            if "joins" in all_properties:
+                all_properties["joins"].add(op.condition)
+            else:
+                all_properties["joins"] = set([op.condition])
 
         elif isinstance(op, LimitScan):
             op_limit_str = op.get_logical_op_id()
@@ -289,34 +312,24 @@ class Optimizer:
         # add the expression and group to the optimizer's expressions and groups and return
         self.expressions[logical_expression.expr_id] = logical_expression
         self.groups[group.group_id] = group
-        logger.debug(f"Constructed group tree for dataset_nodes: {dataset_nodes}")
+        logger.debug(f"Constructed group tree for dataset: {dataset}")
         logger.debug(f"Group: {group.group_id}, {all_fields}, {all_properties}")
 
-        return [group.group_id], all_fields, all_properties
+        return group.group_id, all_fields, all_properties
 
-    def convert_query_plan_to_group_tree(self, query_plan: Dataset) -> str:
-        logger.debug(f"Converting query plan to group tree for query_plan: {query_plan}")
-
-        # TODO: handle joins
-        # Obtain ordered list of datasets
-        dataset_nodes: list[Dataset] = []
-        node = query_plan.copy()
-        while not node.is_root:
-            dataset_nodes.append(node)
-            node = node._sources[0]
-        dataset_nodes.append(node)
-        dataset_nodes = list(reversed(dataset_nodes))
+    def convert_query_plan_to_group_tree(self, dataset: Dataset) -> str:
+        logger.debug(f"Converting query plan to group tree for dataset: {dataset}")
 
         # compute depends_on field for every node
         short_to_full_field_name = {}
-        for node_idx, node in enumerate(dataset_nodes):
+        for node in dataset:
             # update mapping from short to full field names
             short_field_names = get_schema_field_names(node.schema)
             full_field_names = get_schema_field_names(node.schema, id=node.id)
             for short_field_name, full_field_name in zip(short_field_names, full_field_names):
                 # set mapping automatically if this is a new field
                 if short_field_name not in short_to_full_field_name or (
-                    node_idx > 0 and dataset_nodes[node_idx - 1].schema != node.schema and (hasattr(node._operator, "udf") and node._operator.udf is not None)
+                    node._operator.input_schema != node._operator.output_schema and (hasattr(node._operator, "udf") and node._operator.udf is not None)
                 ):
                     short_to_full_field_name[short_field_name] = full_field_name
 
@@ -331,19 +344,18 @@ class Optimizer:
 
             # otherwise, make the node depend on all upstream nodes
             node._operator.depends_on = set()
-            for upstream_node in dataset_nodes[:node_idx]:
+            upstream_nodes = node.get_upstream_datasets()
+            for upstream_node in upstream_nodes:
                 upstream_field_names = get_schema_field_names(upstream_node.schema, id=upstream_node.id)
                 node._operator.depends_on.update(upstream_field_names)
             node._operator.depends_on = list(node._operator.depends_on)
 
         # construct tree of groups
-        final_group_id, _, _ = self.construct_group_tree(dataset_nodes)
+        final_group_id, _, _ = self.construct_group_tree(dataset)
 
-        # check that final_group_id is a singleton
-        assert len(final_group_id) == 1
-        final_group_id = final_group_id[0]
-        logger.debug(f"Converted query plan to group tree for query_plan: {query_plan}")
+        logger.debug(f"Converted query plan to group tree for dataset: {dataset}")
         logger.debug(f"Final group id: {final_group_id}")
+
         return final_group_id
 
     def heuristic_optimization(self, group_id: int) -> None:
@@ -373,21 +385,22 @@ class Optimizer:
                     self.groups, self.expressions, context=context, **self.get_physical_op_params(),
                 )
             elif isinstance(task, OptimizePhysicalExpression):
-                context = {"optimizer_strategy": self.optimizer_strategy}
+                context = {"optimizer_strategy": self.optimizer_strategy, "execution_strategy": self.execution_strategy}
                 new_tasks = task.perform(self.cost_model, self.groups, self.policy, context=context)
 
             self.tasks_stack.extend(new_tasks)
 
         logger.debug(f"Done searching optimization space for group_id: {group_id}")
 
-    def optimize(self, query_plan: Dataset) -> list[PhysicalPlan]:
+    def optimize(self, dataset: Dataset) -> list[PhysicalPlan]:
         """
         The optimize function takes in an initial query plan and searches the space of
         logical and physical plans in order to cost and produce a (near) optimal physical plan.
         """
-        logger.info(f"Optimizing query plan: {query_plan}")
+        logger.info(f"Optimizing query plan: {dataset}")
         # compute the initial group tree for the user plan
-        final_group_id = self.convert_query_plan_to_group_tree(query_plan)
+        dataset_copy = dataset.copy()
+        final_group_id = self.convert_query_plan_to_group_tree(dataset_copy)
 
         # TODO
         # # do heuristic based pre-optimization

@@ -4,7 +4,9 @@ from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.models import PlanStats
 from palimpzest.query.execution.execution_strategy import ExecutionStrategy
 from palimpzest.query.operators.aggregate import AggregateOp
+from palimpzest.query.operators.join import JoinOp
 from palimpzest.query.operators.limit import LimitScanOp
+from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.scan import ContextScanOp, ScanPhysicalOp
 from palimpzest.query.optimizer.plan import PhysicalPlan
 from palimpzest.utils.progress import create_progress_manager
@@ -25,40 +27,65 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
         super().__init__(*args, **kwargs)
         self.max_workers = 1
 
-    def _execute_plan(self, plan: PhysicalPlan, input_queues: dict[str, list], plan_stats: PlanStats) -> tuple[list[DataRecord], PlanStats]:
+    def _execute_plan(self, plan: PhysicalPlan, input_queues: dict[str, dict[str, list]], plan_stats: PlanStats) -> tuple[list[DataRecord], PlanStats]:
         # execute the plan one operator at a time
         output_records = []
-        for op_idx, operator in enumerate(plan.operators):
+        for topo_idx, operator in enumerate(plan):
             # if we've filtered out all records, terminate early
-            full_op_id = operator.get_full_op_id()
-            num_inputs = len(input_queues[full_op_id])
+            source_unique_full_op_ids = (
+                [f"source_{operator.get_full_op_id()}"]
+                if isinstance(operator, (ContextScanOp, ScanPhysicalOp))
+                else plan.get_source_unique_full_op_ids(topo_idx, operator)
+            )
+            unique_full_op_id = f"{topo_idx}-{operator.get_full_op_id()}"
+            num_inputs = sum(len(input_queues[unique_full_op_id][source_unique_full_op_id]) for source_unique_full_op_id in source_unique_full_op_ids)
             if num_inputs == 0:
                 break
 
             # begin to process this operator
             records, record_op_stats = [], []
-            logger.info(f"Processing operator {operator.op_name()} ({full_op_id})")
+            logger.info(f"Processing operator {operator.op_name()} ({unique_full_op_id})")
 
             # if this operator is an aggregate, process all the records in the input_queue
             if isinstance(operator, AggregateOp):
-                record_set = operator(candidates=input_queues[full_op_id])
+                source_unique_full_op_id = source_unique_full_op_ids[0]
+                record_set = operator(candidates=input_queues[unique_full_op_id][source_unique_full_op_id])
                 records = record_set.data_records
                 record_op_stats = record_set.record_op_stats
                 num_outputs = sum(record.passed_operator for record in records)
 
                 # update the progress manager
-                self.progress_manager.incr(full_op_id, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
+                self.progress_manager.incr(unique_full_op_id, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
+
+            # if this operator is a join, process all pairs of records from the two input queues
+            elif isinstance(operator, JoinOp):
+                left_full_source_op_id = source_unique_full_op_ids[0]
+                left_num_inputs = len(input_queues[unique_full_op_id][left_full_source_op_id])
+                left_input_records = [input_queues[unique_full_op_id][left_full_source_op_id].pop(0) for _ in range(left_num_inputs)]
+
+                right_full_source_op_id = source_unique_full_op_ids[1]
+                right_num_inputs = len(input_queues[unique_full_op_id][right_full_source_op_id])
+                right_input_records = [input_queues[unique_full_op_id][right_full_source_op_id].pop(0) for _ in range(right_num_inputs)]
+
+                record_set = operator(left_input_records, right_input_records)
+                records = record_set.data_records
+                record_op_stats = record_set.record_op_stats
+                num_outputs = sum(record.passed_operator for record in records)
+
+                # update the progress manager
+                self.progress_manager.incr(unique_full_op_id, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
 
             # otherwise, process the records in the input queue for this operator one at a time
             else:
-                for input_record in input_queues[full_op_id]:
+                source_unique_full_op_id = source_unique_full_op_ids[0]
+                for input_record in input_queues[unique_full_op_id][source_unique_full_op_id]:
                     record_set = operator(input_record)
                     records.extend(record_set.data_records)
                     record_op_stats.extend(record_set.record_op_stats)
                     num_outputs = sum(record.passed_operator for record in record_set.data_records)
 
                     # update the progress manager
-                    self.progress_manager.incr(full_op_id, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
+                    self.progress_manager.incr(unique_full_op_id, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
 
                     # finish early if this is a limit
                     if isinstance(operator, LimitScanOp) and len(records) == operator.limit:
@@ -68,12 +95,12 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
             plan_stats.add_record_op_stats(record_op_stats)
 
             # update next input_queue (if it exists)
-            output_records = [record for record in records if record.passed_operator]            
-            if op_idx + 1 < len(plan.operators):
-                next_full_op_id = plan.operators[op_idx + 1].get_full_op_id()
-                input_queues[next_full_op_id] = output_records
+            output_records = [record for record in records if record.passed_operator]
+            next_unique_full_op_id = plan.get_next_unique_full_op_id(topo_idx, operator)
+            if next_unique_full_op_id is not None:
+                input_queues[next_unique_full_op_id][unique_full_op_id] = output_records
 
-            logger.info(f"Finished processing operator {operator.op_name()} ({operator.get_full_op_id()}), and generated {len(records)} records")
+            logger.info(f"Finished processing operator {operator.op_name()} ({unique_full_op_id}), and generated {len(records)} records")
 
         # finalize plan stats
         plan_stats.finish()
@@ -82,8 +109,6 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
 
     def execute_plan(self, plan: PhysicalPlan) -> tuple[list[DataRecord], PlanStats]:
         """Initialize the stats and execute the plan."""
-        # for now, assert that the first operator in the plan is a ScanPhysicalOp
-        assert isinstance(plan.operators[0], (ScanPhysicalOp, ContextScanOp)), "First operator in physical plan must be a scan operator"
         logger.info(f"Executing plan {plan.plan_id} with {self.max_workers} workers")
         logger.info(f"Plan Details: {plan}")
 
@@ -98,7 +123,7 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
         self.progress_manager = create_progress_manager(plan, num_samples=self.num_samples, progress=self.progress)
         self.progress_manager.start()
 
-        # NOTE: we must handle progress manager outside of _exeecute_plan to ensure that it is shut down correctly;
+        # NOTE: we must handle progress manager outside of _execute_plan to ensure that it is shut down correctly;
         #       if we don't have the `finally:` branch, then program crashes can cause future program runs to fail
         #       because the progress manager cannot get a handle to the console 
         try:
@@ -115,6 +140,7 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
         return output_records, plan_stats
 
 
+# TODO: bug in else branch with input_queues[unique_full_op_id].pop(0)
 class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
     """
     A single-threaded execution strategy that processes records through a pipeline of operators.
@@ -133,31 +159,39 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
         super().__init__(*args, **kwargs)
         self.max_workers = 1
 
-    def _any_queue_not_empty(self, queues: dict[str, list]) -> bool:
+    def _any_queue_not_empty(self, queues: dict[str, list] | dict[str, dict[str, list]]) -> bool:
         """Helper function to check if any queue is not empty."""
-        return any(len(queue) > 0 for queue in queues.values())
+        for _, value in queues.items():
+            if isinstance(value, dict):
+                if any(len(subqueue) > 0 for subqueue in value.values()):
+                    return True
+            elif len(value) > 0:
+                return True
+        return False
 
-    def _upstream_ops_finished(self, plan: PhysicalPlan, op_idx: int, input_queues: dict[str, list]) -> bool:
-        """Helper function to check if all upstream operators have finished processing their inputs."""
-        for upstream_op_idx in range(op_idx):
-            upstream_full_op_id = plan.operators[upstream_op_idx].get_full_op_id()
-            if len(input_queues[upstream_full_op_id]) > 0:
-                return False
+    def _upstream_ops_finished(self, plan: PhysicalPlan, topo_idx: int, operator: PhysicalOperator, input_queues: dict[str, dict[str, list]]) -> bool:
+        """Helper function to check if agg / join operator is ready to process its inputs."""
+        # for agg / join operator, we can only process it when all upstream operators have finished processing their inputs
+        upstream_unique_full_op_ids = plan.get_upstream_unique_full_op_ids(topo_idx, operator)
+        upstream_input_queues = {upstream_unique_full_op_id: input_queues[upstream_unique_full_op_id] for upstream_unique_full_op_id in upstream_unique_full_op_ids}
+        return not self._any_queue_not_empty(upstream_input_queues)
 
-        return True
 
-    def _execute_plan(self, plan: PhysicalPlan, input_queues: dict[str, list], plan_stats: PlanStats) -> tuple[list[DataRecord], PlanStats]:
+    def _execute_plan(self, plan: PhysicalPlan, input_queues: dict[str, dict[str, list]], plan_stats: PlanStats) -> tuple[list[DataRecord], PlanStats]:
         # execute the plan until either:
         # 1. all records have been processed, or
         # 2. the final limit operation has completed (we break out of the loop if this happens)
         final_output_records = []
         while self._any_queue_not_empty(input_queues):
-            for op_idx, operator in enumerate(plan.operators):
+            for topo_idx, operator in enumerate(plan):
                 # if this operator does not have enough inputs to execute, then skip it
-                full_op_id = operator.get_full_op_id()
-                num_inputs = len(input_queues[full_op_id])
-                agg_op_not_ready = isinstance(operator, AggregateOp) and not self._upstream_ops_finished(plan, op_idx, input_queues)
-                if num_inputs == 0 or agg_op_not_ready:
+                unique_full_op_id = f"{topo_idx}-{operator.get_full_op_id()}"
+                source_unique_full_op_ids = plan.get_source_unique_full_op_ids(topo_idx, operator)
+
+                num_inputs = sum(len(inputs) for inputs in input_queues[unique_full_op_id].values())
+                agg_op_not_ready = isinstance(operator, AggregateOp) and not self._upstream_ops_finished(plan, topo_idx, operator, input_queues)
+                join_op_not_ready = isinstance(operator, JoinOp) and not self._upstream_ops_finished(plan, topo_idx, operator, input_queues)
+                if num_inputs == 0 or agg_op_not_ready or join_op_not_ready:
                     continue
 
                 # create empty lists for records and execution stats generated by executing this operator on its next input(s)
@@ -165,41 +199,60 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
 
                 # if the next operator is an aggregate, process all the records in the input_queue
                 if isinstance(operator, AggregateOp):
-                    input_records = [input_queues[full_op_id].pop(0) for _ in range(num_inputs)]
+                    source_unique_full_op_id = source_unique_full_op_ids[0]
+                    input_records = [input_queues[unique_full_op_id][source_unique_full_op_id].pop(0) for _ in range(num_inputs)]
                     record_set = operator(candidates=input_records)
                     records = record_set.data_records
                     record_op_stats = record_set.record_op_stats
                     num_outputs = sum(record.passed_operator for record in records)
 
                     # update the progress manager
-                    self.progress_manager.incr(full_op_id, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
+                    self.progress_manager.incr(unique_full_op_id, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
+
+                # if this operator is a join, process all pairs of records from the two input queues
+                elif isinstance(operator, JoinOp):
+                    left_full_source_op_id = source_unique_full_op_ids[0]
+                    left_num_inputs = len(input_queues[unique_full_op_id][left_full_source_op_id])
+                    left_input_records = [input_queues[unique_full_op_id][left_full_source_op_id].pop(0) for _ in range(left_num_inputs)]
+
+                    right_full_source_op_id = source_unique_full_op_ids[1]
+                    right_num_inputs = len(input_queues[unique_full_op_id][right_full_source_op_id])
+                    right_input_records = [input_queues[unique_full_op_id][right_full_source_op_id].pop(0) for _ in range(right_num_inputs)]
+
+                    record_set = operator(left_input_records, right_input_records)
+                    records = record_set.data_records
+                    record_op_stats = record_set.record_op_stats
+                    num_outputs = sum(record.passed_operator for record in records)
+
+                    # update the progress manager
+                    self.progress_manager.incr(unique_full_op_id, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
 
                 # otherwise, process the next record in the input queue for this operator
                 else:
-                    input_record = input_queues[full_op_id].pop(0)
+                    input_record = input_queues[unique_full_op_id].pop(0)
                     record_set = operator(input_record)
                     records = record_set.data_records
                     record_op_stats = record_set.record_op_stats
                     num_outputs = sum(record.passed_operator for record in records)
 
                     # update the progress manager
-                    self.progress_manager.incr(full_op_id, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
+                    self.progress_manager.incr(unique_full_op_id, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
 
                 # update plan stats
                 plan_stats.add_record_op_stats(record_op_stats)
 
                 # update next input_queue or final_output_records
-                output_records = [record for record in records if record.passed_operator]            
-                if op_idx + 1 < len(plan.operators):
-                    next_full_op_id = plan.operators[op_idx + 1].get_full_op_id()
-                    input_queues[next_full_op_id].extend(output_records)
+                output_records = [record for record in records if record.passed_operator]
+                next_unique_full_op_id = plan.get_next_unique_full_op_id(topo_idx, operator)
+                if next_unique_full_op_id is not None:
+                    input_queues[next_unique_full_op_id].extend(output_records)
                 else:
                     final_output_records.extend(output_records)
 
-                logger.info(f"Finished processing operator {operator.op_name()} ({operator.get_full_op_id()}) on {num_inputs} records")
+                logger.info(f"Finished processing operator {operator.op_name()} ({unique_full_op_id}) on {num_inputs} records")
 
             # break out of loop if the final operator is a LimitScanOp and we've reached its limit
-            if isinstance(plan.operators[-1], LimitScanOp) and len(final_output_records) == plan.operators[-1].limit:
+            if isinstance(plan.operator, LimitScanOp) and len(final_output_records) == plan.operator.limit:
                 break
 
         # finalize plan stats
@@ -209,8 +262,6 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
 
     def execute_plan(self, plan: PhysicalPlan):
         """Initialize the stats and execute the plan."""
-        # for now, assert that the first operator in the plan is a ScanPhysicalOp
-        assert isinstance(plan.operators[0], (ScanPhysicalOp, ContextScanOp)), "First operator in physical plan must be a scan operator"
         logger.info(f"Executing plan {plan.plan_id} with {self.max_workers} workers")
         logger.info(f"Plan Details: {plan}")
 
@@ -225,7 +276,7 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
         self.progress_manager = create_progress_manager(plan, self.num_samples, self.progress)
         self.progress_manager.start()
 
-        # NOTE: we must handle progress manager outside of _exeecute_plan to ensure that it is shut down correctly;
+        # NOTE: we must handle progress manager outside of _execute_plan to ensure that it is shut down correctly;
         #       if we don't have the `finally:` branch, then program crashes can cause future program runs to fail
         #       because the progress manager cannot get a handle to the console 
         try:

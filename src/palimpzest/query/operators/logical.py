@@ -42,7 +42,6 @@ class LogicalOperator:
         depends_on: list[str] | None = None,
     ):
         # TODO: can we eliminate input_schema?
-        # TODO: should we eliminate output_schema? (and replace it with what?)
         self.output_schema = output_schema
         self.input_schema = input_schema
         self.depends_on = [] if depends_on is None else sorted(depends_on)
@@ -322,6 +321,30 @@ class GroupByAggregate(LogicalOperator):
         logical_op_params = super().get_logical_op_params()
         logical_op_params = {
             "group_by_sig": self.group_by_sig,
+            **logical_op_params,
+        }
+
+        return logical_op_params
+
+
+class JoinOp(LogicalOperator):
+    def __init__(self, condition: str, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.condition = condition
+
+    def __str__(self):
+        return f"Join(condition={self.condition})"
+
+    def get_logical_id_params(self) -> dict:
+        logical_id_params = super().get_logical_id_params()
+        logical_id_params = {"condition": self.condition, **logical_id_params}
+
+        return logical_id_params
+
+    def get_logical_op_params(self) -> dict:
+        logical_op_params = super().get_logical_op_params()
+        logical_op_params = {
+            "condition": self.condition,
             **logical_op_params,
         }
 

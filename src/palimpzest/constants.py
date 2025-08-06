@@ -89,6 +89,10 @@ class PromptStrategy(str, Enum):
     # COT_BOOL_IMAGE_CRITIC = "chain-of-thought-bool-image-critic"
     # COT_BOOL_IMAGE_REFINE = "chain-of-thought-bool-image-refine"
 
+    # Chain-of-Thought Join Prompt Strategies
+    COT_JOIN = "chain-of-thought-join"
+    COT_JOIN_IMAGE = "chain-of-thought-join-image"
+
     # Chain-of-Thought Question Answering Prompt Strategies
     COT_QA = "chain-of-thought-question"
     COT_QA_CRITIC = "chain-of-thought-question-critic"
@@ -114,8 +118,11 @@ class PromptStrategy(str, Enum):
     def is_bool_prompt(self):
         return "bool" in self.value
 
+    def is_join_prompt(self):
+        return "join" in self.value
+
     def is_convert_prompt(self):
-        return "bool" not in self.value
+        return "bool" not in self.value and "join" not in self.value
 
     def is_critic_prompt(self):
         return "critic" in self.value
@@ -134,6 +141,7 @@ class PromptStrategy(str, Enum):
 
     def is_split_merger_prompt(self):
         return "split-merger" in self.value
+
 
 class AggFunc(str, Enum):
     COUNT = "count"
@@ -209,6 +217,9 @@ NAIVE_EST_SOURCE_RECORD_SIZE_IN_BYTES = 1_000_000
 
 # a naive estimate for filter selectivity
 NAIVE_EST_FILTER_SELECTIVITY = 0.5
+
+# a naive estimate for join selectivity
+NAIVE_EST_JOIN_SELECTIVITY = 0.5
 
 # a naive estimate for the number of input tokens processed per record
 NAIVE_EST_NUM_INPUT_TOKENS = 1000

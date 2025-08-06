@@ -38,8 +38,10 @@ class Expression:
         self.plan_cost: PlanCost | None = None
 
         # NOTE: this will be a list of tuples where each tuple has a (pareto-optimal) plan cost
-        # and the input plan cost for which that pareto-optimal plan cost is attainable
-        self.pareto_optimal_plan_costs: list[tuple[PlanCost, PlanCost]] | None = None
+        # and the tuple of input plan cost(s) for which that pareto-optimal plan cost is attainable;
+        # the tuple of input plan cost(s) is (input_plan_cost, None) for non-join operators and
+        # (left_input_plan_cost, right_input_plan_cost) for join operators
+        self.pareto_optimal_plan_costs: list[tuple[PlanCost, tuple[PlanCost, PlanCost]]] | None = None
 
         # compute the expression id
         self.expr_id = self._compute_expr_id()

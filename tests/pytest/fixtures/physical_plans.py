@@ -15,7 +15,7 @@ from palimpzest.query.optimizer.plan import PhysicalPlan, SentinelPlan
 @pytest.fixture
 def scan_only_plan(enron_eval_tiny):
     scan_op = MarshalAndScanDataOp(output_schema=File, datasource=enron_eval_tiny, logical_op_id="scan1")
-    plan = PhysicalPlan(operators=[scan_op])
+    plan = PhysicalPlan._from_ops(operators=[scan_op])
     return plan
 
 
@@ -28,7 +28,7 @@ def non_llm_filter_plan(enron_eval_tiny):
 
     filter = Filter(filter_fn=filter_emails)
     filter_op = NonLLMFilter(input_schema=File, output_schema=File, filter=filter, logical_op_id="filter1")
-    plan = PhysicalPlan(operators=[scan_op, filter_op])
+    plan = PhysicalPlan._from_ops(operators=[scan_op, filter_op])
     return plan
 
 
@@ -43,7 +43,7 @@ def llm_filter_plan(enron_eval_tiny):
         model=Model.GPT_4o_MINI,
         logical_op_id="filter1",
     )
-    plan = PhysicalPlan(operators=[scan_op, filter_op])
+    plan = PhysicalPlan._from_ops(operators=[scan_op, filter_op])
     return plan
 
 
@@ -56,7 +56,7 @@ def bonded_llm_convert_plan(email_schema, enron_eval_tiny):
         model=Model.GPT_4o_MINI,
         logical_op_id="convert1",
     )
-    plan = PhysicalPlan(operators=[scan_op, convert_op_llm])
+    plan = PhysicalPlan._from_ops(operators=[scan_op, convert_op_llm])
     return plan
 
 
@@ -71,7 +71,7 @@ def rag_convert_plan(email_schema, enron_eval_tiny):
         chunk_size=1000,
         logical_op_id="rag_convert1",
     )
-    plan = PhysicalPlan(operators=[scan_op, convert_op_llm])
+    plan = PhysicalPlan._from_ops(operators=[scan_op, convert_op_llm])
     return plan
 
 
@@ -84,7 +84,7 @@ def image_convert_plan(real_estate_listing_files_schema, image_real_estate_listi
         model=Model.GPT_4o_MINI,
         logical_op_id="convert1",
     )
-    plan = PhysicalPlan(operators=[scan_op, convert_op_llm])
+    plan = PhysicalPlan._from_ops(operators=[scan_op, convert_op_llm])
     return plan
 
 
@@ -98,7 +98,7 @@ def one_to_many_convert_plan(real_estate_listing_files_schema, room_real_estate_
         cardinality=Cardinality.ONE_TO_MANY,
         logical_op_id="convert1",
     )
-    plan = PhysicalPlan(operators=[scan_op, convert_op_llm])
+    plan = PhysicalPlan._from_ops(operators=[scan_op, convert_op_llm])
     return plan
 
 

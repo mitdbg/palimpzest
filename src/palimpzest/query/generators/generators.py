@@ -175,7 +175,7 @@ class Generator(Generic[ContextType, InputType]):
 
         return None
 
-    def _check_filter_answer_text(self, answer_text: str) -> dict | None:
+    def _check_bool_answer_text(self, answer_text: str) -> dict | None:
         """
         Return {"passed_operator": True} if and only if "true" is in the answer text.
         Return {"passed_operator": False} if and only if "false" is in the answer text.
@@ -229,15 +229,15 @@ class Generator(Generic[ContextType, InputType]):
 
         return self._check_convert_answer_text(completion_text, fields, throw_exception=True)
 
-    def _parse_filter_answer(self, completion_text: str) -> dict[str, list]:
-        """Extract the answer from the completion object for filter operations."""
+    def _parse_bool_answer(self, completion_text: str) -> dict[str, list]:
+        """Extract the answer from the completion object for filter and join operations."""
         # if the model followed the default instructions, the completion text will place
         # its answer between "ANSWER:" and "---"
         regex = re.compile("answer:(.*?)---", re.IGNORECASE | re.DOTALL)
         matches = regex.findall(completion_text)
         if len(matches) > 0:
             answer_text = matches[0].strip()
-            field_answers = self._check_filter_answer_text(answer_text)
+            field_answers = self._check_bool_answer_text(answer_text)
             if field_answers is not None:
                 return field_answers
 
@@ -246,12 +246,12 @@ class Generator(Generic[ContextType, InputType]):
         matches = regex.findall(completion_text)
         if len(matches) > 0:
             answer_text = matches[0].strip()
-            field_answers = self._check_filter_answer_text(answer_text)
+            field_answers = self._check_bool_answer_text(answer_text)
             if field_answers is not None:
                 return field_answers
 
         # finally, try taking all of the text; throw an exception if this doesn't work
-        field_answers = self._check_filter_answer_text(completion_text)
+        field_answers = self._check_bool_answer_text(completion_text)
         if field_answers is None:
             raise Exception(f"Could not parse answer from completion text: {completion_text}")
 
@@ -269,14 +269,14 @@ class Generator(Generic[ContextType, InputType]):
 
         # extract the per-field answers from the completion text
         field_answers = (
-            self._parse_filter_answer(completion_text)
-            if self.prompt_strategy.is_bool_prompt()
+            self._parse_bool_answer(completion_text)
+            if self.prompt_strategy.is_bool_prompt() or self.prompt_strategy.is_join_prompt()
             else self._parse_convert_answer(completion_text, fields, json_output)
         )
 
         return field_answers
 
-    def __call__(self, candidate: DataRecord, fields: dict[str, FieldInfo] | None, json_output: bool=True, **kwargs) -> GenerationOutput:
+    def __call__(self, candidate: DataRecord, fields: dict[str, FieldInfo] | None, right_candidate: DataRecord | None = None, json_output: bool=True, **kwargs) -> GenerationOutput:
         """Take the input record (`candidate`), generate the output `fields`, and return the generated output."""
         logger.debug(f"Generating for candidate {candidate} with fields {fields}")
 
@@ -292,7 +292,7 @@ class Generator(Generic[ContextType, InputType]):
             warnings.warn("Provided `system_prompt` without providing `prompt`; setting `prompt` = `system_prompt`.")  # noqa: B028
 
         # generate a list of messages which can be used to construct a payload
-        messages = self.prompt_factory.create_messages(candidate, fields, **kwargs)
+        messages = self.prompt_factory.create_messages(candidate, fields, right_candidate, **kwargs)
 
         # generate the text completion
         start_time = time.time()

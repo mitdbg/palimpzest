@@ -40,8 +40,8 @@ def get_three_converts_plan(three_converts_workload, enron_eval_tiny, email_sche
     third_convert_logical_op = ConvertScan(input_schema=foobar_schema, output_schema=baz_schema, depends_on=list(depends_on))
     third_convert_op = LLMConvertBonded(output_schema=baz_schema, input_schema=foobar_schema, model=models[2], depends_on=list(depends_on), logical_op_id=third_convert_logical_op.get_logical_op_id())
 
-    plan = PhysicalPlan(
-        operators=[scan_op, first_convert_op, second_convert_op, third_convert_op],
+    plan = PhysicalPlan._from_ops(
+        ops=[scan_op, first_convert_op, second_convert_op, third_convert_op],
         plan_cost=PlanCost(cost=expected_cost, time=expected_time, quality=expected_quality),
     )
     return plan
@@ -151,7 +151,7 @@ def get_one_filter_one_convert_plan(one_filter_one_convert_workload, enron_eval_
     first_convert_logical_op = ConvertScan(input_schema=TextFile, output_schema=email_schema, depends_on=list(depends_on))
     first_convert_op = LLMConvertBonded(output_schema=email_schema, input_schema=TextFile, model=models[1], depends_on=list(depends_on), logical_op_id=first_convert_logical_op.get_logical_op_id())
 
-    plan = PhysicalPlan(
+    plan = PhysicalPlan._from_ops(
         operators=[scan_op, first_filter_op, first_convert_op],
         plan_cost=PlanCost(cost=expected_cost, time=expected_time, quality=expected_quality),
     )
@@ -213,7 +213,7 @@ def get_two_converts_two_filters_plan(two_converts_two_filters_workload, enron_e
     second_filter_logical_op = FilteredScan(input_schema=foobar_schema, output_schema=foobar_schema, filter=Filter("filter2"), depends_on=list(depends_on))
     second_filter_op = LLMFilter(output_schema=foobar_schema, input_schema=foobar_schema, filter=Filter("filter2"), model=models[3], depends_on=list(depends_on), logical_op_id=second_filter_logical_op.get_logical_op_id())
 
-    plan = PhysicalPlan(
+    plan = PhysicalPlan._from_ops(
         operators=(
             [scan_op, first_convert_op, first_filter_op, second_filter_op, second_convert_op]
             if first_filter_str == "filter1"

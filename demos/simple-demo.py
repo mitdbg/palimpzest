@@ -17,6 +17,7 @@ def main():
     parser.add_argument("--verbose", default=False, action="store_true", help="Print verbose output")
     parser.add_argument("--profile", default=False, action="store_true", help="Profile execution")
     parser.add_argument("--dataset", type=str, help="Path to the dataset")
+    parser.add_argument("--join-dataset", type=str, help="Path to the join dataset (if needed)", default=None)
     parser.add_argument("--task", type=str, help="The task to run")
     parser.add_argument(
         "--execution_strategy",
@@ -43,6 +44,7 @@ def main():
 
     # Set up execution parameters
     dataset = args.dataset
+    join_dataset = args.join_dataset
     task = args.task
     verbose = args.verbose
     profile = args.profile
@@ -67,6 +69,7 @@ def main():
         task=task,
         dataset=dataset,
         policy=policy,
+        join_dataset=join_dataset,
         verbose=verbose,
         profile=profile,
         execution_strategy=args.execution_strategy

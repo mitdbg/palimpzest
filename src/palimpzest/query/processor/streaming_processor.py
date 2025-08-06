@@ -51,7 +51,7 @@ class StreamingQueryProcessor(QueryProcessor):
         start_time = time.time()
 
         # check that the plan does not contain any aggregation operators
-        for op in self.plan.operators:
+        for op in self.plan:
             if isinstance(op, AggregateOp):
                 raise Exception("You cannot have a Streaming Execution if there is an Aggregation Operator")
 
@@ -90,7 +90,7 @@ class StreamingQueryProcessor(QueryProcessor):
 
 
     def get_input_records(self):
-        scan_operator = self.plan.operators[0]
+        scan_operator = [op for op in self.plan][0]
         assert isinstance(scan_operator, ScanPhysicalOp), "First operator in physical plan must be a ScanPhysicalOp"
         datasource = scan_operator.datasource
         if not datasource:
@@ -113,9 +113,9 @@ class StreamingQueryProcessor(QueryProcessor):
         input_records = [record]
         record_op_stats_lst = []
 
-        for operator in plan.operators:
+        for operator in plan:
             # TODO: this being defined in the for loop potentially makes the return
-            # unbounded if plan.operators is empty. This should be defined outside the loop
+            # unbounded if plan is empty. This should be defined outside the loop
             # and the loop refactored to account for not redeclaring this for each operator
             output_records = []
 

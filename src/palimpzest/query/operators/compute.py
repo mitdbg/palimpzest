@@ -102,8 +102,8 @@ class SmolAgentsCompute(PhysicalOperator):
         # create RecordOpStats object
         record_op_stats = RecordOpStats(
             record_id=dr.id,
-            record_parent_id=dr.parent_id,
-            record_source_idx=dr.source_idx,
+            record_parent_ids=dr.parent_ids,
+            record_source_indices=dr.source_indices,
             record_state=dr.to_dict(include_bytes=False),
             full_op_id=self.get_full_op_id(),
             logical_op_id=self.logical_op_id,
@@ -149,7 +149,9 @@ class SmolAgentsCompute(PhysicalOperator):
             add_base_tools=False,
             instructions=instructions,
             return_full_result=True,
-            additional_authorized_imports=["pandas"],
+            additional_authorized_imports=["pandas", "io", "os"],
+            planning_interval=4,
+            max_steps=30,
         )
         result = agent.run(self.instruction)
         # NOTE: you can see the system prompt with `agent.memory.system_prompt.system_prompt`
@@ -159,8 +161,8 @@ class SmolAgentsCompute(PhysicalOperator):
         response = result.output
         input_tokens = result.token_usage.input_tokens
         output_tokens = result.token_usage.output_tokens
-        cost_per_input_token = (3.0 / 1e6) if "anthropic" in self.model_id else (0.15 / 1e6)
-        cost_per_output_token = (15.0 / 1e6) if "anthropic" in self.model_id else (0.6 / 1e6)
+        cost_per_input_token = (3.0 / 1e6) if "anthropic" in self.model_id else (0.15 / 1e6) # (2.5 / 1e6) #
+        cost_per_output_token = (15.0 / 1e6) if "anthropic" in self.model_id else (0.6 / 1e6) # (10.0 / 1e6) #
         input_cost = input_tokens * cost_per_input_token
         output_cost = output_tokens * cost_per_output_token
         generation_stats = GenerationStats(

@@ -12,7 +12,7 @@ from palimpzest.query.generators.generators import Generator
 def question():
     class Question(BaseModel):
         question: str = Field(description="A simple question")
-    dr = DataRecord(schema=Question, source_idx=0)
+    dr = DataRecord(schema=Question, source_indices=[0])
     dr.question = "What color is grass? (one-word answer)"
     return dr
 

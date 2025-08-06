@@ -20,6 +20,10 @@ class ExecutionStrategyType(Enum):
     PARALLEL = ParallelExecutionStrategy
     SEQUENTIAL_PARALLEL = SequentialParallelExecutionStrategy
 
+    def is_fully_parallel(self) -> bool:
+        """Check if the execution strategy executes operators in parallel."""
+        return self == ExecutionStrategyType.PARALLEL
+
 class SentinelExecutionStrategyType(Enum):
     MAB = MABExecutionStrategy
     ALL = AllSamplingExecutionStrategy

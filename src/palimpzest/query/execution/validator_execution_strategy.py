@@ -310,7 +310,7 @@ class OpFrontier:
         for full_op_id, record_op_stats_lst in full_op_id_to_record_op_stats.items():
             # update the set of source indices processed
             for record_op_stats in record_op_stats_lst:
-                self.full_op_id_to_sources_processed[full_op_id].add(record_op_stats.record_source_idx)
+                self.full_op_id_to_sources_processed[full_op_id].add(record_op_stats.record_source_indices[0])
 
             # compute the number of samples as the number of source indices processed
             num_samples = len(self.full_op_id_to_sources_processed[full_op_id])
@@ -322,7 +322,16 @@ class OpFrontier:
             return sum([record_op_stats.passed_operator for record_op_stats in record_op_stats_lst])
 
         def total_input(record_op_stats_lst):
-            return len(set([record_op_stats.record_parent_id for record_op_stats in record_op_stats_lst]))
+            # TODO: this is okay for now because we only really need these calculations for Converts and Filters,
+            #       but this will need more thought if/when we optimize joins
+            all_parent_ids = []
+            for record_op_stats in record_op_stats_lst:
+                all_parent_ids.extend(
+                    [None]
+                    if record_op_stats.record_parent_ids is None
+                    else record_op_stats.record_parent_ids
+                )
+            return len(set(all_parent_ids))
 
         full_op_id_to_mean_selectivity = {
             full_op_id: total_output(record_op_stats_lst) / total_input(record_op_stats_lst)
@@ -696,7 +705,7 @@ class ValidatorExecutionStrategy(SentinelExecutionStrategy):
         self.progress_manager = create_progress_manager(sentinel_plan, sample_budget=self.sample_budget, progress=self.progress)
         self.progress_manager.start()
 
-        # NOTE: we must handle progress manager outside of _exeecute_sentinel_plan to ensure that it is shut down correctly;
+        # NOTE: we must handle progress manager outside of _execute_sentinel_plan to ensure that it is shut down correctly;
         #       if we don't have the `finally:` branch, then program crashes can cause future program runs to fail because
         #       the progress manager cannot get a handle to the console 
         try:

@@ -49,7 +49,7 @@ class BaseValidator:
             # get the input messages; strip out the system message(s)
             output_fields = ["passed_operator"] if is_filter_op else record_set.record_op_stats[0].generated_fields
             msg_kwargs = {"filter_condition": record_op_stats[0].filter_str} if is_filter_op else {"output_schema": record_set.schema}
-            messages = factory.create_messages(record_set.input_data_record, output_fields, **msg_kwargs)
+            messages = factory.create_messages(record_set.input_data_record, output_fields, **msg_kwargs) # TODO: support images, filters, joins, etc.
             input_messages = [msg for msg in messages if msg["role"] != "system"]
 
             outputs = []

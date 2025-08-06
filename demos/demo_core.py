@@ -112,7 +112,21 @@ def build_image_agg_plan(dataset):
     grouped_dog_images = dog_images.groupby(gby_desc)
     return grouped_dog_images
 
-def get_task_config(task, dataset):
+def build_join_plan(dataset1, dataset2):
+    """Build a plan that joins two datasets"""
+    ds1 = pz.TextFileDataset(id="enron-emails", path=dataset1).sem_add_columns(email_cols)
+    ds2 = pz.TextFileDataset(id="other-enron-emails", path=dataset2).sem_add_columns(email_cols)
+    joined = ds1.sem_join(ds2, condition="sender")
+    return joined
+
+def build_join_image_plan(dataset1, dataset2):
+    """Build a plan that joins two datasets with images"""
+    ds1 = pz.ImageFileDataset(id="dog-images", path=dataset1).sem_add_columns(dog_image_cols)
+    ds2 = pz.ImageFileDataset(id="other-dog-images", path=dataset2).sem_add_columns(dog_image_cols)
+    joined = ds1.sem_join(ds2, condition="breed")
+    return joined
+
+def get_task_config(task, dataset, join_dataset=None):
     """Get configuration for a specific task"""
     if task == "paper":
         root_set = build_mit_battery_paper_plan(dataset)
@@ -158,14 +172,22 @@ def get_task_config(task, dataset):
         root_set = enron_limit_plan(dataset, 5)
         cols = ["sender", "subject"]
         stat_path = "profiling-data/limit-profiling.json"
+    elif task == "join":
+        root_set = build_join_plan(dataset, join_dataset)
+        cols = ["filename", "sender", "subject"]
+        stat_path = "profiling-data/join-profiling.json"
+    elif task == "joinImage":
+        root_set = build_join_image_plan(dataset, join_dataset)
+        cols = None
+        stat_path = "profiling-data/joinImage-profiling.json"
     else:
         raise ValueError(f"Unknown task: {task}")
     
     return root_set, cols, stat_path
 
-def execute_task(task, dataset, policy, verbose=False, profile=False, processing_strategy="no_sentinel", execution_strategy="sequential", optimizer_strategy="pareto"):
+def execute_task(task, dataset, policy, join_dataset=None, verbose=False, profile=False, processing_strategy="no_sentinel", execution_strategy="sequential", optimizer_strategy="pareto"):
     """Execute a task and return results"""
-    root_set, cols, stat_path = get_task_config(task, dataset)
+    root_set, cols, stat_path = get_task_config(task, dataset, join_dataset)
     config = pz.QueryProcessorConfig(
         policy=policy,
         verbose=verbose,

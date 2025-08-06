@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from typing import Callable
 
 from chromadb.api.models.Collection import Collection
@@ -15,6 +16,7 @@ from palimpzest.query.operators.logical import (
     ConvertScan,
     FilteredScan,
     GroupByAggregate,
+    JoinOp,
     LimitScan,
     LogicalOperator,
     MapScan,
@@ -83,7 +85,7 @@ class Dataset:
             ValueError: if `sources` is not a `Dataset` or list of `Datasets`
         """
         # set sources
-        self._sources = None
+        self._sources = []
         if isinstance(sources, list):
             self._sources = sources
         elif isinstance(sources, Dataset):
@@ -110,10 +112,15 @@ class Dataset:
 
     @property
     def is_root(self) -> bool:
-        return self._sources is None
+        return len(self._sources) == 0
 
     def __str__(self) -> str:
         return f"Dataset(schema={self._schema}, id={self._id}, op_id={self._operator.get_logical_op_id()})"
+
+    def __iter__(self) -> Iterator[Dataset]:
+        for source in self._sources:
+            yield from source
+        yield self
 
     def _compute_dataset_id(self) -> str:
         """
@@ -121,7 +128,7 @@ class Dataset:
         applied to the `Dataset's` sources.
         """
         return hash_for_serialized_dict({
-            "source_ids": None if self._sources is None else [source.id for source in self._sources],
+            "source_ids": [source.id for source in self._sources],
             "logical_op_id": self._operator.get_logical_op_id(),
         })
 
@@ -150,12 +157,44 @@ class Dataset:
         """
         return []
 
+    def get_upstream_datasets(self) -> list[Dataset]:
+        """
+        Get the list of all upstream datasets that are sources to this dataset.
+        """
+        # recursively get the upstream datasets
+        upstream = []
+        for source in self._sources:
+            upstream.extend(source.get_upstream_datasets())
+            upstream.append(source)
+        return upstream
+
     def copy(self):
         return Dataset(
-            sources=None if self._sources is None else [source.copy() for source in self._sources],
+            sources=[source.copy() for source in self._sources],
             operator=self._operator.copy(),
             schema=self._schema,
         )
+
+    def sem_join(self, other: Dataset, condition: str, depends_on: str | list[str] | None = None) -> Dataset:
+        """
+        Perform a semantic (inner) join on the specified join predicate
+        """
+        # enforce type for depends_on
+        if isinstance(depends_on, str):
+            depends_on = [depends_on]
+
+        # construct new output schema
+        combined_schema = union_schemas([self.schema, other.schema])
+
+        # construct logical operator
+        operator = JoinOp(
+            input_schema=combined_schema,
+            output_schema=combined_schema,
+            condition=condition,
+            depends_on=depends_on,
+        )
+
+        return Dataset(sources=[self, other], operator=operator, schema=combined_schema)
 
     def filter(
         self,

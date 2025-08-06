@@ -46,6 +46,7 @@ class SmolAgentsSearch(PhysicalOperator):
         self.search_query = search_query
         # self.model_id = "anthropic/claude-3-7-sonnet-latest"
         self.model_id = "openai/gpt-4o-mini-2024-07-18"
+        # self.model_id = "openai/gpt-4o-2024-08-06"
         api_key = os.getenv("ANTHROPIC_API_KEY") if "anthropic" in self.model_id else os.getenv("OPENAI_API_KEY")
         self.model = LiteLLMModel(model_id=self.model_id, api_key=api_key)
 
@@ -99,8 +100,8 @@ class SmolAgentsSearch(PhysicalOperator):
         # create RecordOpStats object
         record_op_stats = RecordOpStats(
             record_id=dr.id,
-            record_parent_id=dr.parent_id,
-            record_source_idx=dr.source_idx,
+            record_parent_ids=dr.parent_ids,
+            record_source_indices=dr.source_indices,
             record_state=dr.to_dict(include_bytes=False),
             full_op_id=self.get_full_op_id(),
             logical_op_id=self.logical_op_id,
@@ -130,13 +131,20 @@ class SmolAgentsSearch(PhysicalOperator):
         description = input_context.description
         tools = [tool(make_tool(f)) for f in input_context.tools]
 
-        # construct the full search query
-        full_query = f"Please execute the following search query. Output a **detailed** description of (1) which data you look at, and (2) what you find in that data. Avoid making overly broad statements such as \"What you're searching for is not present in the dataset\". Instead, make more precise statments like \"What you're searching for is not present in files A.txt, B.txt, and C.txt, but may be present elsewhere\".\n\nQUERY: {self.search_query}"
+        # # construct the full search query
+        # full_query = f"Please execute the following search query. Output a **detailed** description of (1) which data you look at, and (2) what you find in that data. Avoid making overly broad statements such as \"What you're searching for is not present in the dataset\". Instead, make more precise statments like \"What you're searching for is not present in files A.txt, B.txt, and C.txt, but may be present elsewhere\".\n\nQUERY: {self.search_query}"
 
         # perform the computation
         instructions = f"\n\nHere is a description of the Context whose data you will be working with, as well as any previously computed results:\n\n{description}"
-        agent = CodeAgent(tools=tools, model=self.model, add_base_tools=False, instructions=instructions, return_full_result=True)
-        result = agent.run(full_query)
+        agent = CodeAgent(
+            tools=tools,
+            model=self.model,
+            add_base_tools=False,
+            instructions=instructions,
+            return_full_result=True,
+            additional_authorized_imports=["pandas", "io", "os"],
+        )
+        result = agent.run(self.search_query)
         # NOTE: you can see the system prompt with `agent.memory.system_prompt.system_prompt`
         # full_steps = agent.memory.get_full_steps()
 
@@ -144,8 +152,8 @@ class SmolAgentsSearch(PhysicalOperator):
         response = result.output
         input_tokens = result.token_usage.input_tokens
         output_tokens = result.token_usage.output_tokens
-        cost_per_input_token = (3.0 / 1e6) if "anthropic" in self.model_id else (0.15 / 1e6)
-        cost_per_output_token = (15.0 / 1e6) if "anthropic" in self.model_id else (0.6 / 1e6)
+        cost_per_input_token = (3.0 / 1e6) if "anthropic" in self.model_id else (0.15 / 1e6) # (2.5 / 1e6) #
+        cost_per_output_token = (15.0 / 1e6) if "anthropic" in self.model_id else (0.6 / 1e6) # (10.0 / 1e6) #
         input_cost = input_tokens * cost_per_input_token
         output_cost = output_tokens * cost_per_output_token
         generation_stats = GenerationStats(
@@ -249,8 +257,8 @@ class SmolAgentsManagedSearch(PhysicalOperator):
         # create RecordOpStats object
         record_op_stats = RecordOpStats(
             record_id=dr.id,
-            record_parent_id=dr.parent_id,
-            record_source_idx=dr.source_idx,
+            record_parent_ids=dr.parent_ids,
+            record_source_indices=dr.source_indices,
             record_state=dr.to_dict(include_bytes=False),
             full_op_id=self.get_full_op_id(),
             logical_op_id=self.logical_op_id,
@@ -442,8 +450,8 @@ class SmolAgentsCustomManagedSearch(PhysicalOperator):
         # create RecordOpStats object
         record_op_stats = RecordOpStats(
             record_id=dr.id,
-            record_parent_id=dr.parent_id,
-            record_source_idx=dr.source_idx,
+            record_parent_ids=dr.parent_ids,
+            record_source_indices=dr.source_indices,
             record_state=dr.to_dict(include_bytes=False),
             full_op_id=self.get_full_op_id(),
             logical_op_id=self.logical_op_id,

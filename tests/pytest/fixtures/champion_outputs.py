@@ -16,14 +16,14 @@ def scan_convert_filter_champion_outputs(scan_convert_filter_sentinel_plan, foob
 
     # compute scan champion_outputs
     for source_idx in range(10):
-        scan_dr = DataRecord(TextFile, source_idx, parent_id=None)
+        scan_dr = DataRecord(TextFile, [source_idx], parent_ids=None)
         scan_dr.filename = f"file{source_idx}"
         scan_dr.contents = None
         champion_outputs[scan_logical_op_id][source_idx] = DataRecordSet([scan_dr], None)
 
     # add convert champion outputs
     for source_idx in range(10):
-        convert_dr = DataRecord(foobar_schema, source_idx)
+        convert_dr = DataRecord(foobar_schema, [source_idx])
         convert_dr.filename = f"file{source_idx}"
         convert_dr.contents = None
         convert_dr.foo = f"foo{source_idx}"
@@ -32,7 +32,7 @@ def scan_convert_filter_champion_outputs(scan_convert_filter_sentinel_plan, foob
 
     # add filter champion outputs
     for source_idx in range(10):
-        filter_dr = DataRecord(foobar_schema, source_idx)
+        filter_dr = DataRecord(foobar_schema, [source_idx])
         filter_dr.filename = f"file{source_idx}"
         filter_dr.contents = None
         filter_dr.foo = f"foo{source_idx}"
@@ -53,14 +53,14 @@ def scan_convert_filter_empty_champion_outputs(scan_convert_filter_sentinel_plan
 
     # compute scan champion_outputs
     for source_idx in range(10):
-        scan_dr = DataRecord(TextFile, source_idx, parent_id=None)
+        scan_dr = DataRecord(TextFile, [source_idx], parent_ids=None)
         scan_dr.filename = f"file{source_idx}"
         scan_dr.contents = None
         champion_outputs[scan_logical_op_id][source_idx] = DataRecordSet([scan_dr], None)
 
     # add convert champion outputs
     for source_idx in range(10):
-        convert_dr = DataRecord(foobar_schema, source_idx)
+        convert_dr = DataRecord(foobar_schema, [source_idx])
         convert_dr.filename = f"file{source_idx}"
         convert_dr.contents = None
         convert_dr.foo = f"foo{source_idx}"
@@ -69,7 +69,7 @@ def scan_convert_filter_empty_champion_outputs(scan_convert_filter_sentinel_plan
 
     # add filter champion outputs
     for source_idx in range(10):
-        filter_dr = DataRecord(foobar_schema, source_idx)
+        filter_dr = DataRecord(foobar_schema, [source_idx])
         filter_dr.filename = f"file{source_idx}"
         filter_dr.contents = None
         filter_dr.foo = f"foo{source_idx}"
@@ -90,14 +90,14 @@ def scan_convert_filter_varied_champion_outputs(scan_convert_filter_sentinel_pla
 
     # compute scan champion_outputs
     for source_idx in range(10):
-        scan_dr = DataRecord(TextFile, source_idx, parent_id=None)
+        scan_dr = DataRecord(TextFile, [source_idx], parent_ids=None)
         scan_dr.filename = f"file{source_idx}"
         scan_dr.contents = None
         champion_outputs[scan_logical_op_id][source_idx] = DataRecordSet([scan_dr], None)
 
     # add convert champion outputs
     for source_idx in range(10):
-        convert_dr = DataRecord(foobar_schema, source_idx)
+        convert_dr = DataRecord(foobar_schema, [source_idx])
         convert_dr.filename = f"file{source_idx}"
         convert_dr.contents = None
         convert_dr.foo = f"foo{source_idx}"
@@ -106,7 +106,7 @@ def scan_convert_filter_varied_champion_outputs(scan_convert_filter_sentinel_pla
 
     # add filter champion outputs
     for source_idx in range(10):
-        filter_dr = DataRecord(foobar_schema, source_idx)
+        filter_dr = DataRecord(foobar_schema, [source_idx])
         filter_dr.filename = f"file{source_idx}"
         filter_dr.contents = None
         filter_dr.foo = f"foo{source_idx}"
@@ -132,7 +132,7 @@ def scan_multi_convert_multi_filter_champion_outputs(scan_multi_convert_multi_fi
 
     # compute scan champion_outputs
     for source_idx in range(10):
-        scan_dr = DataRecord(TextFile, source_idx, parent_id=None)
+        scan_dr = DataRecord(TextFile, [source_idx], parent_ids=None)
         scan_dr.filename = f"file{source_idx}"
         scan_dr.contents = None
         champion_outputs[scan_logical_op_id][source_idx] = DataRecordSet([scan_dr], None)
@@ -141,7 +141,7 @@ def scan_multi_convert_multi_filter_champion_outputs(scan_multi_convert_multi_fi
     for source_idx in range(10):
         drs = []
         for one_to_many_idx in range(2):
-            convert_dr = DataRecord(foobar_schema, source_idx)
+            convert_dr = DataRecord(foobar_schema, [source_idx])
             convert_dr.filename = f"file{source_idx}"
             convert_dr.contents = None
             convert_dr.foo = f"foo{source_idx}-one-to-many-{one_to_many_idx}"
@@ -153,7 +153,7 @@ def scan_multi_convert_multi_filter_champion_outputs(scan_multi_convert_multi_fi
     # add first filter champion outputs
     for source_idx in range(10):
         for one_to_many_idx in range(2):
-            filter_dr = DataRecord(foobar_schema, source_idx)
+            filter_dr = DataRecord(foobar_schema, [source_idx])
             filter_dr.filename = f"file{source_idx}"
             filter_dr.contents = None
             filter_dr.foo = f"foo{source_idx}-one-to-many-{one_to_many_idx}"
@@ -164,7 +164,7 @@ def scan_multi_convert_multi_filter_champion_outputs(scan_multi_convert_multi_fi
     # add second filter champion outputs
     for source_idx in range(7):
         for one_to_many_idx in range(2):
-            filter_dr = DataRecord(foobar_schema, source_idx)
+            filter_dr = DataRecord(foobar_schema, [source_idx])
             filter_dr.filename = f"file{source_idx}"
             filter_dr.contents = None
             filter_dr.foo = f"foo{source_idx}-one-to-many-{one_to_many_idx}"
@@ -175,7 +175,7 @@ def scan_multi_convert_multi_filter_champion_outputs(scan_multi_convert_multi_fi
     # add first convert champion outputs
     for source_idx in range(5):
         for one_to_many_idx in range(2):
-            convert_dr = DataRecord(baz_schema, source_idx)
+            convert_dr = DataRecord(baz_schema, [source_idx])
             convert_dr.filename = f"file{source_idx}"
             convert_dr.contents = None
             convert_dr.foo = f"foo{source_idx}-one-to-many-{one_to_many_idx}"

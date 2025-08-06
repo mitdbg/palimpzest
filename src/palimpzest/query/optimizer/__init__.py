@@ -18,6 +18,9 @@ from palimpzest.query.optimizer.rules import (
     LLMFilterRule as _LLMFilterRule,
 )
 from palimpzest.query.optimizer.rules import (
+    LLMJoinRule as _LLMJoinRule,
+)
+from palimpzest.query.optimizer.rules import (
     MixtureOfAgentsConvertRule as _MixtureOfAgentsConvertRule,
 )
 from palimpzest.query.optimizer.rules import (
@@ -53,6 +56,7 @@ ALL_RULES = [
     _ImplementationRule,
     _LLMConvertBondedRule,
     _LLMFilterRule,
+    _LLMJoinRule,
     _MixtureOfAgentsConvertRule,
     _NonLLMConvertRule,
     _NonLLMFilterRule,

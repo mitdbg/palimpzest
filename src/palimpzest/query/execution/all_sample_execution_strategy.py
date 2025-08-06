@@ -192,7 +192,7 @@ class AllSamplingExecutionStrategy(SentinelExecutionStrategy):
         self.progress_manager = create_progress_manager(plan, sample_budget=self.sample_budget, progress=self.progress)
         self.progress_manager.start()
 
-        # NOTE: we must handle progress manager outside of _exeecute_sentinel_plan to ensure that it is shut down correctly;
+        # NOTE: we must handle progress manager outside of _execute_sentinel_plan to ensure that it is shut down correctly;
         #       if we don't have the `finally:` branch, then program crashes can cause future program runs to fail because
         #       the progress manager cannot get a handle to the console 
         try:

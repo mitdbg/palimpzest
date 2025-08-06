@@ -50,21 +50,24 @@ class ExecutionStrategy(BaseExecutionStrategy, ABC):
         """Execute a single plan according to strategy"""
         pass
 
-    def _create_input_queues(self, plan: PhysicalPlan) -> dict[str, list]:
+    def _create_input_queues(self, plan: PhysicalPlan) -> dict[str, dict[str, list]]:
         """Initialize input queues for each operator in the plan."""
-        input_queues = {}
-        for op in plan.operators:
-            inputs = []
+        input_queues = {f"{topo_idx}-{op.get_full_op_id()}": {} for topo_idx, op in enumerate(plan)}
+        for topo_idx, op in enumerate(plan):
+            full_op_id = op.get_full_op_id()
+            unique_op_id = f"{topo_idx}-{full_op_id}"
             if isinstance(op, ScanPhysicalOp):
                 scan_end_idx = (
                     len(op.datasource)
                     if self.num_samples is None
                     else min(self.scan_start_idx + self.num_samples, len(op.datasource))
                 )
-                inputs = [idx for idx in range(self.scan_start_idx, scan_end_idx)]
+                input_queues[unique_op_id][f"source_{full_op_id}"] = [idx for idx in range(self.scan_start_idx, scan_end_idx)]
             elif isinstance(op, ContextScanOp):
-                inputs = [None]
-            input_queues[op.get_full_op_id()] = inputs
+                input_queues[unique_op_id][f"source_{full_op_id}"] = [None]
+            else:
+                for source_unique_full_op_id in plan.get_source_unique_full_op_ids(topo_idx, op):
+                    input_queues[unique_op_id][source_unique_full_op_id] = []
 
         return input_queues
 
@@ -365,7 +368,7 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
         # TODO: modify unit tests to always have record_op_stats so we can use record_op_stats for source_idx
         # for scan operators, `input` will be the source_idx
         def get_source_idx(input):
-            return input.source_idx if isinstance(input, DataRecord) else input
+            return input.source_indices[0] if isinstance(input, DataRecord) else input
 
         def get_hash(operator, input):
             return hash(f"{operator.get_full_op_id()}{hash(input)}")

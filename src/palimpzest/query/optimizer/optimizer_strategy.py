@@ -15,31 +15,6 @@ class OptimizationStrategy(ABC):
         """Strategy decides how to search through the groups for optimal plan(s)"""
         pass
 
-    def normalize_final_plans(self, plans: list[PhysicalPlan]) -> list[PhysicalPlan]:
-        """
-        For each plan in `plans`, this function enforces that the input schema of every
-        operator is the output schema of the previous operator in the plan.
-
-        Args:
-            plans list[PhysicalPlan]: list of physical plans to normalize
-
-        Returns:
-            list[PhysicalPlan]: list of normalized physical plans
-        """
-        normalized_plans = []
-        for plan in plans:
-            normalized_ops = []
-            for idx, op in enumerate(plan.operators):
-                op_copy = op.copy()
-                if idx == 0:
-                    normalized_ops.append(op_copy)
-                else:
-                    op_copy.input_schema = plan.operators[-1].output_schema
-                    normalized_ops.append(op_copy)
-            normalized_plans.append(PhysicalPlan(operators=normalized_ops, plan_cost=plan.plan_cost))
-
-        return normalized_plans
-
 
 class GreedyStrategy(OptimizationStrategy):
     def _get_greedy_physical_plan(self, groups: dict, group_id: int) -> PhysicalPlan:
@@ -49,17 +24,35 @@ class GreedyStrategy(OptimizationStrategy):
         # get the best physical expression for this group
         best_phys_expr = groups[group_id].best_physical_expression
 
-        # if this expression has no inputs (i.e. it is a BaseScan),
-        # create and return the physical plan
+        # if this expression has no inputs (i.e. it is a BaseScan), create and return the physical plan
+        best_plan = None
         if len(best_phys_expr.input_group_ids) == 0:
-            return PhysicalPlan(operators=[best_phys_expr.operator], plan_cost=best_phys_expr.plan_cost)
+            best_plan = PhysicalPlan(best_phys_expr.operator, subplans=None, plan_cost=best_phys_expr.plan_cost)
 
-        # get the best physical plan(s) for this group's inputs
-        input_group_id = best_phys_expr.input_group_ids[0] # TODO: need to handle joins
-        input_best_phys_plan = self._get_greedy_physical_plan(groups, input_group_id)
+        # otherwise, if this expression is not a join (i.e. it has one input)
+        elif len(best_phys_expr.input_group_ids) == 1:
+            # get the best physical plan for this group's input
+            input_group_id = best_phys_expr.input_group_ids[0]
+            input_best_phys_plan = self._get_greedy_physical_plan(groups, input_group_id)
+
+            # add this operator to best physical plan and return
+            best_plan = PhysicalPlan(best_phys_expr.operator, subplans=[input_best_phys_plan], plan_cost=best_phys_expr.plan_cost)
+
+        # otherwise, this expression is a join (i.e. it has two inputs)
+        elif len(best_phys_expr.input_group_ids) == 2:
+            left_input_group_id, right_input_group_id = best_phys_expr.input_group_ids
+
+            # get the best physical plan for the left input
+            left_best_phys_plan = self._get_greedy_physical_plan(groups, left_input_group_id)
+
+            # get the best physical plan for the right input
+            right_best_phys_plan = self._get_greedy_physical_plan(groups, right_input_group_id)
+
+            # add this operator to best physical plan and return
+            best_plan = PhysicalPlan(best_phys_expr.operator, subplans=[left_best_phys_plan, right_best_phys_plan], plan_cost=best_phys_expr.plan_cost)
 
         # add this operator to best physical plan and return
-        return PhysicalPlan.from_ops_and_sub_plan([best_phys_expr.operator], input_best_phys_plan, best_phys_expr.plan_cost)
+        return best_plan
 
     def get_optimal_plans(self, groups: dict, final_group_id: int, policy: Policy, use_final_op_quality: bool) -> list[PhysicalPlan]:
         logger.info(f"Getting greedy optimal plans for final group id: {final_group_id}")
@@ -85,34 +78,41 @@ class ParetoStrategy(OptimizationStrategy):
         # construct list of pareto optimal plans
         pareto_optimal_plans = []
         for phys_expr in pareto_optimal_phys_exprs:
-            # if this expression has no inputs (i.e. it is a BaseScan),
-            # create and return the physical plan
+            # if this expression has no inputs (i.e. it is a BaseScan), create and return the physical plan
             if len(phys_expr.input_group_ids) == 0:
                 for plan_cost, _ in phys_expr.pareto_optimal_plan_costs:
-                    plan = PhysicalPlan(operators=[phys_expr.operator], plan_cost=plan_cost)
+                    plan = PhysicalPlan(phys_expr.operator, subplans=None, plan_cost=plan_cost)
                     pareto_optimal_plans.append(plan)
 
-            # otherwise, get the pareto optimal physical plan(s) for this group's inputs
-            else:
+            # otherwise, if this expression is not a join (i.e. it has one input)
+            elif len(phys_expr.input_group_ids) == 1:
                 # get the pareto optimal physical plan(s) for this group's inputs
-                input_group_id = phys_expr.input_group_ids[0] # TODO: need to handle joins
+                input_group_id = phys_expr.input_group_ids[0]
                 pareto_optimal_phys_subplans = self._get_candidate_pareto_physical_plans(groups, input_group_id, policy)
 
                 # iterate over the input subplans and find the one(s) which combine with this physical expression
                 # to make a pareto-optimal plan
-                for plan_cost, input_plan_cost in phys_expr.pareto_optimal_plan_costs:
+                for plan_cost, (input_plan_cost, _) in phys_expr.pareto_optimal_plan_costs:
                     for subplan in pareto_optimal_phys_subplans:
-                        if (
-                            subplan.plan_cost.cost == input_plan_cost.cost
-                            and subplan.plan_cost.time == input_plan_cost.time
-                            and subplan.plan_cost.quality == input_plan_cost.quality
-                        ):
-                            # TODO: The plan_cost gets summed with subplan.plan_cost;
-                            #       am I defining expression.best_plan_cost to be the cost of that operator,
-                            #       and expression.pareto_optimal_plan_costs to be the cost(s) of the subplan including that operator?
-                            #       i.e. are my definitions inconsistent?
-                            plan = PhysicalPlan.from_ops_and_sub_plan([phys_expr.operator], subplan, plan_cost)
+                        if subplan.plan_cost == input_plan_cost:
+                            plan = PhysicalPlan(phys_expr.operator, subplans=[subplan], plan_cost=plan_cost)
                             pareto_optimal_plans.append(plan)
+
+            # otherwise, this expression is a join (i.e. it has two inputs)
+            elif len(phys_expr.input_group_ids) == 2:
+                left_input_group_id, right_input_group_id = phys_expr.input_group_ids
+                pareto_optimal_left_subplans = self._get_candidate_pareto_physical_plans(groups, left_input_group_id, policy)
+                pareto_optimal_right_subplans = self._get_candidate_pareto_physical_plans(groups, right_input_group_id, policy)
+
+                # iterate over the input subplans and find the one(s) which combine with this physical expression
+                # to make a pareto-optimal plan
+                for plan_cost, (left_input_plan_cost, right_input_plan_cost) in phys_expr.pareto_optimal_plan_costs:
+                    for left_subplan in pareto_optimal_left_subplans:
+                        if left_subplan.plan_cost == left_input_plan_cost:
+                            for right_subplan in pareto_optimal_right_subplans:
+                                if right_subplan.plan_cost == right_input_plan_cost:
+                                    plan = PhysicalPlan(phys_expr.operator, subplans=[left_subplan, right_subplan], plan_cost=plan_cost)
+                                    pareto_optimal_plans.append(plan)
 
         return pareto_optimal_plans
 

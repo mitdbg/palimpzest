@@ -53,8 +53,8 @@ if __name__ == "__main__":
         with st.container():
             st.write("### Executed plan: \n")
             # st.write(" " + str(plan).replace("\n", "  \n "))
-            for idx, op in enumerate(plan.operators):
-                strop = f"{idx + 1}. {str(op)}"
+            for topo_idx, op in enumerate(plan):
+                strop = f"{topo_idx + 1}. {str(op)}"
                 strop = strop.replace("\n", "  \n")
                 st.write(strop)
 

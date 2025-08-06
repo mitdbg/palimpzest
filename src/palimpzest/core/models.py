@@ -128,6 +128,15 @@ class GenerationStats(BaseModel):
         assert not isinstance(other, GenerationStats), "This should not be called with a GenerationStats object"
         return self
 
+    # NOTE: this is added temporarily to help track cost of compute agent writing PZ code;
+    #       once we find a long-term solution for tracking that cost, we can remove this
+    def to_json(self, filepath: str | None) -> dict | None:
+        if filepath is None:
+            return self.model_dump(mode="json")
+
+        with open(filepath, "w") as f:
+            json.dump(self.model_dump(mode="json"), f)
+
 
 class RecordOpStats(BaseModel):
     """
@@ -138,11 +147,11 @@ class RecordOpStats(BaseModel):
     # record id; an identifier for this record
     record_id: str
 
-    # identifier for the parent of this record
-    record_parent_id: str | None
+    # identifier for the parent(s) of this record
+    record_parent_ids: list[str] | None
 
-    # idenifier for the source idx of this record
-    record_source_idx: str | int
+    # idenifier for the source indices of this record
+    record_source_indices: list[str] | list[int]
 
     # a dictionary with the record state after being processed by the operator
     record_state: dict[str, Any]
@@ -163,8 +172,8 @@ class RecordOpStats(BaseModel):
     cost_per_record: float
 
     ##### NOT-OPTIONAL, BUT FILLED BY EXECUTION CLASS AFTER CONSTRUCTOR CALL #####
-    # the ID of the physical operation which produced the input record for this record at this operation
-    source_full_op_id: str | None = None
+    # the ID(s) of the physical operation(s) which produced the input record(s) for this record at this operation
+    source_full_op_ids: list[str] | None = None
 
     # the ID of the physical plan which produced this record at this operation
     plan_id: str = ""
@@ -205,8 +214,11 @@ class RecordOpStats(BaseModel):
     # (if applicable) the filter text (or a string representation of the filter function) applied to this record
     filter_str: str | None = None
 
+    # (if applicable) the join condition applied to this record
+    join_condition: str | None = None
+
     # the True/False result of whether this record was output by the operator or not
-    # (can only be False if the operator is as Filter)
+    # (can only be False if the operator is a Filter or Join)
     passed_operator: bool = True
 
     # (if applicable) the time (in seconds) spent executing a call to an LLM
@@ -257,8 +269,8 @@ class OperatorStats(BaseModel):
     # a list of RecordOpStats processed by the operation
     record_op_stats_lst: list[RecordOpStats] = Field(default_factory=list)
 
-    # the full ID of the physical operator which precedes this one
-    source_full_op_id: str | None = None
+    # the full ID(s) of the physical operator(s) which precede this one
+    source_full_op_ids: list[str] | None = None
 
     # the ID of the physical plan which this operator is part of
     plan_id: str = ""
@@ -285,7 +297,7 @@ class OperatorStats(BaseModel):
             self.record_op_stats_lst.extend(stats.record_op_stats_lst)
 
         elif isinstance(stats, RecordOpStats):
-            stats.source_full_op_id = self.source_full_op_id
+            stats.source_full_op_ids = self.source_full_op_ids
             stats.plan_id = self.plan_id
             self.record_op_stats_lst.append(stats)
             self.total_op_time += stats.time_per_record
@@ -415,17 +427,18 @@ class PlanStats(BasePlanStats):
         """
         Initialize this PlanStats object from a PhysicalPlan object.
         """
+        # TODO?: have PhysicalPlan return PlanStats object
         operator_stats = {}
-        for op_idx, op in enumerate(plan.operators):
+        for topo_idx, op in enumerate(plan):
             full_op_id = op.get_full_op_id()
             operator_stats[full_op_id] = OperatorStats(
                 full_op_id=full_op_id,
                 op_name=op.op_name(),
-                source_full_op_id=None if op_idx == 0 else plan.operators[op_idx - 1].get_full_op_id(),
+                source_full_op_ids=plan.get_source_unique_full_op_ids(topo_idx, op),
                 plan_id=plan.plan_id,
                 op_details={k: str(v) for k, v in op.get_id_params().items()},
             )
-    
+
         return PlanStats(plan_id=plan.plan_id, plan_str=str(plan), operator_stats=operator_stats)
  
     def sum_op_costs(self) -> float:
@@ -499,18 +512,19 @@ class SentinelPlanStats(BasePlanStats):
         Initialize this PlanStats object from a Sentinel object.
         """
         operator_stats = {}
-        for op_set_idx, (logical_op_id, op_set) in enumerate(plan):
+        for logical_op_id, op_set in plan:
             operator_stats[logical_op_id] = {}
             for physical_op in op_set:
                 full_op_id = physical_op.get_full_op_id()
                 operator_stats[logical_op_id][full_op_id] = OperatorStats(
                     full_op_id=full_op_id,
                     op_name=physical_op.op_name(),
-                    source_full_op_id=None if op_set_idx == 0 else plan.logical_op_ids[op_set_idx - 1],  # NOTE: this may be a reason to keep `source_op_id` instead of `source_full_op_id`
+                    source_full_op_ids=None, # TODO: update this once we refactor SentinelPlanStats
+                    # source_full_op_ids=plan.get_source_unique_full_op_ids(op_set), # None if op_set_idx == 0 else plan.logical_op_ids[op_set_idx - 1],  # NOTE: this may be a reason to keep `source_op_id` instead of `source_full_op_id`
                     plan_id=plan.plan_id,
                     op_details={k: str(v) for k, v in physical_op.get_id_params().items()},
                 )
-    
+
         return SentinelPlanStats(plan_id=plan.plan_id, plan_str=str(plan), operator_stats=operator_stats)
 
     def sum_op_costs(self) -> float:
@@ -846,6 +860,15 @@ class PlanCost(BaseModel):
     def __hash__(self):
         return hash(f"{self.cost}-{self.time}-{self.quality}")
 
+    def __eq__(self, other: Any) -> bool:
+        if not isinstance(other, PlanCost):
+            return False
+        return (
+            self.cost == other.cost
+            and self.time == other.time
+            and self.quality == other.quality
+        )
+
     def model_post_init(self, __context: Any) -> None:
         if self.time_lower_bound is None and self.time_upper_bound is None:
             self.time_lower_bound = self.time
@@ -859,10 +882,51 @@ class PlanCost(BaseModel):
             self.quality_lower_bound = self.quality
             self.quality_upper_bound = self.quality
 
+    def join_add(self, left_plan_cost: PlanCost, right_plan_cost: PlanCost, execution_strategy: str = "parallel") -> PlanCost:
+        """
+        Add the PlanCost objects for two joined plans (left_plan_cost and right_plan_cost)
+        to the PlanCost object for the join operator. The execution strategy determines how
+        the input times are combined. If the execution strategy is "parallel", the input time
+        is the maximum of the two times. If the execution strategy is "sequential" (which is
+        currently anything else), the input time is the sum of the two times.
+
+        For quality, we compute the produce of the operator quality with the average of the
+        two input qualities.
+
+        NOTE: we currently assume the updating of the op_estimates are handled by the caller
+        as there is not a universally correct meaning of addition of op_estimates.
+        """
+        dct = {}
+        for model_field in ["cost", "cost_lower_bound", "cost_upper_bound"]:
+            op_field_value = getattr(self, model_field)
+            left_plan_field_value = getattr(left_plan_cost, model_field)
+            right_plan_field_value = getattr(right_plan_cost, model_field)
+            if op_field_value is not None and left_plan_field_value is not None and right_plan_field_value is not None:
+                dct[model_field] = op_field_value + left_plan_field_value + right_plan_field_value
+
+        for model_field in ["time", "time_lower_bound", "time_upper_bound"]:
+            op_field_value = getattr(self, model_field)
+            left_plan_field_value = getattr(left_plan_cost, model_field)
+            right_plan_field_value = getattr(right_plan_cost, model_field)
+            if op_field_value is not None and left_plan_field_value is not None and right_plan_field_value is not None:
+                if execution_strategy == "parallel":
+                    dct[model_field] = op_field_value + max(left_plan_field_value, right_plan_field_value)
+                else:
+                    dct[model_field] = op_field_value + left_plan_field_value + right_plan_field_value
+
+        for model_field in ["quality", "quality_lower_bound", "quality_upper_bound"]:
+            op_field_value = getattr(self, model_field)
+            left_plan_field_value = getattr(left_plan_cost, model_field)
+            right_plan_field_value = getattr(right_plan_cost, model_field)
+            if op_field_value is not None and left_plan_field_value is not None and right_plan_field_value is not None:
+                dct[model_field] = op_field_value * ((left_plan_field_value + right_plan_field_value) / 2.0)
+
+        return PlanCost(**dct)
+
     def __iadd__(self, other: PlanCost) -> PlanCost:
         """
         NOTE: we currently assume the updating of the op_estimates are handled by the caller
-        as there is not a universally correct meaning of addition of op_estiamtes.
+        as there is not a universally correct meaning of addition of op_estimates.
         """
         self.cost += other.cost
         self.time += other.time
@@ -882,7 +946,7 @@ class PlanCost(BaseModel):
     def __add__(self, other: PlanCost) -> PlanCost:
         """
         NOTE: we currently assume the updating of the op_estimates are handled by the caller
-        as there is not a universally correct meaning of addition of op_estiamtes.
+        as there is not a universally correct meaning of addition of op_estimates.
         """
         dct = {
             field: getattr(self, field) + getattr(other, field)
