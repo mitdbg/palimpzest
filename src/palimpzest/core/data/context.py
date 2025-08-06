@@ -1,20 +1,24 @@
 from __future__ import annotations
 
 import os
-import re
+import time
 from abc import ABC
 from typing import Callable
 
+import pandas as pd
 from pydantic import BaseModel
 from smolagents import CodeAgent, LiteLLMModel
 
 from palimpzest.core.data import context_manager
 from palimpzest.core.data.dataset import Dataset
 from palimpzest.core.lib.schemas import create_schema_from_fields, union_schemas
+from palimpzest.core.models import GenerationStats
 from palimpzest.query.operators.logical import ComputeOperator, ContextScan, LogicalOperator, SearchOperator
 from palimpzest.utils.hash_helpers import hash_for_id
 
-PZ_INSTRUCTION = """\n\nYou are a CodeAgent who is a specialist at writing declarative AI programs with the Palimpzest (PZ) library.
+PZ_INSTRUCTION = """DO NOT GUESS THE ANSWER TO ANY QUESTION\n\nYou are a CodeAgent who is a specialist at writing declarative AI programs with the Palimpzest (PZ) library.
+
+Your primary focus is to write a PZ program to answer the task that you have been given.
 
 Palimpzest is a programming framework which provides you with **semantic operators** (e.g. semantic maps, semantic filters, etc.)
 which are like their traditional counterparts, except they can execute instructions provided in natural language.
@@ -39,7 +43,7 @@ paper_cols = [
 ]
 
 # construct the data processing pipeline with PZ
-ds = pz.TextFileDataset(id="papers", path="path/to/papers")
+ds = pz.FileDirectoryDataset(id="papers", path="path/to/papers")
 ds = ds.sem_add_columns(cols)
 
 # optimize and execute the PZ program
@@ -55,10 +59,8 @@ output = ds.optimize_and_run(config=config, validator=validator)
 # write the execution stats to json
 output.execution_stats.to_json("pz_program_stats.json")
 
-# write the output to a CSV and print the output CSV filepath so the user knows where to find it
-output_filepath = "pz_program_output.csv"
-output.to_df().to_csv(output_filepath, index=False)
-print(f"Results at: {output_filepath}")
+# return the output to the user as a list of dictionaries
+final_answer(output.to_df().to_dict(orient="records"))
 ```
 
 To initialize a dataset in PZ, simply provide the path to a directory to `pz.TextFileDirectory()`
@@ -70,7 +72,7 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
-ds = pz.TextFileDataset(id="files", path="path/to/files")
+ds = pz.FileDirectoryDataset(id="files", path="path/to/files")
 ```
 
 Palimpzest has two primary **semantic operators** which you can use to construct data processing pipelines:
@@ -87,7 +89,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # construct the PZ program
-ds = pz.TextFileDataset(id="papers", path="path/to/research-papers")
+ds = pz.FileDirectoryDataset(id="papers", path="path/to/research-papers")
 ds = ds.sem_filter("The paper is about batteries")
 ds = ds.sem_filter("The paper is from MIT")
 ds = ds.sem_add_columns([{"name": "summary", "type": str, "description": "A summary of the paper"}])
@@ -105,16 +107,16 @@ output = ds.optimize_and_run(config=config, validator=validator)
 # write the execution stats to json
 output.execution_stats.to_json("pz_program_stats.json")
 
-# write the output to a CSV and print the output CSV filepath so the user knows where to find it
-output_filepath = "pz_program_output.csv"
-output.to_df().to_csv(output_filepath, index=False)
-print(f"Results at: {output_filepath}")
+# return the output to the user as a list of dictionaries
+final_answer(output.to_df().to_dict(orient="records"))
 ```
 
 Be sure to always:
 - execute your program using the `.optimize_and_run()` format shown above
 - call `output.execution_stats.to_json("pz_program_stats.json")` to write execution statistics to disk
-- write your output to CSV and print where you wrote it!
+- use final_answer to return your final output as a list of dictionaries
+
+These last three instructions are VERY IMPORTANT. If you do not return your output with final_answer(), all of your work will be lost!
 """
 
 class Context(Dataset, ABC):
@@ -268,88 +270,97 @@ class TextFileContext(Context):
             schema=schema,
             materialized=True,
         )
-    def _check_filter_answer_text(self, answer_text: str) -> dict | None:
-        """
-        Return {"passed_operator": True} if and only if "true" is in the answer text.
-        Return {"passed_operator": False} if and only if "false" is in the answer text.
-        Otherwise, return None.
-        """
-        # NOTE: we may be able to eliminate this condition by specifying this JSON output in the prompt;
-        # however, that would also need to coincide with a change to allow the parse_answer_fn to set "passed_operator"
-        if "true" in answer_text.lower():
-            return {"passed_operator": True}
-        elif "false" in answer_text.lower():
-            return {"passed_operator": False}
-        elif "yes" in answer_text.lower():
-            return {"passed_operator": True}
 
-        return None
-
-    def _parse_filter_answer(self, completion_text: str) -> dict[str, list]:
-        """Extract the answer from the completion object for filter operations."""
-        # if the model followed the default instructions, the completion text will place
-        # its answer between "ANSWER:" and "---"
-        regex = re.compile("answer:(.*?)---", re.IGNORECASE | re.DOTALL)
-        matches = regex.findall(completion_text)
-        if len(matches) > 0:
-            answer_text = matches[0].strip()
-            field_answers = self._check_filter_answer_text(answer_text)
-            if field_answers is not None:
-                return field_answers
-
-        # if the first regex didn't find an answer, try taking all the text after "ANSWER:"
-        regex = re.compile("answer:(.*)", re.IGNORECASE | re.DOTALL)
-        matches = regex.findall(completion_text)
-        if len(matches) > 0:
-            answer_text = matches[0].strip()
-            field_answers = self._check_filter_answer_text(answer_text)
-            if field_answers is not None:
-                return field_answers
-
-        # finally, try taking all of the text; throw an exception if this doesn't work
-        field_answers = self._check_filter_answer_text(completion_text)
-        if field_answers is None:
-            raise Exception(f"Could not parse answer from completion text: {completion_text}")
-
-        return field_answers
-
-    # def tool_list_filepaths(self) -> list[str]:
+    # def _check_filter_answer_text(self, answer_text: str) -> dict | None:
     #     """
-    #     This tool returns the list of all of the filepaths which the `Context` has access to.
+    #     Return {"passed_operator": True} if and only if "true" is in the answer text.
+    #     Return {"passed_operator": False} if and only if "false" is in the answer text.
+    #     Otherwise, return None.
+    #     """
+    #     # NOTE: we may be able to eliminate this condition by specifying this JSON output in the prompt;
+    #     # however, that would also need to coincide with a change to allow the parse_answer_fn to set "passed_operator"
+    #     if "true" in answer_text.lower():
+    #         return {"passed_operator": True}
+    #     elif "false" in answer_text.lower():
+    #         return {"passed_operator": False}
+    #     elif "yes" in answer_text.lower():
+    #         return {"passed_operator": True}
 
-    #     Args:
-    #         None
+    #     return None
+
+    # def _parse_filter_answer(self, completion_text: str) -> dict[str, list]:
+    #     """Extract the answer from the completion object for filter operations."""
+    #     # if the model followed the default instructions, the completion text will place
+    #     # its answer between "ANSWER:" and "---"
+    #     regex = re.compile("answer:(.*?)---", re.IGNORECASE | re.DOTALL)
+    #     matches = regex.findall(completion_text)
+    #     if len(matches) > 0:
+    #         answer_text = matches[0].strip()
+    #         field_answers = self._check_filter_answer_text(answer_text)
+    #         if field_answers is not None:
+    #             return field_answers
+
+    #     # if the first regex didn't find an answer, try taking all the text after "ANSWER:"
+    #     regex = re.compile("answer:(.*)", re.IGNORECASE | re.DOTALL)
+    #     matches = regex.findall(completion_text)
+    #     if len(matches) > 0:
+    #         answer_text = matches[0].strip()
+    #         field_answers = self._check_filter_answer_text(answer_text)
+    #         if field_answers is not None:
+    #             return field_answers
+
+    #     # finally, try taking all of the text; throw an exception if this doesn't work
+    #     field_answers = self._check_filter_answer_text(completion_text)
+    #     if field_answers is None:
+    #         raise Exception(f"Could not parse answer from completion text: {completion_text}")
+
+    #     return field_answers
+
+    def tool_list_filepaths(self) -> list[str]:
+        """
+        This tool returns the list of all of the filepaths which the `Context` has access to.
+
+        Args:
+            None
         
-    #     Returns:
-    #         list[str]: A list of file paths for all files in the `Context`.
-    #     """
-    #     return self.filepaths
+        Returns:
+            list[str]: A list of file paths for all files in the `Context`.
+        """
+        return self.filepaths
 
-    # def tool_read_filepath(self, path: str) -> str:
-    #     """
-    #     This tool takes a filepath (`path`) as input and returns the content of the file as a string.
-    #     It handles both CSV files and html / regular text files. It does not handle images.
+    def tool_read_filepath(self, path: str) -> str:
+        """
+        This tool takes a filepath (`path`) as input and returns the content of the file as a string.
+        It handles both CSV files and html / regular text files. It does not handle images.
 
-    #     Args:
-    #         path (str): The path to the file to read.
+        Args:
+            path (str): The path to the file to read.
 
-    #     Returns:
-    #         str: The content of the file as a string.
-    #     """
-    #     if path.endswith(".csv"):
-    #         return pd.read_csv(path, encoding="ISO-8859-1").to_string(index=False)
+        Returns:
+            str: The content of the file as a string.
+        """
+        if path.endswith(".csv"):
+            return pd.read_csv(path, encoding="ISO-8859-1").to_string(index=False)
 
-    #     with open(path, encoding='utf-8') as file:
-    #         content = file.read()
+        with open(path, encoding='utf-8') as file:
+            content = file.read()
 
-    #     return content
+        return content
 
     def tool_execute_semantic_operators(self, instruction: str) -> str:
         """
+        This tool is exceptional at searching for and extracting information from large datasets.
+
         This tool takes an `instruction` as input and invokes an expert to write a semantic data processing pipeline
         to execute the instruction. The tool returns the path to a CSV file which contains the output of the pipeline.
 
-        For example, the tool could be invoked as follows to extract the title and abstract from a dataset of research papers:
+        For example, the tool could be invoked as follows to find a paper containing a particular subject:
+        ```
+        instruction = "Write a program to find all research papers which mention electrolysis"
+        result_csv_filepath = tool_execute_semantic_operators(instruction)
+        ```
+
+        As another example, the tool could be invoked as follows to extract the title and abstract from a dataset of research papers:
         ```
         instruction = "Write a program to extract the title and abstract from each research paper"
         result_csv_filepath = tool_execute_semantic_operators(instruction)
@@ -377,6 +388,7 @@ class TextFileContext(Context):
             """
             return self.filepaths
 
+        start_time = time.time()
         agent = CodeAgent(
             model=LiteLLMModel(model_id="openai/o1", api_key=os.getenv("ANTHROPIC_API_KEY")),
             tools=[tool_list_filepaths],
@@ -384,10 +396,33 @@ class TextFileContext(Context):
             planning_interval=4,
             add_base_tools=False,
             return_full_result=True,
-            additional_authorized_imports=["dotenv", "json", "palimpzest", "pandas"],
+            additional_authorized_imports=["dotenv", "os", "palimpzest"],
             instructions=PZ_INSTRUCTION,
         )
         result = agent.run(instruction)
+
+        # compute generation stats
         response = result.output
+        input_tokens = result.token_usage.input_tokens
+        output_tokens = result.token_usage.output_tokens
+        cost_per_input_token = (15.0 / 1e6)
+        cost_per_output_token = (60.0 / 1e6)
+        input_cost = input_tokens * cost_per_input_token
+        output_cost = output_tokens * cost_per_output_token
+        generation_stats = GenerationStats(
+            model_name="o1",
+            total_input_tokens=input_tokens,
+            total_output_tokens=output_tokens,
+            total_input_cost=input_cost,
+            total_output_cost=output_cost,
+            cost_per_record=input_cost + output_cost,
+            llm_call_duration_secs=time.time() - start_time,
+        )
+        ts = time.time()
+        generation_stats.to_json(f"pz_program_agent_gen_stats_{ts}.json")
+
+        # save pz program stats if they were computed
+        if os.path.exists("pz_program_stats.json"):
+            os.rename("pz_program_stats.json", f"pz_program_stats_{ts}.json")
 
         return response

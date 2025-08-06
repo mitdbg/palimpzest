@@ -4,6 +4,7 @@ from palimpzest.constants import Cardinality
 from palimpzest.core.data.context import Context, TextFileContext
 from palimpzest.core.data.dataset import Dataset
 from palimpzest.core.data.iter_dataset import (
+    FileDirectoryDataset,
     HTMLFileDataset,
     ImageFileDataset,
     IterDataset,
@@ -36,6 +37,7 @@ __all__ = [
     "Context",
     "TextFileContext",
     "Dataset",
+    "FileDirectoryDataset",
     "IterDataset",
     "MemoryDataset",
     "HTMLFileDataset",

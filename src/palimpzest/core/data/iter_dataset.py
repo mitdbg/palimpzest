@@ -388,6 +388,70 @@ class TextFileDataset(BaseFileDataset):
         return {"filename": filename, "contents": contents}
 
 
+class FileDirectoryDataset(IterDataset):
+    """
+    TextFileDataset returns a dictionary for each text file in a directory. Each dictionary contains the
+    filename and contents of a single text file in the directory.
+    """
+    def __init__(self, path: str, **kwargs) -> None:
+        """
+        Constructor for the `BaseFileDataset` class.
+
+        Args:
+            path (str): The path to the file
+            kwargs (dict): Keyword arguments containing the `Dataset's` id and file-specific `Schema`
+        """
+        # check that path is a valid file or directory
+        assert os.path.isfile(path) or os.path.isdir(path), f"Path {path} is not a file nor a directory"
+
+        # get list of filepaths
+        self.filepaths = []
+        if os.path.isfile(path):
+            self.filepaths = [path]
+        else:
+            self.filepaths = []
+            for root, _, files in os.walk(path):
+                for file in files:
+                    fp = os.path.join(root, file)
+                    self.filepaths.append(fp)
+            self.filepaths = sorted(self.filepaths)
+
+        # call parent constructor to set id, operator, and schema
+        kwargs["schema"] = kwargs.get("schema", TextFile)
+        super().__init__(**kwargs)
+
+    def __len__(self) -> int:
+        return len(self.filepaths)
+
+    def __getitem__(self, idx: int) -> dict:
+        """
+        Returns a dictionary with the filename and contents of the text file at the specified `idx`.
+
+        Args:
+            idx (int): The index of the item to return
+
+        Returns:
+            dict: A dictionary with the filename and contents of the text file.
+
+            .. code-block:: python
+
+                {
+                    "filename": "file.txt",
+                    "contents": "text content here",
+                }
+        """
+        filepath = self.filepaths[idx]
+        contents = None
+        if filepath.endswith(".csv"):
+            contents = pd.read_csv(filepath, encoding="ISO-8859-1").to_string(index=False)
+
+        else:
+            with open(filepath, encoding='utf-8') as file:
+                contents = file.read()
+
+        return {"filename": os.path.basename(filepath), "contents": contents}
+
+
 class XLSFileDataset(BaseFileDataset):
     """
     XLSFileDataset returns a dictionary for each XLS file in a directory. Each dictionary contains the
