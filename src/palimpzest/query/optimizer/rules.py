@@ -685,6 +685,8 @@ class AddContextsBeforeComputeRule(ImplementationRule):
             model = "openai/gpt-4o-mini"
         elif os.getenv("ANTHROPIC_API_KEY"):
             model = "anthropic/claude-3-5-sonnet-20241022"
+        elif os.getenv("GEMINI_API_KEY"):
+            model = "vertex_ai/gemini-2.0-flash"
         elif os.getenv("TOGETHER_API_KEY"):
             model = "together_ai/meta-llama/Llama-3.3-70B-Instruct-Turbo"
 
