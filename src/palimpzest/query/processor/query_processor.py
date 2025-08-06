@@ -1,13 +1,12 @@
 import logging
 from abc import abstractmethod
 
-from palimpzest.core.data.dataclasses import PlanStats
-from palimpzest.core.data.datareaders import DataReader
+from palimpzest.core.data.dataset import Dataset
 from palimpzest.core.elements.records import DataRecord, DataRecordCollection
+from palimpzest.core.models import PlanStats
 from palimpzest.policy import Policy
 from palimpzest.query.execution.execution_strategy import ExecutionStrategy, SentinelExecutionStrategy
 from palimpzest.query.optimizer.optimizer import Optimizer
-from palimpzest.sets import Dataset
 from palimpzest.utils.hash_helpers import hash_for_id
 from palimpzest.utils.model_helpers import get_models
 
@@ -27,9 +26,8 @@ class QueryProcessor:
         execution_strategy: ExecutionStrategy,
         sentinel_execution_strategy: SentinelExecutionStrategy | None,
         num_samples: int | None = None,
-        val_datasource: DataReader | None = None,
+        val_datasource: Dataset | None = None,
         scan_start_idx: int = 0,
-        cache: bool = False,
         verbose: bool = False,
         progress: bool = True,
         max_workers: int | None = None,
@@ -52,7 +50,6 @@ class QueryProcessor:
         self.num_samples = num_samples
         self.val_datasource = val_datasource
         self.scan_start_idx = scan_start_idx
-        self.cache = cache
         self.verbose = verbose
         self.progress = progress
         self.max_workers = max_workers
@@ -61,7 +58,7 @@ class QueryProcessor:
 
         self.available_models = available_models
         if self.available_models is None or len(self.available_models) == 0:
-            self.available_models = get_models(include_vision=True)
+            self.available_models = get_models()
 
         if self.verbose:
             print("Available models: ", self.available_models)
@@ -91,7 +88,6 @@ class QueryProcessor:
         # return the output records and plan stats
         return records, [plan_stats]
 
-    # TODO: consider to support dry_run.
     @abstractmethod
     def execute(self) -> DataRecordCollection:
         raise NotImplementedError("Abstract method to be overwritten by sub-classes")

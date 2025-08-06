@@ -1,16 +1,16 @@
 import logging
 from enum import Enum
 
+from palimpzest.core.data.dataset import Dataset
 from palimpzest.core.elements.records import DataRecordCollection
 from palimpzest.query.execution.execution_strategy import ExecutionStrategy, SentinelExecutionStrategy
 from palimpzest.query.execution.execution_strategy_type import ExecutionStrategyType, SentinelExecutionStrategyType
-from palimpzest.query.optimizer.cost_model import CostModel
+from palimpzest.query.optimizer.cost_model import SampleBasedCostModel
 from palimpzest.query.optimizer.optimizer import Optimizer
 from palimpzest.query.optimizer.optimizer_strategy_type import OptimizationStrategyType
 from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.query.processor.processing_strategy_type import ProcessingStrategyType
 from palimpzest.query.processor.query_processor import QueryProcessor
-from palimpzest.sets import Dataset, Set
 from palimpzest.utils.model_helpers import get_models
 
 logger = logging.getLogger(__name__)
@@ -57,9 +57,6 @@ class QueryProcessorFactory:
     def _config_validation_and_normalization(cls, config: QueryProcessorConfig):
         if config.policy is None:
             raise ValueError("Policy is required for optimizer")
-
-        if config.cache:
-            raise ValueError("cache=True is not supported yet")
         
         # only one of progress or verbose can be set; we will default to progress=True
         if config.progress and config.verbose:
@@ -91,14 +88,14 @@ class QueryProcessorFactory:
         # get available models
         available_models = getattr(config, 'available_models', [])
         if available_models is None or len(available_models) == 0:
-            available_models = get_models(include_vision=True)
+            available_models = get_models()
         config.available_models = available_models
 
         return config
 
     @classmethod
     def _create_optimizer(cls, config: QueryProcessorConfig) -> Optimizer:
-        return Optimizer(cost_model=CostModel(), **config.to_dict())
+        return Optimizer(cost_model=SampleBasedCostModel(), **config.to_dict())
 
     @classmethod
     def _create_execution_strategy(cls, config: QueryProcessorConfig) -> ExecutionStrategy:
@@ -122,7 +119,7 @@ class QueryProcessorFactory:
     @classmethod
     def create_processor(
         cls,
-        dataset: Set,
+        dataset: Dataset,
         config: QueryProcessorConfig | None = None,
         **kwargs
     ) -> QueryProcessor:

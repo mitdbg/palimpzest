@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from palimpzest.core.data.dataclasses import PlanCost
+from palimpzest.core.models import PlanCost
 
 
 def construct_policy_from_kwargs(**kwargs) -> Policy | None:

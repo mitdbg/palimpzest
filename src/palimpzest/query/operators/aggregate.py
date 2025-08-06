@@ -3,10 +3,10 @@ from __future__ import annotations
 import time
 
 from palimpzest.constants import NAIVE_EST_NUM_GROUPS, AggFunc
-from palimpzest.core.data.dataclasses import OperatorCostEstimates, RecordOpStats
 from palimpzest.core.elements.groupbysig import GroupBySig
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
-from palimpzest.core.lib.schemas import Number
+from palimpzest.core.lib.schemas import Average, Count
+from palimpzest.core.models import OperatorCostEstimates, RecordOpStats
 from palimpzest.query.operators.physical import PhysicalOperator
 
 
@@ -111,7 +111,6 @@ class ApplyGroupByOp(AggregateOp):
         group_by_fields = self.group_by_sig.group_by_fields
         agg_fields = self.group_by_sig.get_agg_field_names()
         for g in agg_state:
-            dr = DataRecord(self.group_by_sig.output_schema())
             # NOTE: this will set the parent_id and source_idx to be the id of the final source record;
             #       in the near future we may want to have parent_id accept a list of ids
             dr = DataRecord.from_parent(
@@ -155,12 +154,19 @@ class AverageAggregateOp(AggregateOp):
     # NOTE: we don't actually need / use agg_func here (yet)
 
     def __init__(self, agg_func: AggFunc, *args, **kwargs):
-        kwargs["output_schema"] = Number
+        # enforce that output schema is correct
+        assert kwargs["output_schema"] == Average, "AverageAggregateOp requires output_schema to be Average"
+
+        # enforce that input schema is a single numeric field
+        input_field_types = list(kwargs["input_schema"].model_fields.values())
+        assert len(input_field_types) == 1, "AverageAggregateOp requires input_schema to have exactly one field"
+        numeric_field_types = [bool, int, float, bool | None, int | None, float | None, int | float, int | float | None]
+        is_numeric = input_field_types[0].annotation in numeric_field_types
+        assert is_numeric, f"AverageAggregateOp requires input_schema to have a numeric field type, i.e. one of: {numeric_field_types}\nGot: {input_field_types[0]}"
+
+        # call parent constructor
         super().__init__(*args, **kwargs)
         self.agg_func = agg_func
-
-        if not self.input_schema.get_desc() == Number.get_desc():
-            raise Exception("Aggregate function AVERAGE is only defined over Numbers")
 
     def __str__(self):
         op = super().__str__()
@@ -187,10 +193,22 @@ class AverageAggregateOp(AggregateOp):
     def __call__(self, candidates: DataRecordSet) -> DataRecordSet:
         start_time = time.time()
 
+        # NOTE: we currently do not guarantee that input values conform to their specified type;
+        #       as a result, we simply omit any values which do not parse to a float from the average
+        # NOTE: right now we perform a check in the constructor which enforces that the input_schema
+        #       has a single field which is numeric in nature; in the future we may want to have a
+        #       cleaner way of computing the value (rather than `float(list(candidate...))` below)
         # NOTE: this will set the parent_id and source_idx to be the id of the final source record;
         #       in the near future we may want to have parent_id accept a list of ids
-        dr = DataRecord.from_parent(schema=Number, parent_record=candidates[-1], project_cols=[])
-        dr.value = sum(list(map(lambda c: float(c.value), candidates))) / len(candidates)
+        dr = DataRecord.from_parent(schema=Average, parent_record=candidates[-1], project_cols=[])
+        summation, total = 0, 0
+        for candidate in candidates:
+            try:
+                summation += float(list(candidate.to_dict().values())[0])
+                total += 1
+            except Exception:
+                pass
+        dr.average = summation / total
 
         # create RecordOpStats object
         record_op_stats = RecordOpStats(
@@ -212,7 +230,10 @@ class CountAggregateOp(AggregateOp):
     # NOTE: we don't actually need / use agg_func here (yet)
 
     def __init__(self, agg_func: AggFunc, *args, **kwargs):
-        kwargs["output_schema"] = Number
+        # enforce that output schema is correct
+        assert kwargs["output_schema"] == Count, "CountAggregateOp requires output_schema to be Count"
+
+        # call parent constructor
         super().__init__(*args, **kwargs)
         self.agg_func = agg_func
 
@@ -243,8 +264,8 @@ class CountAggregateOp(AggregateOp):
 
         # NOTE: this will set the parent_id to be the id of the final source record;
         #       in the near future we may want to have parent_id accept a list of ids
-        dr = DataRecord.from_parent(schema=Number, parent_record=candidates[-1], project_cols=[])
-        dr.value = len(candidates)
+        dr = DataRecord.from_parent(schema=Count, parent_record=candidates[-1], project_cols=[])
+        dr.count = len(candidates)
 
         # create RecordOpStats object
         record_op_stats = RecordOpStats(

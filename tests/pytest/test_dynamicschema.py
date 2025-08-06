@@ -22,7 +22,8 @@ def test_dynamicschema_csv():
 def test_dynamicschema_json(mocker, enron_workload, enron_convert, enron_filter):
     email_schema = SchemaBuilder.from_file(data_path + "/email_schema.json")
     assert email_schema is not None
-    assert issubclass(email_schema, TextFile)
+    for field_name in TextFile.model_fields:
+        assert field_name in email_schema.model_fields, f"Field {field_name} not found in the schema"
 
     # mock out calls to generators used by the plans which parameterize this test
     mocker.patch.object(LLMFilter, "filter", side_effect=enron_filter)
@@ -32,9 +33,7 @@ def test_dynamicschema_json(mocker, enron_workload, enron_convert, enron_filter)
         policy=MinCost(),
         available_models=[Model.GPT_4o_MINI],
         num_samples=3,
-        cache=False,
         allow_bonded_query=True,
-        allow_code_synth=False,
         allow_rag_reduction=False,
         allow_mixtures=False,
         allow_critic=False,
@@ -52,7 +51,8 @@ def test_dynamicschema_json(mocker, enron_workload, enron_convert, enron_filter)
 def test_dynamicschema_yml(mocker, enron_workload, enron_convert, enron_filter):
     email_schema = SchemaBuilder.from_file(data_path + "/email_schema.yml")
     assert email_schema is not None
-    assert issubclass(email_schema, TextFile)
+    for field_name in TextFile.model_fields:
+        assert field_name in email_schema.model_fields, f"Field {field_name} not found in the schema"
 
     # mock out calls to generators used by the plans which parameterize this test
     mocker.patch.object(LLMFilter, "filter", side_effect=enron_filter)
@@ -62,9 +62,7 @@ def test_dynamicschema_yml(mocker, enron_workload, enron_convert, enron_filter):
         policy=MinCost(),
         available_models=[Model.GPT_4o_MINI],
         num_samples=3,
-        cache=False,
         allow_bonded_query=True,
-        allow_code_synth=False,
         allow_rag_reduction=False,
         allow_mixtures=False,
         allow_critic=False,

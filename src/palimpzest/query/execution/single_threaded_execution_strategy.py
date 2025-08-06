@@ -1,11 +1,11 @@
 import logging
 
-from palimpzest.core.data.dataclasses import PlanStats
 from palimpzest.core.elements.records import DataRecord
+from palimpzest.core.models import PlanStats
 from palimpzest.query.execution.execution_strategy import ExecutionStrategy
 from palimpzest.query.operators.aggregate import AggregateOp
 from palimpzest.query.operators.limit import LimitScanOp
-from palimpzest.query.operators.scan import ScanPhysicalOp
+from palimpzest.query.operators.scan import ContextScanOp, ScanPhysicalOp
 from palimpzest.query.optimizer.plan import PhysicalPlan
 from palimpzest.utils.progress import create_progress_manager
 
@@ -67,9 +67,6 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
             # update plan stats
             plan_stats.add_record_op_stats(record_op_stats)
 
-            # add records to the cache
-            self._add_records_to_cache(operator.target_cache_id, records)
-
             # update next input_queue (if it exists)
             output_records = [record for record in records if record.passed_operator]            
             if op_idx + 1 < len(plan.operators):
@@ -77,9 +74,6 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
                 input_queues[next_full_op_id] = output_records
 
             logger.info(f"Finished processing operator {operator.op_name()} ({operator.get_full_op_id()}), and generated {len(records)} records")
-
-        # close the cache
-        self._close_cache([op.target_cache_id for op in plan.operators])
 
         # finalize plan stats
         plan_stats.finish()
@@ -89,7 +83,7 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
     def execute_plan(self, plan: PhysicalPlan) -> tuple[list[DataRecord], PlanStats]:
         """Initialize the stats and execute the plan."""
         # for now, assert that the first operator in the plan is a ScanPhysicalOp
-        assert isinstance(plan.operators[0], ScanPhysicalOp), "First operator in physical plan must be a ScanPhysicalOp"
+        assert isinstance(plan.operators[0], (ScanPhysicalOp, ContextScanOp)), "First operator in physical plan must be a scan operator"
         logger.info(f"Executing plan {plan.plan_id} with {self.max_workers} workers")
         logger.info(f"Plan Details: {plan}")
 
@@ -194,9 +188,6 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
                 # update plan stats
                 plan_stats.add_record_op_stats(record_op_stats)
 
-                # add records to the cache
-                self._add_records_to_cache(operator.target_cache_id, records)
-
                 # update next input_queue or final_output_records
                 output_records = [record for record in records if record.passed_operator]            
                 if op_idx + 1 < len(plan.operators):
@@ -211,9 +202,6 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
             if isinstance(plan.operators[-1], LimitScanOp) and len(final_output_records) == plan.operators[-1].limit:
                 break
 
-        # close the cache
-        self._close_cache([op.target_cache_id for op in plan.operators])
-
         # finalize plan stats
         plan_stats.finish()
 
@@ -222,7 +210,7 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
     def execute_plan(self, plan: PhysicalPlan):
         """Initialize the stats and execute the plan."""
         # for now, assert that the first operator in the plan is a ScanPhysicalOp
-        assert isinstance(plan.operators[0], ScanPhysicalOp), "First operator in physical plan must be a ScanPhysicalOp"
+        assert isinstance(plan.operators[0], (ScanPhysicalOp, ContextScanOp)), "First operator in physical plan must be a scan operator"
         logger.info(f"Executing plan {plan.plan_id} with {self.max_workers} workers")
         logger.info(f"Plan Details: {plan}")
 

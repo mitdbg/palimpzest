@@ -3,13 +3,13 @@ import multiprocessing
 from concurrent.futures import ThreadPoolExecutor, wait
 
 from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS
-from palimpzest.core.data.dataclasses import PlanStats
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
+from palimpzest.core.models import PlanStats
 from palimpzest.query.execution.execution_strategy import ExecutionStrategy
 from palimpzest.query.operators.aggregate import AggregateOp
 from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.operators.physical import PhysicalOperator
-from palimpzest.query.operators.scan import ScanPhysicalOp
+from palimpzest.query.operators.scan import ContextScanOp, ScanPhysicalOp
 from palimpzest.query.optimizer.plan import PhysicalPlan
 from palimpzest.utils.progress import create_progress_manager
 
@@ -80,9 +80,6 @@ class ParallelExecutionStrategy(ExecutionStrategy):
             # update plan stats
             plan_stats.add_record_op_stats(record_op_stats)
 
-            # add records to the cache
-            self._add_records_to_cache(operator.target_cache_id, records)
-
             # add records which aren't filtered to the output records
             output_records.extend([record for record in records if record.passed_operator])
         
@@ -140,9 +137,6 @@ class ParallelExecutionStrategy(ExecutionStrategy):
                 if isinstance(final_op, LimitScanOp) and len(output_records) == final_op.limit:
                     break
 
-        # close the cache
-        self._close_cache([op.target_cache_id for op in plan.operators])
-
         # finalize plan stats
         plan_stats.finish()
 
@@ -152,7 +146,7 @@ class ParallelExecutionStrategy(ExecutionStrategy):
     def execute_plan(self, plan: PhysicalPlan):
         """Initialize the stats and execute the plan."""
         # for now, assert that the first operator in the plan is a ScanPhysicalOp
-        assert isinstance(plan.operators[0], ScanPhysicalOp), "First operator in physical plan must be a ScanPhysicalOp"
+        assert isinstance(plan.operators[0], (ScanPhysicalOp, ContextScanOp)), "First operator in physical plan must be a scan operator"
         logger.info(f"Executing plan {plan.plan_id} with {self.max_workers} workers")
         logger.info(f"Plan Details: {plan}")
 
@@ -249,9 +243,6 @@ class SequentialParallelExecutionStrategy(ExecutionStrategy):
             # update plan stats
             plan_stats.add_record_op_stats(record_op_stats)
 
-            # add records to the cache
-            self._add_records_to_cache(operator.target_cache_id, records)
-
             # add records which aren't filtered to the output records
             output_records.extend([record for record in records if record.passed_operator])
         
@@ -307,9 +298,6 @@ class SequentialParallelExecutionStrategy(ExecutionStrategy):
                         if isinstance(final_op, LimitScanOp) and len(output_records) == final_op.limit:
                             break
 
-        # close the cache
-        self._close_cache([op.target_cache_id for op in plan.operators])
-
         # finalize plan stats
         plan_stats.finish()
 
@@ -319,7 +307,7 @@ class SequentialParallelExecutionStrategy(ExecutionStrategy):
     def execute_plan(self, plan: PhysicalPlan):
         """Initialize the stats and execute the plan."""
         # for now, assert that the first operator in the plan is a ScanPhysicalOp
-        assert isinstance(plan.operators[0], ScanPhysicalOp), "First operator in physical plan must be a ScanPhysicalOp"
+        assert isinstance(plan.operators[0], (ScanPhysicalOp, ContextScanOp)), "First operator in physical plan must be a scan operator"
         logger.info(f"Executing plan {plan.plan_id} with {self.max_workers} workers")
         logger.info(f"Plan Details: {plan}")
 

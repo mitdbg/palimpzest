@@ -3,9 +3,10 @@ from __future__ import annotations
 import time
 from typing import Callable
 
-from palimpzest.core.data.dataclasses import GenerationStats, OperatorCostEstimates, RecordOpStats
+from pydantic.fields import FieldInfo
+
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
-from palimpzest.core.lib.fields import Field
+from palimpzest.core.models import GenerationStats, OperatorCostEstimates, RecordOpStats
 from palimpzest.query.operators.physical import PhysicalOperator
 
 
@@ -75,7 +76,7 @@ class MapOp(PhysicalOperator):
             quality=1.0,
         )
 
-    def map(self, candidate: DataRecord, fields: dict[str, Field]) -> tuple[dict[str, list], GenerationStats]:
+    def map(self, candidate: DataRecord, fields: dict[str, FieldInfo]) -> tuple[dict[str, list], GenerationStats]:
         # apply UDF to input record
         start_time = time.time()
         field_answers = {}
@@ -111,7 +112,7 @@ class MapOp(PhysicalOperator):
 
         # execute the map operation
         field_answers: dict[str, list]
-        fields = {field: field_type for field, field_type in self.output_schema.field_map().items()}
+        fields = {field: field_type for field, field_type in self.output_schema.model_fields.items()} # TODO: is this copy necessary?
         field_answers, generation_stats = self.map(candidate=candidate, fields=fields)
         assert all([field in field_answers for field in fields]), "Not all fields are present in output of map!"
 

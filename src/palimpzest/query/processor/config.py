@@ -1,8 +1,8 @@
 import json
 from dataclasses import dataclass, field
+from typing import Any
 
 from palimpzest.constants import Model
-from palimpzest.core.data.datareaders import DataReader
 from palimpzest.policy import MaxQuality, Policy
 
 
@@ -16,12 +16,11 @@ class QueryProcessorConfig:
     sentinel_execution_strategy: str | None = field(default="auto")  # substituted with SentinelExecutionStrategyType
     optimizer_strategy: str = field(default="pareto")                # substituted with OptimizationStrategyType
 
-    val_datasource: DataReader | None = field(default=None)
+    val_datasource: Any | None = field(default=None) # NOTE: val_datasource is a Dataset
 
     policy: Policy = field(default_factory=MaxQuality)
     scan_start_idx: int = field(default=0)
     num_samples: int = field(default=None)
-    cache: bool = field(default=False)  # NOTE: until we properly implement caching, let's set the default to False
     verbose: bool = field(default=False)
     progress: bool = field(default=True)
     available_models: list[Model] | None = field(default=None)
@@ -30,7 +29,6 @@ class QueryProcessorConfig:
 
     allow_bonded_query: bool = field(default=True)
     allow_model_selection: bool = field(default=True)
-    allow_code_synth: bool = field(default=False)
     allow_rag_reduction: bool = field(default=True)
     allow_mixtures: bool = field(default=True)
     allow_critic: bool = field(default=True)
@@ -50,14 +48,12 @@ class QueryProcessorConfig:
             "policy": self.policy,
             "scan_start_idx": self.scan_start_idx,
             "num_samples": self.num_samples,
-            "cache": self.cache,
             "verbose": self.verbose,
             "progress": self.progress,
             "available_models": self.available_models,
             "max_workers": self.max_workers,
             "allow_bonded_query": self.allow_bonded_query,
             "allow_model_selection": self.allow_model_selection,
-            "allow_code_synth": self.allow_code_synth,
             "allow_rag_reduction": self.allow_rag_reduction,
             "allow_mixtures": self.allow_mixtures,
             "allow_critic": self.allow_critic,
@@ -70,7 +66,7 @@ class QueryProcessorConfig:
         """Convert the config to a JSON string representation."""
         config_dict = self.to_dict()
         config_dict["val_datasource"] = (
-            None if self.val_datasource is None else self.val_datasource.serialize()
+            None if self.val_datasource is None else self.val_datasource.id
         )
         config_dict["policy"] = self.policy.to_json_str()
         for strategy in ["processing_strategy", "execution_strategy", "sentinel_execution_strategy", "optimizer_strategy"]:

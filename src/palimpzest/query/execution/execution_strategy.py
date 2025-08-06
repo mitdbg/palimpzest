@@ -6,15 +6,15 @@ import numpy as np
 from chromadb.api.models.Collection import Collection
 
 from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS
-from palimpzest.core.data.dataclasses import OperatorCostEstimates, PlanStats, RecordOpStats
-from palimpzest.core.data.datareaders import DataReader
+from palimpzest.core.data.dataset import Dataset
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
+from palimpzest.core.models import OperatorCostEstimates, PlanStats, RecordOpStats
 from palimpzest.policy import Policy
 from palimpzest.query.operators.convert import LLMConvert
 from palimpzest.query.operators.filter import FilterOp, LLMFilter
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.retrieve import RetrieveOp
-from palimpzest.query.operators.scan import ScanPhysicalOp
+from palimpzest.query.operators.scan import ContextScanOp, ScanPhysicalOp
 from palimpzest.query.optimizer.plan import PhysicalPlan, SentinelPlan
 from palimpzest.utils.progress import PZSentinelProgressManager
 
@@ -25,7 +25,6 @@ class BaseExecutionStrategy:
                  scan_start_idx: int = 0, 
                  max_workers: int | None = None,
                  num_samples: int | None = None,
-                 cache: bool = False,
                  verbose: bool = False,
                  progress: bool = True,
                  *args,
@@ -33,25 +32,9 @@ class BaseExecutionStrategy:
         self.scan_start_idx = scan_start_idx
         self.max_workers = max_workers
         self.num_samples = num_samples
-        self.cache = cache
         self.verbose = verbose
         self.progress = progress
 
-
-    def _add_records_to_cache(self, target_cache_id: str, records: list[DataRecord]) -> None:
-        """Add each record (which isn't filtered) to the cache for the given target_cache_id."""
-        if self.cache:
-            for record in records:
-                if getattr(record, "passed_operator", True):
-                    # self.datadir.append_cache(target_cache_id, record)
-                    pass
-
-    def _close_cache(self, target_cache_ids: list[str]) -> None:
-        """Close the cache for each of the given target_cache_ids"""
-        if self.cache:
-            for target_cache_id in target_cache_ids:  # noqa: B007
-                # self.datadir.close_cache(target_cache_id)
-                pass
 
 class ExecutionStrategy(BaseExecutionStrategy, ABC):
     """Base strategy for executing query plans. Defines how to execute a PhysicalPlan.
@@ -73,11 +56,13 @@ class ExecutionStrategy(BaseExecutionStrategy, ABC):
             inputs = []
             if isinstance(op, ScanPhysicalOp):
                 scan_end_idx = (
-                    len(op.datareader)
+                    len(op.datasource)
                     if self.num_samples is None
-                    else min(self.scan_start_idx + self.num_samples, len(op.datareader))
+                    else min(self.scan_start_idx + self.num_samples, len(op.datasource))
                 )
                 inputs = [idx for idx in range(self.scan_start_idx, scan_end_idx)]
+            elif isinstance(op, ContextScanOp):
+                inputs = [None]
             input_queues[op.get_full_op_id()] = inputs
 
         return input_queues
@@ -90,7 +75,7 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
     """
     def __init__(
         self,
-        val_datasource: DataReader,
+        val_datasource: Dataset,
         k: int,
         j: int,
         sample_budget: int,

@@ -33,7 +33,7 @@ biodex_ranked_reactions_labels_cols = [
 ]
 
 
-class BiodexReader(pz.DataReader):
+class BiodexDataset(pz.IterDataset):
     def __init__(
         self,
         rp_at_k: int = 5,
@@ -151,9 +151,9 @@ class BiodexReader(pz.DataReader):
             item["labels"] = self.compute_label(entry)
 
             # add scoring functions for list fields
-            rank_precision_at_k = partial(BiodexReader.rank_precision_at_k, k=self.rp_at_k)
-            item["score_fn"]["reactions"] = BiodexReader.term_recall
-            item["score_fn"]["reaction_labels"] = BiodexReader.term_recall
+            rank_precision_at_k = partial(BiodexDataset.rank_precision_at_k, k=self.rp_at_k)
+            item["score_fn"]["reactions"] = BiodexDataset.term_recall
+            item["score_fn"]["reaction_labels"] = BiodexDataset.term_recall
             item["score_fn"]["ranked_reaction_labels"] = rank_precision_at_k
 
         return item
@@ -265,11 +265,11 @@ if __name__ == "__main__":
             priors = json.load(f)
     print(f"EXPERIMENT NAME: {exp_name}")
 
-    if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None:
-        print("WARNING: Both OPENAI_API_KEY and TOGETHER_API_KEY are unset")
+    if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None and os.getenv("ANTHROPIC_API_KEY") is None:
+        print("WARNING: OPENAI_API_KEY, TOGETHER_API_KEY, and ANTHROPIC_API_KEY are unset")
 
     # create data source
-    datareader = BiodexReader(
+    dataset = BiodexDataset(
         split="test",
         num_samples=250,
         shuffle=True,
@@ -277,7 +277,7 @@ if __name__ == "__main__":
     )
 
     # create validation data source
-    val_datasource = BiodexReader(
+    val_datasource = BiodexDataset(
         split="train",
         num_samples=val_examples,
         shuffle=True,
@@ -328,7 +328,7 @@ if __name__ == "__main__":
         return {"reaction_labels": final_sorted_results[:k]}
 
     # construct plan
-    plan = pz.Dataset(datareader)
+    plan = pz.Dataset(dataset)
     plan = plan.sem_add_columns(biodex_reactions_cols)
     plan = plan.retrieve(
         index=index,
@@ -347,7 +347,6 @@ if __name__ == "__main__":
     # execute pz plan
     config = pz.QueryProcessorConfig(
         policy=policy,
-        cache=False,
         val_datasource=val_datasource,
         processing_strategy=processing_strategy,
         optimizer_strategy=optimizer_strategy,
@@ -365,7 +364,6 @@ if __name__ == "__main__":
             Model.DEEPSEEK_R1_DISTILL_QWEN_1_5B,
         ],
         allow_bonded_query=True,
-        allow_code_synth=False,
         allow_critic=True,
         allow_mixtures=True,
         allow_rag_reduction=True,

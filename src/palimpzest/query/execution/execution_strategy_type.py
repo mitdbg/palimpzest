@@ -6,7 +6,6 @@ from palimpzest.query.execution.parallel_execution_strategy import (
     ParallelExecutionStrategy,
     SequentialParallelExecutionStrategy,
 )
-from palimpzest.query.execution.random_sampling_execution_strategy import RandomSamplingExecutionStrategy
 from palimpzest.query.execution.single_threaded_execution_strategy import (
     PipelinedSingleThreadExecutionStrategy,
     SequentialSingleThreadExecutionStrategy,
@@ -22,5 +21,4 @@ class ExecutionStrategyType(Enum):
 
 class SentinelExecutionStrategyType(Enum):
     MAB = MABExecutionStrategy
-    RANDOM = RandomSamplingExecutionStrategy
     ALL = AllSamplingExecutionStrategy

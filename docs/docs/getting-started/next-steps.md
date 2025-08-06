@@ -9,7 +9,7 @@ It would probably be okay to duplicate a lot of the links in `docs/user-guide/ov
 
 Next, the page should link to "barebones" documentation, i.e. the "third-layer" pages which contain class and function definitions.
 
-- `DataReaders`
+- `Context`
 - `Dataset`
 - `Aggregate`
 - `Convert` (or whatever we're calling it)
@@ -27,7 +27,7 @@ Now that you've learned the basics of PZ, it's time to explore topics we've touc
 
 Our [User Guide](../user-guide/overview.md) contains deeper dives into the most important aspects of PZ, including:
 
-- [How to read your own data](../user-guide/datareaders.md) (coming soon!)
+- [How to read your own data](../user-guide/dataset.md) (coming soon!)
 - [An overview of all operators in PZ](../user-guide/operators.md) (coming soon!)
 - [A primer on optimization](../user-guide/optimization.md) (coming soon!)
 
