@@ -22,6 +22,7 @@ class PhysicalOperator:
         input_schema: BaseModel | None = None,
         depends_on: list[str] | None = None,
         logical_op_id: str | None = None,
+        unique_logical_op_id: str | None = None,
         logical_op_name: str | None = None,
         verbose: bool = False,
         *args,
@@ -31,6 +32,7 @@ class PhysicalOperator:
         self.input_schema = input_schema
         self.depends_on = depends_on if depends_on is None else sorted(depends_on)
         self.logical_op_id = logical_op_id
+        self.unique_logical_op_id = unique_logical_op_id
         self.logical_op_name = logical_op_name
         self.verbose = verbose
         self.op_id = None
@@ -124,8 +126,11 @@ class PhysicalOperator:
 
         return self.op_id
     
-    def get_logical_op_id(self) -> str | None:
+    def get_logical_op_id(self) -> str:
         return self.logical_op_id
+
+    def get_unique_logical_op_id(self) -> str:
+        return self.unique_logical_op_id
 
     def get_full_op_id(self):
         return f"{self.get_logical_op_id()}-{self.get_op_id()}"

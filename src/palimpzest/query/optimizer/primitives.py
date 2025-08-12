@@ -100,9 +100,9 @@ class Group:
     Maintains a set of logical multi-expressions and physical multi-expressions.
     """
 
-    def __init__(self, logical_expressions: list[Expression], fields: dict[str, FieldInfo], properties: dict[str, set[str]]):
-        self.logical_expressions = set(logical_expressions)
-        self.physical_expressions = set()
+    def __init__(self, logical_expressions: list[LogicalExpression], fields: dict[str, FieldInfo], properties: dict[str, set[str]]):
+        self.logical_expressions: set[LogicalExpression] = set(logical_expressions)
+        self.physical_expressions: set[PhysicalExpression] = set()
         self.fields = fields
         self.explored = False
         self.best_physical_expression: PhysicalExpression | None = None

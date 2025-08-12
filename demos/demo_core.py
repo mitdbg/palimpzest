@@ -185,13 +185,12 @@ def get_task_config(task, dataset, join_dataset=None):
     
     return root_set, cols, stat_path
 
-def execute_task(task, dataset, policy, join_dataset=None, verbose=False, profile=False, processing_strategy="no_sentinel", execution_strategy="sequential", optimizer_strategy="pareto"):
+def execute_task(task, dataset, policy, join_dataset=None, verbose=False, profile=False, execution_strategy="sequential", optimizer_strategy="pareto"):
     """Execute a task and return results"""
     root_set, cols, stat_path = get_task_config(task, dataset, join_dataset)
     config = pz.QueryProcessorConfig(
         policy=policy,
         verbose=verbose,
-        processing_strategy=processing_strategy,
         execution_strategy=execution_strategy,
         optimizer_strategy=optimizer_strategy,
     )

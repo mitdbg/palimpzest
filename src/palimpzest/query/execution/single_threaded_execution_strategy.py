@@ -92,7 +92,7 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
                         break
 
             # update plan stats
-            plan_stats.add_record_op_stats(record_op_stats)
+            plan_stats.add_record_op_stats(unique_full_op_id, record_op_stats)
 
             # update next input_queue (if it exists)
             output_records = [record for record in records if record.passed_operator]
@@ -140,7 +140,6 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
         return output_records, plan_stats
 
 
-# TODO: bug in else branch with input_queues[unique_full_op_id].pop(0)
 class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
     """
     A single-threaded execution strategy that processes records through a pipeline of operators.
@@ -244,7 +243,7 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
                     self.progress_manager.incr(unique_full_op_id, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
 
                 # update plan stats
-                plan_stats.add_record_op_stats(record_op_stats)
+                plan_stats.add_record_op_stats(unique_full_op_id, record_op_stats)
 
                 # update next input_queue or final_output_records
                 output_records = [record for record in records if record.passed_operator]

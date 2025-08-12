@@ -9,8 +9,7 @@ class QueryProcessorConfig(BaseModel):
     """Shared context for query processors"""
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    # execution, processing, and optimization flags
-    processing_strategy: str = Field(default="auto")                 # substituted with ProcessingStrategyType
+    # execution and optimization flags
     execution_strategy: str = Field(default="sequential")            # substituted with ExecutionStrategyType
     sentinel_execution_strategy: str | None = Field(default="auto")  # substituted with SentinelExecutionStrategyType
     optimizer_strategy: str = Field(default="pareto")                # substituted with OptimizationStrategyType

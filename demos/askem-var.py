@@ -42,7 +42,7 @@ if __name__ == "__main__":
         config = pz.QueryProcessorConfig(
             policy=policy,
             verbose=True,
-            processing_strategy="streaming",
+            processing_strategy="streaming", # NOTE: processing_strategy and streaming are deprecated; we will need to update this demo
             execution_strategy="sequential",
             optimizer_strategy="pareto",
         )

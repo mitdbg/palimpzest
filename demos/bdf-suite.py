@@ -85,7 +85,7 @@ def extract_supplemental(processing_strategy, execution_strategy, optimizer_stra
 
     config = pz.QueryProcessorConfig(
         policy=policy,
-        processing_strategy=processing_strategy,
+        processing_strategy=processing_strategy, # NOTE: processing_strategy and streaming are deprecated; we will need to update this demo
         execution_strategy=execution_strategy,
         optimizer_strategy=optimizer_strategy,
     )

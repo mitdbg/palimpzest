@@ -11,7 +11,7 @@ from pydantic.fields import FieldInfo
 from palimpzest.core.data import context
 from palimpzest.core.lib.schemas import ImageBase64, create_schema_from_df, project, union_schemas
 from palimpzest.core.models import ExecutionStats, PlanStats, RecordOpStats
-from palimpzest.utils.hash_helpers import hash_for_id
+from palimpzest.utils.hash_helpers import hash_for_id, hash_for_serialized_dict
 
 
 class DataRecord:
@@ -20,14 +20,14 @@ class DataRecord:
     def __init__(
         self,
         schema: BaseModel,
-        source_indices: int | list[int],
+        source_indices: str | list[str],
         parent_ids: str | list[str] | None = None,
         cardinality_idx: int | None = None,
     ):
         # check that source_indices are provided
-        assert source_indices is not None, "Every DataRecord must be constructed with a source index (or indices)"
+        assert source_indices is not None, "Every DataRecord must be constructed with source index (or indices)"
 
-        # normalize to list[int]; we check for `not list` b/c currently source_indices can be a float or numpy type
+        # normalize to list[str]
         if not isinstance(source_indices, list):
             source_indices = [source_indices]
 
@@ -44,8 +44,9 @@ class DataRecord:
         # mapping from field names to their values
         self.field_values: dict[str, Any] = {}
 
-        # the index in the root Dataset from which this DataRecord is derived
-        self.source_indices = [int(source_idx) for source_idx in source_indices]
+        # the index in the root Dataset from which this DataRecord is derived;
+        # each source index takes the form: f"{root_dataset.id}-{idx}"
+        self.source_indices = sorted(source_indices)
 
         # the id(s) of the parent record(s) from which this DataRecord is derived
         self.parent_ids = parent_ids
@@ -259,6 +260,7 @@ class DataRecord:
         return new_dr
 
 
+    # TODO: unused outside of unit tests
     @staticmethod
     def from_df(df: pd.DataFrame, schema: BaseModel | None = None) -> list[DataRecord]:
         """Create a list of DataRecords from a pandas DataFrame
@@ -273,13 +275,21 @@ class DataRecord:
         if df is None:
             raise ValueError("DataFrame is None!")
 
-        records = []
+        # create schema if one isn't provided
         if schema is None:
             schema = create_schema_from_df(df)
 
-        for source_idx, row in df.iterrows():
+        # create an id for the dataset from the schema
+        dataset_id = hash_for_serialized_dict({
+            k: {"annotation": str(v.annotation), "default": str(v.default), "description": v.description}
+            for k, v in schema.model_fields.items()
+        })
+
+        # create records
+        records = []
+        for idx, row in df.iterrows():
             row_dict = row.to_dict()
-            record = DataRecord(schema=schema, source_indices=[source_idx])
+            record = DataRecord(schema=schema, source_indices=[f"{dataset_id}-{idx}"])
             record.field_values = row_dict
             record.field_types = {field_name: schema.model_fields[field_name] for field_name in row_dict}
             records.append(record)
@@ -355,7 +365,7 @@ class DataRecordSet:
             data_records: list[DataRecord],
             record_op_stats: list[RecordOpStats],
             field_to_score_fn: dict[str, str | callable] | None = None,
-            input_data_record: DataRecord | None = None,
+            input: int | DataRecord | list[DataRecord] | tuple[list[DataRecord]] | None = None,
         ):
         # set data_records, parent_ids, and source_indices; note that it is possible for
         # data_records to be an empty list in the event of a failed convert
@@ -363,7 +373,13 @@ class DataRecordSet:
         self.parent_ids = data_records[0].parent_ids if len(data_records) > 0 else None
         self.source_indices = data_records[0].source_indices if len(data_records) > 0 else None
         self.schema = data_records[0].schema if len(data_records) > 0 else None
-        self.input_data_record = input_data_record
+
+        # the input to the operator which produced the data_records; type is tuple[DataRecord] | tuple[int]
+        # - for scan operators, input is a singleton tuple[int] which wraps the source_idx, e.g.: (source_idx,)
+        # - for join operators, input is a tuple with one entry for the left input DataRecord and one entry for the right input DataRecord
+        # - for aggregate operators, input is a tuple with all the input DataRecords to the aggregation
+        # - for all other operaotrs, input is a singleton tuple[DataRecord] which wraps the single input
+        self.input = input
 
         # set statistics for generating these records
         self.record_op_stats = record_op_stats

@@ -1,126 +1,185 @@
-# from abc import ABC, abstractmethod
 import json
-from typing import Callable
 
 import litellm
 
 # from colorama import Fore, Style
-from palimpzest.constants import Cardinality, Model, PromptStrategy
-from palimpzest.core.elements.records import DataRecordSet
-from palimpzest.prompts import VALIDATOR_PROMPT, PromptFactory
+from palimpzest.constants import Cardinality, Model
+from palimpzest.core.elements.records import DataRecord
+from palimpzest.prompts import (
+    FLAT_MAP_IMAGE_VALIDATOR_PROMPT,
+    FLAT_MAP_VALIDATOR_PROMPT,
+    MAP_IMAGE_VALIDATOR_PROMPT,
+    MAP_VALIDATOR_PROMPT,
+    PromptFactory,
+)
 from palimpzest.query.generators.generators import get_json_from_answer
+from palimpzest.query.operators.convert import LLMConvert
 from palimpzest.query.operators.filter import LLMFilter
-from palimpzest.query.operators.physical import PhysicalOperator
+from palimpzest.query.operators.join import JoinOp
 
 
-class BaseValidator:
+class Validator:
     """
     The Validator is used during optimization to score the output of physical operator(s) and physical plan(s).
 
-    The core function of the Validator is to take a (set of) input(s) and a (set of) output(s)
-    - LLM validation vs. Non-LLM validation
-    - operator-level validation vs. plan-level validation
-    - LLM validation may only make sense at the operator-level
-    - Non-LLM Validation may work at the operator and/or plan-level
-
-    TODO: start with non-llm based operator level validation; port over code from Sentinel executor
-    TODO: allow Validator to come with its own source Dataset(s)
-    TODO: try to eliminate need for source_idx
+    TODO: support end-to-end labels; will likely require a different SentinelExecutionStrategy which
+          executes the full input to produce an output, evaluates the output, and then updates
+          intermediate operator(s) based on the evaluation.
     """
-    def __init__(self, eval_fn: Callable | None = None) -> None:
-        self.eval_fn = self.default_eval_fn if eval_fn is None else eval_fn
+    def __init__(self):
+        self.filter_cache = {}
+        self.join_cache = {}
 
-    def default_eval_fn(self, record_set_tuples: list[tuple[DataRecordSet, PhysicalOperator]]) -> list[tuple[DataRecordSet, PhysicalOperator]]:
+    def map_score_fn(self, fields: list[str], input_record: dict, output: dict) -> float | None:
+        raise NotImplementedError("Validator.map_score_fn not implemented.")
+
+    def flat_map_score_fn(self, fields: list[str], input_record: dict, output: list[dict]) -> float | None:
+        raise NotImplementedError("Validator.flat_map_score_fn not implemented.")
+
+    def filter_score_fn(self, filter_str: str, input_record: dict, output: bool) -> float | None:
+        raise NotImplementedError("Validator.filter_score_fn not implemented.")
+
+    def join_score_fn(self, condition: str, left_input_record: dict, right_input_record: dict, output: bool) -> float | None:
+        raise NotImplementedError("Validator.join_score_fn not implemented.")
+
+    # TODO: cache map outputs and their scores, as common field extractions are likely to repeat
+    def _default_map_score_fn(self, op: LLMConvert, fields: list[str], input_record: DataRecord, output: dict) -> float | None:
+        """
+        Compute the quality of the generated output for the given fields and input_record.
+        """
+        # create prompt factory
+        factory = PromptFactory(op.prompt_strategy, Model.GPT_4o, Cardinality.ONE_TO_ONE) # TODO: switch to o4_MINI after merging in dev
+
+        # get the input messages; strip out the system message(s)
+        msg_kwargs = {"output_schema": op.output_schema, "project_cols": op.get_input_fields()}
+        messages = factory.create_messages(input_record, fields, **msg_kwargs)
+        input_messages = [msg for msg in messages if msg["role"] != "system"]
+        output = json.dumps(output, indent=2)
+        output_message = f"OUTPUT:\n--------\n{output}\n\nEVALUATION: "
+        # input_str = '\n'.join(list(map(lambda d: d['content'], input_messages + [{"role": "user", "content": outputs_message}])))
+
+        # invoke the judge
+        score = None
+        try:
+            validator_prompt = MAP_IMAGE_VALIDATOR_PROMPT if op.prompt_strategy.is_image_prompt() else MAP_VALIDATOR_PROMPT
+            val_messages = [{"role": "system", "content": validator_prompt}] + input_messages + [{"role": "user", "content": output_message}]
+            completion = litellm.completion(model="openai/o4-mini", messages=val_messages)
+            completion_text = completion.choices[0].message.content
+            # print(f"INPUT:\n{input_str}")
+            # print(Fore.GREEN + f"{completion_text}\n" + Style.RESET_ALL)
+
+            # parse the evaluation
+            eval_dict: dict = get_json_from_answer(completion_text, Model.GPT_4o, Cardinality.ONE_TO_ONE) # TODO: modify VALIDATOR_PROMPT above to expect single dict output
+            score = sum(eval_dict.values()) / len(eval_dict)
+
+        except Exception:
+            pass
+
+        return score
+
+    def _default_flat_map_score_fn(self, op: LLMConvert, fields: list[str], input_record: dict, output: list[dict]) -> float | None:
         """
         Compute the quality for each record_op_stats object in the given record_set.
         """
-        # TODO: COT_BOOL_IMAGE; COT_QA_IMAGE; Cardinality and Model
-        label = None
-        for record_set, physical_op in record_set_tuples:
-            is_filter_op = isinstance(physical_op, LLMFilter)
+        # create prompt factory
+        factory = PromptFactory(op.prompt_strategy, Model.GPT_4o, Cardinality.ONE_TO_MANY) # TODO: switch to o4_MINI after merging in dev
 
-            # isolate record_op_stats
-            record_op_stats = record_set.record_op_stats
+        # get the input messages; strip out the system message(s)
+        msg_kwargs = {"output_schema": op.output_schema, "project_cols": op.get_input_fields()}
+        messages = factory.create_messages(input_record, fields, **msg_kwargs)
+        input_messages = [msg for msg in messages if msg["role"] != "system"]
+        output = json.dumps(output, indent=2)
+        output_message = f"OUTPUTS:\n--------\n{output}\n\nEVALUATION: "
+        # input_str = '\n'.join(list(map(lambda d: d['content'], input_messages + [{"role": "user", "content": output_message}])))
 
-            # create prompt factory
-            prompt_strategy = PromptStrategy.COT_BOOL if is_filter_op else PromptStrategy.COT_QA
-            factory = PromptFactory(prompt_strategy, Model.GPT_4o, Cardinality.ONE_TO_ONE)
+        # invoke the judge
+        score = None
+        try:
+            validator_prompt = FLAT_MAP_IMAGE_VALIDATOR_PROMPT if op.prompt_strategy.is_image_prompt() else FLAT_MAP_VALIDATOR_PROMPT
+            val_messages = [{"role": "system", "content": validator_prompt}] + input_messages + [{"role": "user", "content": output_message}]
+            completion = litellm.completion(model="openai/o4-mini", messages=val_messages)
+            completion_text = completion.choices[0].message.content
+            # print(f"INPUT:\n{input_str}")
+            # print(Fore.GREEN + f"{completion_text}\n" + Style.RESET_ALL)
 
-            # get the input messages; strip out the system message(s)
-            output_fields = ["passed_operator"] if is_filter_op else record_set.record_op_stats[0].generated_fields
-            msg_kwargs = {"filter_condition": record_op_stats[0].filter_str} if is_filter_op else {"output_schema": record_set.schema}
-            messages = factory.create_messages(record_set.input_data_record, output_fields, **msg_kwargs) # TODO: support images, filters, joins, etc.
-            input_messages = [msg for msg in messages if msg["role"] != "system"]
+            # parse the evaluation
+            eval_dicts: list[dict] = get_json_from_answer(completion_text, Model.GPT_4o, Cardinality.ONE_TO_MANY)
+            all_qualities = []
+            for record_eval_dict in eval_dicts:
+                all_qualities.extend(record_eval_dict.values())
+            score = sum(all_qualities) / len(all_qualities)
 
-            outputs = []
-            for record_op_stats in record_set.record_op_stats:
-                output_dict = (
-                    {"passed_operator": record_op_stats.passed_operator}
-                    if record_op_stats.generated_fields is None
-                    else {k: v for k, v in record_op_stats.record_state.items() if k in record_op_stats.generated_fields}
-                )
-                output_dict["record_id"] = record_op_stats.record_id
-                outputs.append(output_dict)
+        except Exception:
+            pass
 
-            outputs = json.dumps(outputs, indent=2)
-            outputs_message = f"OUTPUTS:\n--------\n{outputs}\n\nEVALUATION: "
-            # input_str = '\n'.join(list(map(lambda d: d['content'], input_messages + [{"role": "user", "content": outputs_message}])))
+        return score
 
-            # if this operation failed
-            if len(record_set) == 0:
-                record_set.record_op_stats[0].quality = 0.0
-                continue
+    def _default_filter_score_fn(self, op: LLMFilter, filter_str: str, input_record: dict, output: bool) -> float | None:
+        """
+        Compute the quality for each record_op_stats object in the given record_set.
+        """
+        score = None
+        filter_input_hash = hash(f"{filter_str}{hash(input_record)}")
+        label = self.filter_cache.get(filter_input_hash, None)
+        if label is None:
+            validator_op: LLMFilter = op.copy()
+            validator_op.model = Model.GPT_4o
+            try:
+                target_record_set = validator_op(input_record)
+                label = target_record_set[0].passed_operator
+                self.filter_cache[filter_input_hash] = label
+                score = label == output
 
-            # if this is a filter op, run the op with the validator and assess quality relative to its output
-            if is_filter_op and label is None:
-                validator_op = physical_op.copy()
-                validator_op.model = Model.GPT_4o
-                try:
-                    target_record_set = validator_op(record_set.input_data_record)
-                    label = target_record_set.record_op_stats[0].passed_operator
-                    # print(f"INPUT:\n{input_str}")
-                    # print(Fore.GREEN + f"VALIDATOR LABEL: {label}\n" + Style.RESET_ALL)
-                except Exception:
-                    label = None
+            except Exception:
+                pass
 
-            # apply label for filters
-            if is_filter_op:
-                record_set.record_op_stats[0].quality = (
-                    (label == record_set.record_op_stats[0].passed_operator)
-                    if label is not None
-                    else 0.5
-                )
+        else:
+            score = label == output
 
-            else:
-                # invoke the judge
-                try:
-                    val_messages = [{"role": "system", "content": VALIDATOR_PROMPT}] + input_messages + [{"role": "user", "content": outputs_message}]
-                    completion = litellm.completion(model="openai/gpt-4o", messages=val_messages)
-                    completion_text = completion.choices[0].message.content
-                    # print(f"INPUT:\n{input_str}")
-                    # print(Fore.GREEN + f"{completion_text}\n" + Style.RESET_ALL)
+        return score
 
-                    # parse the evaluation
-                    output: list[dict] = get_json_from_answer(completion_text, Model.GPT_4o, Cardinality.ONE_TO_MANY)
-                    for record_eval_dict in output:
-                        for record_op_stats in record_set.record_op_stats:
-                            if record_eval_dict["record_id"] == record_op_stats.record_id:
-                                record_eval_dict.pop("record_id")
-                                record_op_stats.quality = sum(record_eval_dict.values()) / len(record_eval_dict)
-                except Exception:
-                    for record_op_stats in record_set.record_op_stats:
-                        record_op_stats.quality = 0.5
+    def _default_join_score_fn(self, op: JoinOp, condition: str, left_input_record: DataRecord, right_input_record: DataRecord, output: bool) -> float | None:
+        score = None
+        join_input_hash = hash(f"{condition}{hash(left_input_record)}{hash(right_input_record)}")
+        label = self.join_cache.get(join_input_hash, None)
+        if label is None:
+            validator_op: JoinOp = op.copy()
+            validator_op.model = Model.GPT_4o
+            try:
+                target_record_set = validator_op([left_input_record], [right_input_record])
+                label = target_record_set[0].passed_operator
+                self.join_cache[join_input_hash] = label
+                score = label == output
 
-        return record_set
+            except Exception:
+                pass
 
+        else:
+            score = label == output
 
-class Validator(BaseValidator):
-    """
-    """
-    pass
+        return score
 
 
-class LLMValidator(BaseValidator):
-    """
-    """
-    pass
+    def _score_map(self, op: LLMConvert, fields: list[str], input_record: DataRecord, output: dict):
+        try:
+            return self.map_score_fn(fields, input_record.to_dict(), output)
+        except NotImplementedError:
+            return self._default_map_score_fn(op, fields, input_record, output)
+
+    def _score_flat_map(self, op: LLMConvert, fields: list[str], input_record: DataRecord, output: list[dict]):
+        try:
+            return self.flat_map_score_fn(fields, input_record.to_dict(), output)
+        except NotImplementedError:
+            return self._default_flat_map_score_fn(op, fields, input_record, output)
+
+    def _score_filter(self, op: LLMFilter, filter_str: str, input_record: DataRecord, output: bool):
+        try:
+            return self.filter_score_fn(filter_str, input_record.to_dict(), output)
+        except NotImplementedError:
+            return self._default_filter_score_fn(op, filter_str, input_record, output)
+
+    def _score_join(self, op: JoinOp, condition: str, left_input_record: DataRecord, right_input_record: DataRecord, output: bool):
+        try:
+            return self.join_score_fn(condition, left_input_record.to_dict(), right_input_record.to_dict(), output)
+        except NotImplementedError:
+            return self._default_join_score_fn(op, condition, left_input_record, right_input_record, output)

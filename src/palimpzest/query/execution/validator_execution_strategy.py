@@ -16,6 +16,7 @@ from palimpzest.query.operators.retrieve import RetrieveOp
 from palimpzest.query.operators.scan import ContextScanOp, ScanPhysicalOp
 from palimpzest.query.optimizer.plan import SentinelPlan
 from palimpzest.utils.progress import create_progress_manager
+from palimpzest.validator.validator import Validator
 
 
 class OpFrontier:
@@ -657,7 +658,7 @@ class ValidatorExecutionStrategy(SentinelExecutionStrategy):
                 # update the number of samples drawn for each operator
 
                 # update plan stats
-                plan_stats.add_record_op_stats(new_record_op_stats)
+                plan_stats.add_record_op_stats(unique_logical_op_id, new_record_op_stats)
 
                 # FUTURE TODO: simply set input based on source_idx_to_target_record_set (b/c we won't have scores computed)
                 # provide the champion record sets as inputs to the next logical operator
@@ -679,7 +680,7 @@ class ValidatorExecutionStrategy(SentinelExecutionStrategy):
 
         return plan_stats
 
-    def execute_sentinel_plan(self, sentinel_plan: SentinelPlan, dataset: Dataset) -> SentinelPlanStats:
+    def execute_sentinel_plan(self, sentinel_plan: SentinelPlan, dataset: Dataset, validator: Validator) -> SentinelPlanStats:
         # initialize plan stats
         plan_stats = SentinelPlanStats.from_plan(sentinel_plan)
         plan_stats.start()

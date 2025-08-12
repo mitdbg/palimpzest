@@ -151,7 +151,7 @@ class RecordOpStats(BaseModel):
     record_parent_ids: list[str] | None
 
     # idenifier for the source indices of this record
-    record_source_indices: list[str] | list[int]
+    record_source_indices: list[str]
 
     # a dictionary with the record state after being processed by the operator
     record_state: dict[str, Any]
@@ -173,7 +173,10 @@ class RecordOpStats(BaseModel):
 
     ##### NOT-OPTIONAL, BUT FILLED BY EXECUTION CLASS AFTER CONSTRUCTOR CALL #####
     # the ID(s) of the physical operation(s) which produced the input record(s) for this record at this operation
-    source_full_op_ids: list[str] | None = None
+    source_unique_full_op_ids: list[str] | None = None
+
+    # the ID(s) of the logical operation(s) which produced the input record(s) for this record at this operation
+    source_unique_logical_op_ids: list[str] | None = None
 
     # the ID of the physical plan which produced this record at this operation
     plan_id: str = ""
@@ -269,8 +272,11 @@ class OperatorStats(BaseModel):
     # a list of RecordOpStats processed by the operation
     record_op_stats_lst: list[RecordOpStats] = Field(default_factory=list)
 
-    # the full ID(s) of the physical operator(s) which precede this one
-    source_full_op_ids: list[str] | None = None
+    # the unique full ID(s) of the physical operator(s) which precede this one (used by PlanStats)
+    source_unique_full_op_ids: list[str] | None = None
+
+    # the unique full ID(s) of the logical operator(s) which precede this one (used by SentinelPlanStats)
+    source_unique_logical_op_ids: list[str] | None = None
 
     # the ID of the physical plan which this operator is part of
     plan_id: str = ""
@@ -297,7 +303,7 @@ class OperatorStats(BaseModel):
             self.record_op_stats_lst.extend(stats.record_op_stats_lst)
 
         elif isinstance(stats, RecordOpStats):
-            stats.source_full_op_ids = self.source_full_op_ids
+            stats.source_unique_full_op_ids = self.source_unique_full_op_ids
             stats.plan_id = self.plan_id
             self.record_op_stats_lst.append(stats)
             self.total_op_time += stats.time_per_record
@@ -397,9 +403,9 @@ class BasePlanStats(BaseModel):
         pass
 
     @abstractmethod
-    def add_record_op_stats(self, record_op_stats: RecordOpStats | list[RecordOpStats]) -> None:
+    def add_record_op_stats(self, unique_full_op_id: str, record_op_stats: RecordOpStats | list[RecordOpStats]) -> None:
         """
-        Add the given RecordOpStats to this plan's operator stats.
+        Add the given RecordOpStats to this plan's operator stats for the given operator id.
         """
         pass
 
@@ -430,11 +436,11 @@ class PlanStats(BasePlanStats):
         # TODO?: have PhysicalPlan return PlanStats object
         operator_stats = {}
         for topo_idx, op in enumerate(plan):
-            full_op_id = op.get_full_op_id()
-            operator_stats[full_op_id] = OperatorStats(
-                full_op_id=full_op_id,
+            unique_full_op_id = f"{topo_idx}-{op.get_full_op_id()}"
+            operator_stats[unique_full_op_id] = OperatorStats(
+                full_op_id=op.get_full_op_id(),
                 op_name=op.op_name(),
-                source_full_op_ids=plan.get_source_unique_full_op_ids(topo_idx, op),
+                source_unique_full_op_ids=plan.get_source_unique_full_op_ids(topo_idx, op),
                 plan_id=plan.plan_id,
                 op_details={k: str(v) for k, v in op.get_id_params().items()},
             )
@@ -459,20 +465,19 @@ class PlanStats(BasePlanStats):
         """
         return sum([op_stats.total_output_tokens for _, op_stats in self.operator_stats.items()])
 
-    def add_record_op_stats(self, record_op_stats: RecordOpStats | list[RecordOpStats]) -> None:
+    def add_record_op_stats(self, unique_full_op_id: str, record_op_stats: RecordOpStats | list[RecordOpStats]) -> None:
         """
-        Add the given RecordOpStats to this plan's operator stats.
+        Add the given RecordOpStats to this plan's operator stats for the given operator id.
         """
         # normalize input type to be list[RecordOpStats]
         record_op_stats_lst = record_op_stats if isinstance(record_op_stats, list) else [record_op_stats]
 
         # update operator stats
         for record_op_stats in record_op_stats_lst:
-            full_op_id = record_op_stats.full_op_id
-            if full_op_id in self.operator_stats:
-                self.operator_stats[full_op_id] += record_op_stats
+            if unique_full_op_id in self.operator_stats:
+                self.operator_stats[unique_full_op_id] += record_op_stats
             else:
-                raise ValueError(f"RecordOpStats with full_op_id {full_op_id} not found in PlanStats")
+                raise ValueError(f"RecordOpStats with unique_full_op_id {unique_full_op_id} not found in PlanStats")
 
     def __iadd__(self, plan_stats: PlanStats) -> None:
         """
@@ -486,11 +491,11 @@ class PlanStats(BasePlanStats):
         self.total_plan_cost += plan_stats.total_plan_cost
         self.total_input_tokens += plan_stats.total_input_tokens
         self.total_output_tokens += plan_stats.total_output_tokens
-        for full_op_id, op_stats in plan_stats.operator_stats.items():
-            if full_op_id in self.operator_stats:
-                self.operator_stats[full_op_id] += op_stats
+        for unique_full_op_id, op_stats in plan_stats.operator_stats.items():
+            if unique_full_op_id in self.operator_stats:
+                self.operator_stats[unique_full_op_id] += op_stats
             else:
-                self.operator_stats[full_op_id] = op_stats
+                self.operator_stats[unique_full_op_id] = op_stats
 
     def __str__(self) -> str:
         stats = f"total_plan_time={self.total_plan_time} \n"
@@ -512,15 +517,15 @@ class SentinelPlanStats(BasePlanStats):
         Initialize this PlanStats object from a Sentinel object.
         """
         operator_stats = {}
-        for logical_op_id, op_set in plan:
-            operator_stats[logical_op_id] = {}
+        for topo_idx, (logical_op_id, op_set) in enumerate(plan):
+            unique_logical_op_id = f"{topo_idx}-{logical_op_id}"
+            operator_stats[unique_logical_op_id] = {}
             for physical_op in op_set:
                 full_op_id = physical_op.get_full_op_id()
-                operator_stats[logical_op_id][full_op_id] = OperatorStats(
+                operator_stats[unique_logical_op_id][full_op_id] = OperatorStats(
                     full_op_id=full_op_id,
                     op_name=physical_op.op_name(),
-                    source_full_op_ids=None, # TODO: update this once we refactor SentinelPlanStats
-                    # source_full_op_ids=plan.get_source_unique_full_op_ids(op_set), # None if op_set_idx == 0 else plan.logical_op_ids[op_set_idx - 1],  # NOTE: this may be a reason to keep `source_op_id` instead of `source_full_op_id`
+                    source_unique_logical_op_ids=plan.get_source_unique_logical_op_ids(unique_logical_op_id),
                     plan_id=plan.plan_id,
                     op_details={k: str(v) for k, v in physical_op.get_id_params().items()},
                 )
@@ -545,24 +550,23 @@ class SentinelPlanStats(BasePlanStats):
         """
         return sum(sum([op_stats.total_output_tokens for _, op_stats in phys_op_stats.items()]) for _, phys_op_stats in self.operator_stats.items())
 
-    def add_record_op_stats(self, record_op_stats: RecordOpStats | list[RecordOpStats]) -> None:
+    def add_record_op_stats(self, unique_logical_op_id: str, record_op_stats: RecordOpStats | list[RecordOpStats]) -> None:
         """
-        Add the given RecordOpStats to this plan's operator stats.
+        Add the given RecordOpStats to this plan's operator stats for the given operator set id.
         """
         # normalize input type to be list[RecordOpStats]
         record_op_stats_lst = record_op_stats if isinstance(record_op_stats, list) else [record_op_stats]
 
         # update operator stats
         for record_op_stats in record_op_stats_lst:
-            logical_op_id = record_op_stats.logical_op_id
             full_op_id = record_op_stats.full_op_id
-            if logical_op_id in self.operator_stats:
-                if full_op_id in self.operator_stats[logical_op_id]:
-                    self.operator_stats[logical_op_id][full_op_id] += record_op_stats
+            if unique_logical_op_id in self.operator_stats:
+                if full_op_id in self.operator_stats[unique_logical_op_id]:
+                    self.operator_stats[unique_logical_op_id][full_op_id] += record_op_stats
                 else:
                     raise ValueError(f"RecordOpStats with full_op_id {full_op_id} not found in SentinelPlanStats")
             else:
-                raise ValueError(f"RecordOpStats with logical_op_id {logical_op_id} not found in SentinelPlanStats")
+                raise ValueError(f"RecordOpStats with unique_logical_op_id {unique_logical_op_id} not found in SentinelPlanStats")
 
     def __iadd__(self, plan_stats: SentinelPlanStats) -> None:
         """
@@ -576,15 +580,15 @@ class SentinelPlanStats(BasePlanStats):
         self.total_plan_cost += plan_stats.total_plan_cost
         self.total_input_tokens += plan_stats.total_input_tokens
         self.total_output_tokens += plan_stats.total_output_tokens
-        for logical_op_id, physical_op_stats in plan_stats.operator_stats.items():
+        for unique_logical_op_id, physical_op_stats in plan_stats.operator_stats.items():
             for full_op_id, op_stats in physical_op_stats.items():
-                if logical_op_id in self.operator_stats:
-                    if full_op_id in self.operator_stats[logical_op_id]:
-                        self.operator_stats[logical_op_id][full_op_id] += op_stats
+                if unique_logical_op_id in self.operator_stats:
+                    if full_op_id in self.operator_stats[unique_logical_op_id]:
+                        self.operator_stats[unique_logical_op_id][full_op_id] += op_stats
                     else:
-                        self.operator_stats[logical_op_id][full_op_id] = op_stats
+                        self.operator_stats[unique_logical_op_id][full_op_id] = op_stats
                 else:
-                    self.operator_stats[logical_op_id] = physical_op_stats
+                    self.operator_stats[unique_logical_op_id] = physical_op_stats
 
     def __str__(self) -> str:
         stats = f"total_plan_time={self.total_plan_time} \n"

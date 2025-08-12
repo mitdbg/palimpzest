@@ -12,10 +12,10 @@ from palimpzest.policy import Policy
 from palimpzest.query.execution.execution_strategy_type import ExecutionStrategyType
 from palimpzest.query.operators.logical import (
     ComputeOperator,
+    ConvertScan,
     FilteredScan,
     JoinOp,
     LimitScan,
-    MapScan,
     Project,
     SearchOperator,
 )
@@ -240,9 +240,23 @@ class Optimizer:
             {} if dataset.is_root else {field_name.split(".")[-1] for field_name in op.depends_on}
         )
 
+        # NOTE: group_id is computed as the unique (sorted) set of fields and properties;
+        #       If an operation does not modify the fields (or modifies them in a way that
+        #       can create an idential field set to an earlier group) then we must add an
+        #       id from the operator to disambiguate the two groups.
         # compute all properties including this operations'
         all_properties = deepcopy(input_group_properties)
-        if isinstance(op, FilteredScan):
+        if isinstance(op, ConvertScan) and sorted(op.input_schema.model_fields.keys()) == sorted(op.output_schema.model_fields.keys()):
+            model_fields_dict = {
+                k: {"annotation": v.annotation, "default": v.default, "description": v.description}
+                for k, v in op.output_schema.model_fields.items()
+            }
+            if "maps" in all_properties:
+                all_properties["maps"].add(model_fields_dict)
+            else:
+                all_properties["maps"] = set([model_fields_dict])
+
+        elif isinstance(op, FilteredScan):
             # NOTE: we could use op.get_full_op_id() here, but storing filter strings makes
             #       debugging a bit easier as you can read which filters are in the Group
             op_filter_str = op.filter.get_filter_str()
@@ -251,7 +265,7 @@ class Optimizer:
             else:
                 all_properties["filters"] = set([op_filter_str])
 
-        if isinstance(op, JoinOp):
+        elif isinstance(op, JoinOp):
             if "joins" in all_properties:
                 all_properties["joins"].add(op.condition)
             else:
@@ -270,13 +284,6 @@ class Optimizer:
                 all_properties["projects"].add(op_project_str)
             else:
                 all_properties["projects"] = set([op_project_str])
-
-        elif isinstance(op, MapScan):
-            op_udf_str = op.udf.__name__
-            if "udfs" in all_properties:
-                all_properties["udfs"].add(op_udf_str)
-            else:
-                all_properties["udfs"] = set([op_udf_str])
 
         # TODO: temporary fix; perhaps use op_ids to identify group?
         elif isinstance(op, ComputeOperator):
@@ -328,9 +335,7 @@ class Optimizer:
             full_field_names = get_schema_field_names(node.schema, id=node.id)
             for short_field_name, full_field_name in zip(short_field_names, full_field_names):
                 # set mapping automatically if this is a new field
-                if short_field_name not in short_to_full_field_name or (
-                    node._operator.input_schema != node._operator.output_schema and (hasattr(node._operator, "udf") and node._operator.udf is not None)
-                ):
+                if short_field_name not in short_to_full_field_name or (hasattr(node._operator, "udf") and node._operator.udf is not None):
                     short_to_full_field_name[short_field_name] = full_field_name
 
             # if the node is a root Dataset, then skip

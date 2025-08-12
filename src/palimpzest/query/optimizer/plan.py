@@ -7,7 +7,7 @@ from palimpzest.query.operators.aggregate import AggregateOp
 from palimpzest.query.operators.join import JoinOp
 from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.operators.physical import PhysicalOperator
-from palimpzest.query.operators.scan import ContextScanOp, MarshalAndScanDataOp, ScanPhysicalOp
+from palimpzest.query.operators.scan import ContextScanOp, MarshalAndScanDataOp
 from palimpzest.utils.hash_helpers import hash_for_id
 
 
@@ -74,7 +74,7 @@ class PhysicalPlan(Plan):
         Two different PhysicalPlan instances with the identical lists of operators will have equivalent plan_ids.
         """
         full_op_id = self.operator.get_full_op_id()
-        subplan_ids = [subplan.compute_plan_id for subplan in self.subplans]
+        subplan_ids = [subplan.compute_plan_id() for subplan in self.subplans]
         return hash_for_id(str((full_op_id,) + tuple(subplan_ids)))
 
     def get_est_total_outputs(self, num_samples: int | None = None, current_idx: int | None = None, source_unique_full_op_ids_map: dict | None = None) -> tuple[dict[str, int], int]:
@@ -179,7 +179,7 @@ class PhysicalPlan(Plan):
         _, next_unique_full_op_id = self.unique_full_op_id_to_next_unique_full_op_and_id[unique_full_op_id]
         return next_unique_full_op_id
 
-    def _compute_upstream_unique_full_op_ids_map(self, upstream_map: dict[str, list[str]], current_idx: int | None = None) -> tuple[int, str]:
+    def _compute_upstream_unique_full_op_ids_map(self, upstream_map: dict[str, list[str]], current_idx: int | None = None) -> tuple[int, str, list[str]]:
         # set the upstream unique full_op_ids for this operator
         subplan_topo_idx_upstream_unique_full_op_id_tuples = []
         for subplan in self.subplans:
@@ -248,7 +248,7 @@ class PhysicalPlan(Plan):
 
     def _get_str(self, idx: int = 0, indent: int = 0) -> str:
         indent_str = " " * (indent * 2)
-        plan_str = f"{indent_str}{idx}. {type(self.operator).__name__} -> {self.operator.output_schema.__name__} \n\n"
+        plan_str = f"{indent_str}{idx}. {str(self.operator)}\n"
         for subplan in self.subplans:
             plan_str += subplan._get_str(idx=idx + 1, indent=indent + 1)
 
@@ -287,18 +287,27 @@ class PhysicalPlan(Plan):
         return cls(operator=ops[-1], subplans=[subplan], plan_cost=plan_cost)
 
 
+# TODO(?): take list[PhysicalOperator] as input, but then store OpFrontier
 class SentinelPlan(Plan):
-    def __init__(self, operator_sets: list[list[PhysicalOperator]]):
-        # enforce that first operator_set is a scan and that every operator_set has at least one operator
-        if len(operator_sets) > 0:
-            assert isinstance(operator_sets[0][0], ScanPhysicalOp), "first operator set must be a scan"
-            assert all(len(op_set) > 0 for op_set in operator_sets), "every operator set must have at least one operator"
-
-        # store operator_sets and logical_op_ids; sort operator_sets internally by full_op_id
-        self.operator_sets = operator_sets
-        self.operator_sets = [sorted(op_set, key=lambda op: op.get_full_op_id()) for op_set in self.operator_sets]
-        self.logical_op_ids = [op_set[0].logical_op_id for op_set in self.operator_sets]
+    def __init__(self, operator_set: list[PhysicalOperator], subplans: list[SentinelPlan] | None):
+        # store operator_set and logical_op_id; sort operator_set internally by full_op_id
+        self.operator_set = sorted(operator_set, key=lambda op: op.get_full_op_id())
+        self.logical_op_id = self.operator_set[0].logical_op_id
+        self.subplans = subplans
         self.plan_id = self.compute_plan_id()
+
+        # compute mapping from unique logical_op_id to next unique logical_op_id in the plan
+        self.unique_logical_op_id_to_next_unique_logical_op_id = {}
+        current_idx, _ = self._compute_next_unique_logical_op_id_map(self.unique_logical_op_id_to_next_unique_logical_op_id)
+        self.unique_logical_op_id_to_next_unique_logical_op_id[f"{current_idx}-{self.logical_op_id}"] = None
+
+        # compute mapping from unique logical_op_id to root dataset ids
+        self.unique_logical_op_id_to_root_dataset_ids = {}
+        self._compute_root_dataset_ids_map(self.unique_logical_op_id_to_root_dataset_ids)
+
+        # compute mapping from unique logical_op_id to source unique logical_op_ids
+        self.unique_logical_op_id_to_source_logical_op_ids = {}
+        self._compute_source_unique_logical_op_ids_map(self.unique_logical_op_id_to_source_logical_op_ids)
 
     def compute_plan_id(self) -> str:
         """
@@ -306,10 +315,9 @@ class SentinelPlan(Plan):
 
         Two different SentinelPlan instances with the identical operator_sets will have equivalent plan_ids.
         """
-        hash_str = ""
-        for logical_op_id, op_set in zip(self.logical_op_ids, self.operator_sets):
-            hash_str += f"{logical_op_id} {tuple(op.get_full_op_id() for op in op_set)} "
-        return hash_for_id(hash_str)
+        full_id = (self.logical_op_id,) + tuple([op.get_full_op_id() for op in self.operator_set])
+        subplan_ids = [subplan.compute_plan_id() for subplan in self.subplans]
+        return hash_for_id(str((full_id,) + tuple(subplan_ids)))
 
     def __eq__(self, other):
         return isinstance(other, SentinelPlan) and self.plan_id == other.plan_id
@@ -320,40 +328,125 @@ class SentinelPlan(Plan):
     def __repr__(self) -> str:
         return str(self)
 
-    def __str__(self):
-        # by assertion, first operator_set is guaranteed to be a scan
-        start = self.operator_sets[0][0]
-        plan_str = f" 0. {type(start).__name__} -> {start.output_schema.__name__} \n\n"
-
-        # build string one operator set at a time
-        for idx, operator_set in enumerate(self.operator_sets[1:]):
-            if len(operator_set) == 1:
-                operator = operator_set[0]
-                plan_str += f" {idx+1}. {str(operator)}\n"
-
-            else:
-                for inner_idx, operator in enumerate(operator_set):
-                    plan_str += f" {idx+1}.{inner_idx+1}. {str(operator)}\n"
+    def _get_str(self, idx: int = 0, indent: int = 0) -> str:
+        indent_str = " " * (indent * 2)
+        for inner_idx, operator in enumerate(self.operator_set):
+            inner_idx_str = "" if len(self.operator_set) == 1 else f"{inner_idx + 1}."
+            plan_str = f"{indent_str}{idx}.{inner_idx_str} {str(operator)}\n"
+            for subplan in self.subplans:
+                plan_str += subplan._get_str(idx=idx + 1, indent=indent + 1)
 
         return plan_str
 
+    def __str__(self):
+        return self._get_str()
+
     def __getitem__(self, slice):
-        return self.logical_op_ids[slice], self.operator_sets[slice]
+        op_set_tuples = [op_set_tuple for op_set_tuple in self]
+        return op_set_tuples[slice]
 
     def __iter__(self):
-        yield from zip(self.logical_op_ids, self.operator_sets)
+        for subplan in self.subplans:
+            yield from subplan
+        yield self.logical_op_id, self.operator_set
 
     def __len__(self):
-        return len(self.logical_op_ids)
+        return 1 + sum(len(subplan) for subplan in self.subplans)
+    
+    def _compute_next_unique_logical_op_id_map(self, next_map: dict[str, str | None], current_idx: int | None = None) -> tuple[int, str]:
+        """Compute a mapping from each operator's unique logical_op_id to the next operator's unique logical_op_id.
 
-    @staticmethod
-    def from_ops_and_sub_plan(op_sets: list[list[PhysicalOperator]], sub_plan: SentinelPlan) -> SentinelPlan:
-        # create copies of all logical operators
-        copy_sub_plan = [[op.copy() for op in op_set] for op_set in sub_plan.operator_sets]
-        copy_ops = [[op.copy() for op in op_set] for op_set in op_sets]
+        The unique logical_op_id is constructed as "{topological_index}-{logical_op_id}" to differentiate between
+        multiple instances of the same physical operator in the plan (e.g., in self-joins).
 
-        # construct full set of operators
-        copy_sub_plan.extend(copy_ops)
+        Args:
+            next_map: A dictionary to populate with the mapping from unique logical_op_id to next logical_op_id.
+            current_idx: The current topological index in the plan. If None, starts at 0.
 
-        # return the SentinelPlan
-        return SentinelPlan(operator_sets=copy_sub_plan)
+        Returns:
+            A tuple containing:
+                - The current topological index after processing this plan.
+                - The unique logical_op_id of this plan's root logical operator.
+        """
+        # If there are subplans, compute their next maps first
+        subplan_topo_idx_op_id_pairs = []
+        for subplan in self.subplans:
+            current_idx, current_logical_op_id = subplan._compute_next_unique_logical_op_id_map(next_map, current_idx)
+            subplan_topo_idx_op_id_pairs.append((current_idx, current_logical_op_id))
+            current_idx += 1  # increment after processing each subplan
+
+        # for each subplan's root operator, set its next to this plan's root operator
+        for topo_idx, logical_op_id in subplan_topo_idx_op_id_pairs:
+            unique_logical_op_id = f"{topo_idx}-{logical_op_id}"
+            this_unique_logical_op_id = f"{current_idx}-{self.logical_op_id}"
+            next_map[unique_logical_op_id] = this_unique_logical_op_id
+
+        # if this is the first call, initialize current_idx
+        if current_idx is None:
+            current_idx = 0
+
+        return current_idx, self.logical_op_id
+
+    def get_next_unique_logical_op_id(self, unique_logical_op_id: str) -> str | None:
+        """Return the unique logical_op_id of the next operator in the plan after the given operator, or None if it is the last operator."""
+        return self.unique_logical_op_id_to_next_unique_logical_op_id[unique_logical_op_id]
+
+    def _compute_root_dataset_ids_map(self, root_dataset_ids_map: dict[str, list[str]], current_idx: int | None = None) -> tuple[int, list[str]]:
+        # set the root dataset ids for this operator
+        subplan_root_dataset_ids = []
+        for subplan in self.subplans:
+            current_idx, subplan_root_dataset_ids = subplan._compute_root_dataset_ids_map(root_dataset_ids_map, current_idx)
+            subplan_root_dataset_ids.extend(subplan_root_dataset_ids)
+            current_idx += 1
+
+        # if current_idx is None, this is the first call, so we initialize it to 0
+        if current_idx is None:
+            current_idx = 0
+
+        # compute this operator's unique logical_op_id
+        this_unique_logical_op_id = f"{current_idx}-{self.logical_op_id}"
+
+        # if this operator is a root dataset scan, update root_dataset_ids
+        root_dataset_ids = []
+        if isinstance(self.operator_set[0], MarshalAndScanDataOp):
+            root_dataset_ids.append(self.operator_set[0].datasource.id)
+        elif isinstance(self.operator_set[0], ContextScanOp):
+            root_dataset_ids.append(self.operator_set[0].context.id)
+
+        # update the root_dataset_ids_map for this operator
+        root_dataset_ids_map[this_unique_logical_op_id] = root_dataset_ids + subplan_root_dataset_ids
+
+        # return the current index and the upstream unique logical_op_ids for this operator
+        return current_idx, root_dataset_ids_map[this_unique_logical_op_id]
+
+    def get_root_dataset_ids(self, unique_logical_op_id: str) -> list[str]:
+        """Return the list of root dataset ids which are upstream of this operator."""
+        return self.unique_logical_op_id_to_root_dataset_ids[unique_logical_op_id]
+
+    def _compute_source_unique_logical_op_ids_map(self, source_map: dict[str, list[str]], current_idx: int | None = None) -> tuple[int, str]:
+        # get the topological index and logical_op_id pairs for all subplans' root operators
+        subplan_topo_idx_op_id_pairs = []
+        for subplan in self.subplans:
+            current_idx, current_logical_op_id = subplan._compute_source_unique_logical_op_ids_map(source_map, current_idx)
+            subplan_topo_idx_op_id_pairs.append((current_idx, current_logical_op_id))
+            current_idx += 1
+
+        # if current_idx is None, this is the first call, so we initialize it to 0
+        if current_idx is None:
+            current_idx = 0
+
+        # compute this operator's unique logical_op_id
+        this_unique_logical_op_id = f"{current_idx}-{self.logical_op_id}"
+
+        # update the source_map for this operator
+        source_map[this_unique_logical_op_id] = []
+        for topo_idx, logical_op_id in subplan_topo_idx_op_id_pairs:
+            unique_logical_op_id = f"{topo_idx}-{logical_op_id}"
+            source_map[this_unique_logical_op_id].append(unique_logical_op_id)
+
+        # return the current unique logical_op_id for this operator
+        return current_idx, self.logical_op_id
+
+    def get_source_unique_logical_op_ids(self, unique_logical_op_id: str) -> list[str]:
+        """Return the list of unique logical_op_ids for the input(s) to this operator."""
+        return self.unique_logical_op_id_to_source_logical_op_ids[unique_logical_op_id]

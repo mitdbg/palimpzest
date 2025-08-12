@@ -16,7 +16,12 @@ from palimpzest.prompts.util_phrases import (
     ONE_TO_MANY_OUTPUT_FORMAT_INSTRUCTION,
     ONE_TO_ONE_OUTPUT_FORMAT_INSTRUCTION,
 )
-from palimpzest.prompts.validator import VALIDATOR_PROMPT
+from palimpzest.prompts.validator import (
+    FLAT_MAP_IMAGE_VALIDATOR_PROMPT,
+    FLAT_MAP_VALIDATOR_PROMPT,
+    MAP_IMAGE_VALIDATOR_PROMPT,
+    MAP_VALIDATOR_PROMPT,
+)
 
 __all__ = [
     # agent prompts
@@ -38,5 +43,8 @@ __all__ = [
     "ONE_TO_MANY_OUTPUT_FORMAT_INSTRUCTION",
     "ONE_TO_ONE_OUTPUT_FORMAT_INSTRUCTION",
     # validator
-    "VALIDATOR_PROMPT"
+    "FLAT_MAP_IMAGE_VALIDATOR_PROMPT",
+    "FLAT_MAP_VALIDATOR_PROMPT",
+    "MAP_IMAGE_VALIDATOR_PROMPT",
+    "MAP_VALIDATOR_PROMPT",
 ]

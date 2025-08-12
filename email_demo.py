@@ -81,7 +81,7 @@ def sem_filter(filepath: str, predicate: str) -> bool:
         contents = f.read()
 
     # create data record for file
-    dr = DataRecord(schema=TextFile, source_indices=[0])
+    dr = DataRecord(schema=TextFile, source_indices=[f"file-{0}"])
     dr.filename = os.path.basename(filepath)
     dr.contents = contents
 
@@ -129,7 +129,7 @@ def sem_map(filepath: str, fields: list[dict]) -> dict:
         contents = f.read()
 
     # create data record for file
-    dr = DataRecord(schema=TextFile, source_indices=[0])
+    dr = DataRecord(schema=TextFile, source_indices=[f"file-{0}"])
     dr.filename = os.path.basename(filepath)
     dr.contents = contents
 

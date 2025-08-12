@@ -2,13 +2,18 @@ import logging
 
 import numpy as np
 
+from palimpzest.core.data.dataset import Dataset
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.core.models import SentinelPlanStats
 from palimpzest.query.execution.execution_strategy import SentinelExecutionStrategy
+from palimpzest.query.operators.aggregate import AggregateOp
+from palimpzest.query.operators.filter import FilterOp
+from palimpzest.query.operators.join import JoinOp
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.scan import ContextScanOp, ScanPhysicalOp
 from palimpzest.query.optimizer.plan import SentinelPlan
 from palimpzest.utils.progress import create_progress_manager
+from palimpzest.validator.validator import Validator
 
 logger = logging.getLogger(__name__)
 
@@ -21,36 +26,78 @@ class OpSet:
     2. has been sampled fewer than j times
     """
 
-    def __init__(self, op_set: list[PhysicalOperator], source_indices: list[int]):
+    def __init__(self, op_set: list[PhysicalOperator], source_unique_logical_op_ids: list[str], source_indices: list[int]):
         # construct the set of operators
         self.ops = op_set
 
         # store the order in which we will sample the source records
         self.source_indices = source_indices
 
+        # boolean indication of the type of operator in this OpSet
+        sample_op = op_set[0]
+        self.is_scan_op = isinstance(sample_op, (ScanPhysicalOp, ContextScanOp))
+        self.is_filter_op = isinstance(sample_op, FilterOp)
+        self.is_aggregate_op = isinstance(sample_op, AggregateOp)
+        self.is_llm_join = isinstance(sample_op, JoinOp)
+
         # set the initial inputs for this logical operator
-        is_scan_op = isinstance(op_set[0], (ContextScanOp, ScanPhysicalOp))
-        self.source_idx_to_input = {source_idx: [source_idx] for source_idx in self.source_indices} if is_scan_op else {}
+        self.source_indices_to_inputs = {source_unique_logical_op_id: {} for source_unique_logical_op_id in source_unique_logical_op_ids}
+        if self.is_scan_op:
+            self.source_indices_to_inputs["source"] = {source_idx: [int(source_idx.split("-")[-1])] for source_idx in self.source_indices}
 
-    def get_op_input_pairs(self) -> list[PhysicalOperator, DataRecord | int | None]:
+    def get_op_inputs(self) -> list[PhysicalOperator, DataRecord | int | None]:
         """
-        Returns the list of frontier operators and their next input to process. If there are
-        any indices in `source_indices_to_sample` which this operator does not sample on its own, then
-        we also have this frontier process that source_idx's input with its max quality operator.
+        Returns the list of frontier operators and their next input to process.
         """
-        # get the list of (op, source_idx) pairs which this operator needs to execute
-        op_source_idx_pairs = []
+        # if this is an aggregate, run on every input
+        if self.is_aggregate_op:
+            op = self.ops[0]
+            all_inputs = []
+            for _, source_indices_to_inputs in self.source_indices_to_inputs.items():
+                for _, inputs in source_indices_to_inputs.items():
+                    all_inputs.extend(inputs)
+            return [(op, tuple(), all_inputs)]
+
+        # if this is an un-optimized (non-scan, non-join) operator, flatten inputs and run on each one
+        elif not self.is_scan_op and not self.is_llm_join and len(self.ops) == 1:
+            op_inputs = []
+            op = self.ops[0]
+            for _, source_indices_to_inputs in self.source_indices_to_inputs.items():
+                for source_indices, inputs in source_indices_to_inputs.items():
+                    for input in inputs:
+                        op_inputs.append((op, source_indices, input))
+            return op_inputs
+
+        # get the list of (op, source_indices) pairs which this operator needs to execute
+        op_source_indices_pairs = []
         for op in self.ops:
-            # construct list of inputs by looking up the input for the given source_idx
-            for source_idx in self.source_indices:
-                op_source_idx_pairs.append((op, source_idx))
+            # construct list of inputs by looking up the input for the given source_indices
+            for source_indices in self.source_indices:
+                op_source_indices_pairs.append((op, source_indices))
 
-        # fetch the corresponding (op, input) pairs
-        op_input_pairs = []
-        for op, source_idx in op_source_idx_pairs:
-            op_input_pairs.extend([(op, input_record) for input_record in self.source_idx_to_input[source_idx]])
+        # construct the op inputs
+        op_inputs = []
+        if self.is_llm_join:
+            left_source_unique_logical_op_id, right_source_unique_logical_op_id = list(self.source_indices_to_inputs)
+            left_source_indices_to_inputs = self.source_indices_to_inputs[left_source_unique_logical_op_id]
+            right_source_indices_to_inputs = self.source_indices_to_inputs[right_source_unique_logical_op_id]
+            for op, source_indices in op_source_indices_pairs:
+                left_source_indices = source_indices[0]
+                right_source_indices = source_indices[1]
+                left_inputs = left_source_indices_to_inputs.get(left_source_indices, [])
+                right_inputs = right_source_indices_to_inputs.get(right_source_indices, [])
+                if len(left_inputs) > 0 and len(right_inputs) > 0:
+                    op_inputs.append((op, (left_source_indices, right_source_indices), (left_inputs, right_inputs)))
+            return op_inputs
 
-        return op_input_pairs
+        # if operator is not a join
+        op_inputs = [
+            (op, source_indices, input)
+            for op, source_indices in op_source_indices_pairs
+            for input in self.source_indices_to_inputs.get(source_indices, [])
+        ]
+
+        return op_inputs
 
     def pick_highest_quality_output(self, record_sets: list[DataRecordSet]) -> DataRecordSet:
         # if there's only one operator in the set, we return its record_set
@@ -100,68 +147,59 @@ class OpSet:
             for record in max_quality_record_set:
                 input.append(record if record.passed_operator else None)
 
-            self.source_idx_to_input[source_idx] = input
-
+            self.source_indices_to_inputs[source_idx] = input
 
 class AllSamplingExecutionStrategy(SentinelExecutionStrategy):
-
-    def _get_source_indices(self):
-        """Get the list of source indices which the sentinel plan should execute over."""
-        # create list of all source indices and shuffle it
-        total_num_samples = len(self.train_dataset)
-        source_indices = list(np.arange(total_num_samples))
-
-        return source_indices
 
     def _execute_sentinel_plan(self,
             plan: SentinelPlan,
             op_sets: dict[str, OpSet],
-            expected_outputs: dict[int, dict] | None,
+            validator: Validator,
             plan_stats: SentinelPlanStats,
         ) -> SentinelPlanStats:
         # execute operator sets in sequence
-        for op_idx, (logical_op_id, op_set) in enumerate(plan):
-            # get frontier ops and their next input
-            op_input_pairs = op_sets[logical_op_id].get_op_input_pairs()
+        for topo_idx, (logical_op_id, _) in enumerate(plan):
+            # compute unique logical op id within plan
+            unique_logical_op_id = f"{topo_idx}-{logical_op_id}"
 
-            # break out of the loop if op_input_pairs is empty, as this means all records have been filtered out
-            if len(op_input_pairs) == 0:
+            # get frontier ops and their next input
+            op_inputs = op_sets[logical_op_id].get_op_inputs()
+
+            # break out of the loop if op_inputs is empty, as this means all records have been filtered out
+            if len(op_inputs) == 0:
                 break
 
             # run sampled operators on sampled inputs
-            source_idx_to_record_sets_and_ops, _ = self._execute_op_set(op_input_pairs)
+            source_indices_to_record_set_tuples, _ = self._execute_op_set(unique_logical_op_id, op_inputs)
 
-            # FUTURE TODO: have this return the highest quality record set simply based on our posterior (or prior) belief on operator quality
-            # get the target record set for each source_idx
-            source_idx_to_target_record_set = self._get_target_record_sets(logical_op_id, source_idx_to_record_sets_and_ops, expected_outputs)
-
-            # FUTURE TODO: move this outside of the loop (i.e. assume we only get quality label(s) after executing full program)
             # score the quality of each generated output
-            physical_op_cls = op_set[0].__class__
-            source_idx_to_record_sets = {
-                source_idx: list(map(lambda tup: tup[0], record_sets_and_ops))
-                for source_idx, record_sets_and_ops in source_idx_to_record_sets_and_ops.items()
-            }
-            source_idx_to_record_sets = self._score_quality(physical_op_cls, source_idx_to_record_sets, source_idx_to_target_record_set)
+            source_indices_to_all_record_sets = {
+                    source_indices: [(record_set, op) for record_set, op, _ in record_set_tuples]
+                    for source_indices, record_set_tuples in source_indices_to_record_set_tuples.items()
+                }
+            source_indices_to_all_record_sets = self._score_quality(validator, source_indices_to_all_record_sets)
 
-            # flatten the lists of records and record_op_stats
-            all_records, all_record_op_stats = self._flatten_record_sets(source_idx_to_record_sets)
+            # remove records that were read from the execution cache before adding to record op stats
+            new_record_op_stats = []
+            for _, record_set_tuples in source_indices_to_record_set_tuples.items():
+                for record_set, _, is_new in record_set_tuples:
+                    if is_new:
+                        new_record_op_stats.extend(record_set.record_op_stats)
 
             # update plan stats
-            plan_stats.add_record_op_stats(all_record_op_stats)
+            plan_stats.add_record_op_stats(unique_logical_op_id, new_record_op_stats)
 
-            # FUTURE TODO: simply set input based on source_idx_to_target_record_set (b/c we won't have scores computed)
-            # provide the champion record sets as inputs to the next logical operator
-            if op_idx + 1 < len(plan):
-                next_logical_op_id = plan.logical_op_ids[op_idx + 1]
-                op_sets[next_logical_op_id].update_inputs(source_idx_to_record_sets)
+            # provide the best record sets as inputs to the next logical operator
+            next_unique_logical_op_id = plan.get_next_unique_logical_op_id(unique_logical_op_id)
+            if next_unique_logical_op_id is not None:
+                op_sets[next_unique_logical_op_id].update_inputs(unique_logical_op_id, source_indices_to_all_record_sets)
 
         # finalize plan stats
         plan_stats.finish()
 
         return plan_stats
 
-    def execute_sentinel_plan(self, plan: SentinelPlan, expected_outputs: dict[int, dict] | None):
+    def execute_sentinel_plan(self, plan: SentinelPlan, train_dataset: dict[str, Dataset], validator: Validator): # expected_outputs: dict[int, dict] | None):
         """
         NOTE: this function currently requires us to set k and j properly in order to make
               comparison in our research against the corresponding sample budget in MAB.
@@ -170,8 +208,6 @@ class AllSamplingExecutionStrategy(SentinelExecutionStrategy):
         calls does not perfectly match the sample_budget. This may cause some minor discrepancies with
         the progress manager as a result.
         """
-        # for now, assert that the first operator in the plan is a ScanPhysicalOp
-        assert all(isinstance(op, (ContextScanOp, ScanPhysicalOp)) for op in plan.operator_sets[0]), "First operator in physical plan must be a scan operator"
         logger.info(f"Executing plan {plan.plan_id} with {self.max_workers} workers")
         logger.info(f"Plan Details: {plan}")
 
@@ -179,14 +215,37 @@ class AllSamplingExecutionStrategy(SentinelExecutionStrategy):
         plan_stats = SentinelPlanStats.from_plan(plan)
         plan_stats.start()
 
-        # get list of source indices which can be sampled from
-        source_indices = self._get_source_indices()
+        # get lists of source indices
+        dataset_id_to_source_indices = {}
+        for dataset_id, dataset in train_dataset.items():
+            total_num_samples = len(dataset)
+            source_indices = [f"{dataset_id}-{int(idx)}" for idx in np.arange(total_num_samples)]
+            dataset_id_to_source_indices[dataset_id] = source_indices
 
         # initialize set of physical operators for each logical operator
-        op_sets = {
-            logical_op_id: OpSet(op_set, source_indices)
-            for logical_op_id, op_set in plan
-        }
+        op_sets = {}
+        for topo_idx, (logical_op_id, op_set) in enumerate(plan):
+            unique_logical_op_id = f"{topo_idx}-{logical_op_id}"
+            source_unique_logical_op_ids = plan.get_source_unique_logical_op_ids(unique_logical_op_id)
+            sample_op = op_set[0]
+            if isinstance(sample_op, (ScanPhysicalOp, ContextScanOp)):
+                root_dataset_ids = plan.get_root_dataset_ids(unique_logical_op_id)
+                assert len(root_dataset_ids) == 1, f"Scan for {sample_op} has {len(root_dataset_ids)} > 1 root dataset ids"
+                root_dataset_id = root_dataset_ids[0]
+                source_indices = dataset_id_to_source_indices[root_dataset_id]
+                op_sets[unique_logical_op_id] = OpSet(op_set, source_unique_logical_op_ids, source_indices)
+            elif isinstance(sample_op, JoinOp):
+                assert len(source_unique_logical_op_ids) == 2, f"Join for {sample_op} has {len(source_unique_logical_op_ids)} != 2 source logical operators"
+                left_source_indices = op_sets[source_unique_logical_op_ids[0]].source_indices
+                right_source_indices = op_sets[source_unique_logical_op_ids[1]].source_indices
+                source_indices = []
+                for left_source_idx in left_source_indices:
+                    for right_source_idx in right_source_indices:
+                        source_indices.append((left_source_idx, right_source_idx))
+                op_sets[unique_logical_op_id] = OpSet(op_set, source_unique_logical_op_ids, source_indices)
+            else:
+                source_indices = op_sets[source_unique_logical_op_ids[0]].source_indices
+                op_sets[unique_logical_op_id] = OpSet(op_set, source_unique_logical_op_ids, source_indices)
 
         # initialize and start the progress manager
         self.progress_manager = create_progress_manager(plan, sample_budget=self.sample_budget, progress=self.progress)
@@ -197,7 +256,7 @@ class AllSamplingExecutionStrategy(SentinelExecutionStrategy):
         #       the progress manager cannot get a handle to the console 
         try:
             # execute sentinel plan by sampling records and operators
-            plan_stats = self._execute_sentinel_plan(plan, op_sets, expected_outputs, plan_stats)
+            plan_stats = self._execute_sentinel_plan(plan, op_sets, validator, plan_stats)
 
         finally:
             # finish progress tracking

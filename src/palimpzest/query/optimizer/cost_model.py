@@ -85,8 +85,8 @@ class SampleBasedCostModel:
 
         # flatten the nested dictionary of execution data and pull out fields relevant to cost estimation
         execution_record_op_stats = []
-        for logical_op_id, full_op_id_to_op_stats in sentinel_plan_stats.operator_stats.items():
-            logger.debug(f"Computing operator statistics for logical_op_id: {logical_op_id}")
+        for unique_logical_op_id, full_op_id_to_op_stats in sentinel_plan_stats.operator_stats.items():
+            logger.debug(f"Computing operator statistics for logical_op_id: {unique_logical_op_id}")
             # flatten the execution data into a list of RecordOpStats
             op_set_execution_data = [
                 record_op_stats
@@ -97,7 +97,7 @@ class SampleBasedCostModel:
             # add entries from execution data into matrices
             for record_op_stats in op_set_execution_data:
                 record_op_stats_dict = {
-                    "logical_op_id": logical_op_id,
+                    "unique_logical_op_id": unique_logical_op_id,
                     "full_op_id": record_op_stats.full_op_id,
                     "record_id": record_op_stats.record_id,
                     "record_parent_ids": record_op_stats.record_parent_ids,
@@ -116,9 +116,9 @@ class SampleBasedCostModel:
 
         # for each full_op_id, compute its average cost_per_record, time_per_record, selectivity, and quality
         operator_to_stats = {}
-        for logical_op_id, logical_op_df in operator_stats_df.groupby("logical_op_id"):
-            logger.debug(f"Computing operator statistics for logical_op_id: {logical_op_id}")
-            operator_to_stats[logical_op_id] = {}
+        for unique_logical_op_id, logical_op_df in operator_stats_df.groupby("unique_logical_op_id"):
+            logger.debug(f"Computing operator statistics for unique_logical_op_id: {unique_logical_op_id}")
+            operator_to_stats[unique_logical_op_id] = {}
 
             for full_op_id, physical_op_df in logical_op_df.groupby("full_op_id"):
                 # compute the number of input records processed by this operator; use source_indices for scan operator(s)
@@ -131,7 +131,7 @@ class SampleBasedCostModel:
                 # compute selectivity
                 selectivity = physical_op_df.passed_operator.sum() / num_source_records
 
-                operator_to_stats[logical_op_id][full_op_id] = {
+                operator_to_stats[unique_logical_op_id][full_op_id] = {
                     "cost": physical_op_df.cost_per_record.mean(),
                     "time": physical_op_df.time_per_record.mean(),
                     "quality": physical_op_df.quality.mean(),
@@ -205,8 +205,8 @@ class SampleBasedCostModel:
     def __call__(self, operator: PhysicalOperator, source_op_estimates: OperatorCostEstimates | None = None, right_source_op_estimates: OperatorCostEstimates | None = None) -> PlanCost:
         # for non-sentinel execution, we use naive estimates
         full_op_id = operator.get_full_op_id()
-        logical_op_id = operator.logical_op_id
-        if self.operator_to_stats is None or logical_op_id not in self.operator_to_stats:
+        unique_logical_op_id = operator.unique_logical_op_id
+        if self.operator_to_stats is None or unique_logical_op_id not in self.operator_to_stats:
             return self._compute_naive_plan_cost(operator, source_op_estimates, right_source_op_estimates)
 
         # NOTE: some physical operators may not have any sample execution data in this cost model;
@@ -214,16 +214,16 @@ class SampleBasedCostModel:
         #       we will have execution data for each operator passed into __call__; nevertheless, we
         #       still perform a sanity check
         # look up physical and logical op ids associated with this physical operator
-        physical_op_to_stats = self.operator_to_stats.get(logical_op_id)
+        physical_op_to_stats = self.operator_to_stats.get(unique_logical_op_id)
         assert physical_op_to_stats is not None, f"No execution data for logical operator: {str(operator)}"
         assert physical_op_to_stats.get(full_op_id) is not None, f"No execution data for physical operator: {str(operator)}"
         logger.debug(f"Calling __call__ for {str(operator)}")
 
         # look up stats for this operation
-        est_cost_per_record = self.operator_to_stats[logical_op_id][full_op_id]["cost"]
-        est_time_per_record = self.operator_to_stats[logical_op_id][full_op_id]["time"]
-        est_quality = self.operator_to_stats[logical_op_id][full_op_id]["quality"]
-        est_selectivity = self.operator_to_stats[logical_op_id][full_op_id]["selectivity"]
+        est_cost_per_record = self.operator_to_stats[unique_logical_op_id][full_op_id]["cost"]
+        est_time_per_record = self.operator_to_stats[unique_logical_op_id][full_op_id]["time"]
+        est_quality = self.operator_to_stats[unique_logical_op_id][full_op_id]["quality"]
+        est_selectivity = self.operator_to_stats[unique_logical_op_id][full_op_id]["selectivity"]
 
         # create source_op_estimates for scan operators if they are not provided
         if isinstance(operator, ScanPhysicalOp):

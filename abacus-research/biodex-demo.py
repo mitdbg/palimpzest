@@ -40,7 +40,7 @@ class BiodexDataset(pz.IterDataset):
         shuffle: bool = False,
         seed: int = 42,
     ):
-        super().__init__(id=f"biodex-{split}", schema=biodex_entry_cols)
+        super().__init__(id=f"biodex-{split}", schema=biodex_entry_cols) # TODO: this will raise a warning b/c "biodex-test" will not match "biodex-train"
 
         self.dataset = datasets.load_dataset("BioDEX/BioDEX-Reactions", split=split).to_pandas()
         if shuffle:
@@ -165,12 +165,6 @@ if __name__ == "__main__":
     parser.add_argument("--constrained", default=False, action="store_true", help="Use constrained objective")
     parser.add_argument("--gpt4-mini-only", default=False, action="store_true", help="Use only GPT-4o-mini")
     parser.add_argument(
-        "--processing-strategy",
-        default="sentinel",
-        type=str,
-        help="The engine to use. One of sentinel or no_sentinel",
-    )
-    parser.add_argument(
         "--execution-strategy",
         default="parallel",
         type=str,
@@ -255,7 +249,6 @@ if __name__ == "__main__":
     k = args.k
     j = args.j
     sample_budget = args.sample_budget
-    processing_strategy = args.processing_strategy
     execution_strategy = args.execution_strategy
     sentinel_execution_strategy = args.sentinel_execution_strategy
     exp_name = (
@@ -351,7 +344,6 @@ if __name__ == "__main__":
     # execute pz plan
     config = pz.QueryProcessorConfig(
         policy=policy,
-        processing_strategy=processing_strategy,
         optimizer_strategy="pareto",
         sentinel_execution_strategy=sentinel_execution_strategy,
         execution_strategy=execution_strategy,
@@ -372,7 +364,7 @@ if __name__ == "__main__":
         priors=priors,
     )
 
-    data_record_collection = plan.run(config=config, train_dataset=train_dataset, validator=pz.Validator(None))
+    data_record_collection = plan.optimize_and_run(config=config, train_dataset=train_dataset, validator=pz.Validator(None))
 
     print(data_record_collection.to_df())
     data_record_collection.to_df().to_csv(f"opt-profiling-data/{exp_name}-output.csv", index=False)

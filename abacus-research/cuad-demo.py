@@ -506,12 +506,6 @@ def parse_arguments():
     parser.add_argument("--constrained", default=False, action="store_true", help="Use constrained objective")
     parser.add_argument("--gpt4-mini-only", default=False, action="store_true", help="Use only GPT-4o-mini")
     parser.add_argument(
-        "--processing-strategy",
-        default="sentinel",
-        type=str,
-        help="The engine to use. One of sentinel or no_sentinel",
-    )
-    parser.add_argument(
         "--sentinel-execution-strategy",
         default="mab",
         type=str,
@@ -664,7 +658,6 @@ def main():
     config = pz.QueryProcessorConfig(
         policy=policy,
         verbose=False,
-        processing_strategy="sentinel",
         optimizer_strategy=optimizer_strategy,
         sentinel_execution_strategy=sentinel_strategy,
         execution_strategy=execution_strategy,

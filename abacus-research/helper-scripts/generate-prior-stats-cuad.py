@@ -552,7 +552,6 @@ def main():
     query = build_cuad_query(dataset, args.mode)
     print("Built query; Starting query execution")
 
-    processing_strategy = "sentinel"
     execution_strategy = "parallel"
     sentinel_execution_strategy = "all"
     optimizer_strategy = "pareto"
@@ -560,7 +559,6 @@ def main():
     exp_name = f"cuad-priors-{optimizer_strategy}-seed{seed}"
     config = pz.QueryProcessorConfig(
         verbose=False,
-        processing_strategy=processing_strategy,
         optimizer_strategy=optimizer_strategy,
         sentinel_execution_strategy=sentinel_execution_strategy,
         execution_strategy=execution_strategy,

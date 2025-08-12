@@ -168,7 +168,6 @@ if __name__ == "__main__":
     verbose = args.verbose
     progress = args.progress
     seed = 123 # NOTE: unique to cascades run
-    processing_strategy = "sentinel"
     execution_strategy = "parallel"
     sentinel_execution_strategy = "all"
     optimizer_strategy = "pareto"
@@ -236,7 +235,6 @@ if __name__ == "__main__":
 
     # execute pz plan
     config = pz.QueryProcessorConfig(
-        processing_strategy=processing_strategy,
         optimizer_strategy=optimizer_strategy,
         sentinel_execution_strategy=sentinel_execution_strategy,
         execution_strategy=execution_strategy,

@@ -136,7 +136,6 @@ if __name__ == "__main__":
 
     config = pz.QueryProcessorConfig(
         policy=policy,
-        processing_strategy="no_sentinel",
         execution_strategy=executor,
     )
     data_record_collection = output.run(config)

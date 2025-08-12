@@ -26,14 +26,12 @@ class ConvertOp(PhysicalOperator, ABC):
         self,
         cardinality: Cardinality = Cardinality.ONE_TO_ONE,
         udf: Callable | None = None,
-        desc: str | None = None,
         *args,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
         self.cardinality = cardinality
         self.udf = udf
-        self.desc = desc
 
     def get_id_params(self):
         id_params = super().get_id_params()
@@ -47,7 +45,7 @@ class ConvertOp(PhysicalOperator, ABC):
 
     def get_op_params(self):
         op_params = super().get_op_params()
-        op_params = {"cardinality": self.cardinality, "udf": self.udf, "desc": self.desc, **op_params}
+        op_params = {"cardinality": self.cardinality, "udf": self.udf, **op_params}
 
         return op_params
 

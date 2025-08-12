@@ -41,7 +41,7 @@ class RetrieveOp(PhysicalOperator):
         super().__init__(*args, **kwargs)
 
         # extract the field names from the output_attrs
-        if isinstance(output_attrs, BaseModel):
+        if issubclass(output_attrs, BaseModel):
             self.output_field_names = list(output_attrs.model_fields)
         elif isinstance(output_attrs, list):
             self.output_field_names = [attr["name"] for attr in output_attrs]

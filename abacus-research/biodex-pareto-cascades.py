@@ -165,12 +165,6 @@ if __name__ == "__main__":
     parser.add_argument("--progress", default=False, action="store_true", help="Print progress output")
     parser.add_argument("--constrained", default=False, action="store_true", help="Use constrained objective")
     parser.add_argument(
-        "--processing-strategy",
-        default="sentinel",
-        type=str,
-        help="The engine to use. One of sentinel or no_sentinel",
-    )
-    parser.add_argument(
         "--execution-strategy",
         default="parallel",
         type=str,
@@ -249,7 +243,6 @@ if __name__ == "__main__":
     k = args.k
     j = args.j
     sample_budget = args.sample_budget
-    processing_strategy = args.processing_strategy
     execution_strategy = args.execution_strategy
     sentinel_execution_strategy = args.sentinel_execution_strategy
     optimizer_strategy = args.optimizer_strategy
@@ -333,7 +326,6 @@ if __name__ == "__main__":
     # execute pz plan
     config = pz.QueryProcessorConfig(
         policy=MaxQualityAtFixedCost(max_cost=cost),
-        processing_strategy=processing_strategy,
         optimizer_strategy=optimizer_strategy,
         sentinel_execution_strategy=sentinel_execution_strategy,
         execution_strategy=execution_strategy,

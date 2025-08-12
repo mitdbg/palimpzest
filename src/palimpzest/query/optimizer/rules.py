@@ -24,12 +24,10 @@ from palimpzest.query.operators.logical import (
     GroupByAggregate,
     JoinOp,
     LimitScan,
-    MapScan,
     Project,
     RetrieveScan,
     SearchOperator,
 )
-from palimpzest.query.operators.map import MapOp
 from palimpzest.query.operators.mixture_of_agents_convert import MixtureOfAgentsConvert
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.project import ProjectOp
@@ -335,6 +333,7 @@ class ImplementationRule(Rule):
             {
                 "verbose": runtime_kwargs["verbose"],
                 "logical_op_id": logical_op.get_logical_op_id(),
+                "unique_logical_op_id": logical_op.get_unique_logical_op_id(),
                 "logical_op_name": logical_op.logical_op_name(),
             }
         )
@@ -584,7 +583,6 @@ class RetrieveRule(ImplementationRule):
         # create variable physical operator kwargs for each model which can implement this logical_expression
         ks = cls.k_budgets if logical_expression.operator.k == -1 else [logical_expression.operator.k]
         variable_op_kwargs = [{"k": k} for k in ks]
-
         return cls._perform_substitution(logical_expression, RetrieveOp, runtime_kwargs, variable_op_kwargs)
 
 
@@ -741,7 +739,6 @@ class BasicSubstitutionRule(ImplementationRule):
         LimitScan: LimitScanOp,
         Project: ProjectOp,
         GroupByAggregate: ApplyGroupByOp,
-        MapScan: MapOp,
     }
 
     @classmethod

@@ -16,6 +16,9 @@ from palimpzest.utils.progress import create_progress_manager
 
 logger = logging.getLogger(__name__)
 
+import cProfile
+import pstats
+
 class ParallelExecutionStrategy(ExecutionStrategy):
     """
     A parallel execution strategy that processes data through a pipeline of operators using thread-based parallelism.
@@ -81,7 +84,7 @@ class ParallelExecutionStrategy(ExecutionStrategy):
             self.progress_manager.incr(unique_full_op_id, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
 
             # update plan stats
-            plan_stats.add_record_op_stats(record_op_stats)
+            plan_stats.add_record_op_stats(unique_full_op_id, record_op_stats)
 
             # add records which aren't filtered to the output records
             output_records.extend([record for record in records if record.passed_operator])
@@ -256,7 +259,7 @@ class SequentialParallelExecutionStrategy(ExecutionStrategy):
             self.progress_manager.incr(unique_full_op_id, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
 
             # update plan stats
-            plan_stats.add_record_op_stats(record_op_stats)
+            plan_stats.add_record_op_stats(unique_full_op_id, record_op_stats)
 
             # add records which aren't filtered to the output records
             output_records.extend([record for record in records if record.passed_operator])
@@ -359,9 +362,16 @@ class SequentialParallelExecutionStrategy(ExecutionStrategy):
         #       because the progress manager cannot get a handle to the console 
         try:
             # execute plan
+            profiler = cProfile.Profile()
+            profiler.enable()
             output_records, plan_stats = self._execute_plan(plan, input_queues, future_queues, plan_stats)
+            profiler.disable()
 
         finally:
+            # Create a pstats object from the profiler results
+            stats = pstats.Stats(profiler)
+            stats.dump_stats("parallel_exec_results.prof")
+
             # finish progress tracking
             self.progress_manager.finish()
 

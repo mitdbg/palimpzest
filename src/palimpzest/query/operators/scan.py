@@ -73,7 +73,7 @@ class ScanPhysicalOp(PhysicalOperator, ABC):
         assert all([field in item_field_dict for field in output_field_names]), f"Some fields in Dataset schema not present in item!\n - Dataset fields: {output_field_names}\n - Item fields: {list(item.keys())}"
 
         # construct a DataRecord from the item
-        dr = DataRecord(self.output_schema, source_indices=[idx])
+        dr = DataRecord(self.output_schema, source_indices=[f"{self.datasource.id}-{idx}"])
         for field in output_field_names:
             setattr(dr, field, item_field_dict[field])
 
@@ -172,7 +172,7 @@ class ContextScanOp(PhysicalOperator):
         """
         # construct a DataRecord from the context
         start_time = time.time()
-        dr = DataRecord(self.output_schema, source_indices=[0])
+        dr = DataRecord(self.output_schema, source_indices=[f"{self.context.id}-{0}"])
         dr.context = self.context
         end_time = time.time()
 

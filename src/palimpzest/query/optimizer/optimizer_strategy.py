@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 
 from palimpzest.policy import Policy
 from palimpzest.query.optimizer.plan import PhysicalPlan, SentinelPlan
+from palimpzest.query.optimizer.primitives import Group
 
 logger = logging.getLogger(__name__)
 
@@ -142,29 +143,33 @@ class ParetoStrategy(OptimizationStrategy):
     
 
 class SentinelStrategy(OptimizationStrategy):
-    def _get_sentinel_plan(self, groups: dict, group_id: int) -> SentinelPlan:
+    def _get_sentinel_plan(self, groups: dict[str, Group], group_id: int) -> SentinelPlan:
         """
         Create and return a SentinelPlan object.
+
+        NOTE: this strategy is only used to construct a SentinelPlan before performing optimization.
+              Currently, we do not perform any transformation rules when building the groups which
+              are fed into this function. Thus, every physical expression will correspond to the same
+              logical operator and share the same logical_op_id. Eventually we will want to consider
+              multiple logical re-orderings of operators in our SentinelPlan, but for now it is static.
         """
-        # get all the physical expressions for this group
+        # get all the physical expressions for this group as well as their logical_op_id
         phys_exprs = groups[group_id].physical_expressions
         phys_op_set = [expr.operator for expr in phys_exprs]
 
-        # if this expression has no inputs (i.e. it is a BaseScan),
-        # create and return the physical plan
+        # if this expression has no inputs (i.e. it is a scan operator), create and return the sentinel plan
         best_phys_expr = groups[group_id].best_physical_expression
         if len(best_phys_expr.input_group_ids) == 0:
-            return SentinelPlan(operator_sets=[phys_op_set])
+            return SentinelPlan(operator_set=phys_op_set, subplans=None)
 
-        # TODO: need to handle joins
-        # get the best physical plan(s) for this group's inputs
-        best_phys_subplan = SentinelPlan(operator_sets=[])
+        # get the subplans
+        subplans = []
         for input_group_id in best_phys_expr.input_group_ids:
-            input_best_phys_plan = self._get_sentinel_plan(groups, input_group_id)
-            best_phys_subplan = SentinelPlan.from_ops_and_sub_plan(best_phys_subplan.operator_sets, input_best_phys_plan)
+            subplan = self._get_sentinel_plan(groups, input_group_id)
+            subplans.append(subplan)
 
-        # add this operator set to best physical plan and return
-        return SentinelPlan.from_ops_and_sub_plan([phys_op_set], best_phys_subplan)
+        # compose the current physical operator set with its subplans
+        return SentinelPlan(operator_set=phys_op_set, subplans=subplans)
 
     def get_optimal_plans(self, groups: dict, final_group_id: int, policy: Policy, use_final_op_quality: bool) -> list[SentinelPlan]:
         logger.info(f"Getting sentinel optimal plans for final group id: {final_group_id}")

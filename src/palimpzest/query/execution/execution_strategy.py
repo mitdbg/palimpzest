@@ -5,19 +5,20 @@ from concurrent.futures import ThreadPoolExecutor, wait
 import numpy as np
 from chromadb.api.models.Collection import Collection
 
-from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS
+from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS, Cardinality
 from palimpzest.core.data.dataset import Dataset
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
-from palimpzest.core.models import OperatorCostEstimates, PlanStats, RecordOpStats
+from palimpzest.core.models import PlanStats, SentinelPlanStats
 from palimpzest.policy import Policy
 from palimpzest.query.operators.convert import LLMConvert
 from palimpzest.query.operators.filter import FilterOp, LLMFilter
+from palimpzest.query.operators.join import JoinOp
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.retrieve import RetrieveOp
 from palimpzest.query.operators.scan import ContextScanOp, ScanPhysicalOp
 from palimpzest.query.optimizer.plan import PhysicalPlan, SentinelPlan
 from palimpzest.utils.progress import PZSentinelProgressManager
-from palimpzest.validator.validator import BaseValidator
+from palimpzest.validator.validator import Validator
 
 logger = logging.getLogger(__name__)
 
@@ -79,8 +80,6 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
     """
     def __init__(
         self,
-        train_dataset: Dataset,
-        validator: BaseValidator,
         k: int,
         j: int,
         sample_budget: int,
@@ -93,8 +92,6 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
-        self.train_dataset = train_dataset
-        self.validator = validator
         self.k = k
         self.j = j
         self.sample_budget = sample_budget
@@ -105,16 +102,13 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
         self.rng = np.random.default_rng(seed=seed)
         self.exp_name = exp_name
 
-        # special cache which is used for tracking the target record sets for each (source_idx, logical_op_id)
-        self.champion_output_cache: dict[int, dict[str, tuple[DataRecordSet, float]]] = {}
-
         # general cache which maps hash(logical_op_id, phys_op_id, hash(input)) --> record_set
         self.cache: dict[int, DataRecordSet] = {}
 
         # progress manager used to track progress of the execution
         self.progress_manager: PZSentinelProgressManager | None = None
 
-    def _compute_quality(
+    def _old_compute_quality(
             self,
             physical_op_cls: type[PhysicalOperator],
             record_set: DataRecordSet,
@@ -213,184 +207,99 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
 
     def _score_quality(
         self,
-        physical_op_cls: type[PhysicalOperator],
-        source_idx_to_record_sets: dict[int, list[DataRecordSet]],
-        source_idx_to_target_record_set: dict[int, DataRecordSet],
+        validator: Validator,
+        source_indices_to_record_sets: dict[tuple[str], list[tuple[DataRecordSet, PhysicalOperator]]],
     ) -> dict[int, list[DataRecordSet]]:
-        """
-        NOTE: This approach to cost modeling does not work directly for aggregation queries;
-              for these queries, we would ask the user to provide validation data for the step immediately
-              before a final aggregation
-
-        NOTE: This function currently assumes that one-to-many converts do NOT create duplicate outputs.
-        This assumption would break if, for example, we extracted the breed of every dog in an image.
-        If there were two golden retrievers and a bernoodle in an image and we extracted:
-
-            {"image": "file1.png", "breed": "Golden Retriever"}
-            {"image": "file1.png", "breed": "Golden Retriever"}
-            {"image": "file1.png", "breed": "Bernedoodle"}
-
-        This function would currently give perfect accuracy to the following output:
-
-            {"image": "file1.png", "breed": "Golden Retriever"}
-            {"image": "file1.png", "breed": "Bernedoodle"}
-
-        Even though it is missing one of the golden retrievers.
-        """
         # extract information about the logical operation performed at this stage of the sentinel plan;
         # NOTE: we can infer these fields from context clues, but in the long-term we should have a more
         #       principled way of getting these directly from attributes either stored in the sentinel_plan
         #       or in the PhysicalOperator
-        is_perfect_quality_op = (
-            not issubclass(physical_op_cls, LLMConvert)
-            and not issubclass(physical_op_cls, LLMFilter)
-            and not issubclass(physical_op_cls, RetrieveOp)
-        )
+        def is_perfect_quality_op(op: PhysicalOperator):
+            return (
+                not isinstance(op, LLMConvert)
+                and not isinstance(op, LLMFilter)
+                and not isinstance(op, RetrieveOp)
+                and not isinstance(op, JoinOp)
+            )
 
         # compute quality of each output computed by this operator
-        for source_idx, record_sets in source_idx_to_record_sets.items():
-            # if this operation does not involve an LLM, every record_op_stats object gets perfect quality
-            if is_perfect_quality_op:
-                for record_set in record_sets:
+        for _, record_set_tuples in source_indices_to_record_sets.items():
+            for record_set, op in record_set_tuples:
+                # if this operation does not involve an LLM, every record_op_stats object gets perfect quality
+                if is_perfect_quality_op(op):
                     for record_op_stats in record_set.record_op_stats:
                         record_op_stats.quality = 1.0
-                continue
+                    continue
 
-            # extract target output for this record set
-            target_record_set = source_idx_to_target_record_set[source_idx]
+                # if the operation failed, assign 0.0 quality
+                if len(record_set) == 0:
+                    record_set.record_op_stats[0].quality = 0.0
+                    continue
 
-            # for each record_set produced by an operation, compute its quality
-            for record_set in record_sets:
-                record_set = self._compute_quality(physical_op_cls, record_set, target_record_set)
+                # for each record_set produced by an operation, compute its quality
+                if isinstance(op, LLMConvert) and op.cardinality is Cardinality.ONE_TO_ONE:
+                    fields = op.generated_fields
+                    input_record = record_set.input
+                    output = record_set.data_records[0].to_dict(project_cols=fields)
+                    record_set.record_op_stats[0].quality = validator._score_map(op, fields, input_record, output)
+
+                elif isinstance(op, LLMConvert) and op.cardinality is Cardinality.ONE_TO_MANY:
+                    fields = op.generated_fields
+                    input_record = record_set.input
+                    output = []
+                    for data_record in record_set.data_records:
+                        output.append(data_record.to_dict(project_cols=fields))
+                    score = validator._score_flat_map(op, fields, input_record, output)
+                    for record_op_stats in record_set.record_op_stats:
+                        record_op_stats.quality = score
+
+                elif isinstance(op, LLMFilter):
+                    filter_str = op.filter_obj.filter_condition
+                    input_record = record_set.input.to_dict()
+                    output = record_set.data_records[0].passed_operator
+                    record_set.record_op_stats[0].quality = validator._score_filter(op, filter_str, input_record, output)
+
+                elif isinstance(op, JoinOp):
+                    condition = op.condition
+                    for left_idx, left_input_record in enumerate(record_set.input[0]):
+                        for right_idx, right_input_record in enumerate(record_set.input[1]):
+                            record_idx = left_idx * len(record_set.input[0]) + right_idx
+                            output = record_set.data_records[record_idx].passed_operator
+                            record_set.record_op_stats[record_idx].quality = validator._score_join(op, condition, left_input_record, right_input_record, output)
 
         # return the quality annotated record sets
-        return source_idx_to_record_sets
+        return source_indices_to_record_sets
 
-    def _get_target_record_sets(
-        self,
-        logical_op_id: str,
-        source_idx_to_record_set_tuples: dict[int, list[tuple[DataRecordSet, PhysicalOperator, bool]]],
-        expected_outputs: dict[int, dict] | None,
-    ) -> dict[int, DataRecordSet]:
-        # initialize mapping from source index to target record sets
-        source_idx_to_target_record_set = {}
+    def _execute_op_set(self, unique_logical_op_id: str, op_inputs: list[tuple[PhysicalOperator, str | tuple, int | DataRecord | list[DataRecord] | tuple[list[DataRecord]]]]) -> tuple[dict[int, list[tuple[DataRecordSet, PhysicalOperator, bool]]], dict[str, int]]:
+        def execute_op_wrapper(operator: PhysicalOperator, source_indices: str | tuple, input: int | DataRecord | list[DataRecord] | tuple[list[DataRecord]]) -> tuple[DataRecordSet, PhysicalOperator, list[DataRecord] | list[int]]:
+            # operator is a join
+            record_set = operator(input[0], input[1]) if isinstance(operator, JoinOp) else operator(input)
+            return record_set, operator, source_indices, input
 
-        for source_idx, record_set_tuples in source_idx_to_record_set_tuples.items():
-            # get the first generated output for this source_idx
-            base_target_record = None
-            for record_set, _, _ in record_set_tuples:
-                if len(record_set) > 0:
-                    base_target_record = record_set[0]
-                    break
-
-            # compute availability of data
-            base_target_present = base_target_record is not None
-            labels_present = expected_outputs is not None
-            labels_for_source_present = False
-            if labels_present and source_idx in expected_outputs:
-                labels = expected_outputs[source_idx].get("labels", [])
-                labels_dict_lst = labels if isinstance(labels, list) else [labels]
-                labels_for_source_present = labels_dict_lst != [] and labels_dict_lst != [None]
-
-            # if we have a base target record and label info, use the label info to construct the target record set
-            if base_target_present and labels_for_source_present:
-                # get the field_to_score_fn                
-                field_to_score_fn = expected_outputs[source_idx].get("score_fn", {})
-
-                # construct the target record set; we force passed_operator to be True for all target records
-                target_records = []
-                for labels_dict in labels_dict_lst:
-                    target_record = base_target_record.copy()
-                    for field, value in labels_dict.items():
-                        target_record[field] = value
-                    target_record.passed_operator = True
-                    target_records.append(target_record)
-
-                source_idx_to_target_record_set[source_idx] = DataRecordSet(target_records, None, field_to_score_fn)
-                continue
-
-            # get the best computed output for this (source_idx, logical_op_id) so far (if one exists)
-            champion_record_set, champion_op_quality = None, None
-            if source_idx in self.champion_output_cache and logical_op_id in self.champion_output_cache[source_idx]:
-                champion_record_set, champion_op_quality = self.champion_output_cache[source_idx][logical_op_id]
-
-            # get the highest quality output that we just computed
-            max_quality_record_set, max_op_quality = self._pick_champion_output(record_set_tuples)
-
-            # if this new output is of higher quality than our previous champion (or if we didn't have
-            # a previous champion) then we update our champion record set
-            if champion_op_quality is None or (max_op_quality is not None and max_op_quality > champion_op_quality):
-                champion_record_set, champion_op_quality = max_quality_record_set, max_op_quality
-
-            # update the cache with the new champion record set and quality
-            if source_idx not in self.champion_output_cache:
-                self.champion_output_cache[source_idx] = {}
-            self.champion_output_cache[source_idx][logical_op_id] = (champion_record_set, champion_op_quality)
-
-            # set the target
-            source_idx_to_target_record_set[source_idx] = champion_record_set
-
-        return source_idx_to_target_record_set
-
-    def _pick_champion_output(self, record_set_tuples: list[tuple[DataRecordSet, PhysicalOperator, bool]]) -> tuple[DataRecordSet, float | None]:
-        # find the operator with the highest estimated quality and return its record_set
-        base_op_cost_est = OperatorCostEstimates(cardinality=1.0, cost_per_record=0.0, time_per_record=0.0, quality=1.0)
-        champion_record_set, champion_quality = None, None
-        for record_set, op, _ in record_set_tuples:
-            # skip failed operations
-            if len(record_set) == 0:
-                continue
-
-            # get the estimated quality of this operator
-            est_quality = op.naive_cost_estimates(base_op_cost_est).quality if self._is_llm_op(op) else 1.0
-            if champion_quality is None or est_quality > champion_quality:
-                champion_record_set, champion_quality = record_set, est_quality
-
-        return champion_record_set, champion_quality
-
-    def _flatten_record_sets(self, source_idx_to_record_sets: dict[int, list[DataRecordSet]]) -> tuple[list[DataRecord], list[RecordOpStats]]:
-        """
-        Flatten the list of record sets and record op stats for each source_idx.
-        """
-        all_records, all_record_op_stats = [], []
-        for _, record_sets in source_idx_to_record_sets.items():
-            for record_set in record_sets:
-                all_records.extend(record_set.data_records)
-                all_record_op_stats.extend(record_set.record_op_stats)
-
-        return all_records, all_record_op_stats
-
-    def _execute_op_set(self, op_input_pairs: list[tuple[PhysicalOperator, DataRecord | int]]) -> tuple[dict[int, list[tuple[DataRecordSet, PhysicalOperator, bool]]], dict[str, int]]:
-        def execute_op_wrapper(operator, input) -> tuple[DataRecordSet, PhysicalOperator, DataRecord | int]:
-            record_set = operator(input)
-            return record_set, operator, input
-
-        # TODO: modify unit tests to always have record_op_stats so we can use record_op_stats for source_idx
-        # for scan operators, `input` will be the source_idx
-        def get_source_idx(input):
-            return input.source_indices[0] if isinstance(input, DataRecord) else input
-
-        def get_hash(operator, input):
+        def get_hash(operator: PhysicalOperator, input: int | DataRecord | list[DataRecord] | tuple[list[DataRecord]]):
+            if isinstance(input, list):
+                input = tuple(input)
+            elif isinstance(input, tuple):
+                input = (tuple(input[0]), tuple(input[1]))
             return hash(f"{operator.get_full_op_id()}{hash(input)}")
 
         # initialize mapping from source indices to output record sets
-        source_idx_to_record_sets_and_ops = {get_source_idx(input): [] for _, input in op_input_pairs}
+        source_indices_to_record_sets_and_ops = {source_indices: [] for _, source_indices, _ in op_inputs}
 
         # if any operations were previously executed, read the results from the cache
-        final_op_input_pairs = []
-        for operator, input in op_input_pairs:
+        final_op_inputs = []
+        for operator, source_indices, input in op_inputs:
             # compute hash
             op_input_hash = get_hash(operator, input)
 
             # get result from cache
             if op_input_hash in self.cache:
-                source_idx = get_source_idx(input)
                 record_set, operator = self.cache[op_input_hash]
-                source_idx_to_record_sets_and_ops[source_idx].append((record_set, operator, False))
+                source_indices_to_record_sets_and_ops[source_indices].append((record_set, operator, False))
 
-            # otherwise, add to final_op_input_pairs
+            # otherwise, add to final_op_inputs
             else:
-                final_op_input_pairs.append((operator, input))
+                final_op_inputs.append((operator, source_indices, input))
 
         # keep track of the number of llm operations
         num_llm_ops = 0
@@ -399,8 +308,8 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             # create futures
             futures = [
-                executor.submit(execute_op_wrapper, operator, input)
-                for operator, input in final_op_input_pairs
+                executor.submit(execute_op_wrapper, operator, source_indices, input)
+                for operator, source_indices, input in final_op_inputs
             ]
             output_record_sets = []
             while len(futures) > 0:
@@ -417,29 +326,27 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
                     # update progress manager
                     if self._is_llm_op(operator):
                         num_llm_ops += 1
-                        self.progress_manager.incr(operator.get_logical_op_id(), num_samples=1, total_cost=record_set.get_total_cost())
+                        self.progress_manager.incr(unique_logical_op_id, num_samples=1, total_cost=record_set.get_total_cost())
 
                 # update futures
                 futures = list(not_done_futures)
 
-            # update mapping from source_idx to record sets and operators
-            for record_set, operator, input in output_record_sets:
-                # get the source_idx associated with this input record;
-                source_idx = get_source_idx(input)
+            # update mapping from source_indices to record sets and operators
+            for record_set, operator, source_indices, input in output_record_sets:
+                # add record_set to mapping from source_indices --> record_sets
+                record_set.input = input
+                source_indices_to_record_sets_and_ops[source_indices].append((record_set, operator, True))
 
-                # add record_set to mapping from source_idx --> record_sets
-                record_set.input_data_record = input
-                source_idx_to_record_sets_and_ops[source_idx].append((record_set, operator, True))
-
-        return source_idx_to_record_sets_and_ops, num_llm_ops
+        return source_indices_to_record_sets_and_ops, num_llm_ops
 
     def _is_llm_op(self, physical_op: PhysicalOperator) -> bool:
         is_llm_convert = isinstance(physical_op, LLMConvert)
         is_llm_filter = isinstance(physical_op, LLMFilter)
         is_llm_retrieve = isinstance(physical_op, RetrieveOp) and isinstance(physical_op.index, Collection)
-        return is_llm_convert or is_llm_filter or is_llm_retrieve
+        is_llm_join = isinstance(physical_op, JoinOp)
+        return is_llm_convert or is_llm_filter or is_llm_retrieve or is_llm_join
 
     @abstractmethod
-    def execute_sentinel_plan(self, sentinel_plan: SentinelPlan, expected_outputs: dict[str, dict]):
+    def execute_sentinel_plan(self, sentinel_plan: SentinelPlan, train_dataset: dict[str, Dataset], validator: Validator) -> SentinelPlanStats:
         """Execute a SentinelPlan according to strategy"""
         pass
