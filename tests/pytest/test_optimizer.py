@@ -421,7 +421,6 @@ class TestParetoOptimizer:
         physical_plan = physical_plans[0]
 
         # assert that physical plan matches expected plan
-        # import pdb; pdb.set_trace()
         assert physical_plan.plan_cost.quality == pytest.approx(expected_plan.plan_cost.quality)
         assert physical_plan.plan_cost.cost == pytest.approx(expected_plan.plan_cost.cost)
         assert physical_plan.plan_cost.time == pytest.approx(expected_plan.plan_cost.time)

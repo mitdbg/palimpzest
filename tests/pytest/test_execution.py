@@ -57,7 +57,7 @@ class TestExecution:
         This test executes the given
         """
         # create processor
-        config = QueryProcessorConfig(processing_strategy="no_sentinel", execution_strategy=execution_strategy, policy=MaxQuality())
+        config = QueryProcessorConfig(execution_strategy=execution_strategy, policy=MaxQuality())
         processor = QueryProcessorFactory.create_processor(dataset, config)
 
         # mock out calls to generators used by the plans which parameterize this test
