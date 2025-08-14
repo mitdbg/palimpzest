@@ -178,7 +178,7 @@ class NestedLoopsJoin(JoinOp):
                     op_details={k: str(v) for k, v in self.get_id_params().items()},
                 )
                 output_record_op_stats.append(record_op_stats)
-                print(f"{join_idx}/{total_join_candidates} JOINED")
                 join_idx += 1
+                print(f"{join_idx}/{total_join_candidates} JOINED")
 
         return DataRecordSet(output_records, output_record_op_stats)

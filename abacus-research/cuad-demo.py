@@ -587,7 +587,7 @@ def build_cuad_query(dataset, mode):
             cols.append({"name": category["Category"], "type": list[str], "desc": desc})
 
         desc = "Extract the text spans (if they exist) from the contract."
-        dataset = dataset.sem_add_columns(cols, desc=desc, depends_on=["contract"])
+        dataset = dataset.sem_add_columns(cols, depends_on=["contract"])
     elif mode == "separate-converts":
         for category in cuad_categories:
             desc = (
@@ -595,7 +595,6 @@ def build_cuad_query(dataset, mode):
             )
             dataset = dataset.sem_add_columns(
                 [{"name": category["Category"], "type": list[str], "desc": desc}],
-                desc=category["Description"],
                 depends_on=["contract"],
             )
 
@@ -634,7 +633,7 @@ def main():
         Model.GPT_4o_MINI,
         Model.LLAMA3_1_8B,
         Model.LLAMA3_3_70B,
-        Model.MIXTRAL,
+        # Model.MIXTRAL, # NOTE: only available in tag `abacus-paper-experiments`
         Model.DEEPSEEK_R1_DISTILL_QWEN_1_5B,
     ]
 
@@ -677,7 +676,7 @@ def main():
     )
 
     print(f"EXPERIMENT NAME: {exp_name}")
-    data_record_collection = query.run(config=config, train_dataset=train_dataset, validator=pz.Validator())
+    data_record_collection = query.optimize_and_run(config=config, train_dataset=train_dataset, validator=pz.Validator())
     print("Query execution completed")
 
     # save statistics

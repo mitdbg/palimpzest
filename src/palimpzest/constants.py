@@ -14,7 +14,6 @@ class Model(str, Enum):
     LLAMA3_1_8B = "together_ai/meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo"
     LLAMA3_3_70B = "together_ai/meta-llama/Llama-3.3-70B-Instruct-Turbo"
     LLAMA3_2_90B_V = "together_ai/meta-llama/Llama-3.2-90B-Vision-Instruct-Turbo"
-    MIXTRAL = "together_ai/mistralai/Mixtral-8x7B-Instruct-v0.1"
     DEEPSEEK_V3 = "together_ai/deepseek-ai/DeepSeek-V3"
     DEEPSEEK_R1_DISTILL_QWEN_1_5B = "together_ai/deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"
     GPT_4o = "openai/gpt-4o-2024-08-06"
@@ -34,9 +33,6 @@ class Model(str, Enum):
 
     def is_llama_model(self):
         return "llama" in self.value.lower()
-
-    def is_mixtral_model(self):
-        return "mixtral" in self.value.lower()
 
     def is_clip_model(self):
         return "clip" in self.value.lower()
@@ -209,8 +205,8 @@ NAIVE_BYTES_PER_RECORD = 1024
 # Rough conversion from # of characters --> # of tokens; assumes 1 token ~= 4 chars
 TOKENS_PER_CHARACTER = 0.25
 
-# Rough estimate of the number of tokens the context is allowed to take up for MIXTRAL and LLAMA3 models
-MIXTRAL_LLAMA_CONTEXT_TOKENS_LIMIT = 6000
+# Rough estimate of the number of tokens the context is allowed to take up for LLAMA3 models
+LLAMA_CONTEXT_TOKENS_LIMIT = 6000
 
 # a naive estimate for the input record size
 NAIVE_EST_SOURCE_RECORD_SIZE_IN_BYTES = 1_000_000
@@ -298,17 +294,6 @@ LLAMA3_2_90B_V_MODEL_CARD = {
     "seconds_per_output_token": 0.0222,
     ##### Agg. Benchmark #####
     "overall": 65.00, # set to be slightly higher than gpt-4o-mini
-}
-MIXTRAL_8X_7B_MODEL_CARD = {
-    ##### Cost in USD #####
-    "usd_per_input_token": 0.6 / 1e6,
-    "usd_per_output_token": 0.6 / 1e6,
-    ##### Time #####
-    "seconds_per_output_token": 0.0112,
-    ##### Agg. Benchmark #####
-    "overall": 43.27,
-    ##### Code #####
-    "code": 40.0,
 }
 DEEPSEEK_V3_MODEL_CARD = {
     ##### Cost in USD #####
@@ -421,7 +406,6 @@ MODEL_CARDS = {
     Model.LLAMA3_2_90B_V.value: LLAMA3_2_90B_V_MODEL_CARD,
     Model.DEEPSEEK_V3.value: DEEPSEEK_V3_MODEL_CARD,
     Model.DEEPSEEK_R1_DISTILL_QWEN_1_5B.value: DEEPSEEK_R1_DISTILL_QWEN_1_5B_MODEL_CARD,
-    Model.MIXTRAL.value: MIXTRAL_8X_7B_MODEL_CARD,
     Model.GPT_4o.value: GPT_4o_MODEL_CARD,
     Model.GPT_4o_MINI.value: GPT_4o_MINI_MODEL_CARD,
     # Model.o1.value: o1_MODEL_CARD,
@@ -431,117 +415,3 @@ MODEL_CARDS = {
     Model.CLAUDE_3_7_SONNET.value: CLAUDE_3_7_SONNET_MODEL_CARD,
     Model.CLAUDE_3_5_HAIKU.value: CLAUDE_3_5_HAIKU_MODEL_CARD,
 }
-
-
-###### DEPRECATED ######
-# # NOTE: seconds_per_output_token is based on `gpt-3.5-turbo-1106`
-# GPT_3_5_MODEL_CARD = {
-#     ##### Cost in USD #####
-#     "usd_per_input_token": 0.5 / 1E6,
-#     "usd_per_output_token": 1.5 / 1E6,
-#     ##### Time #####
-#     "seconds_per_output_token": 0.0065,
-#     ##### Agg. Benchmark #####
-#     "overall": 70.0, # 5-shot
-#     ##### Commonsense Reasoning #####
-#     "reasoning": 84.1,
-#     ### "HellaSwag": 85.5,^  # 10-shot
-#     ### "WinoGrande": 81.6,^ # 5-shot
-#     ### "Arc-e": 85.2,^      # 25-shot
-#     ##### World Knowledge #####
-#     ##### Reading Comprehension #####
-#     ### "DROP": 64.1, # 3-shot
-#     ##### Code #####
-#     "code": 48.1,
-#     ### "HumanEval": 48.1,^ # 0-shot
-#     ##### Math #####
-#     "math": 57.1,
-#     ### "GSM8K": 57.1,^     # 5-shot
-# }
-# # NOTE: the seconds_per_output_token was computed based on a slightly different model ('gpt-4-1106-preview')
-# #       and the benchmark statistics were computed based on the GPT-4 Technical Report; these might be
-# #       slightly innacurate compared to the real numbers for gpt-4-0125-preview, but we'll use them until
-# #       we have something better. (The cost metrics are accurate).
-# GPT_4_MODEL_CARD = {
-#     ##### Cost in USD #####
-#     "usd_per_input_token": 10 / 1E6,
-#     "usd_per_output_token": 30 / 1E6,
-#     ##### Time #####
-#     "seconds_per_output_token": 0.018,
-#     ##### Agg. Benchmark #####
-#     "overall": 86.4, # 5-shot
-#     ##### Commonsense Reasoning #####
-#     "reasoning": 93.0,
-#     ### "HellaSwag": 95.3,^  # 10-shot
-#     ### "WinoGrande": 87.5,^ # 5-shot
-#     ### "Arc-e": 96.3,^      # 25-shot
-#     ##### World Knowledge #####
-#     ##### Reading Comprehension #####
-#     ### "DROP": 80.9, # 3-shot
-#     ##### Code #####
-#     "code": 67.0,
-#     ### "HumanEval": 67.0,^ # 0-shot
-#     ##### Math #####
-#     "math": 92.0,
-#     ### "GSM8K": 92.0,^     # 5-shot
-# }
-
-# # TODO: use cost info in here: https://platform.openai.com/docs/guides/vision/calculating-costs
-# GPT_4V_MODEL_CARD = {
-#     ##### Cost in USD #####
-#     "usd_per_input_token": 10 / 1E6,
-#     "usd_per_output_token": 30 / 1E6,
-#     ##### Time #####
-#     "seconds_per_output_token": 0.042 / 10.0, # TODO: / 10.0 is a hack; need to figure out why time estimates are so off
-#     ##### Agg. Benchmark #####
-#     "overall": 86.4,
-# }
-
-
-# GEMINI_1_MODEL_CARD = {
-#     ##### Cost in USD #####
-#     "usd_per_input_token": 125 / 1E8, # Gemini is free but rate limited for now. Pricing will be updated
-#     "usd_per_output_token": 375 / 1E9,
-#     ##### Time #####
-#     "seconds_per_output_token": 0.042 / 10.0, # TODO:
-#     ##### Agg. Benchmark #####
-#     "overall": 65.0, # 90.0 TODO: we are using the free version of Gemini which is substantially worse than its paid version; I'm manually revising it's quality below that of Mixtral
-#     ##### Commonsense Reasoning #####
-#     "reasoning": 80.0, # 87.8, TODO: see note above on overall
-#     # "HellaSwag": 87.8,  # 10-shot
-#     ##### World Knowledge #####
-#     ##### Reading Comprehension #####
-#     # "DROP": 82.4, # Variable shots ?
-#     ##### Code #####
-#     "code": 74.4,
-#     # "HumanEval": 74.4, # 0-shot (IT)*
-#     # "Natural2Code": 74.9, # 0-shot
-#     ##### Math #####
-#     "math": 94.4,
-#     # "GSM8K": 94.4,     # maj1@32
-#     # "MATH": 53.2,      # 4-shot
-# }
-
-# GEMINI_1V_MODEL_CARD = {
-#     ##### Cost in USD #####
-#     "usd_per_input_token": 25 / 1E6,  # Gemini is free but rate limited for now. Pricing will be updated
-#     "usd_per_output_token": 375 / 1E9,
-#     ##### Time #####
-#     "seconds_per_output_token": 0.042, # / 10.0, # TODO:
-#     ##### Agg. Benchmark #####
-#     "overall": 65.0, # 90.0, TODO: see note above in Gemini_1 model card
-#     ##### Commonsense Reasoning #####
-#     "reasoning": 80.0, # 87.8, TODO: see note above in Gemini_1 model card
-#     # "HellaSwag": 87.8,  # 10-shot
-#     ##### World Knowledge #####
-#     ##### Reading Comprehension #####
-#     # "DROP": 82.4, # Variable shots ?
-#     ##### Code #####
-#     "code": 74.4,
-#     # "HumanEval": 74.4, # 0-shot (IT)*
-#     # "Natural2Code": 74.9, # 0-shot
-#     ##### Math #####
-#     "math": 94.4,
-#     # "GSM8K": 94.4,     # maj1@32
-#     # "MATH": 53.2,      # 4-shot
-# }

@@ -350,7 +350,7 @@ if __name__ == "__main__":
             Model.GPT_4o_MINI,
             Model.LLAMA3_1_8B,
             Model.LLAMA3_3_70B,
-            Model.MIXTRAL,
+            # Model.MIXTRAL, # NOTE: only available in tag `abacus-paper-experiments`
             Model.DEEPSEEK_R1_DISTILL_QWEN_1_5B,
         ],
         allow_bonded_query=True,

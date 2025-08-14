@@ -7,6 +7,8 @@ import pandas as pd
 from pydantic import BaseModel, Field, create_model
 from pydantic.fields import FieldInfo
 
+from palimpzest.utils.hash_helpers import hash_for_serialized_dict
+
 # DEFINITIONS
 PANDAS_DTYPE_TO_PYDANTIC = {
     "object": str,
@@ -25,22 +27,26 @@ def get_schema_field_names(schema: type[BaseModel], id: str | None = None) -> li
     return list(schema.model_fields) if id is None else [f"{schema.__name__}.{id}.{field_name}" for field_name in schema.model_fields]
 
 
-def _create_pickleable_model(**fields: dict[str, tuple[type, FieldInfo]]) -> type[BaseModel]:
+def _create_pickleable_model(fields: dict[str, tuple[type, FieldInfo]]) -> type[BaseModel]:
     """Create a Pydantic model that can be pickled."""
     # create unique name for the unioned model
     new_schema_name = f"Schema{sorted(fields.keys())}"
+    new_schema_id = hash_for_serialized_dict({
+        field_name: {"annotation": str(annotation), "default": str(field.default), "description": field.description}
+        for field_name, (annotation, field) in fields.items()
+    })
 
     # if this class already exists, get it from the module and return
     module = sys.modules[__name__]
-    if hasattr(module, new_schema_name):
-        return getattr(module, new_schema_name)
+    if hasattr(module, new_schema_id):
+        return getattr(module, new_schema_id)
 
     # create the class dynamically
     new_model = create_model(new_schema_name, **fields)
 
     # register it in the module's namespace so pickle can find it
     module = sys.modules[__name__]
-    setattr(module, new_schema_name, new_model)
+    setattr(module, new_schema_id, new_model)
     new_model.__module__ = module.__name__
 
     return new_model
@@ -58,7 +64,7 @@ def project(model: type[BaseModel], project_fields: list[str]) -> type[BaseModel
             fields[field_name] = (field.annotation, field)
 
     # create and return the new schema
-    return _create_pickleable_model(**fields)
+    return _create_pickleable_model(fields)
 
 
 def create_schema_from_fields(fields: list[dict]) -> type[BaseModel]:
@@ -76,7 +82,7 @@ def create_schema_from_fields(fields: list[dict]) -> type[BaseModel]:
         field_type = field["type"]
         fields_[field_name] = (field_type, Field(**{k: v for k, v in field.items() if k not in ["name", "type"]}))
 
-    return _create_pickleable_model(**fields_)
+    return _create_pickleable_model(fields_)
 
 
 def create_schema_from_df(df: pd.DataFrame) -> type[BaseModel]:
@@ -89,20 +95,23 @@ def create_schema_from_df(df: pd.DataFrame) -> type[BaseModel]:
         fields[column] = (annotation, Field(description=field_desc))
 
     # create and return the new schema
-    return _create_pickleable_model(**fields)
+    return _create_pickleable_model(fields)
 
 
-def union_schemas(models: list[type[BaseModel]]) -> type[BaseModel]:
+def union_schemas(models: list[type[BaseModel]], join: bool = False) -> type[BaseModel]:
     """Union multiple Pydantic models into a single model."""
     fields = {}
     for model in models:
         for field_name, field in model.model_fields.items():
-            if field_name in fields:
+            if field_name in fields and not join:
                 assert fields[field_name][0] == field.annotation, f"Field {field_name} has different types in different models"
+            elif field_name in fields and join:
+                while field_name in fields:
+                    field_name = f"{field_name}_right"
             fields[field_name] = (field.annotation, field)
 
     # create and return the new schema
-    return _create_pickleable_model(**fields)
+    return _create_pickleable_model(fields)
 
 ###################################################################################
 # "Core" useful Schemas. These are Schemas that almost everyone will need.

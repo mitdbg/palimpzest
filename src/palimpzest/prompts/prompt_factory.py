@@ -7,7 +7,7 @@ from string import Formatter
 from pydantic import BaseModel
 
 from palimpzest.constants import (
-    MIXTRAL_LLAMA_CONTEXT_TOKENS_LIMIT,
+    LLAMA_CONTEXT_TOKENS_LIMIT,
     TOKENS_PER_CHARACTER,
     Cardinality,
     Model,
@@ -180,12 +180,12 @@ class PromptFactory:
         # TODO: this does not work for image prompts
         # TODO: this ignores the size of the `orignal_messages` in critique and refine prompts
         # cut down on context based on window length
-        if self.model.is_llama_model() or self.model.is_mixtral_model():
+        if self.model.is_llama_model():
             total_context_len = len(json.dumps(context, indent=2))
 
             # sort fields by length and progressively strip from the longest field until it is short enough;
-            # NOTE: MIXTRAL_LLAMA_CONTEXT_TOKENS_LIMIT is a rough estimate which leaves room for the rest of the prompt text
-            while total_context_len * TOKENS_PER_CHARACTER > MIXTRAL_LLAMA_CONTEXT_TOKENS_LIMIT:
+            # NOTE: LLAMA_CONTEXT_TOKENS_LIMIT is a rough estimate which leaves room for the rest of the prompt text
+            while total_context_len * TOKENS_PER_CHARACTER > LLAMA_CONTEXT_TOKENS_LIMIT:
                 # sort fields by length
                 field_lengths = [(field, len(value) if value is not None else 0) for field, value in context.items()]
                 sorted_fields = sorted(field_lengths, key=lambda item: item[1], reverse=True)
@@ -194,7 +194,7 @@ class PromptFactory:
                 longest_field_name, longest_field_length = sorted_fields[0]
 
                 # trim the field
-                context_factor = MIXTRAL_LLAMA_CONTEXT_TOKENS_LIMIT / (total_context_len * TOKENS_PER_CHARACTER)
+                context_factor = LLAMA_CONTEXT_TOKENS_LIMIT / (total_context_len * TOKENS_PER_CHARACTER)
                 keep_frac_idx = int(longest_field_length * context_factor)
                 context[longest_field_name] = context[longest_field_name][:keep_frac_idx]
 
@@ -216,7 +216,11 @@ class PromptFactory:
         Returns:
             list[str]: The list of input field names.
         """
-        return kwargs.get("project_cols", candidate.get_field_names())
+        # NOTE: joins will include left and right input fields in project_cols, so we have to check
+        #       if the field is in the candidate record
+        input_fields = kwargs.get("project_cols", candidate.get_field_names())
+        input_fields = [field for field in input_fields if field in candidate.get_field_names()]
+        return input_fields
 
     def _get_input_fields_desc(self, candidate: DataRecord, input_fields: list[str]) -> str:
         """

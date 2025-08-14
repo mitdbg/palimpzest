@@ -416,7 +416,7 @@ class OpFrontier:
             for full_op_id, record_op_stats_lst in full_op_id_to_record_op_stats.items()
         }
         full_op_id_to_mean_quality = {
-            full_op_id: np.mean([record_op_stats.quality for record_op_stats in record_op_stats_lst])
+            full_op_id: np.mean([record_op_stats.quality for record_op_stats in record_op_stats_lst if record_op_stats.quality is not None])
             for full_op_id, record_op_stats_lst in full_op_id_to_record_op_stats.items()
         }
 
@@ -562,7 +562,7 @@ class OpFrontier:
         out_record_op_stats = []
         for idx in range(len(idx_to_records)):
             records_lst, record_op_stats_lst = zip(*idx_to_records[idx])
-            max_quality_record, max_quality = records_lst[0], record_op_stats_lst[0].quality if record_op_stats_lst[0] is not None else 0.0
+            max_quality_record, max_quality = records_lst[0], record_op_stats_lst[0].quality if record_op_stats_lst[0].quality is not None else 0.0
             max_quality_stats = record_op_stats_lst[0]
             for record, record_op_stats in zip(records_lst[1:], record_op_stats_lst[1:]):
                 record_quality = record_op_stats.quality if record_op_stats.quality is not None else 0.0
@@ -666,7 +666,6 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
                     for source_indices, record_set_tuples in source_indices_to_record_set_tuples.items()
                 }
                 source_indices_to_all_record_sets = self._score_quality(validator, source_indices_to_all_record_sets)
-                # import pdb; pdb.set_trace()
 
                 # remove records that were read from the execution cache before adding to record op stats
                 new_record_op_stats = []

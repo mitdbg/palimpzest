@@ -308,7 +308,7 @@ if __name__ == "__main__":
         "--model",
         default="gpt-4o",
         type=str,
-        help="One of 'gpt-4o', 'gpt-4o-mini', 'llama', 'mixtral'",
+        help="One of 'gpt-4o', 'gpt-4o-mini', 'llama'",
     )
     parser.add_argument(
         "--seed",

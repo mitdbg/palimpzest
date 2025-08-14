@@ -248,7 +248,7 @@ if __name__ == "__main__":
             Model.LLAMA3_1_8B,
             Model.LLAMA3_3_70B,
             Model.LLAMA3_2_90B_V,
-            Model.MIXTRAL,
+            # Model.MIXTRAL, # NOTE: only available in tag `abacus-paper-experiments`
             # Model.DEEPSEEK_V3,
             Model.DEEPSEEK_R1_DISTILL_QWEN_1_5B,
         ],

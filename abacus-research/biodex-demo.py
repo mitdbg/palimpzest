@@ -192,7 +192,7 @@ if __name__ == "__main__":
         "--model",
         default="gpt-4o",
         type=str,
-        help="One of 'gpt-4o', 'gpt-4o-mini', 'llama', 'mixtral'",
+        help="One of 'gpt-4o', 'gpt-4o-mini', 'llama'",
     )
     parser.add_argument(
         "--seed",
@@ -337,7 +337,7 @@ if __name__ == "__main__":
         Model.GPT_4o_MINI,
         Model.LLAMA3_1_8B,
         Model.LLAMA3_3_70B,
-        Model.MIXTRAL,
+        # Model.MIXTRAL,  # NOTE: only available in tag `abacus-paper-experiments`
         Model.DEEPSEEK_R1_DISTILL_QWEN_1_5B,
     ]
 

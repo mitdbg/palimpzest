@@ -199,7 +199,13 @@ class BaseScan(LogicalOperator):
         )
 
     def get_logical_id_params(self) -> dict:
-        return super().get_logical_id_params()
+        logical_id_params = super().get_logical_id_params()
+        logical_id_params = {
+            "id": self.datasource.id,
+            **logical_id_params,
+        }
+
+        return logical_id_params
 
     def get_logical_op_params(self) -> dict:
         logical_op_params = super().get_logical_op_params()
@@ -225,7 +231,13 @@ class ContextScan(LogicalOperator):
         )
 
     def get_logical_id_params(self) -> dict:
-        return super().get_logical_id_params()
+        logical_id_params = super().get_logical_id_params()
+        logical_id_params = {
+            "id": self.context.id,
+            **logical_id_params,
+        }
+
+        return logical_id_params
 
     def get_logical_op_params(self) -> dict:
         logical_op_params = super().get_logical_op_params()

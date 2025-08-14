@@ -392,7 +392,6 @@ class Optimizer:
             elif isinstance(task, OptimizePhysicalExpression):
                 context = {"optimizer_strategy": self.optimizer_strategy, "execution_strategy": self.execution_strategy}
                 new_tasks = task.perform(self.cost_model, self.groups, self.policy, context=context)
-
             self.tasks_stack.extend(new_tasks)
 
         logger.debug(f"Done searching optimization space for group_id: {group_id}")

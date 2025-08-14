@@ -218,7 +218,7 @@ class Dataset:
             depends_on = [depends_on]
 
         # construct new output schema
-        combined_schema = union_schemas([self.schema, other.schema])
+        combined_schema = union_schemas([self.schema, other.schema], join=True)
 
         # construct logical operator
         operator = JoinOp(

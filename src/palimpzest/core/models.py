@@ -130,7 +130,7 @@ class GenerationStats(BaseModel):
 
     # NOTE: this is added temporarily to help track cost of compute agent writing PZ code;
     #       once we find a long-term solution for tracking that cost, we can remove this
-    def to_json(self, filepath: str | None) -> dict | None:
+    def to_json(self, filepath: str | None = None) -> dict | None:
         if filepath is None:
             return self.model_dump(mode="json")
 
@@ -752,7 +752,7 @@ class ExecutionStats(BaseModel):
             else:
                 raise TypeError(f"Cannot add {type(plan_stats)} to ExecutionStats")
 
-    def to_json(self, filepath: str | None) -> dict | None:
+    def to_json(self, filepath: str | None = None) -> dict | None:
         if filepath is None:
             return self.model_dump(mode="json")
 

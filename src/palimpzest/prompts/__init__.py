@@ -21,6 +21,7 @@ from palimpzest.prompts.validator import (
     FLAT_MAP_VALIDATOR_PROMPT,
     MAP_IMAGE_VALIDATOR_PROMPT,
     MAP_VALIDATOR_PROMPT,
+    RETRIEVE_VALIDATOR_PROMPT,
 )
 
 __all__ = [
@@ -47,4 +48,5 @@ __all__ = [
     "FLAT_MAP_VALIDATOR_PROMPT",
     "MAP_IMAGE_VALIDATOR_PROMPT",
     "MAP_VALIDATOR_PROMPT",
+    "RETRIEVE_VALIDATOR_PROMPT",
 ]

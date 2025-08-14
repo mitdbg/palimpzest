@@ -129,7 +129,7 @@ def scan_convert_filter_varied_execution_data(scan_convert_filter_sentinel_plan,
         scan_drs.append(scan_dr)
 
     # create convert data records
-    models = [Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL]
+    models = [Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B]
     for model in models:
         for idx in range(10):
             convert_dr = DataRecord.from_parent(foobar_schema, scan_drs[idx])
@@ -189,15 +189,15 @@ def scan_convert_filter_varied_execution_data(scan_convert_filter_sentinel_plan,
         source_idx = filter_dr.source_indices[0]
         model = models[idx // 10]
 
-        # GPT-4 passes odd examples
-        # GPT-3.5 passes even examples
-        # Mixtral passes all examples
+        # GPT-4o passes odd examples
+        # GPT-4o-mini passes even examples
+        # LLAMA3_1_8B passes all examples
         passed_operator = None
         if model == Model.GPT_4o:
             passed_operator = bool(source_idx % 2)
         elif model == Model.GPT_4o_MINI:
             passed_operator = not bool(source_idx % 2)
-        elif model == Model.MIXTRAL:
+        elif model == Model.LLAMA3_1_8B:
             passed_operator = True
 
         record_op_stats = RecordOpStats(
@@ -243,7 +243,7 @@ def scan_multi_convert_multi_filter_execution_data(scan_multi_convert_multi_filt
         scan_drs.append(scan_dr)
 
     # create first convert data records
-    models = [Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL]
+    models = [Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B]
     for model in models:
         for source_idx in range(10):
             for one_to_many_idx in range(2):
@@ -340,7 +340,7 @@ def scan_multi_convert_multi_filter_execution_data(scan_multi_convert_multi_filt
                 elif model_idx == 1 and one_to_many_idx == 1:
                     passed_operator = False
 
-                # MIXTRAL passes all records
+                # LLAMA3_1_8B passes all records
 
                 record_op_stats = RecordOpStats(
                     record_id=filter_dr.id,
@@ -380,7 +380,7 @@ def scan_multi_convert_multi_filter_execution_data(scan_multi_convert_multi_filt
                 elif model_idx == 1 and one_to_many_idx == 1:
                     passed_operator = False
 
-                # MIXTRAL passes all records
+                # LLAMA3_1_8B passes all records
 
                 # filter out records with abs_idx >= 30
                 record_op_stats = RecordOpStats(

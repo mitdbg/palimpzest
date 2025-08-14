@@ -113,7 +113,7 @@ def scan_convert_filter_sentinel_plan(foobar_schema):
             model=model,
             logical_op_id="convert1",
         )
-        for model in [Model.GPT_4o_MINI, Model.GPT_4o, Model.MIXTRAL]
+        for model in [Model.GPT_4o_MINI, Model.GPT_4o, Model.LLAMA3_1_8B]
     ]
     filter_ops = [
         LLMFilter(
@@ -123,7 +123,7 @@ def scan_convert_filter_sentinel_plan(foobar_schema):
             model=model,
             logical_op_id="filter1",
         )
-        for model in [Model.GPT_4o_MINI, Model.GPT_4o, Model.MIXTRAL]
+        for model in [Model.GPT_4o_MINI, Model.GPT_4o, Model.LLAMA3_1_8B]
     ]
     plan = SentinelPlan(operator_sets=[[scan_op], convert_ops, filter_ops])
     return plan
@@ -140,7 +140,7 @@ def scan_multi_convert_multi_filter_sentinel_plan(foobar_schema, baz_schema):
             model=model,
             logical_op_id="convert1",
         )
-        for model in [Model.GPT_4o_MINI, Model.GPT_4o, Model.MIXTRAL]
+        for model in [Model.GPT_4o_MINI, Model.GPT_4o, Model.LLAMA3_1_8B]
     ]
     filter_ops1 = [
         LLMFilter(
@@ -150,7 +150,7 @@ def scan_multi_convert_multi_filter_sentinel_plan(foobar_schema, baz_schema):
             model=model,
             logical_op_id="filter1",
         )
-        for model in [Model.GPT_4o_MINI, Model.GPT_4o, Model.MIXTRAL]
+        for model in [Model.GPT_4o_MINI, Model.GPT_4o, Model.LLAMA3_1_8B]
     ]
     filter_ops2 = [
         LLMFilter(
@@ -160,7 +160,7 @@ def scan_multi_convert_multi_filter_sentinel_plan(foobar_schema, baz_schema):
             model=model,
             logical_op_id="filter2",
         )
-        for model in [Model.GPT_4o_MINI, Model.GPT_4o, Model.MIXTRAL]
+        for model in [Model.GPT_4o_MINI, Model.GPT_4o, Model.LLAMA3_1_8B]
     ]
     convert_ops2 = [
         LLMConvertBonded(
@@ -169,7 +169,7 @@ def scan_multi_convert_multi_filter_sentinel_plan(foobar_schema, baz_schema):
             model=model,
             logical_op_id="convert2",
         )
-        for model in [Model.GPT_4o_MINI, Model.GPT_4o, Model.MIXTRAL]
+        for model in [Model.GPT_4o_MINI, Model.GPT_4o, Model.LLAMA3_1_8B]
     ]
     plan = SentinelPlan(operator_sets=[[scan_op], convert_ops1, filter_ops1, filter_ops2, convert_ops2])
     return plan

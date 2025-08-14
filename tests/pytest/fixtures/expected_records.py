@@ -104,7 +104,7 @@ def scan_convert_filter_varied_expected_outputs(foobar_schema):
             dr.filename = f"file{source_idx}"
             dr.contents = None
             dr.foo = f"foo{source_idx}"
-            dr.bar = f"bar{source_idx}-{str(Model.GPT_4o_MINI)}" if source_idx < 6 else f"bar{source_idx}-{str(Model.MIXTRAL)}"
+            dr.bar = f"bar{source_idx}-{str(Model.GPT_4o_MINI)}" if source_idx < 6 else f"bar{source_idx}-{str(Model.LLAMA3_1_8B)}"
             dr.passed_operator = True
             expected_outputs[source_idx] = DataRecordSet([dr], None)
 

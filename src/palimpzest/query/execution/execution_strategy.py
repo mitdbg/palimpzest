@@ -253,6 +253,15 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
                     for record_op_stats in record_set.record_op_stats:
                         record_op_stats.quality = score
 
+                # TODO: this scoring function will (likely) bias towards small values of k since it
+                # measures precision and not recall / F1; will need to revisit this in the future
+                elif isinstance(op, RetrieveOp):
+                    fields = op.generated_fields
+                    input_record = record_set.input
+                    output = record_set.data_records[0].to_dict(project_cols=fields)
+                    score = validator._score_retrieve(op, fields, input_record, output)
+                    record_set.record_op_stats[0].quality = score
+
                 elif isinstance(op, LLMFilter):
                     filter_str = op.filter_obj.filter_condition
                     input_record = record_set.input

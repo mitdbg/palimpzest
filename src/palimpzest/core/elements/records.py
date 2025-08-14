@@ -243,8 +243,16 @@ class DataRecord:
         )
 
         # get the set of fields and field descriptions to copy from the parent record(s)
-        left_copy_field_names = project_cols if project_cols is not None else left_parent_record.get_field_names()
-        right_copy_field_names = project_cols if project_cols is not None else right_parent_record.get_field_names()
+        left_copy_field_names = (
+            left_parent_record.get_field_names()
+            if project_cols is None
+            else [col for col in project_cols if col in left_parent_record.get_field_names()]
+        )
+        right_copy_field_names = (
+            right_parent_record.get_field_names()
+            if project_cols is None
+            else [col for col in project_cols if col in right_parent_record.get_field_names()]
+        )
         left_copy_field_names = [field.split(".")[-1] for field in left_copy_field_names]
         right_copy_field_names = [field.split(".")[-1] for field in right_copy_field_names]
 
@@ -254,8 +262,11 @@ class DataRecord:
             new_dr[field_name] = left_parent_record[field_name]
 
         for field_name in right_copy_field_names:
-            new_dr.field_types[field_name] = right_parent_record.get_field_type(field_name)
-            new_dr[field_name] = right_parent_record[field_name]
+            new_field_name = field_name
+            if field_name in left_copy_field_names:
+                new_field_name = f"{field_name}_right"
+            new_dr.field_types[new_field_name] = right_parent_record.get_field_type(field_name)
+            new_dr[new_field_name] = right_parent_record[field_name]
 
         return new_dr
 

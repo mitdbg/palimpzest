@@ -110,7 +110,7 @@ class TestOptimizer:
             policy=policy,
             cost_model=cost_model,
             verbose=True,
-            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
+            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B],
             optimizer_strategy=opt_strategy,
         )
         physical_plans = optimizer.optimize(plan)
@@ -128,7 +128,7 @@ class TestOptimizer:
             policy=policy,
             cost_model=cost_model,
             verbose=True,
-            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
+            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B],
             optimizer_strategy=opt_strategy,
             allow_rag_reduction=False,
             allow_mixtures=False,
@@ -152,7 +152,7 @@ class TestOptimizer:
             policy=policy,
             cost_model=cost_model,
             verbose=True,
-            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
+            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B],
             optimizer_strategy=opt_strategy,
         )
         physical_plans = optimizer.optimize(plan)
@@ -171,7 +171,7 @@ class TestOptimizer:
             policy=policy,
             cost_model=cost_model,
             verbose=True,
-            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
+            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B],
             optimizer_strategy=opt_strategy,
         )
         physical_plans = optimizer.optimize(plan)
@@ -191,7 +191,7 @@ class TestOptimizer:
             policy=policy,
             cost_model=cost_model,
             verbose=True,
-            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
+            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B],
             optimizer_strategy=opt_strategy,
         )
         physical_plans = optimizer.optimize(plan)
@@ -213,7 +213,7 @@ class TestOptimizer:
             policy=policy,
             cost_model=cost_model,
             verbose=True,
-            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
+            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B],
             optimizer_strategy=opt_strategy,
         )
         physical_plans = optimizer.optimize(plan)
@@ -232,7 +232,7 @@ class TestOptimizer:
             policy=policy,
             cost_model=cost_model,
             verbose=True,
-            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
+            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B],
             allow_rag_reduction=False,
             allow_mixtures=False,
             allow_critic=False,
@@ -268,7 +268,7 @@ class TestOptimizer:
             policy=policy,
             cost_model=cost_model,
             verbose=True,
-            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
+            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B],
             optimizer_strategy=opt_strategy,
         )
         physical_plans = optimizer.optimize(plan)

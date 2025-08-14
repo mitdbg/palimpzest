@@ -28,7 +28,8 @@ class ScanPhysicalOp(PhysicalOperator, ABC):
         return op
 
     def get_id_params(self):
-        return super().get_id_params()
+        id_params = super().get_id_params()
+        return {"datasource_id": self.datasource.id, **id_params}
 
     def get_op_params(self):
         op_params = super().get_op_params()
