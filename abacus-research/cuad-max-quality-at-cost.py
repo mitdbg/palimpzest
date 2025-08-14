@@ -657,7 +657,7 @@ def main():
     )
 
     print(f"EXPERIMENT NAME: {exp_name}")
-    data_record_collection = query.run(config=config, train_dataset=train_dataset, validator=pz.Validator(None))
+    data_record_collection = query.run(config=config, train_dataset=train_dataset, validator=pz.Validator())
     print("Query execution completed")
 
     # save statistics

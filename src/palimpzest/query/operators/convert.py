@@ -318,7 +318,7 @@ class LLMConvert(ConvertOp):
         return None if self.model is None else self.model.value
 
     def is_image_conversion(self) -> bool:
-        return self.prompt_strategy is PromptStrategy.COT_QA_IMAGE
+        return self.prompt_strategy.is_image_prompt()
 
     def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         """

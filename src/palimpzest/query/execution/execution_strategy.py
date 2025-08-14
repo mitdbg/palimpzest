@@ -255,7 +255,7 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
 
                 elif isinstance(op, LLMFilter):
                     filter_str = op.filter_obj.filter_condition
-                    input_record = record_set.input.to_dict()
+                    input_record = record_set.input
                     output = record_set.data_records[0].passed_operator
                     record_set.record_op_stats[0].quality = validator._score_filter(op, filter_str, input_record, output)
 
@@ -316,8 +316,8 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
                 done_futures, not_done_futures = wait(futures, timeout=PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS)
                 for future in done_futures:
                     # update output record sets
-                    record_set, operator, input = future.result()
-                    output_record_sets.append((record_set, operator, input))
+                    record_set, operator, source_indices, input = future.result()
+                    output_record_sets.append((record_set, operator, source_indices, input))
 
                     # update cache
                     op_input_hash = get_hash(operator, input)

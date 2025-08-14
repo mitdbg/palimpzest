@@ -188,7 +188,7 @@ if __name__ == "__main__":
         exp_name=exp_name,
     )
 
-    data_record_collection = plan.run(config=config, train_dataset=train_dataset, validator=pz.Validator(None))
+    data_record_collection = plan.run(config=config, train_dataset=train_dataset, validator=pz.Validator())
 
     print(data_record_collection.to_df())
     data_record_collection.to_df().to_csv(f"priors-data/{exp_name}-output.csv", index=False)

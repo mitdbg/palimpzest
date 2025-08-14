@@ -91,10 +91,11 @@ class OpSet:
             return op_inputs
 
         # if operator is not a join
+        source_unique_logical_op_id = list(self.source_indices_to_inputs)[0]
         op_inputs = [
             (op, source_indices, input)
             for op, source_indices in op_source_indices_pairs
-            for input in self.source_indices_to_inputs.get(source_indices, [])
+            for input in self.source_indices_to_inputs[source_unique_logical_op_id].get(source_indices, [])
         ]
 
         return op_inputs
@@ -192,6 +193,10 @@ class AllSamplingExecutionStrategy(SentinelExecutionStrategy):
             # provide the best record sets as inputs to the next logical operator
             next_unique_logical_op_id = plan.get_next_unique_logical_op_id(unique_logical_op_id)
             if next_unique_logical_op_id is not None:
+                source_indices_to_all_record_sets = {
+                    source_indices: [record_set for record_set, _ in record_set_tuples]
+                    for source_indices, record_set_tuples in source_indices_to_all_record_sets.items()
+                }
                 op_sets[next_unique_logical_op_id].update_inputs(unique_logical_op_id, source_indices_to_all_record_sets)
 
         # finalize plan stats

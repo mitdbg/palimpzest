@@ -215,9 +215,9 @@ class OpFrontier:
         """
         op_source_indices_pairs = []
 
-        # if this operator is not being optimized: we don't request inputs, but simply process what we are given
-        if not self.is_scan_op and not self.is_llm_join and len(self.frontier_ops) == 1:
-            return (self.frontier_ops[0], None)
+        # if this operator is not being optimized: we don't request inputs, but simply process what we are given / told to (in the case of scans)
+        if not self.is_llm_join and len(self.frontier_ops) == 1:
+            return [(self.frontier_ops[0], None)]
 
         # otherwise, sample (operator, source_indices) pairs
         for op in self.frontier_ops:
@@ -271,10 +271,26 @@ class OpFrontier:
         op_source_indices_pairs = self._get_op_source_indices_pairs()
 
         # remove any root datasets which this op frontier does not have access to from the source_indices_to_sample
-        source_indices_to_sample = {
-            tuple(filter(lambda elt: elt.split("-")[0] in self.root_dataset_ids, source_indices_tuple))
-            for source_indices_tuple in source_indices_to_sample
-        }
+        def remove_unavailable_root_datasets(source_indices: str | tuple) -> str | tuple | None:
+            # base case: source_indices is a string
+            if isinstance(source_indices, str):
+                return source_indices if source_indices.split("-")[0] in self.root_dataset_ids else None
+
+            # recursive case: source_indices is a tuple
+            left_indices = source_indices[0]
+            right_indices = source_indices[1]
+            left_filtered = remove_unavailable_root_datasets(left_indices)
+            right_filtered = remove_unavailable_root_datasets(right_indices)
+            if left_filtered is None and right_filtered is None:
+                return None
+
+            if left_filtered is None:
+                return right_filtered
+            if right_filtered is None:
+                return left_filtered
+            return (left_filtered, right_filtered)
+
+        source_indices_to_sample = {remove_unavailable_root_datasets(source_indices) for source_indices in source_indices_to_sample}
 
         # if there are any source_indices in source_indices_to_sample which are not sampled by this operator,
         # apply the max quality operator (and any other frontier operators with no samples)
@@ -302,15 +318,16 @@ class OpFrontier:
             return op_inputs
 
         # if operator is not a join
+        source_unique_logical_op_id = list(self.source_indices_to_inputs)[0]
         op_inputs = [
             (op, source_indices, input)
             for op, source_indices in op_source_indices_pairs
-            for input in self.source_indices_to_inputs.get(source_indices, [])
+            for input in self.source_indices_to_inputs[source_unique_logical_op_id].get(source_indices, [])
         ]
 
         return op_inputs
 
-    def update_frontier(self, logical_op_id: str, plan_stats: SentinelPlanStats) -> None:
+    def update_frontier(self, unique_logical_op_id: str, plan_stats: SentinelPlanStats) -> None:
         """
         Update the set of frontier operators, pulling in new ones from the reservoir as needed.
         This function will:
@@ -322,7 +339,7 @@ class OpFrontier:
         #       upstream operators change; in this case, we de-duplicate record_op_stats with identical record_ids
         #       and keep the one with the maximum quality
         # get a mapping from full_op_id --> list[RecordOpStats]
-        full_op_id_to_op_stats: dict[str, OperatorStats] = plan_stats.operator_stats.get(logical_op_id, {})
+        full_op_id_to_op_stats: dict[str, OperatorStats] = plan_stats.operator_stats.get(unique_logical_op_id, {})
         full_op_id_to_record_op_stats: dict[str, list[RecordOpStats]] = {}
         for full_op_id, op_stats in full_op_id_to_op_stats.items():
             # skip over operators which have not been sampled
@@ -350,6 +367,12 @@ class OpFrontier:
             source_indices_processed = set()
             for record_op_stats in record_op_stats_lst:
                 source_indices = record_op_stats.record_source_indices
+
+                if len(source_indices) == 1:
+                    source_indices = source_indices[0]
+                elif self.is_llm_join or self.is_aggregate_op:
+                    source_indices = tuple(source_indices)
+
                 self.full_op_id_to_sources_processed[full_op_id].add(source_indices)
                 source_indices_processed.add(source_indices)
 
@@ -539,10 +562,10 @@ class OpFrontier:
         out_record_op_stats = []
         for idx in range(len(idx_to_records)):
             records_lst, record_op_stats_lst = zip(*idx_to_records[idx])
-            max_quality_record, max_quality = records_lst[0], record_op_stats_lst[0].quality
+            max_quality_record, max_quality = records_lst[0], record_op_stats_lst[0].quality if record_op_stats_lst[0] is not None else 0.0
             max_quality_stats = record_op_stats_lst[0]
             for record, record_op_stats in zip(records_lst[1:], record_op_stats_lst[1:]):
-                record_quality = record_op_stats.quality
+                record_quality = record_op_stats.quality if record_op_stats.quality is not None else 0.0
                 if record_quality > max_quality:
                     max_quality_record = record
                     max_quality = record_quality
@@ -643,6 +666,7 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
                     for source_indices, record_set_tuples in source_indices_to_record_set_tuples.items()
                 }
                 source_indices_to_all_record_sets = self._score_quality(validator, source_indices_to_all_record_sets)
+                # import pdb; pdb.set_trace()
 
                 # remove records that were read from the execution cache before adding to record op stats
                 new_record_op_stats = []
@@ -657,10 +681,14 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
                 # provide the best record sets as inputs to the next logical operator
                 next_unique_logical_op_id = plan.get_next_unique_logical_op_id(unique_logical_op_id)
                 if next_unique_logical_op_id is not None:
+                    source_indices_to_all_record_sets = {
+                        source_indices: [record_set for record_set, _ in record_set_tuples]
+                        for source_indices, record_set_tuples in source_indices_to_all_record_sets.items()
+                    }
                     op_frontiers[next_unique_logical_op_id].update_inputs(unique_logical_op_id, source_indices_to_all_record_sets)
 
                 # update the (pareto) frontier for each set of operators
-                op_frontiers[unique_logical_op_id].update_frontier(logical_op_id, plan_stats)
+                op_frontiers[unique_logical_op_id].update_frontier(unique_logical_op_id, plan_stats)
 
         # finalize plan stats
         plan_stats.finish()

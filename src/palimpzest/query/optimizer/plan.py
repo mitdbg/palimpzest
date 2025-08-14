@@ -293,7 +293,7 @@ class SentinelPlan(Plan):
         # store operator_set and logical_op_id; sort operator_set internally by full_op_id
         self.operator_set = sorted(operator_set, key=lambda op: op.get_full_op_id())
         self.logical_op_id = self.operator_set[0].logical_op_id
-        self.subplans = subplans
+        self.subplans = [] if subplans is None else subplans
         self.plan_id = self.compute_plan_id()
 
         # compute mapping from unique logical_op_id to next unique logical_op_id in the plan
@@ -330,9 +330,10 @@ class SentinelPlan(Plan):
 
     def _get_str(self, idx: int = 0, indent: int = 0) -> str:
         indent_str = " " * (indent * 2)
+        plan_str = ""
         for inner_idx, operator in enumerate(self.operator_set):
             inner_idx_str = "" if len(self.operator_set) == 1 else f"{inner_idx + 1}."
-            plan_str = f"{indent_str}{idx}.{inner_idx_str} {str(operator)}\n"
+            plan_str += f"{indent_str}{idx}.{inner_idx_str} {str(operator)}\n"
             for subplan in self.subplans:
                 plan_str += subplan._get_str(idx=idx + 1, indent=indent + 1)
 
@@ -393,10 +394,10 @@ class SentinelPlan(Plan):
 
     def _compute_root_dataset_ids_map(self, root_dataset_ids_map: dict[str, list[str]], current_idx: int | None = None) -> tuple[int, list[str]]:
         # set the root dataset ids for this operator
-        subplan_root_dataset_ids = []
+        all_subplan_root_dataset_ids = []
         for subplan in self.subplans:
             current_idx, subplan_root_dataset_ids = subplan._compute_root_dataset_ids_map(root_dataset_ids_map, current_idx)
-            subplan_root_dataset_ids.extend(subplan_root_dataset_ids)
+            all_subplan_root_dataset_ids.extend(subplan_root_dataset_ids)
             current_idx += 1
 
         # if current_idx is None, this is the first call, so we initialize it to 0
@@ -414,7 +415,7 @@ class SentinelPlan(Plan):
             root_dataset_ids.append(self.operator_set[0].context.id)
 
         # update the root_dataset_ids_map for this operator
-        root_dataset_ids_map[this_unique_logical_op_id] = root_dataset_ids + subplan_root_dataset_ids
+        root_dataset_ids_map[this_unique_logical_op_id] = root_dataset_ids + all_subplan_root_dataset_ids
 
         # return the current index and the upstream unique logical_op_ids for this operator
         return current_idx, root_dataset_ids_map[this_unique_logical_op_id]
