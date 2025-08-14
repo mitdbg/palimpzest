@@ -158,7 +158,7 @@ class AverageAggregateOp(AggregateOp):
         input_field_types = list(kwargs["input_schema"].model_fields.values())
         assert len(input_field_types) == 1, "AverageAggregateOp requires input_schema to have exactly one field"
         numeric_field_types = [bool, int, float, bool | None, int | None, float | None, int | float, int | float | None]
-        is_numeric = input_field_types[0] in numeric_field_types
+        is_numeric = input_field_types[0].annotation in numeric_field_types
         assert is_numeric, f"AverageAggregateOp requires input_schema to have a numeric field type, i.e. one of: {numeric_field_types}\nGot: {input_field_types[0]}"
 
         # call parent constructor

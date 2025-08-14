@@ -32,14 +32,26 @@ def get_models(include_embedding: bool = False) -> list[Model]:
             ]
         models.extend(anthropic_models)
 
+    if os.getenv("GEMINI_API_KEY") is not None:
+        vertex_models = [model for model in Model if model.is_vertex_model()]
+        if not include_embedding:
+            vertex_models = [
+                model for model in vertex_models if not model.is_embedding_model()
+            ]
+        models.extend(vertex_models)
+
     return models
 
 # The order is the priority of the model
 TEXT_MODEL_PRIORITY = [
     # Model.o1,
+    Model.GEMINI_2_5_PRO,
+    Model.o4_MINI,
+    Model.LLAMA_4_MAVERICK,
+    Model.GEMINI_2_0_FLASH,
+    Model.CLAUDE_3_7_SONNET,
     Model.GPT_4o,
     Model.GPT_4o_MINI,
-    Model.CLAUDE_3_7_SONNET,
     Model.CLAUDE_3_5_SONNET,
     Model.LLAMA3_3_70B,
     Model.DEEPSEEK_V3,
@@ -49,6 +61,10 @@ TEXT_MODEL_PRIORITY = [
 ]
 
 VISION_MODEL_PRIORITY = [
+    Model.GEMINI_2_5_PRO,
+    Model.o4_MINI,
+    Model.LLAMA_4_MAVERICK,
+    Model.GEMINI_2_0_FLASH,
     Model.GPT_4o,
     Model.GPT_4o_MINI,
     Model.LLAMA3_2_90B_V,
@@ -67,7 +83,7 @@ def get_champion_model(available_models, vision=False):
     raise Exception(
         f"No {task_type} models available to create physical plans!\n"
         "You must set at least one of the following environment variables:\n"
-        "[OPENAI_API_KEY, TOGETHER_API_KEY, ANTHROPIC_API_KEY]\n"
+        "[OPENAI_API_KEY, TOGETHER_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY]\n"
         f"Available models: {available_models}"
     )
 
