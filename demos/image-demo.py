@@ -38,7 +38,6 @@ if __name__ == "__main__":
     config = pz.QueryProcessorConfig(
         policy=policy,
         verbose=True,
-        processing_strategy="no_sentinel",
     )
     data_record_collection = plan.run(config)
 

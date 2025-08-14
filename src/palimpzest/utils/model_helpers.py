@@ -54,7 +54,6 @@ TEXT_MODEL_PRIORITY = [
     Model.GPT_4o_MINI,
     Model.CLAUDE_3_5_SONNET,
     Model.LLAMA3_3_70B,
-    Model.MIXTRAL,
     Model.DEEPSEEK_V3,
     Model.LLAMA3_2_3B,
     Model.LLAMA3_1_8B,

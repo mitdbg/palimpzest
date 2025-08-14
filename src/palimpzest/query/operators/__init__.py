@@ -9,6 +9,8 @@ from palimpzest.query.operators.convert import NonLLMConvert as _NonLLMConvert
 from palimpzest.query.operators.filter import FilterOp as _FilterOp
 from palimpzest.query.operators.filter import LLMFilter as _LLMFilter
 from palimpzest.query.operators.filter import NonLLMFilter as _NonLLMFilter
+from palimpzest.query.operators.join import JoinOp as _JoinOp
+from palimpzest.query.operators.join import NestedLoopsJoin as _NestedLoopsJoin
 from palimpzest.query.operators.limit import LimitScanOp as _LimitScanOp
 from palimpzest.query.operators.logical import (
     Aggregate as _Aggregate,
@@ -24,6 +26,9 @@ from palimpzest.query.operators.logical import (
 )
 from palimpzest.query.operators.logical import (
     GroupByAggregate as _GroupByAggregate,
+)
+from palimpzest.query.operators.logical import (
+    JoinOp as _LogicalJoinOp,
 )
 from palimpzest.query.operators.logical import (
     LimitScan as _LimitScan,
@@ -51,6 +56,7 @@ LOGICAL_OPERATORS = [
     _ConvertScan,
     _FilteredScan,
     _GroupByAggregate,
+    _LogicalJoinOp,
     _LimitScan,
     _Project,
     _RetrieveScan,
@@ -65,6 +71,8 @@ PHYSICAL_OPERATORS = (
     + [_ScanPhysicalOp, _MarshalAndScanDataOp]
     # filter
     + [_FilterOp, _NonLLMFilter, _LLMFilter]
+    # join
+    + [_JoinOp, _NestedLoopsJoin]
     # limit
     + [_LimitScanOp]
     # mixture-of-agents

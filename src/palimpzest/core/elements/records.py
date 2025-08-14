@@ -11,7 +11,7 @@ from pydantic.fields import FieldInfo
 from palimpzest.core.data import context
 from palimpzest.core.lib.schemas import ImageBase64, create_schema_from_df, project, union_schemas
 from palimpzest.core.models import ExecutionStats, PlanStats, RecordOpStats
-from palimpzest.utils.hash_helpers import hash_for_id
+from palimpzest.utils.hash_helpers import hash_for_id, hash_for_serialized_dict
 
 
 class DataRecord:
@@ -20,12 +20,20 @@ class DataRecord:
     def __init__(
         self,
         schema: BaseModel,
-        source_idx: int,
-        parent_id: str | None = None,
+        source_indices: str | list[str],
+        parent_ids: str | list[str] | None = None,
         cardinality_idx: int | None = None,
     ):
-        # check that source_idx is provided
-        assert source_idx is not None, "Every DataRecord must be constructed with a source_idx"
+        # check that source_indices are provided
+        assert source_indices is not None, "Every DataRecord must be constructed with source index (or indices)"
+
+        # normalize to list[str]
+        if not isinstance(source_indices, list):
+            source_indices = [source_indices]
+
+        # normalize to list[str]
+        if isinstance(parent_ids, str):
+            parent_ids = [parent_ids]
 
         # schema for the data record
         self.schema = schema
@@ -36,12 +44,12 @@ class DataRecord:
         # mapping from field names to their values
         self.field_values: dict[str, Any] = {}
 
-        # TODO: handle multiple sources
-        # the index in the root Dataset from which this DataRecord is derived
-        self.source_idx = int(source_idx)
+        # the index in the root Dataset from which this DataRecord is derived;
+        # each source index takes the form: f"{root_dataset.id}-{idx}"
+        self.source_indices = sorted(source_indices)
 
-        # the id of the parent record(s) from which this DataRecord is derived
-        self.parent_id = parent_id
+        # the id(s) of the parent record(s) from which this DataRecord is derived
+        self.parent_ids = parent_ids
 
         # store the cardinality index
         self.cardinality_idx = cardinality_idx
@@ -51,7 +59,7 @@ class DataRecord:
 
         # NOTE: Record ids are hashed based on:
         # 0. their schema (keys)
-        # 1. their parent record id(s) (or source_idx if there is no parent record)
+        # 1. their parent record id(s) (or source_indices if there is no parent record)
         # 2. their index in the fan out (if this is in a one-to-many operation)
         #
         # We currently do NOT hash just based on record content (i.e. schema (key, value) pairs)
@@ -62,9 +70,9 @@ class DataRecord:
 
         # unique identifier for the record
         id_str = (
-            str(schema) + (parent_id if parent_id is not None else str(self.source_idx))
+            str(schema) + str(parent_ids) if parent_ids is not None else str(self.source_indices)
             if cardinality_idx is None
-            else str(schema) + str(cardinality_idx) + str(parent_id if parent_id is not None else str(self.source_idx))
+            else str(schema) + str(cardinality_idx) + str(parent_ids) if parent_ids is not None else str(self.source_indices)
         )
         # TODO(Jun): build-in id should has a special name, the current self.id is too general which would conflict with user defined schema too easily.
         # the options: built_in_id, generated_id
@@ -72,7 +80,7 @@ class DataRecord:
 
 
     def __setattr__(self, name: str, value: Any, /) -> None:
-        if name in ["schema", "field_types", "field_values", "source_idx", "parent_id", "cardinality_idx", "passed_operator", "id"]:
+        if name in ["schema", "field_types", "field_values", "source_indices", "parent_ids", "cardinality_idx", "passed_operator", "id"]:
             super().__setattr__(name, value)
         else:
             self.field_values[name] = value
@@ -125,11 +133,11 @@ class DataRecord:
 
 
     def copy(self, include_bytes: bool = True, project_cols: list[str] | None = None):
-        # make new record which has parent_record as its parent (and the same source_idx)
+        # make copy of the current record
         new_dr = DataRecord(
             self.schema,
-            source_idx=self.source_idx,
-            parent_id=self.id,
+            source_indices=self.source_indices,
+            parent_ids=self.parent_ids,
             cardinality_idx=self.cardinality_idx,
         )
 
@@ -177,11 +185,11 @@ class DataRecord:
             new_schema = union_schemas([schema, parent_record.schema])
             new_schema = project(new_schema, project_cols)
 
-        # make new record which has parent_record as its parent (and the same source_idx)
+        # make new record which has parent_record as its parent (and the same source_indices)
         new_dr = DataRecord(
             new_schema,
-            source_idx=parent_record.source_idx,
-            parent_id=parent_record.id,
+            source_indices=parent_record.source_indices,
+            parent_ids=[parent_record.id],
             cardinality_idx=cardinality_idx,
         )
 
@@ -201,26 +209,69 @@ class DataRecord:
     def from_agg_parents(
         schema: BaseModel,
         parent_records: DataRecordSet,
-        project_cols: list[str] | None = None,
         cardinality_idx: int | None = None,
     ) -> DataRecord:
-        # TODO: we can implement this once we support having multiple parent ids
-        pass
+        # flatten source indices from all parents
+        source_indices = [
+            source_idx
+            for parent_record in parent_records
+            for source_idx in parent_record.source_indices
+        ]
 
+        # make new record which has all parent records as its parents
+        return DataRecord(
+            schema,
+            source_indices=source_indices,
+            parent_ids=[parent_record.id for parent_record in parent_records],
+            cardinality_idx=cardinality_idx,
+        )
 
     @staticmethod
     def from_join_parents(
-        left_schema: BaseModel,
-        right_schema: BaseModel,
+        schema: BaseModel,
         left_parent_record: DataRecord,
         right_parent_record: DataRecord,
         project_cols: list[str] | None = None,
         cardinality_idx: int = None,
     ) -> DataRecord:
-        # TODO: we can implement this method if/when we add joins
-        pass
+        # make new record which has left and right parent record as its parents
+        new_dr = DataRecord(
+            schema,
+            source_indices=list(left_parent_record.source_indices) + list(right_parent_record.source_indices),
+            parent_ids=[left_parent_record.id, right_parent_record.id],
+            cardinality_idx=cardinality_idx,
+        )
+
+        # get the set of fields and field descriptions to copy from the parent record(s)
+        left_copy_field_names = (
+            left_parent_record.get_field_names()
+            if project_cols is None
+            else [col for col in project_cols if col in left_parent_record.get_field_names()]
+        )
+        right_copy_field_names = (
+            right_parent_record.get_field_names()
+            if project_cols is None
+            else [col for col in project_cols if col in right_parent_record.get_field_names()]
+        )
+        left_copy_field_names = [field.split(".")[-1] for field in left_copy_field_names]
+        right_copy_field_names = [field.split(".")[-1] for field in right_copy_field_names]
+
+        # copy fields from the parents
+        for field_name in left_copy_field_names:
+            new_dr.field_types[field_name] = left_parent_record.get_field_type(field_name)
+            new_dr[field_name] = left_parent_record[field_name]
+
+        for field_name in right_copy_field_names:
+            new_field_name = field_name
+            if field_name in left_copy_field_names:
+                new_field_name = f"{field_name}_right"
+            new_dr.field_types[new_field_name] = right_parent_record.get_field_type(field_name)
+            new_dr[new_field_name] = right_parent_record[field_name]
+
+        return new_dr
 
 
+    # TODO: unused outside of unit tests
     @staticmethod
     def from_df(df: pd.DataFrame, schema: BaseModel | None = None) -> list[DataRecord]:
         """Create a list of DataRecords from a pandas DataFrame
@@ -235,13 +286,21 @@ class DataRecord:
         if df is None:
             raise ValueError("DataFrame is None!")
 
-        records = []
+        # create schema if one isn't provided
         if schema is None:
             schema = create_schema_from_df(df)
 
-        for source_idx, row in df.iterrows():
+        # create an id for the dataset from the schema
+        dataset_id = hash_for_serialized_dict({
+            k: {"annotation": str(v.annotation), "default": str(v.default), "description": v.description}
+            for k, v in schema.model_fields.items()
+        })
+
+        # create records
+        records = []
+        for idx, row in df.iterrows():
             row_dict = row.to_dict()
-            record = DataRecord(schema=schema, source_idx=source_idx)
+            record = DataRecord(schema=schema, source_indices=[f"{dataset_id}-{idx}"])
             record.field_values = row_dict
             record.field_types = {field_name: schema.model_fields[field_name] for field_name in row_dict}
             records.append(record)
@@ -306,7 +365,7 @@ class DataRecord:
 
 class DataRecordSet:
     """
-    A DataRecordSet contains a list of DataRecords that share the same schema, same parent_id, and same source_idx.
+    A DataRecordSet contains a list of DataRecords that share the same schema, same parent(s), and same source(s).
 
     We explicitly check that this is True.
 
@@ -317,19 +376,21 @@ class DataRecordSet:
             data_records: list[DataRecord],
             record_op_stats: list[RecordOpStats],
             field_to_score_fn: dict[str, str | callable] | None = None,
+            input: int | DataRecord | list[DataRecord] | tuple[list[DataRecord]] | None = None,
         ):
-        # check that all data_records are derived from the same parent record
-        if len(data_records) > 0:
-            parent_id = data_records[0].parent_id
-            error_msg = "DataRecordSet must be constructed from the output of executing a single operator on a single input."
-            assert all([dr.parent_id == parent_id for dr in data_records]), error_msg
-
-        # set data_records, parent_id, and source_idx; note that it is possible for
+        # set data_records, parent_ids, and source_indices; note that it is possible for
         # data_records to be an empty list in the event of a failed convert
         self.data_records = data_records
-        self.parent_id = data_records[0].parent_id if len(data_records) > 0 else None
-        self.source_idx = data_records[0].source_idx if len(data_records) > 0 else None
+        self.parent_ids = data_records[0].parent_ids if len(data_records) > 0 else None
+        self.source_indices = data_records[0].source_indices if len(data_records) > 0 else None
         self.schema = data_records[0].schema if len(data_records) > 0 else None
+
+        # the input to the operator which produced the data_records; type is tuple[DataRecord] | tuple[int]
+        # - for scan operators, input is a singleton tuple[int] which wraps the source_idx, e.g.: (source_idx,)
+        # - for join operators, input is a tuple with one entry for the left input DataRecord and one entry for the right input DataRecord
+        # - for aggregate operators, input is a tuple with all the input DataRecords to the aggregation
+        # - for all other operaotrs, input is a singleton tuple[DataRecord] which wraps the single input
+        self.input = input
 
         # set statistics for generating these records
         self.record_op_stats = record_op_stats
@@ -362,7 +423,7 @@ class DataRecordCollection:
     The difference between DataRecordSet and DataRecordCollection 
 
     Goal: 
-        DataRecordSet is a set of DataRecords that share the same schema, same parent_id, and same source_idx.
+        DataRecordSet is a set of DataRecords that share the same schema, same parents, and same sources.
         DataRecordCollection is a general wrapper for list[DataRecord].
     
     Usage:

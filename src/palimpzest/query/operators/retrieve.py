@@ -41,7 +41,7 @@ class RetrieveOp(PhysicalOperator):
         super().__init__(*args, **kwargs)
 
         # extract the field names from the output_attrs
-        if isinstance(output_attrs, BaseModel):
+        if issubclass(output_attrs, BaseModel):
             self.output_field_names = list(output_attrs.model_fields)
         elif isinstance(output_attrs, list):
             self.output_field_names = [attr["name"] for attr in output_attrs]
@@ -160,8 +160,8 @@ class RetrieveOp(PhysicalOperator):
         # construct the RecordOpStats object
         record_op_stats = RecordOpStats(
             record_id=output_dr.id,
-            record_parent_id=output_dr.parent_id,
-            record_source_idx=output_dr.source_idx,
+            record_parent_ids=output_dr.parent_ids,
+            record_source_indices=output_dr.source_indices,
             record_state=record_state,
             full_op_id=self.get_full_op_id(),
             logical_op_id=self.logical_op_id,

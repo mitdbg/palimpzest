@@ -68,5 +68,5 @@ def test_dataset_add_columns(sample_df):
     assert score_field.annotation == int | float
     assert score_field.description == 'Score'
 
-    with pytest.raises(ValueError, match="`udf` and `cols` must be provided for add_columns."):
-        ds.add_columns(udf=add_greeting, cols=None)
+    with pytest.raises(ValueError, match="`udf` must be provided for add_columns."):
+        ds.add_columns(udf=None, cols=None)

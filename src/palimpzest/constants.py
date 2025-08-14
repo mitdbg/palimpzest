@@ -14,7 +14,6 @@ class Model(str, Enum):
     LLAMA3_1_8B = "together_ai/meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo"
     LLAMA3_3_70B = "together_ai/meta-llama/Llama-3.3-70B-Instruct-Turbo"
     LLAMA3_2_90B_V = "together_ai/meta-llama/Llama-3.2-90B-Vision-Instruct-Turbo"
-    MIXTRAL = "together_ai/mistralai/Mixtral-8x7B-Instruct-v0.1"
     DEEPSEEK_V3 = "together_ai/deepseek-ai/DeepSeek-V3"
     DEEPSEEK_R1_DISTILL_QWEN_1_5B = "together_ai/deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"
     GPT_4o = "openai/gpt-4o-2024-08-06"
@@ -35,9 +34,6 @@ class Model(str, Enum):
 
     def is_llama_model(self):
         return "llama" in self.value.lower()
-
-    def is_mixtral_model(self):
-        return "mixtral" in self.value.lower()
 
     def is_clip_model(self):
         return "clip" in self.value.lower()
@@ -95,6 +91,10 @@ class PromptStrategy(str, Enum):
     # COT_BOOL_IMAGE_CRITIC = "chain-of-thought-bool-image-critic"
     # COT_BOOL_IMAGE_REFINE = "chain-of-thought-bool-image-refine"
 
+    # Chain-of-Thought Join Prompt Strategies
+    COT_JOIN = "chain-of-thought-join"
+    COT_JOIN_IMAGE = "chain-of-thought-join-image"
+
     # Chain-of-Thought Question Answering Prompt Strategies
     COT_QA = "chain-of-thought-question"
     COT_QA_CRITIC = "chain-of-thought-question-critic"
@@ -120,8 +120,11 @@ class PromptStrategy(str, Enum):
     def is_bool_prompt(self):
         return "bool" in self.value
 
+    def is_join_prompt(self):
+        return "join" in self.value
+
     def is_convert_prompt(self):
-        return "bool" not in self.value
+        return "bool" not in self.value and "join" not in self.value
 
     def is_critic_prompt(self):
         return "critic" in self.value
@@ -140,6 +143,7 @@ class PromptStrategy(str, Enum):
 
     def is_split_merger_prompt(self):
         return "split-merger" in self.value
+
 
 class AggFunc(str, Enum):
     COUNT = "count"
@@ -207,14 +211,17 @@ NAIVE_BYTES_PER_RECORD = 1024
 # Rough conversion from # of characters --> # of tokens; assumes 1 token ~= 4 chars
 TOKENS_PER_CHARACTER = 0.25
 
-# Rough estimate of the number of tokens the context is allowed to take up for MIXTRAL and LLAMA3 models
-MIXTRAL_LLAMA_CONTEXT_TOKENS_LIMIT = 6000
+# Rough estimate of the number of tokens the context is allowed to take up for LLAMA3 models
+LLAMA_CONTEXT_TOKENS_LIMIT = 6000
 
 # a naive estimate for the input record size
 NAIVE_EST_SOURCE_RECORD_SIZE_IN_BYTES = 1_000_000
 
 # a naive estimate for filter selectivity
 NAIVE_EST_FILTER_SELECTIVITY = 0.5
+
+# a naive estimate for join selectivity
+NAIVE_EST_JOIN_SELECTIVITY = 0.5
 
 # a naive estimate for the number of input tokens processed per record
 NAIVE_EST_NUM_INPUT_TOKENS = 1000
@@ -287,15 +294,6 @@ LLAMA3_2_90B_V_MODEL_CARD = {
     "seconds_per_output_token": 0.0222,
     ##### Agg. Benchmark #####
     "overall": 65.00, # set to be slightly higher than gpt-4o-mini
-}
-MIXTRAL_8X_7B_MODEL_CARD = {
-    ##### Cost in USD #####
-    "usd_per_input_token": 0.6 / 1e6,
-    "usd_per_output_token": 0.6 / 1e6,
-    ##### Time #####
-    "seconds_per_output_token": 0.0112,
-    ##### Agg. Benchmark #####
-    "overall": 43.27,
 }
 DEEPSEEK_V3_MODEL_CARD = {
     ##### Cost in USD #####
@@ -435,7 +433,6 @@ MODEL_CARDS = {
     Model.LLAMA3_2_90B_V.value: LLAMA3_2_90B_V_MODEL_CARD,
     Model.DEEPSEEK_V3.value: DEEPSEEK_V3_MODEL_CARD,
     Model.DEEPSEEK_R1_DISTILL_QWEN_1_5B.value: DEEPSEEK_R1_DISTILL_QWEN_1_5B_MODEL_CARD,
-    Model.MIXTRAL.value: MIXTRAL_8X_7B_MODEL_CARD,
     Model.GPT_4o.value: GPT_4o_MODEL_CARD,
     Model.GPT_4o_MINI.value: GPT_4o_MINI_MODEL_CARD,
     Model.o4_MINI.value: o4_MINI_MODEL_CARD,

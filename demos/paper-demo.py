@@ -96,9 +96,10 @@ table_cols = [
 
 class RealEstateListingDataset(pz.IterDataset):
     def __init__(self, listings_dir):
-        super().__init__(real_estate_listing_cols)
+        super().__init__(id="real-estate", schema=real_estate_listing_cols)
         self.listings_dir = listings_dir
         self.listings = sorted(os.listdir(self.listings_dir))
+        self.listings = [file for file in self.listings if not file.startswith(".")]
 
     def __len__(self):
         return len(self.listings)
@@ -179,7 +180,7 @@ if __name__ == "__main__":
 
     # create pz plan
     if workload == "enron":
-        plan = pz.Dataset(dataset).sem_add_columns(email_cols)
+        plan = dataset.sem_add_columns(email_cols)
         plan = plan.sem_filter(
             "The email is not quoting from a news article or an article written by someone outside of Enron"
         )
@@ -188,7 +189,7 @@ if __name__ == "__main__":
         )
 
     elif workload == "real-estate":
-        plan = pz.Dataset(RealEstateListingDataset(dataset))
+        plan = RealEstateListingDataset(dataset)
         plan = plan.sem_add_columns(real_estate_text_cols, depends_on="text_content")
         plan = plan.sem_add_columns(real_estate_image_cols, depends_on="image_filepaths")
         plan = plan.sem_filter(
@@ -199,8 +200,7 @@ if __name__ == "__main__":
         plan = plan.filter(in_price_range, depends_on="price")
 
     elif workload == "medical-schema-matching":
-        plan = pz.Dataset(dataset)
-        plan = plan.add_columns(xls_to_tables, cols=table_cols, cardinality=pz.Cardinality.ONE_TO_MANY)
+        plan = dataset.add_columns(xls_to_tables, cols=table_cols, cardinality=pz.Cardinality.ONE_TO_MANY)
         plan = plan.sem_filter("The rows of the table contain the patient age")
         plan = plan.sem_add_columns(case_data_cols, cardinality=pz.Cardinality.ONE_TO_MANY)
 
@@ -209,6 +209,7 @@ if __name__ == "__main__":
         verbose=verbose,
         policy=policy,
         execution_strategy=args.executor,
+        progress=False,
     )
     data_record_collection = plan.run(config)
     print(data_record_collection.to_df())

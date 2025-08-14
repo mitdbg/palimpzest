@@ -87,7 +87,7 @@ class MMQADataset(pz.IterDataset):
         shuffle: bool = False,
         seed: int = 42,
     ):
-        super().__init__(mmqa_entry_cols)
+        super().__init__(id=f"mmqa-{split}", schema=mmqa_entry_cols)
 
         # read the appropriate dataset
         dataset = []
@@ -281,12 +281,6 @@ if __name__ == "__main__":
     parser.add_argument("--progress", default=False, action="store_true", help="Print progress output")
     parser.add_argument("--gpt4-mini-only", default=False, action="store_true", help="Use only GPT-4o-mini")
     parser.add_argument(
-        "--processing-strategy",
-        default="sentinel",
-        type=str,
-        help="The engine to use. One of sentinel or no_sentinel",
-    )
-    parser.add_argument(
         "--execution-strategy",
         default="parallel",
         type=str,
@@ -314,7 +308,7 @@ if __name__ == "__main__":
         "--model",
         default="gpt-4o",
         type=str,
-        help="One of 'gpt-4o', 'gpt-4o-mini', 'llama', 'mixtral'",
+        help="One of 'gpt-4o', 'gpt-4o-mini', 'llama'",
     )
     parser.add_argument(
         "--seed",
@@ -365,7 +359,6 @@ if __name__ == "__main__":
     k = args.k
     j = args.j
     sample_budget = args.sample_budget
-    processing_strategy = args.processing_strategy
     execution_strategy = args.execution_strategy
     sentinel_execution_strategy = args.sentinel_execution_strategy
     exp_name = (
@@ -393,7 +386,7 @@ if __name__ == "__main__":
     )
 
     # create validation data source
-    val_datasource = MMQADataset(
+    train_dataset = MMQADataset(
         split="train",
         num_samples=val_examples,
         shuffle=True,
@@ -473,8 +466,7 @@ if __name__ == "__main__":
         return {"supporting_images": results, "supporting_image_ids": result_ids}
 
     # construct plan
-    plan = pz.Dataset(dataset)
-    plan = plan.retrieve(
+    plan = dataset.retrieve(
         index=text_index,
         search_func=text_search_func,
         search_attr="question",
@@ -497,8 +489,6 @@ if __name__ == "__main__":
     # execute pz plan
     config = pz.QueryProcessorConfig(
         policy=policy,
-        val_datasource=val_datasource,
-        processing_strategy=processing_strategy,
         optimizer_strategy="pareto",
         sentinel_execution_strategy=sentinel_execution_strategy,
         execution_strategy=execution_strategy,
@@ -513,16 +503,14 @@ if __name__ == "__main__":
         allow_mixtures=True,
         allow_rag_reduction=True,
         progress=progress,
-    )
-
-    data_record_collection = plan.run(
-        config=config,
         k=k,
         j=j,
         sample_budget=sample_budget,
         seed=seed,
         exp_name=exp_name,
     )
+
+    data_record_collection = plan.run(config=config, train_dataset=train_dataset, validator=pz.Validator())
 
     print(data_record_collection.to_df())
     data_record_collection.to_df().to_csv(f"opt-profiling-data/{exp_name}-output.csv", index=False)

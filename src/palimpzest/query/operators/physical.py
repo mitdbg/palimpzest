@@ -22,6 +22,7 @@ class PhysicalOperator:
         input_schema: BaseModel | None = None,
         depends_on: list[str] | None = None,
         logical_op_id: str | None = None,
+        unique_logical_op_id: str | None = None,
         logical_op_name: str | None = None,
         verbose: bool = False,
         *args,
@@ -31,6 +32,7 @@ class PhysicalOperator:
         self.input_schema = input_schema
         self.depends_on = depends_on if depends_on is None else sorted(depends_on)
         self.logical_op_id = logical_op_id
+        self.unique_logical_op_id = unique_logical_op_id
         self.logical_op_name = logical_op_name
         self.verbose = verbose
         self.op_id = None
@@ -56,9 +58,11 @@ class PhysicalOperator:
             op += f"    Model: {self.model}\n"
         return op
 
+    # def __eq__(self, other) -> bool:
+    #     all_op_params_match = all(value == getattr(other, key) for key, value in self.get_op_params().items())
+    #     return isinstance(other, self.__class__) and all_op_params_match
     def __eq__(self, other) -> bool:
-        all_op_params_match = all(value == getattr(other, key) for key, value in self.get_op_params().items())
-        return isinstance(other, self.__class__) and all_op_params_match
+        return isinstance(other, self.__class__) and self.get_full_op_id() == other.get_full_op_id()
 
     def copy(self) -> PhysicalOperator:
         return self.__class__(**self.get_op_params())
@@ -114,10 +118,7 @@ class PhysicalOperator:
         # get op name and op parameters which are relevant for computing the id
         op_name = self.op_name()
         id_params = self.get_id_params()
-        id_params = {
-            k: str(v) if k != "output_schema" else sorted(v.model_fields)
-            for k, v in id_params.items()
-        }
+        id_params = {k: str(v) for k, v in id_params.items()}
 
         # compute, set, and return the op_id
         hash_str = json.dumps({"op_name": op_name, **id_params}, sort_keys=True)
@@ -125,8 +126,11 @@ class PhysicalOperator:
 
         return self.op_id
     
-    def get_logical_op_id(self) -> str | None:
+    def get_logical_op_id(self) -> str:
         return self.logical_op_id
+
+    def get_unique_logical_op_id(self) -> str:
+        return self.unique_logical_op_id
 
     def get_full_op_id(self):
         return f"{self.get_logical_op_id()}-{self.get_op_id()}"

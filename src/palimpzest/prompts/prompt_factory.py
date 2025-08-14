@@ -7,7 +7,7 @@ from string import Formatter
 from pydantic import BaseModel
 
 from palimpzest.constants import (
-    MIXTRAL_LLAMA_CONTEXT_TOKENS_LIMIT,
+    LLAMA_CONTEXT_TOKENS_LIMIT,
     TOKENS_PER_CHARACTER,
     Cardinality,
     Model,
@@ -57,6 +57,26 @@ from palimpzest.prompts.filter_prompts import (
     COT_BOOL_IMAGE_JOB_INSTRUCTION,
     COT_BOOL_JOB_INSTRUCTION,
 )
+from palimpzest.prompts.join_prompts import (
+    COT_JOIN_BASE_SYSTEM_PROMPT,
+    COT_JOIN_BASE_USER_PROMPT,
+    COT_JOIN_EXAMPLE_CONTEXT,
+    COT_JOIN_EXAMPLE_INPUT_FIELDS,
+    COT_JOIN_EXAMPLE_JOIN_CONDITION,
+    COT_JOIN_EXAMPLE_REASONING,
+    COT_JOIN_IMAGE_DISCLAIMER,
+    COT_JOIN_IMAGE_EXAMPLE_CONTEXT,
+    COT_JOIN_IMAGE_EXAMPLE_INPUT_FIELDS,
+    COT_JOIN_IMAGE_EXAMPLE_JOIN_CONDITION,
+    COT_JOIN_IMAGE_EXAMPLE_REASONING,
+    COT_JOIN_IMAGE_JOB_INSTRUCTION,
+    COT_JOIN_IMAGE_RIGHT_EXAMPLE_CONTEXT,
+    COT_JOIN_IMAGE_RIGHT_EXAMPLE_INPUT_FIELDS,
+    COT_JOIN_JOB_INSTRUCTION,
+    COT_JOIN_RIGHT_EXAMPLE_CONTEXT,
+    COT_JOIN_RIGHT_EXAMPLE_INPUT_FIELDS,
+    COT_JOIN_RIGHT_IMAGE_DISCLAIMER,
+)
 from palimpzest.prompts.moa_aggregator_convert_prompts import (
     COT_MOA_AGG_BASE_SYSTEM_PROMPT,
     COT_MOA_AGG_BASE_USER_PROMPT,
@@ -101,6 +121,8 @@ class PromptFactory:
     BASE_SYSTEM_PROMPT_MAP = {
         PromptStrategy.COT_BOOL: COT_BOOL_BASE_SYSTEM_PROMPT,
         PromptStrategy.COT_BOOL_IMAGE: COT_BOOL_BASE_SYSTEM_PROMPT,
+        PromptStrategy.COT_JOIN: COT_JOIN_BASE_SYSTEM_PROMPT,
+        PromptStrategy.COT_JOIN_IMAGE: COT_JOIN_BASE_SYSTEM_PROMPT,
         PromptStrategy.COT_QA: COT_QA_BASE_SYSTEM_PROMPT,
         PromptStrategy.COT_QA_CRITIC: None,
         PromptStrategy.COT_QA_REFINE: None,
@@ -116,6 +138,8 @@ class PromptFactory:
     BASE_USER_PROMPT_MAP = {
         PromptStrategy.COT_BOOL: COT_BOOL_BASE_USER_PROMPT,
         PromptStrategy.COT_BOOL_IMAGE: COT_BOOL_BASE_USER_PROMPT,
+        PromptStrategy.COT_JOIN: COT_JOIN_BASE_USER_PROMPT,
+        PromptStrategy.COT_JOIN_IMAGE: COT_JOIN_BASE_USER_PROMPT,
         PromptStrategy.COT_QA: COT_QA_BASE_USER_PROMPT,
         PromptStrategy.COT_QA_CRITIC: BASE_CRITIQUE_PROMPT,
         PromptStrategy.COT_QA_REFINE: BASE_REFINEMENT_PROMPT,
@@ -156,12 +180,12 @@ class PromptFactory:
         # TODO: this does not work for image prompts
         # TODO: this ignores the size of the `orignal_messages` in critique and refine prompts
         # cut down on context based on window length
-        if self.model.is_llama_model() or self.model.is_mixtral_model():
+        if self.model.is_llama_model():
             total_context_len = len(json.dumps(context, indent=2))
 
             # sort fields by length and progressively strip from the longest field until it is short enough;
-            # NOTE: MIXTRAL_LLAMA_CONTEXT_TOKENS_LIMIT is a rough estimate which leaves room for the rest of the prompt text
-            while total_context_len * TOKENS_PER_CHARACTER > MIXTRAL_LLAMA_CONTEXT_TOKENS_LIMIT:
+            # NOTE: LLAMA_CONTEXT_TOKENS_LIMIT is a rough estimate which leaves room for the rest of the prompt text
+            while total_context_len * TOKENS_PER_CHARACTER > LLAMA_CONTEXT_TOKENS_LIMIT:
                 # sort fields by length
                 field_lengths = [(field, len(value) if value is not None else 0) for field, value in context.items()]
                 sorted_fields = sorted(field_lengths, key=lambda item: item[1], reverse=True)
@@ -170,7 +194,7 @@ class PromptFactory:
                 longest_field_name, longest_field_length = sorted_fields[0]
 
                 # trim the field
-                context_factor = MIXTRAL_LLAMA_CONTEXT_TOKENS_LIMIT / (total_context_len * TOKENS_PER_CHARACTER)
+                context_factor = LLAMA_CONTEXT_TOKENS_LIMIT / (total_context_len * TOKENS_PER_CHARACTER)
                 keep_frac_idx = int(longest_field_length * context_factor)
                 context[longest_field_name] = context[longest_field_name][:keep_frac_idx]
 
@@ -192,7 +216,11 @@ class PromptFactory:
         Returns:
             list[str]: The list of input field names.
         """
-        return kwargs.get("project_cols", candidate.get_field_names())
+        # NOTE: joins will include left and right input fields in project_cols, so we have to check
+        #       if the field is in the candidate record
+        input_fields = kwargs.get("project_cols", candidate.get_field_names())
+        input_fields = [field for field in input_fields if field in candidate.get_field_names()]
+        return input_fields
 
     def _get_input_fields_desc(self, candidate: DataRecord, input_fields: list[str]) -> str:
         """
@@ -245,6 +273,19 @@ class PromptFactory:
             assert filter_condition is not None, "Filter condition must be provided for filter operations."
 
         return filter_condition
+
+    def _get_join_condition(self, **kwargs) -> str | None:
+        """
+        Returns the join condition for the join operation.
+
+        Returns:
+            str | None: The join condition (if applicable).
+        """
+        join_condition = kwargs.get("join_condition")
+        if self.prompt_strategy.is_join_prompt():
+            assert join_condition is not None, "Join condition must be provided for join operations."
+
+        return join_condition
 
     def _get_original_output(self, **kwargs) -> str | None:
         """
@@ -339,6 +380,8 @@ class PromptFactory:
         prompt_strategy_to_job_instruction = {
             PromptStrategy.COT_BOOL: COT_BOOL_JOB_INSTRUCTION,
             PromptStrategy.COT_BOOL_IMAGE: COT_BOOL_IMAGE_JOB_INSTRUCTION,
+            PromptStrategy.COT_JOIN: COT_JOIN_JOB_INSTRUCTION,
+            PromptStrategy.COT_JOIN_IMAGE: COT_JOIN_IMAGE_JOB_INSTRUCTION,
             PromptStrategy.COT_QA: COT_QA_JOB_INSTRUCTION,
             PromptStrategy.COT_QA_IMAGE: COT_QA_IMAGE_JOB_INSTRUCTION,
             PromptStrategy.COT_MOA_PROPOSER: COT_MOA_PROPOSER_JOB_INSTRUCTION,
@@ -404,6 +447,8 @@ class PromptFactory:
         prompt_strategy_to_example_input_fields = {
             PromptStrategy.COT_BOOL: COT_BOOL_EXAMPLE_INPUT_FIELDS,
             PromptStrategy.COT_BOOL_IMAGE: COT_BOOL_IMAGE_EXAMPLE_INPUT_FIELDS,
+            PromptStrategy.COT_JOIN: COT_JOIN_EXAMPLE_INPUT_FIELDS,
+            PromptStrategy.COT_JOIN_IMAGE: COT_JOIN_IMAGE_EXAMPLE_INPUT_FIELDS,
             PromptStrategy.COT_QA: COT_QA_EXAMPLE_INPUT_FIELDS,
             PromptStrategy.COT_QA_IMAGE: COT_QA_IMAGE_EXAMPLE_INPUT_FIELDS,
             PromptStrategy.COT_MOA_PROPOSER: COT_MOA_PROPOSER_EXAMPLE_INPUT_FIELDS,
@@ -412,6 +457,20 @@ class PromptFactory:
         }
 
         return prompt_strategy_to_example_input_fields.get(self.prompt_strategy)
+
+    def _get_right_example_input_fields(self) -> str | None:
+        """
+        Returns the example right input fields for the join prompt.
+
+        Returns:
+            str | None: The example right input fields (if applicable).
+        """
+        prompt_strategy_to_right_example_input_fields = {
+            PromptStrategy.COT_JOIN: COT_JOIN_RIGHT_EXAMPLE_INPUT_FIELDS,
+            PromptStrategy.COT_JOIN_IMAGE: COT_JOIN_IMAGE_RIGHT_EXAMPLE_INPUT_FIELDS,
+        }
+
+        return prompt_strategy_to_right_example_input_fields.get(self.prompt_strategy)
 
     def _get_example_output_fields(self) -> str | None:
         """
@@ -440,6 +499,8 @@ class PromptFactory:
         prompt_strategy_to_example_context = {
             PromptStrategy.COT_BOOL: COT_BOOL_EXAMPLE_CONTEXT,
             PromptStrategy.COT_BOOL_IMAGE: COT_BOOL_IMAGE_EXAMPLE_CONTEXT,
+            PromptStrategy.COT_JOIN: COT_JOIN_EXAMPLE_CONTEXT,
+            PromptStrategy.COT_JOIN_IMAGE: COT_JOIN_IMAGE_EXAMPLE_CONTEXT,
             PromptStrategy.COT_QA: COT_QA_EXAMPLE_CONTEXT,
             PromptStrategy.COT_QA_IMAGE: COT_QA_IMAGE_EXAMPLE_CONTEXT,
             PromptStrategy.COT_MOA_PROPOSER: COT_MOA_PROPOSER_EXAMPLE_CONTEXT,
@@ -448,6 +509,20 @@ class PromptFactory:
         }
 
         return prompt_strategy_to_example_context.get(self.prompt_strategy)
+
+    def _get_right_example_context(self) -> str | None:
+        """
+        Returns the right example context for the join prompt.
+
+        Returns:
+            str | None: The right example context (if applicable).
+        """
+        prompt_strategy_to_right_example_context = {
+            PromptStrategy.COT_JOIN: COT_JOIN_RIGHT_EXAMPLE_CONTEXT,
+            PromptStrategy.COT_JOIN_IMAGE: COT_JOIN_IMAGE_RIGHT_EXAMPLE_CONTEXT,
+        }
+
+        return prompt_strategy_to_right_example_context.get(self.prompt_strategy)
 
     def _get_image_disclaimer(self) -> str:
         """
@@ -459,8 +534,23 @@ class PromptFactory:
         """
         prompt_strategy_to_image_disclaimer = {
             PromptStrategy.COT_BOOL_IMAGE: COT_BOOL_IMAGE_DISCLAIMER,
+            PromptStrategy.COT_JOIN_IMAGE: COT_JOIN_IMAGE_DISCLAIMER,
             PromptStrategy.COT_QA_IMAGE: COT_QA_IMAGE_DISCLAIMER,
             PromptStrategy.COT_MOA_PROPOSER_IMAGE: COT_MOA_PROPOSER_IMAGE_DISCLAIMER,
+        }
+
+        return prompt_strategy_to_image_disclaimer.get(self.prompt_strategy, "")
+
+    def _get_right_image_disclaimer(self) -> str:
+        """
+        Returns the right image disclaimer for the prompt. The disclaimer must be an empty string
+        for text prompts.
+
+        Returns:
+            str: The right image disclaimer. If this is a text prompt then it is an empty string.
+        """
+        prompt_strategy_to_image_disclaimer = {
+            PromptStrategy.COT_JOIN_IMAGE: COT_JOIN_RIGHT_IMAGE_DISCLAIMER,
         }
 
         return prompt_strategy_to_image_disclaimer.get(self.prompt_strategy, "")
@@ -479,6 +569,20 @@ class PromptFactory:
 
         return prompt_strategy_to_example_filter_condition.get(self.prompt_strategy)
 
+    def _get_example_join_condition(self) -> str | None:
+        """
+        Returns the example join condition for the prompt.
+
+        Returns:
+            str | None: The example join condition (if applicable).
+        """
+        prompt_strategy_to_example_join_condition = {
+            PromptStrategy.COT_JOIN: COT_JOIN_EXAMPLE_JOIN_CONDITION,
+            PromptStrategy.COT_JOIN_IMAGE: COT_JOIN_IMAGE_EXAMPLE_JOIN_CONDITION,
+        }
+
+        return prompt_strategy_to_example_join_condition.get(self.prompt_strategy)
+
     def _get_example_reasoning(self) -> str | None:
         """
         Returns the example reasoning for the prompt.
@@ -489,6 +593,8 @@ class PromptFactory:
         prompt_strategy_to_example_reasoning = {
             PromptStrategy.COT_BOOL: COT_BOOL_EXAMPLE_REASONING,
             PromptStrategy.COT_BOOL_IMAGE: COT_BOOL_IMAGE_EXAMPLE_REASONING,
+            PromptStrategy.COT_JOIN: COT_JOIN_EXAMPLE_REASONING,
+            PromptStrategy.COT_JOIN_IMAGE: COT_JOIN_IMAGE_EXAMPLE_REASONING,
             PromptStrategy.COT_QA: COT_QA_EXAMPLE_REASONING,
             PromptStrategy.COT_QA_IMAGE: COT_QA_IMAGE_EXAMPLE_REASONING,
         }
@@ -513,7 +619,7 @@ class PromptFactory:
         return prompt_strategy_to_example_answer.get(self.prompt_strategy)
 
     def _get_all_format_kwargs(
-        self, candidate: DataRecord, input_fields: list[str], output_fields: list[str], **kwargs
+        self, candidate: DataRecord, input_fields: list[str], output_fields: list[str], right_candidate: DataRecord | None, right_input_fields: list[str], **kwargs
     ) -> dict:
         """
         Returns a dictionary containing all the format kwargs for templating the prompts.
@@ -533,11 +639,19 @@ class PromptFactory:
             "input_fields_desc": self._get_input_fields_desc(candidate, input_fields),
             "output_fields_desc": self._get_output_fields_desc(output_fields, **kwargs),
             "filter_condition": self._get_filter_condition(**kwargs),
+            "join_condition": self._get_join_condition(**kwargs),
             "original_output": self._get_original_output(**kwargs),
             "critique_output": self._get_critique_output(**kwargs),
             "model_responses": self._get_model_responses(**kwargs),
             "chunk_outputs": self._get_chunk_outputs(**kwargs),
         }
+
+        # if a right candidate is provided, we also get the context and input field descriptions for the right candidate
+        if right_candidate is not None:
+            input_format_kwargs.update({
+                "right_context": self._get_context(right_candidate, right_input_fields),
+                "right_input_fields_desc": self._get_input_fields_desc(right_candidate, right_input_fields),
+            })
 
         # get format kwargs which depend on the prompt strategy
         prompt_strategy_format_kwargs = {
@@ -547,10 +661,14 @@ class PromptFactory:
             "refinement_criteria": self._get_refinement_criteria(),
             "finish_instruction": self._get_finish_instruction(),
             "example_input_fields": self._get_example_input_fields(),
+            "right_example_input_fields": self._get_right_example_input_fields(),
             "example_output_fields": self._get_example_output_fields(),
             "example_context": self._get_example_context(),
+            "right_example_context": self._get_right_example_context(),
             "image_disclaimer": self._get_image_disclaimer(),
+            "right_image_disclaimer": self._get_right_image_disclaimer(),
             "example_filter_condition": self._get_example_filter_condition(),
+            "example_join_condition": self._get_example_join_condition(),
             "example_reasoning": self._get_example_reasoning(),
             "example_answer": self._get_example_answer(),
         }
@@ -570,7 +688,7 @@ class PromptFactory:
             list[dict]: The image messages for the chat payload.
         """
         # create a message for each image in an input field with an image (or list of image) type
-        image_messages = []
+        image_content = []
         for field_name in input_fields:
             field_value = candidate[field_name]
             field_type = candidate.get_field_type(field_name)
@@ -579,39 +697,39 @@ class PromptFactory:
             if field_type.annotation in [ImageFilepath, ImageFilepath | None]:
                 with open(field_value, "rb") as f:
                     base64_image_str = base64.b64encode(f.read()).decode("utf-8")
-                image_messages.append(
-                    {"role": "user", "type": "image", "content": f"data:image/jpeg;base64,{base64_image_str}"}
+                image_content.append(
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image_str}"}}
                 )
 
             elif field_type.annotation in [list[ImageFilepath], list[ImageFilepath] | None]:
                 for image_filepath in field_value:
                     with open(image_filepath, "rb") as f:
                         base64_image_str = base64.b64encode(f.read()).decode("utf-8")
-                    image_messages.append(
-                        {"role": "user", "type": "image", "content": f"data:image/jpeg;base64,{base64_image_str}"}
+                    image_content.append(
+                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image_str}"}}
                     )
 
             # image url (or list of image urls)
             elif field_type.annotation in [ImageURL, ImageURL | None]:
-                image_messages.append({"role": "user", "type": "image", "content": field_value})
+                image_content.append({"type": "image_url", "image_url": {"url": field_value}})
 
             elif field_type.annotation in [list[ImageURL], list[ImageURL] | None]:
                 for image_url in field_value:
-                    image_messages.append({"role": "user", "type": "image", "content": image_url})
+                    image_content.append({"type": "image_url", "image_url": {"url": image_url}})
 
             # pre-encoded images (or list of pre-encoded images)
             elif field_type.annotation in [ImageBase64, ImageBase64 | None]:
-                image_messages.append(
-                    {"role": "user", "type": "image", "content": f"data:image/jpeg;base64,{field_value}"}
+                image_content.append(
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{field_value}"}}
                 )
 
             elif field_type.annotation in [list[ImageBase64], list[ImageBase64] | None]:
                 for base64_image in field_value:
-                    image_messages.append(
-                        {"role": "user", "type": "image", "content": f"data:image/jpeg;base64,{base64_image}"}
+                    image_content.append(
+                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
                     )
 
-        return image_messages
+        return [{"role": "user", "type": "image", "content": image_content}] if len(image_content) > 0 else []
 
     def _get_system_prompt(self, **format_kwargs) -> str | None:
         """
@@ -630,7 +748,7 @@ class PromptFactory:
 
         return base_prompt.format(**format_kwargs)
 
-    def _get_user_messages(self, candidate: DataRecord, input_fields: list[str], **kwargs) -> str:
+    def _get_user_messages(self, candidate: DataRecord, input_fields: list[str], right_candidate: DataRecord | None, right_input_fields: list[str], **kwargs) -> str:
         """
         Returns a list of messages for the chat payload based on the prompt strategy.
 
@@ -647,10 +765,14 @@ class PromptFactory:
         # get the base prompt template
         base_prompt = self.BASE_USER_PROMPT_MAP.get(self.prompt_strategy)
 
-        # get any image messages for the chat payload (will be an empty list if this is not an image prompt)
-        image_messages = (
-            self._create_image_messages(candidate, input_fields) if self.prompt_strategy.is_image_prompt() else []
-        )
+        # get any image messages for the chat payload (will be an empty list if no image fields exist)
+        image_messages = self._create_image_messages(candidate, input_fields)
+
+        # get any right image messages for the chat payload (will be an empty list if this is not a join image prompt)
+        right_image_messages = []
+        if self.prompt_strategy.is_join_prompt():
+            assert right_candidate is not None, "Right candidate must be provided for join prompts."
+            right_image_messages = self._create_image_messages(right_candidate, right_input_fields)
 
         # get any original messages for critique and refinement operations
         original_messages = kwargs.get("original_messages")
@@ -669,10 +791,19 @@ class PromptFactory:
             user_messages.extend(original_messages)
             user_messages.append({"role": "user", "type": "text", "content": base_prompt_end.format(**kwargs)})
 
-        elif self.prompt_strategy.is_image_prompt():
+        elif self.prompt_strategy.is_image_prompt() and not self.prompt_strategy.is_join_prompt():
             base_prompt_start, base_prompt_end = base_prompt.split("<<image-placeholder>>\n")
             user_messages.append({"role": "user", "type": "text", "content": base_prompt_start.format(**kwargs)})
             user_messages.extend(image_messages)
+            user_messages.append({"role": "user", "type": "text", "content": base_prompt_end.format(**kwargs)})
+
+        elif self.prompt_strategy.is_image_prompt() and self.prompt_strategy.is_join_prompt():
+            # for join image prompts, we may have two sets of images (one from the left candidate and one from the right candidate)
+            base_prompt_start, base_prompt_mid, base_prompt_end = base_prompt.split("<<image-placeholder>>\n")
+            user_messages.append({"role": "user", "type": "text", "content": base_prompt_start.format(**kwargs)})
+            user_messages.extend(image_messages)
+            user_messages.append({"role": "user", "type": "text", "content": base_prompt_mid.format(**kwargs)})
+            user_messages.extend(right_image_messages)
             user_messages.append({"role": "user", "type": "text", "content": base_prompt_end.format(**kwargs)})
 
         else:
@@ -739,7 +870,7 @@ class PromptFactory:
 
         return messages
 
-    def create_messages(self, candidate: DataRecord, output_fields: list[str], **kwargs) -> list[dict]:
+    def create_messages(self, candidate: DataRecord, output_fields: list[str], right_candidate: DataRecord | None = None, **kwargs) -> list[dict]:
         """
         Creates the messages for the chat payload based on the prompt strategy.
 
@@ -753,6 +884,7 @@ class PromptFactory:
         Args:
             candidate (DataRecord): The input record.
             output_fields (list[str]): The output fields.
+            right_candidate (DataRecord | None): The other join input record (only provided for joins).
             kwargs: The keyword arguments provided by the user.
 
         Returns:
@@ -760,6 +892,7 @@ class PromptFactory:
         """
         # compute the set of input fields
         input_fields = self._get_input_fields(candidate, **kwargs)
+        right_input_fields = [] if right_candidate is None else self._get_input_fields(right_candidate, **kwargs)
 
         # if the user provides a prompt, we process that prompt into messages and return them
         if "prompt" in kwargs:
@@ -773,7 +906,7 @@ class PromptFactory:
         messages = []
 
         # compute the full dictionary of format kwargs and add to kwargs
-        format_kwargs = self._get_all_format_kwargs(candidate, input_fields, output_fields, **kwargs)
+        format_kwargs = self._get_all_format_kwargs(candidate, input_fields, output_fields, right_candidate, right_input_fields, **kwargs)
         kwargs = {**kwargs, **format_kwargs}
 
         # generate system message (if applicable)
@@ -782,7 +915,7 @@ class PromptFactory:
             messages.append({"role": "system", "type": "text", "content": system_prompt})
 
         # generate user messages and add to messages
-        user_messages = self._get_user_messages(candidate, input_fields, **kwargs)
+        user_messages = self._get_user_messages(candidate, input_fields, right_candidate, right_input_fields, **kwargs)
         messages.extend(user_messages)
 
         return messages

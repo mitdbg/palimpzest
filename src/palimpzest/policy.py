@@ -111,6 +111,7 @@ class Policy:
             "config": self.get_dict()
         }, indent=2)
 
+
 class MaxQuality(Policy):
     """
     This policy has no constraints and computes the best plan as the one with
@@ -341,29 +342,3 @@ class MinTimeAtFixedQuality(Policy):
             return plan.quality > other_plan.quality
 
         return plan.time < other_plan.time
-
-
-# TODO: add this back in a way which allows users to select a plan from a small pareto optimal set at the end of
-# query optimization
-# class UserChoice(Policy):
-#     """
-#     This policy asks the user to decide which of the pareto-optimal
-#     candidate plans to execute.
-#     """
-
-#     def __str__(self):
-#         return "User Choice"
-
-#     def choose(self, candidatePlans: List[PhysicalPlan]) -> PhysicalPlan:
-#         print("Please select a plan from the following options:")
-#         for idx, plan in enumerate(candidatePlans):
-#             print(f"[{idx}] {plan}")
-#         user_choice = input(f"Please select a plan in [0-{len(candidatePlans) - 1}]: ")
-#         user_choice = int(user_choice)
-#         if user_choice not in range(len(candidatePlans)):
-#             print(
-#                 f"Error: user choice {user_choice} was not a number in the specified range. Please try again."
-#             )
-#             return self.choose(candidatePlans)
-
-#         return candidatePlans[user_choice]

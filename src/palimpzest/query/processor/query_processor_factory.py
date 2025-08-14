@@ -9,9 +9,9 @@ from palimpzest.query.optimizer.cost_model import SampleBasedCostModel
 from palimpzest.query.optimizer.optimizer import Optimizer
 from palimpzest.query.optimizer.optimizer_strategy_type import OptimizationStrategyType
 from palimpzest.query.processor.config import QueryProcessorConfig
-from palimpzest.query.processor.processing_strategy_type import ProcessingStrategyType
 from palimpzest.query.processor.query_processor import QueryProcessor
 from palimpzest.utils.model_helpers import get_models
+from palimpzest.validator.validator import Validator
 
 logger = logging.getLogger(__name__)
 
@@ -33,12 +33,11 @@ class QueryProcessorFactory:
         an exception if the conversion fails.
         """
         strategy_types = {
-            "processing_strategy": ProcessingStrategyType,
             "execution_strategy": ExecutionStrategyType,
             "sentinel_execution_strategy": SentinelExecutionStrategyType,
             "optimizer_strategy": OptimizationStrategyType,
         }
-        for strategy in ["processing_strategy", "execution_strategy", "sentinel_execution_strategy", "optimizer_strategy"]:
+        for strategy in ["execution_strategy", "sentinel_execution_strategy", "optimizer_strategy"]:
             strategy_str = getattr(config, strategy)
             strategy_type = strategy_types[strategy]
             strategy_enum = None
@@ -54,7 +53,7 @@ class QueryProcessorFactory:
         return config
 
     @classmethod
-    def _config_validation_and_normalization(cls, config: QueryProcessorConfig):
+    def _config_validation_and_normalization(cls, config: QueryProcessorConfig, train_dataset: dict[str, Dataset] | None, validator : Validator | None):
         if config.policy is None:
             raise ValueError("Policy is required for optimizer")
         
@@ -63,27 +62,16 @@ class QueryProcessorFactory:
             print("WARNING: Both `progress` and `verbose` are set to True, but only one can be True at a time; defaulting to `progress=True`")
             config.verbose = False
 
-        # handle "auto" defaults for processing and sentinel execution strategies
-        if config.processing_strategy == "auto":
-            config.processing_strategy = "no_sentinel" if config.val_datasource is None else "sentinel"
+        # boolean flag for whether we're performing optimization or not
+        optimization = train_dataset is not None or validator is not None
+        val_based_opt = train_dataset is None and validator is not None
 
+        # handle "auto" default for sentinel execution strategies
         if config.sentinel_execution_strategy == "auto":
-            config.sentinel_execution_strategy = None if config.val_datasource is None else "mab"
+            config.sentinel_execution_strategy = ("validator" if val_based_opt else "mab") if optimization else None
 
         # convert the config values for processing, execution, and optimization strategies to enums
         config = cls._normalize_strategies(config)
-
-        # check that processor uses a supported execution strategy
-        if config.execution_strategy not in config.processing_strategy.valid_execution_strategies():
-            raise ValueError(f"Unsupported `execution_strategy` {config.execution_strategy} for `processing_strategy` {config.processing_strategy}.")
-
-        # check that validation data is provided for sentinel execution
-        if config.val_datasource is None and config.processing_strategy.is_sentinel_strategy():
-            raise ValueError("`val_datasource` is required for SENTINEL processing strategies")
-
-        # check that sentinel execution is provided for sentinel processor
-        if config.sentinel_execution_strategy is None and config.processing_strategy.is_sentinel_strategy():
-            raise ValueError("`sentinel_execution_strategy` is required for SENTINEL processing strategies")
 
         # get available models
         available_models = getattr(config, 'available_models', [])
@@ -121,7 +109,8 @@ class QueryProcessorFactory:
         cls,
         dataset: Dataset,
         config: QueryProcessorConfig | None = None,
-        **kwargs
+        train_dataset: dict[str, Dataset] | None = None,
+        validator: Validator | None = None,
     ) -> QueryProcessor:
         """
         Creates a QueryProcessor with specified processing and execution strategies.
@@ -135,23 +124,27 @@ class QueryProcessorFactory:
             config = QueryProcessorConfig()
 
         # apply any additional keyword arguments to the config and validate its contents
-        config.update(**kwargs)
-        config = cls._config_validation_and_normalization(config)
+        config = cls._config_validation_and_normalization(config, train_dataset, validator)
 
         # create the optimizer, execution strateg(ies), and processor
         optimizer = cls._create_optimizer(config)
         config.execution_strategy = cls._create_execution_strategy(config)
         config.sentinel_execution_strategy = cls._create_sentinel_execution_strategy(config)
-        processor_cls = config.processing_strategy.value
-        processor = processor_cls(dataset, optimizer, **config.to_dict())
+        processor = QueryProcessor(dataset, optimizer, train_dataset=train_dataset, validator=validator, **config.to_dict())
 
         return processor
 
     @classmethod
-    def create_and_run_processor(cls, dataset: Dataset, config: QueryProcessorConfig | None = None, **kwargs) -> DataRecordCollection:
-        # TODO(Jun): Consider to use cache here.
+    def create_and_run_processor(
+        cls,
+        dataset: Dataset,
+        config: QueryProcessorConfig | None = None,
+        train_dataset: dict[str, Dataset] | None = None,
+        validator: Validator | None = None,
+    ) -> DataRecordCollection:
         logger.info(f"Creating processor for dataset: {dataset}")
-        processor = cls.create_processor(dataset=dataset, config=config, **kwargs)
+        dataset._generate_unique_logical_op_ids()
+        processor = cls.create_processor(dataset, config, train_dataset, validator)
         logger.info(f"Created processor: {processor}")
 
         return processor.execute()

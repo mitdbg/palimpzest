@@ -97,7 +97,6 @@ class ContextManager:
             self.index.update(**context_payload)
         else:
             self.index.add(**context_payload)
-        # import pdb; pdb.set_trace()
 
     def update_context(self, id: str, description: str, materialized: bool = True) -> None:
         """

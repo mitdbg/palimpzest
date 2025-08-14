@@ -36,7 +36,7 @@ class BiodexDataset(pz.IterDataset):
         num_samples: int = 5,
         split: str = "test",
     ):
-        super().__init__(biodex_entry_cols)
+        super().__init__(id=f"biodex-{split}", schema=biodex_entry_cols)
 
         if split == "test":
             self.dataset = datasets.load_dataset("BioDEX/BioDEX-Reactions", split=split).to_pandas().to_dict(orient="records")[:num_samples]
@@ -168,7 +168,6 @@ if __name__ == "__main__":
     verbose = args.verbose
     progress = args.progress
     seed = 123 # NOTE: unique to cascades run
-    processing_strategy = "sentinel"
     execution_strategy = "parallel"
     sentinel_execution_strategy = "all"
     optimizer_strategy = "pareto"
@@ -184,7 +183,7 @@ if __name__ == "__main__":
     )
 
     # create validation data source
-    val_datasource = BiodexDataset(
+    train_dataset = BiodexDataset(
         split="train",
         num_samples=5,
     )
@@ -223,8 +222,7 @@ if __name__ == "__main__":
         return {"reaction_labels": final_sorted_results[:k]}
 
     # construct plan
-    plan = pz.Dataset(dataset)
-    plan = plan.retrieve(
+    plan = dataset.retrieve(
         index=index,
         search_func=search_func,
         search_attr="reactions",
@@ -232,14 +230,11 @@ if __name__ == "__main__":
     )
     plan = plan.sem_add_columns(biodex_ranked_reactions_labels_cols, depends_on=["title", "abstract", "fulltext", "reaction_labels"])
 
-
     # only use final op quality
     use_final_op_quality = True
 
     # execute pz plan
     config = pz.QueryProcessorConfig(
-        val_datasource=val_datasource,
-        processing_strategy=processing_strategy,
         optimizer_strategy=optimizer_strategy,
         sentinel_execution_strategy=sentinel_execution_strategy,
         execution_strategy=execution_strategy,
@@ -253,7 +248,7 @@ if __name__ == "__main__":
             Model.LLAMA3_1_8B,
             Model.LLAMA3_3_70B,
             Model.LLAMA3_2_90B_V,
-            Model.MIXTRAL,
+            # Model.MIXTRAL, # NOTE: only available in tag `abacus-paper-experiments`
             # Model.DEEPSEEK_V3,
             Model.DEEPSEEK_R1_DISTILL_QWEN_1_5B,
         ],
@@ -262,16 +257,14 @@ if __name__ == "__main__":
         allow_mixtures=True,
         allow_rag_reduction=True,
         progress=progress,
-    )
-
-    data_record_collection = plan.run(
-        config=config,
         k=-1,
         j=-1,
         sample_budget=5*1014 + 5*7,
         seed=seed,
         exp_name=exp_name,
     )
+
+    data_record_collection = plan.optimize_and_run(config=config, train_dataset=train_dataset, validator=pz.Validator())
 
     print(data_record_collection.to_df())
     data_record_collection.to_df().to_csv(f"priors-data/{exp_name}-output.csv", index=False)

@@ -42,7 +42,7 @@ if __name__ == "__main__":
         config = pz.QueryProcessorConfig(
             policy=policy,
             verbose=True,
-            processing_strategy="streaming",
+            processing_strategy="streaming", # NOTE: processing_strategy and streaming are deprecated; we will need to update this demo
             execution_strategy="sequential",
             optimizer_strategy="pareto",
         )
@@ -53,8 +53,8 @@ if __name__ == "__main__":
         with st.container():
             st.write("### Executed plan: \n")
             # st.write(" " + str(plan).replace("\n", "  \n "))
-            for idx, op in enumerate(plan.operators):
-                strop = f"{idx + 1}. {str(op)}"
+            for topo_idx, op in enumerate(plan):
+                strop = f"{topo_idx + 1}. {str(op)}"
                 strop = strop.replace("\n", "  \n")
                 st.write(strop)
 

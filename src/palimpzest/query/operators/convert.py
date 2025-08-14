@@ -26,14 +26,12 @@ class ConvertOp(PhysicalOperator, ABC):
         self,
         cardinality: Cardinality = Cardinality.ONE_TO_ONE,
         udf: Callable | None = None,
-        desc: str | None = None,
         *args,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
         self.cardinality = cardinality
         self.udf = udf
-        self.desc = desc
 
     def get_id_params(self):
         id_params = super().get_id_params()
@@ -47,7 +45,7 @@ class ConvertOp(PhysicalOperator, ABC):
 
     def get_op_params(self):
         op_params = super().get_op_params()
-        op_params = {"cardinality": self.cardinality, "udf": self.udf, "desc": self.desc, **op_params}
+        op_params = {"cardinality": self.cardinality, "udf": self.udf, **op_params}
 
         return op_params
 
@@ -112,8 +110,8 @@ class ConvertOp(PhysicalOperator, ABC):
         record_op_stats_lst = [
             RecordOpStats(
                 record_id=dr.id,
-                record_parent_id=dr.parent_id,
-                record_source_idx=dr.source_idx,
+                record_parent_ids=dr.parent_ids,
+                record_source_indices=dr.source_indices,
                 record_state=dr.to_dict(include_bytes=False),
                 full_op_id=self.get_full_op_id(),
                 logical_op_id=self.logical_op_id,
@@ -320,7 +318,7 @@ class LLMConvert(ConvertOp):
         return None if self.model is None else self.model.value
 
     def is_image_conversion(self) -> bool:
-        return self.prompt_strategy is PromptStrategy.COT_QA_IMAGE
+        return self.prompt_strategy.is_image_prompt()
 
     def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         """

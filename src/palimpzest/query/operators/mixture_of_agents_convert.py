@@ -76,6 +76,9 @@ class MixtureOfAgentsConvert(LLMConvert):
 
         return op_params
 
+    def is_image_conversion(self) -> bool:
+        return self.proposer_prompt_strategy.is_image_prompt()
+
     def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         """
         Currently, we are using multiple proposer models with different temperatures to synthesize

@@ -34,7 +34,7 @@ output_cols = [
 
 class QuestionDataset(pz.IterDataset):
     def __init__(self, questions_dataset_path: str, num_questions_to_process: int):
-        super().__init__(question_dataset_cols)
+        super().__init__(id="questions", schema=question_dataset_cols)
 
         # `questions_dataset_path` is the path to the file containing the questions which is expected to be a jsonl file.
         # Each line in the file is a JSON object with an "id" and a "question" field.

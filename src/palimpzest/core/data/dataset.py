@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import warnings
+from collections.abc import Iterator
 from typing import Callable
 
 from chromadb.api.models.Collection import Collection
@@ -15,14 +17,15 @@ from palimpzest.query.operators.logical import (
     ConvertScan,
     FilteredScan,
     GroupByAggregate,
+    JoinOp,
     LimitScan,
     LogicalOperator,
-    MapScan,
     Project,
     RetrieveScan,
 )
 from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.utils.hash_helpers import hash_for_serialized_dict
+from palimpzest.validator.validator import Validator
 
 
 # TODO?: remove `schema` from `Dataset` and access it from `operator`?
@@ -82,7 +85,7 @@ class Dataset:
             ValueError: if `sources` is not a `Dataset` or list of `Datasets`
         """
         # set sources
-        self._sources = None
+        self._sources = []
         if isinstance(sources, list):
             self._sources = sources
         elif isinstance(sources, Dataset):
@@ -109,10 +112,15 @@ class Dataset:
 
     @property
     def is_root(self) -> bool:
-        return self._sources is None
+        return len(self._sources) == 0
 
     def __str__(self) -> str:
         return f"Dataset(schema={self._schema}, id={self._id}, op_id={self._operator.get_logical_op_id()})"
+
+    def __iter__(self) -> Iterator[Dataset]:
+        for source in self._sources:
+            yield from source
+        yield self
 
     def _compute_dataset_id(self) -> str:
         """
@@ -120,27 +128,49 @@ class Dataset:
         applied to the `Dataset's` sources.
         """
         return hash_for_serialized_dict({
-            "source_ids": None if self._sources is None else [source.id for source in self._sources],
+            "source_ids": [source.id for source in self._sources],
             "logical_op_id": self._operator.get_logical_op_id(),
         })
 
-    def _set_data_source(self, id: str, source: Dataset) -> None:
+    def _set_root_datasets(self, new_root_datasets: dict[str, Dataset]) -> None:
         """
-        Update the source with the given `id` to use the new `source`. This is used during optimization
-        to re-use the same physical plan while running it on a validation dataset. If the `id` is not
-        present in this `Dataset`'s sources, pass the update through to its sources.
+        Update the root dataset(s) for this dataset with the `new_root_datasets`. This is used during
+        optimization to reuse the same physical plan while running it on a train dataset.
 
         Args:
-            id (str): the identifier for the source `Dataset`
-            source (`Dataset`): the (validation) dataset
+            new_root_datasets (dict[str, Dataset]): the new root datasets for this dataset.
         """
         new_sources = []
         for old_source in self._sources:
-            if id == old_source.id:
-                new_sources.append(source)
+            if old_source.id in new_root_datasets:
+                new_sources.append(new_root_datasets[old_source.id])
             else:
-                old_source._set_data_source(id, source)
+                old_source._set_root_datasets(new_root_datasets)
                 new_sources.append(old_source)
+        self._sources = new_sources
+
+    def _generate_unique_logical_op_ids(self, topo_idx: int | None = None) -> None:
+        """
+        Generate unique operation IDs for all operators in this dataset and its sources.
+        This is used to ensure that each operator can be uniquely identified during execution.
+        """
+        # generate the unique op ids for all sources' operators
+        for source in self._sources:
+            topo_idx = source._generate_unique_logical_op_ids(topo_idx)
+            topo_idx += 1
+
+        # if topo_idx is None, this is the first call, so we initialize it to 0
+        if topo_idx is None:
+            topo_idx = 0
+
+        # compute this operator's unique operator id
+        this_unique_logical_op_id = f"{topo_idx}-{self._operator.get_logical_op_id()}"
+
+        # update the unique logical op id for this operator
+        self._operator.set_unique_logical_op_id(this_unique_logical_op_id)
+
+        # return the current unique full_op_id for this operator
+        return topo_idx
 
     # TODO
     def _resolve_depends_on(self, depends_on: list[str]) -> list[str]:
@@ -149,12 +179,56 @@ class Dataset:
         """
         return []
 
+    def _get_root_datasets(self) -> dict[str, Dataset]:
+        """Return a mapping from the id --> Dataset for all root datasets."""
+        if self.is_root:
+            return {self.id: self}
+
+        root_datasets = {}
+        for source in self._sources:
+            child_root_datasets = source._get_root_datasets()
+            root_datasets = {**root_datasets, **child_root_datasets}
+
+        return root_datasets
+
+    def get_upstream_datasets(self) -> list[Dataset]:
+        """
+        Get the list of all upstream datasets that are sources to this dataset.
+        """
+        # recursively get the upstream datasets
+        upstream = []
+        for source in self._sources:
+            upstream.extend(source.get_upstream_datasets())
+            upstream.append(source)
+        return upstream
+
     def copy(self):
         return Dataset(
-            sources=None if self._sources is None else [source.copy() for source in self._sources],
-            operator=self._operator,
+            sources=[source.copy() for source in self._sources],
+            operator=self._operator.copy(),
             schema=self._schema,
         )
+
+    def sem_join(self, other: Dataset, condition: str, depends_on: str | list[str] | None = None) -> Dataset:
+        """
+        Perform a semantic (inner) join on the specified join predicate
+        """
+        # enforce type for depends_on
+        if isinstance(depends_on, str):
+            depends_on = [depends_on]
+
+        # construct new output schema
+        combined_schema = union_schemas([self.schema, other.schema], join=True)
+
+        # construct logical operator
+        operator = JoinOp(
+            input_schema=combined_schema,
+            output_schema=combined_schema,
+            condition=condition,
+            depends_on=depends_on,
+        )
+
+        return Dataset(sources=[self, other], operator=operator, schema=combined_schema)
 
     def filter(
         self,
@@ -203,22 +277,15 @@ class Dataset:
 
         return Dataset(sources=[self], operator=operator, schema=self.schema)
 
-    def sem_add_columns(self, cols: list[dict] | type[BaseModel],
-                        cardinality: Cardinality = Cardinality.ONE_TO_ONE,
-                        depends_on: str | list[str] | None = None) -> Dataset:
-        """
-        Add new columns by specifying the column names, descriptions, and types.
-        The column will be computed during the execution of the Dataset.
-        Example:
-            sem_add_columns(
-                [{'name': 'greeting', 'desc': 'The greeting message', 'type': str},
-                 {'name': 'age', 'desc': 'The age of the person', 'type': int},
-                 {'name': 'full_name', 'desc': 'The name of the person', 'type': str}]
-            )
-        """
+    def _sem_map(self, cols: list[dict] | type[BaseModel] | None,
+                 cardinality: Cardinality,
+                 depends_on: str | list[str] | None = None) -> Dataset:
+        """Execute the semantic map operation with the appropriate cardinality."""
         # construct new output schema
         new_output_schema = None
-        if isinstance(cols, list):
+        if cols is None:
+            new_output_schema = self.schema
+        elif isinstance(cols, list):
             cols = create_schema_from_fields(cols)
             new_output_schema = union_schemas([self.schema, cols])
         elif issubclass(cols, BaseModel):
@@ -241,36 +308,81 @@ class Dataset:
 
         return Dataset(sources=[self], operator=operator, schema=new_output_schema)
 
-    def add_columns(self, udf: Callable,
-                    cols: list[dict] | type[BaseModel],
-                    cardinality: Cardinality = Cardinality.ONE_TO_ONE,
-                    depends_on: str | list[str] | None = None) -> Dataset:
-        """
-        Add new columns by specifying UDFs.
 
-        Examples:
-            add_columns(
-                udf=compute_personal_greeting,
+    def sem_add_columns(self, cols: list[dict] | type[BaseModel],
+                        cardinality: Cardinality = Cardinality.ONE_TO_ONE,
+                        depends_on: str | list[str] | None = None) -> Dataset:
+        """
+        NOTE: we are renaming this function to `sem_map` and deprecating `sem_add_columns` in the next
+        release of PZ. To update your code, simply change your calls from `.sem_add_columns(...)` to `.sem_map(...)`.
+        The function arguments will stay the same.
+
+        Add new columns by specifying the column names, descriptions, and types.
+        The column will be computed during the execution of the Dataset.
+        Example:
+            sem_add_columns(
+                [{'name': 'greeting', 'desc': 'The greeting message', 'type': str},
+                 {'name': 'age', 'desc': 'The age of the person', 'type': int},
+                 {'name': 'full_name', 'desc': 'The name of the person', 'type': str}]
+            )
+        """
+        # issue deprecation warning
+        warnings.warn(
+            "we are renaming this function to `sem_map` and deprecating `sem_add_columns` in the next"
+            " release of PZ. To update your code, simply change your calls from `.sem_add_columns(...)`"
+            " to `.sem_map(...)`. The function arguments will stay the same.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+
+        return self._sem_map(cols, cardinality, depends_on)
+
+    def sem_map(self, cols: list[dict] | type[BaseModel], depends_on: str | list[str] | None = None) -> Dataset:
+        """
+        Compute new field(s) by specifying their names, descriptions, and types. For each input there will
+        be one output. The field(s) will be computed during the execution of the Dataset.
+
+        Example:
+            sem_map(
+                [{'name': 'greeting', 'desc': 'The greeting message', 'type': str},
+                 {'name': 'age', 'desc': 'The age of the person', 'type': int},
+                 {'name': 'full_name', 'desc': 'The name of the person', 'type': str}]
+            )
+        """
+        return self._sem_map(cols, Cardinality.ONE_TO_ONE, depends_on)
+
+    def sem_flat_map(self, cols: list[dict] | type[BaseModel], depends_on: str | list[str] | None = None) -> Dataset:
+        """
+        Compute new field(s) by specifying their names, descriptions, and types. For each input there will
+        be one or more output(s). The field(s) will be computed during the execution of the Dataset.
+
+        Example:
+            sem_flat_map(
                 cols=[
-                    {'name': 'greeting', 'description': 'The greeting message', 'type': str},
-                    {'name': 'age', 'description': 'The age of the person', 'type': int},
-                    {'name': 'full_name', 'description': 'The name of the person', 'type': str},
+                    {'name': 'author_name', 'description': 'The name of the author', 'type': str},
+                    {'name': 'institution', 'description': 'The institution of the author', 'type': str},
+                    {'name': 'email', 'description': 'The author's email', 'type': str},
                 ]
             )
         """
-        # sanity check inputs
-        if udf is None or cols is None:
-            raise ValueError("`udf` and `cols` must be provided for add_columns.")
+        return self._sem_map(cols, Cardinality.ONE_TO_MANY, depends_on)
 
+    def _map(self, udf: Callable,
+            cols: list[dict] | type[BaseModel] | None,
+            cardinality: Cardinality,
+            depends_on: str | list[str] | None = None) -> Dataset:
+        """Execute the map operation with the appropriate cardinality."""
         # construct new output schema
         new_output_schema = None
-        if isinstance(cols, list):
+        if cols is None:
+            new_output_schema = self.schema
+        elif isinstance(cols, list):
             cols = create_schema_from_fields(cols)
             new_output_schema = union_schemas([self.schema, cols])
         elif issubclass(cols, BaseModel):
             new_output_schema = union_schemas([self.schema, cols])
         else:
-            raise ValueError("`cols` must be a list of dictionaries or a BaseModel.")
+            raise ValueError("`cols` must be a list of dictionaries, a BaseModel, or None.")
 
         # enforce type for depends_on
         if isinstance(depends_on, str):
@@ -287,21 +399,91 @@ class Dataset:
 
         return Dataset(sources=[self], operator=operator, schema=new_output_schema)
 
-    def map(self, udf: Callable) -> Dataset:
+    def add_columns(self, udf: Callable,
+                    cols: list[dict] | type[BaseModel] | None,
+                    cardinality: Cardinality = Cardinality.ONE_TO_ONE,
+                    depends_on: str | list[str] | None = None) -> Dataset:
         """
-        Apply a UDF map function.
+        NOTE: we are renaming this function to `map` and deprecating `add_columns` in the next
+        release of PZ. To update your code, simply change your calls from `.add_columns(...)` to `.map(...)`.
+        The function arguments will stay the same.
+
+        Compute new fields (or update existing ones) with a UDF. For each input, this function will compute one output.
+
+        Set `cols=None` if your add_columns operation is not computing any new fields.
 
         Examples:
-            map(udf=clean_column_values)
+            add_columns(
+                udf=compute_personal_greeting,
+                cols=[
+                    {'name': 'greeting', 'description': 'The greeting message', 'type': str},
+                    {'name': 'age', 'description': 'The age of the person', 'type': int},
+                    {'name': 'full_name', 'description': 'The name of the person', 'type': str},
+                ]
+            )
+        """
+        # issue deprecation warning
+        warnings.warn(
+            "we are renaming this function to `map` and deprecating `add_columns` in the next"
+            " release of PZ. To update your code, simply change your calls from `.add_columns(...)`"
+            " to `.map(...)`. The function arguments will stay the same.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+
+        # sanity check inputs
+        if udf is None:
+            raise ValueError("`udf` must be provided for add_columns.")
+
+        return self._map(udf, cols, cardinality, depends_on)
+
+    def map(self, udf: Callable,
+            cols: list[dict] | type[BaseModel] | None,
+            depends_on: str | list[str] | None = None) -> Dataset:
+        """
+        Compute new fields (or update existing ones) with a UDF. For each input, this function will compute one output.
+
+        Set `cols=None` if your map is not computing any new fields.
+
+        Examples:
+            map(
+                udf=compute_personal_greeting,
+                cols=[
+                    {'name': 'greeting', 'description': 'The greeting message', 'type': str},
+                    {'name': 'age', 'description': 'The age of the person', 'type': int},
+                    {'name': 'full_name', 'description': 'The name of the person', 'type': str},
+                ]
+            )
         """
         # sanity check inputs
         if udf is None:
             raise ValueError("`udf` must be provided for map.")
 
-        # construct logical operator
-        operator = MapScan(input_schema=self.schema, output_schema=self.schema, udf=udf)
+        return self._map(udf, cols, Cardinality.ONE_TO_ONE, depends_on)
 
-        return Dataset(sources=[self], operator=operator, schema=self.schema)
+    def flat_map(self, udf: Callable,
+            cols: list[dict] | type[BaseModel] | None,
+            depends_on: str | list[str] | None = None) -> Dataset:
+        """
+        Compute new fields (or update existing ones) with a UDF. For each input, this function will compute one or more outputs.
+
+        Set `cols=None` if your flat_map is not computing any new fields.
+
+        Examples:
+            flat_map(
+                udf=extract_paper_authors,
+                cols=[
+                    {'name': 'author_name', 'description': 'The name of the author', 'type': str},
+                    {'name': 'institution', 'description': 'The institution of the author', 'type': str},
+                    {'name': 'email', 'description': 'The author's email', 'type': str},
+                ]
+            )
+        """
+        # sanity check inputs
+        if udf is None:
+            raise ValueError("`udf` must be provided for map.")
+
+        return self._map(udf, cols, Cardinality.ONE_TO_MANY, depends_on)
 
     def count(self) -> Dataset:
         """Apply a count aggregation to this set"""
@@ -379,4 +561,44 @@ class Dataset:
         if policy is not None:
             kwargs["policy"] = policy
 
-        return QueryProcessorFactory.create_and_run_processor(self, config, **kwargs)
+        return QueryProcessorFactory.create_and_run_processor(self, config)
+
+    def optimize_and_run(self, train_dataset: dict[str, Dataset] | Dataset | None = None, validator: Validator | None = None, config: QueryProcessorConfig | None = None, **kwargs):
+        """Optimize the PZ program using the train_dataset and validator before running the optimized plan."""
+        # TODO: this import currently needs to be here to avoid a circular import; we should fix this in a subsequent PR
+        from palimpzest.query.processor.query_processor_factory import QueryProcessorFactory
+
+        # confirm that either train_dataset or validator is provided
+        assert train_dataset is not None or validator is not None, "Must provide at least one of train_dataset or validator to use optimize_and_run()"
+
+        # validate the train_dataset has one input for each source dataset and normalize its type to be a dict
+        if train_dataset is not None:
+            root_datasets = self._get_root_datasets()
+            if isinstance(train_dataset, Dataset) and len(root_datasets) > 1:
+                raise ValueError(
+                    "For plans with more than one root dataset, `train_dataset` must be a dictionary mapping"
+                    " {'dataset_id' --> Dataset} for all root Datasets"
+                )
+
+            elif isinstance(train_dataset, Dataset):
+                root_dataset_id = list(root_datasets.values())[0].id
+                if train_dataset.id != root_dataset_id:
+                    warnings.warn(
+                        f"train_dataset.id={train_dataset.id} does not match root dataset id={root_dataset_id}\n"
+                        f"Setting train_dataset to be the training data for root dataset with id={root_dataset_id} anyways.",
+                        stacklevel=2,
+                    )
+                train_dataset = {root_dataset_id: train_dataset}
+
+            elif not all(dataset_id in train_dataset for dataset_id in root_datasets):
+                missing_ids = [dataset_id for dataset_id in root_datasets if dataset_id not in train_dataset]
+                raise ValueError(
+                    f"`train_dataset` is missing the following root dataset id(s): {missing_ids}"
+                )
+
+        # as syntactic sugar, we will allow some keyword arguments to parameterize our policies
+        policy = construct_policy_from_kwargs(**kwargs)
+        if policy is not None:
+            kwargs["policy"] = policy
+
+        return QueryProcessorFactory.create_and_run_processor(self, config, train_dataset, validator)

@@ -28,7 +28,8 @@ class ScanPhysicalOp(PhysicalOperator, ABC):
         return op
 
     def get_id_params(self):
-        return super().get_id_params()
+        id_params = super().get_id_params()
+        return {"datasource_id": self.datasource.id, **id_params}
 
     def get_op_params(self):
         op_params = super().get_op_params()
@@ -73,15 +74,15 @@ class ScanPhysicalOp(PhysicalOperator, ABC):
         assert all([field in item_field_dict for field in output_field_names]), f"Some fields in Dataset schema not present in item!\n - Dataset fields: {output_field_names}\n - Item fields: {list(item.keys())}"
 
         # construct a DataRecord from the item
-        dr = DataRecord(self.output_schema, source_idx=idx)
+        dr = DataRecord(self.output_schema, source_indices=[f"{self.datasource.id}-{idx}"])
         for field in output_field_names:
             setattr(dr, field, item_field_dict[field])
 
         # create RecordOpStats objects
         record_op_stats = RecordOpStats(
             record_id=dr.id,
-            record_parent_id=dr.parent_id,
-            record_source_idx=dr.source_idx,
+            record_parent_ids=dr.parent_ids,
+            record_source_indices=dr.source_indices,
             record_state=dr.to_dict(include_bytes=False),
             full_op_id=self.get_full_op_id(),
             logical_op_id=self.logical_op_id,
@@ -172,15 +173,15 @@ class ContextScanOp(PhysicalOperator):
         """
         # construct a DataRecord from the context
         start_time = time.time()
-        dr = DataRecord(self.output_schema, source_idx=0)
+        dr = DataRecord(self.output_schema, source_indices=[f"{self.context.id}-{0}"])
         dr.context = self.context
         end_time = time.time()
 
         # create RecordOpStats objects
         record_op_stats = RecordOpStats(
             record_id=dr.id,
-            record_parent_id=dr.parent_id,
-            record_source_idx=dr.source_idx,
+            record_parent_ids=dr.parent_ids,
+            record_source_indices=dr.source_indices,
             record_state=dr.to_dict(include_bytes=False),
             full_op_id=self.get_full_op_id(),
             logical_op_id=self.logical_op_id,

@@ -16,7 +16,7 @@ class AggregateOp(PhysicalOperator):
     __call__ methods. Thus, we use a slightly modified abstract base class for
     these operators.
     """
-    def __call__(self, candidates: DataRecordSet) -> DataRecordSet:
+    def __call__(self, candidates: list[DataRecord]) -> DataRecordSet:
         raise NotImplementedError("Using __call__ from abstract method")
 
 
@@ -81,7 +81,7 @@ class ApplyGroupByOp(AggregateOp):
         else:
             raise Exception("Unknown agg function " + func)
 
-    def __call__(self, candidates: DataRecordSet) -> DataRecordSet:
+    def __call__(self, candidates: list[DataRecord]) -> DataRecordSet:
         start_time = time.time()
 
         # build group array
@@ -107,16 +107,13 @@ class ApplyGroupByOp(AggregateOp):
             agg_state[group] = state
 
         # return list of data records (one per group)
-        drs = []
+        drs: list[DataRecord] = []
         group_by_fields = self.group_by_sig.group_by_fields
         agg_fields = self.group_by_sig.get_agg_field_names()
         for g in agg_state:
-            # NOTE: this will set the parent_id and source_idx to be the id of the final source record;
-            #       in the near future we may want to have parent_id accept a list of ids
-            dr = DataRecord.from_parent(
+            dr = DataRecord.from_agg_parents(
                 schema=self.group_by_sig.output_schema(),
-                parent_record=candidates[-1],
-                project_cols=[],
+                parent_records=candidates,
             )
             for i in range(0, len(g)):
                 k = g[i]
@@ -134,8 +131,8 @@ class ApplyGroupByOp(AggregateOp):
         for dr in drs:
             record_op_stats = RecordOpStats(
                 record_id=dr.id,
-                record_parent_id=dr.parent_id,
-                record_source_idx=dr.source_idx,
+                record_parent_ids=dr.parent_ids,
+                record_source_indices=dr.source_indices,
                 record_state=dr.to_dict(include_bytes=False),
                 full_op_id=self.get_full_op_id(),
                 logical_op_id=self.logical_op_id,
@@ -190,7 +187,7 @@ class AverageAggregateOp(AggregateOp):
             quality=1.0,
         )
 
-    def __call__(self, candidates: DataRecordSet) -> DataRecordSet:
+    def __call__(self, candidates: list[DataRecord]) -> DataRecordSet:
         start_time = time.time()
 
         # NOTE: we currently do not guarantee that input values conform to their specified type;
@@ -198,9 +195,7 @@ class AverageAggregateOp(AggregateOp):
         # NOTE: right now we perform a check in the constructor which enforces that the input_schema
         #       has a single field which is numeric in nature; in the future we may want to have a
         #       cleaner way of computing the value (rather than `float(list(candidate...))` below)
-        # NOTE: this will set the parent_id and source_idx to be the id of the final source record;
-        #       in the near future we may want to have parent_id accept a list of ids
-        dr = DataRecord.from_parent(schema=Average, parent_record=candidates[-1], project_cols=[])
+        dr = DataRecord.from_agg_parents(schema=Average, parent_records=candidates)
         summation, total = 0, 0
         for candidate in candidates:
             try:
@@ -213,8 +208,8 @@ class AverageAggregateOp(AggregateOp):
         # create RecordOpStats object
         record_op_stats = RecordOpStats(
             record_id=dr.id,
-            record_parent_id=dr.parent_id,
-            record_source_idx=dr.source_idx,
+            record_parent_ids=dr.parent_ids,
+            record_source_indices=dr.source_indices,
             record_state=dr.to_dict(include_bytes=False),
             full_op_id=self.get_full_op_id(),
             logical_op_id=self.logical_op_id,
@@ -259,19 +254,18 @@ class CountAggregateOp(AggregateOp):
             quality=1.0,
         )
 
-    def __call__(self, candidates: DataRecordSet) -> DataRecordSet:
+    def __call__(self, candidates: list[DataRecord]) -> DataRecordSet:
         start_time = time.time()
 
-        # NOTE: this will set the parent_id to be the id of the final source record;
-        #       in the near future we may want to have parent_id accept a list of ids
-        dr = DataRecord.from_parent(schema=Count, parent_record=candidates[-1], project_cols=[])
+        # create new DataRecord
+        dr = DataRecord.from_agg_parents(schema=Count, parent_records=candidates)
         dr.count = len(candidates)
 
         # create RecordOpStats object
         record_op_stats = RecordOpStats(
             record_id=dr.id,
-            record_parent_id=dr.parent_id,
-            record_source_idx=dr.source_idx,
+            record_parent_ids=dr.parent_ids,
+            record_source_indices=dr.source_indices,
             record_state=dr.to_dict(include_bytes=False),
             full_op_id=self.get_full_op_id(),
             logical_op_id=self.logical_op_id,

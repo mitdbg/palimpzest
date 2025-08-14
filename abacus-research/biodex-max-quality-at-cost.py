@@ -42,7 +42,7 @@ class BiodexDataset(pz.IterDataset):
         shuffle: bool = False,
         seed: int = 42,
     ):
-        super().__init__(biodex_entry_cols)
+        super().__init__(id=f"biodex-{split}", schema=biodex_entry_cols)
 
         self.dataset = datasets.load_dataset("BioDEX/BioDEX-Reactions", split=split).to_pandas()
         if shuffle:
@@ -165,12 +165,6 @@ if __name__ == "__main__":
     parser.add_argument("--verbose", default=False, action="store_true", help="Print verbose output")
     parser.add_argument("--progress", default=False, action="store_true", help="Print progress output")
     parser.add_argument(
-        "--processing-strategy",
-        default="sentinel",
-        type=str,
-        help="The engine to use. One of sentinel or no_sentinel",
-    )
-    parser.add_argument(
         "--execution-strategy",
         default="parallel",
         type=str,
@@ -249,7 +243,6 @@ if __name__ == "__main__":
     k = args.k
     j = args.j
     sample_budget = args.sample_budget
-    processing_strategy = args.processing_strategy
     execution_strategy = args.execution_strategy
     sentinel_execution_strategy = args.sentinel_execution_strategy
     optimizer_strategy = args.optimizer_strategy
@@ -277,7 +270,7 @@ if __name__ == "__main__":
     )
 
     # create validation data source
-    val_datasource = BiodexDataset(
+    train_dataset = BiodexDataset(
         split="train",
         num_samples=val_examples,
         shuffle=True,
@@ -328,8 +321,7 @@ if __name__ == "__main__":
         return {"reaction_labels": final_sorted_results[:k]}
 
     # construct plan
-    plan = pz.Dataset(dataset)
-    plan = plan.sem_add_columns(biodex_reactions_cols)
+    plan = dataset.sem_add_columns(biodex_reactions_cols)
     plan = plan.retrieve(
         index=index,
         search_func=search_func,
@@ -347,8 +339,6 @@ if __name__ == "__main__":
     # execute pz plan
     config = pz.QueryProcessorConfig(
         policy=policy,
-        val_datasource=val_datasource,
-        processing_strategy=processing_strategy,
         optimizer_strategy=optimizer_strategy,
         sentinel_execution_strategy=sentinel_execution_strategy,
         execution_strategy=execution_strategy,
@@ -360,7 +350,7 @@ if __name__ == "__main__":
             Model.GPT_4o_MINI,
             Model.LLAMA3_1_8B,
             Model.LLAMA3_3_70B,
-            Model.MIXTRAL,
+            # Model.MIXTRAL, # NOTE: only available in tag `abacus-paper-experiments`
             Model.DEEPSEEK_R1_DISTILL_QWEN_1_5B,
         ],
         allow_bonded_query=True,
@@ -368,10 +358,6 @@ if __name__ == "__main__":
         allow_mixtures=True,
         allow_rag_reduction=True,
         progress=progress,
-    )
-
-    data_record_collection = plan.run(
-        config=config,
         k=k,
         j=j,
         sample_budget=sample_budget,
@@ -379,6 +365,8 @@ if __name__ == "__main__":
         exp_name=exp_name,
         priors=priors,
     )
+
+    data_record_collection = plan.run(config=config, train_dataset=train_dataset, validator=pz.Validator())
 
     print(data_record_collection.to_df())
     data_record_collection.to_df().to_csv(f"max-quality-at-cost-data/{exp_name}-output.csv", index=False)
