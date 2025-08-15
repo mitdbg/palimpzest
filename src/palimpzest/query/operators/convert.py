@@ -346,7 +346,7 @@ class LLMConvert(ConvertOp):
         cardinality = selectivity * source_op_cost_estimates.cardinality
 
         # estimate quality of output based on the strength of the model being used
-        quality = (MODEL_CARDS[model_name]["overall"] / 100.0) * source_op_cost_estimates.quality
+        quality = (MODEL_CARDS[model_name]["overall"] / 100.0)
 
         return OperatorCostEstimates(
             cardinality=cardinality,

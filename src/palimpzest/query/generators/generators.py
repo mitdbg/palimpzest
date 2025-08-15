@@ -298,7 +298,7 @@ class Generator(Generic[ContextType, InputType]):
         start_time = time.time()
         completion = None
         try:
-            completion_kwargs = {"temperature": kwargs.get("temperature", 0.0)}
+            completion_kwargs = {} if self.model.is_o_model() else {"temperature": kwargs.get("temperature", 0.0)}
             completion = litellm.completion(model=self.model_name, messages=messages, **completion_kwargs)
             end_time = time.time()
             logger.debug(f"Generated completion in {end_time - start_time:.2f} seconds")

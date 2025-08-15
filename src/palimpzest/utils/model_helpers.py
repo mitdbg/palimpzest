@@ -44,25 +44,31 @@ def get_models(include_embedding: bool = False) -> list[Model]:
 
 # The order is the priority of the model
 TEXT_MODEL_PRIORITY = [
-    # Model.o1,
+    Model.GPT_5,
     Model.GEMINI_2_5_PRO,
+    Model.GPT_5_MINI,
     Model.o4_MINI,
-    Model.LLAMA_4_MAVERICK,
-    Model.GEMINI_2_0_FLASH,
+    Model.GEMINI_2_5_FLASH,
     Model.CLAUDE_3_7_SONNET,
-    Model.GPT_4o,
-    Model.GPT_4o_MINI,
     Model.CLAUDE_3_5_SONNET,
-    Model.LLAMA3_3_70B,
+    Model.GEMINI_2_0_FLASH,
+    Model.LLAMA_4_MAVERICK,
+    Model.GPT_4o,
     Model.DEEPSEEK_V3,
-    Model.LLAMA3_2_3B,
+    Model.GPT_4o_MINI,
+    Model.CLAUDE_3_5_HAIKU,
+    Model.LLAMA3_3_70B,
     Model.LLAMA3_1_8B,
     Model.DEEPSEEK_R1_DISTILL_QWEN_1_5B,
+    Model.LLAMA3_2_3B,
 ]
 
 VISION_MODEL_PRIORITY = [
+    Model.GPT_5,
     Model.GEMINI_2_5_PRO,
+    Model.GPT_5_MINI,
     Model.o4_MINI,
+    Model.GEMINI_2_5_FLASH,
     Model.LLAMA_4_MAVERICK,
     Model.GEMINI_2_0_FLASH,
     Model.GPT_4o,

@@ -1,17 +1,17 @@
 import logging
 from abc import ABC, abstractmethod
-from concurrent.futures import ThreadPoolExecutor, wait
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import numpy as np
 from chromadb.api.models.Collection import Collection
 
-from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS, Cardinality
+from palimpzest.constants import Cardinality
 from palimpzest.core.data.dataset import Dataset
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
-from palimpzest.core.models import PlanStats, SentinelPlanStats
+from palimpzest.core.models import GenerationStats, PlanStats, SentinelPlanStats
 from palimpzest.policy import Policy
 from palimpzest.query.operators.convert import LLMConvert
-from palimpzest.query.operators.filter import FilterOp, LLMFilter
+from palimpzest.query.operators.filter import LLMFilter
 from palimpzest.query.operators.join import JoinOp
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.retrieve import RetrieveOp
@@ -108,108 +108,11 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
         # progress manager used to track progress of the execution
         self.progress_manager: PZSentinelProgressManager | None = None
 
-    def _old_compute_quality(
-            self,
-            physical_op_cls: type[PhysicalOperator],
-            record_set: DataRecordSet,
-            target_record_set: DataRecordSet,
-        ) -> DataRecordSet:
-        """
-        Compute the quality for the given `record_set` by comparing it to the `target_record_set`.
-
-        Update the record_set by assigning the quality to each entry in its record_op_stats and
-        returning the updated record_set.
-        """
-        # if this operation failed
-        if len(record_set) == 0:
-            record_set.record_op_stats[0].quality = 0.0
-
-        # if this operation is a filter:
-        # - return 1.0 if there's a match in the expected output which this operator does not filter out and 0.0 otherwise
-        elif issubclass(physical_op_cls, FilterOp):
-            # NOTE: we know that record_set.data_records will contain a single entry for a filter op
-            record = record_set.data_records[0]
-
-            # search for a record in the target with the same set of fields
-            found_match_in_target = False
-            for target_record in target_record_set:
-                all_correct = True
-                for field, value in record.field_values.items():
-                    if value != target_record[field]:
-                        all_correct = False
-                        break
-
-                if all_correct:
-                    found_match_in_target = target_record.passed_operator
-                    break
-
-            # set quality based on whether we found a match in the target and return
-            record_set.record_op_stats[0].quality = int(record.passed_operator == found_match_in_target)
-
-            return record_set
-
-        # if this is a successful convert operation
-        else:
-            # NOTE: the following computation assumes we do not project out computed values
-            #       (and that the validation examples provide all computed fields); even if
-            #       a user program does add projection, we can ignore the projection on the
-            #       validation dataset and use the champion model (as opposed to the validation
-            #       output) for scoring fields which have their values projected out
-
-            # GREEDY ALGORITHM
-            # for each record in the expected output, we look for the computed record which maximizes the quality metric;
-            # once we've identified that computed record we remove it from consideration for the next expected output
-            field_to_score_fn = target_record_set.get_field_to_score_fn()
-            for target_record in target_record_set:
-                best_quality, best_record_op_stats = 0.0, None
-                for record_op_stats in record_set.record_op_stats:
-                    # if we already assigned this record a quality, skip it
-                    if record_op_stats.quality is not None:
-                        continue
-
-                    # compute number of matches between this record's computed fields and this expected record's outputs
-                    total_quality = 0
-                    for field in record_op_stats.generated_fields:
-                        computed_value = record_op_stats.record_state.get(field, None)
-                        expected_value = target_record[field]
-
-                        # get the metric function for this field
-                        score_fn = field_to_score_fn.get(field, "exact")
-
-                        # compute exact match
-                        if score_fn == "exact":
-                            total_quality += int(computed_value == expected_value)
-
-                        # compute UDF metric
-                        elif callable(score_fn):
-                            total_quality += score_fn(computed_value, expected_value)
-
-                        # otherwise, throw an exception
-                        else:
-                            raise Exception(f"Unrecognized score_fn: {score_fn}")
-
-                    # compute recall and update best seen so far
-                    quality = total_quality / len(record_op_stats.generated_fields)
-                    if quality > best_quality:
-                        best_quality = quality
-                        best_record_op_stats = record_op_stats
-
-                # set best_quality as quality for the best_record_op_stats
-                if best_record_op_stats is not None:
-                    best_record_op_stats.quality = best_quality
-
-        # for any records which did not receive a quality, set it to 0.0 as these are unexpected extras
-        for record_op_stats in record_set.record_op_stats:
-            if record_op_stats.quality is None:
-                record_op_stats.quality = 0.0
-
-        return record_set
-
     def _score_quality(
         self,
         validator: Validator,
         source_indices_to_record_sets: dict[tuple[str], list[tuple[DataRecordSet, PhysicalOperator]]],
-    ) -> dict[int, list[DataRecordSet]]:
+    ) -> tuple[dict[int, list[DataRecordSet]], GenerationStats]:
         # extract information about the logical operation performed at this stage of the sentinel plan;
         # NOTE: we can infer these fields from context clues, but in the long-term we should have a more
         #       principled way of getting these directly from attributes either stored in the sentinel_plan
@@ -222,34 +125,103 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
                 and not isinstance(op, JoinOp)
             )
 
+        # create minimal set of futures necessary to compute quality of each output record
+        futures, full_hashes, full_hash_to_bool_output = [], set(), {}
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            for _, record_set_tuples in source_indices_to_record_sets.items():
+                for record_set, op in record_set_tuples:
+                    # if this operation does not involve an LLM, every record_op_stats object gets perfect quality
+                    if is_perfect_quality_op(op):
+                        for record_op_stats in record_set.record_op_stats:
+                            record_op_stats.quality = 1.0
+                        continue
+
+                    # if the operation failed, assign 0.0 quality
+                    if len(record_set) == 0:
+                        record_set.record_op_stats[0].quality = 0.0
+                        continue
+
+                    # create future for map
+                    if isinstance(op, LLMConvert) and op.cardinality is Cardinality.ONE_TO_ONE:
+                        fields = op.generated_fields
+                        input_record: DataRecord = record_set.input
+                        output = record_set.data_records[0].to_json_str(project_cols=fields, bytes_to_str=True, sorted=True)
+                        full_hash = f"{hash(input_record)}{hash(output)}"
+                        if full_hash not in full_hashes:
+                            full_hashes.add(full_hash)
+                            futures.append(executor.submit(validator._score_map, op, fields, input_record, output, full_hash))
+
+                    # create future for flat map
+                    elif isinstance(op, LLMConvert) and op.cardinality is Cardinality.ONE_TO_MANY:
+                        fields = op.generated_fields
+                        input_record: DataRecord = record_set.input
+                        output = []
+                        for data_record in record_set.data_records:
+                            output.append(data_record.to_json_str(project_cols=fields, bytes_to_str=True, sorted=True))
+                        full_hash = f"{hash(input_record)}{hash(tuple(sorted(output)))}"
+                        if full_hash not in full_hashes:
+                            full_hashes.add(full_hash)
+                            futures.append(executor.submit(validator._score_flat_map, op, fields, input_record, output, full_hash))
+
+                    # create future for retrieve
+                    elif isinstance(op, RetrieveOp):
+                        fields = op.generated_fields
+                        input_record: DataRecord = record_set.input
+                        output = record_set.data_records[0].to_json_str(project_cols=fields, bytes_to_str=True, sorted=True)
+                        full_hash = f"{hash(input_record)}{hash(output)}"
+                        if full_hash not in full_hashes:
+                            full_hashes.add(full_hash)
+                            futures.append(executor.submit(validator._score_retrieve, op, fields, input_record, output, full_hash))
+
+                    # create future for filter
+                    elif isinstance(op, LLMFilter):
+                        filter_str = op.filter_obj.filter_condition
+                        input_record: DataRecord = record_set.input
+                        output = record_set.data_records[0].passed_operator
+                        full_hash = f"{filter_str}{hash(input_record)}"
+                        if full_hash not in full_hashes:
+                            full_hash_to_bool_output[full_hash] = output
+                            full_hashes.add(full_hash)
+                            futures.append(executor.submit(validator._score_filter, op, filter_str, input_record, output, full_hash))
+
+                    # create future for join
+                    elif isinstance(op, JoinOp):
+                        condition = op.condition
+                        for left_idx, left_input_record in enumerate(record_set.input[0]):
+                            for right_idx, right_input_record in enumerate(record_set.input[1]):
+                                record_idx = left_idx * len(record_set.input[1]) + right_idx
+                                output = record_set.data_records[record_idx].passed_operator
+                                full_hash = f"{condition}{hash(left_input_record)}{hash(right_input_record)}"
+                                if full_hash not in full_hashes:
+                                    full_hash_to_bool_output[full_hash] = output
+                                    full_hashes.add(full_hash)
+                                    futures.append(executor.submit(validator._score_join, op, condition, left_input_record, right_input_record, output, full_hash))
+
+        # collect results from futures
+        full_hash_to_score, validation_gen_stats = {}, GenerationStats()
+        for future in as_completed(futures):
+            score, gen_stats, full_hash = future.result()
+            full_hash_to_score[full_hash] = score
+            validation_gen_stats += gen_stats
+
         # compute quality of each output computed by this operator
         for _, record_set_tuples in source_indices_to_record_sets.items():
             for record_set, op in record_set_tuples:
-                # if this operation does not involve an LLM, every record_op_stats object gets perfect quality
-                if is_perfect_quality_op(op):
-                    for record_op_stats in record_set.record_op_stats:
-                        record_op_stats.quality = 1.0
-                    continue
-
-                # if the operation failed, assign 0.0 quality
-                if len(record_set) == 0:
-                    record_set.record_op_stats[0].quality = 0.0
-                    continue
-
-                # for each record_set produced by an operation, compute its quality
                 if isinstance(op, LLMConvert) and op.cardinality is Cardinality.ONE_TO_ONE:
                     fields = op.generated_fields
-                    input_record = record_set.input
-                    output = record_set.data_records[0].to_dict(project_cols=fields)
-                    record_set.record_op_stats[0].quality = validator._score_map(op, fields, input_record, output)
+                    input_record: DataRecord = record_set.input
+                    output = record_set.data_records[0].to_json_str(project_cols=fields, bytes_to_str=True, sorted=True)
+                    full_hash = f"{hash(input_record)}{hash(output)}"
+                    record_set.record_op_stats[0].quality = full_hash_to_score[full_hash]
 
                 elif isinstance(op, LLMConvert) and op.cardinality is Cardinality.ONE_TO_MANY:
                     fields = op.generated_fields
-                    input_record = record_set.input
+                    input_record: DataRecord = record_set.input
                     output = []
                     for data_record in record_set.data_records:
-                        output.append(data_record.to_dict(project_cols=fields))
-                    score = validator._score_flat_map(op, fields, input_record, output)
+                        output.append(data_record.to_json_str(project_cols=fields, bytes_to_str=True, sorted=True))
+                    full_hash = f"{hash(input_record)}{hash(tuple(sorted(output)))}"
+                    score = full_hash_to_score[full_hash]
                     for record_op_stats in record_set.record_op_stats:
                         record_op_stats.quality = score
 
@@ -257,27 +229,36 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
                 # measures precision and not recall / F1; will need to revisit this in the future
                 elif isinstance(op, RetrieveOp):
                     fields = op.generated_fields
-                    input_record = record_set.input
-                    output = record_set.data_records[0].to_dict(project_cols=fields)
-                    score = validator._score_retrieve(op, fields, input_record, output)
+                    input_record: DataRecord = record_set.input
+                    output = record_set.data_records[0].to_json_str(project_cols=fields, bytes_to_str=True, sorted=True)
+                    full_hash = f"{hash(input_record)}{hash(output)}"
+                    score = full_hash_to_score[full_hash]
                     record_set.record_op_stats[0].quality = score
 
                 elif isinstance(op, LLMFilter):
                     filter_str = op.filter_obj.filter_condition
-                    input_record = record_set.input
+                    input_record: DataRecord = record_set.input
                     output = record_set.data_records[0].passed_operator
-                    record_set.record_op_stats[0].quality = validator._score_filter(op, filter_str, input_record, output)
+                    full_hash = f"{filter_str}{hash(input_record)}"
+                    if output == full_hash_to_bool_output[full_hash]:
+                        record_set.record_op_stats[0].quality = full_hash_to_score[full_hash]
+                    else:
+                        record_set.record_op_stats[0].quality = 1.0 - full_hash_to_score[full_hash]
 
                 elif isinstance(op, JoinOp):
                     condition = op.condition
                     for left_idx, left_input_record in enumerate(record_set.input[0]):
                         for right_idx, right_input_record in enumerate(record_set.input[1]):
-                            record_idx = left_idx * len(record_set.input[0]) + right_idx
+                            record_idx = left_idx * len(record_set.input[1]) + right_idx
                             output = record_set.data_records[record_idx].passed_operator
-                            record_set.record_op_stats[record_idx].quality = validator._score_join(op, condition, left_input_record, right_input_record, output)
+                            full_hash = f"{condition}{hash(left_input_record)}{hash(right_input_record)}"
+                            if output == full_hash_to_bool_output[full_hash]:
+                                record_set.record_op_stats[record_idx].quality = full_hash_to_score[full_hash]
+                            else:
+                                record_set.record_op_stats[record_idx].quality = 1.0 - full_hash_to_score[full_hash]
 
         # return the quality annotated record sets
-        return source_indices_to_record_sets
+        return source_indices_to_record_sets, validation_gen_stats
 
     def _execute_op_set(self, unique_logical_op_id: str, op_inputs: list[tuple[PhysicalOperator, str | tuple, int | DataRecord | list[DataRecord] | tuple[list[DataRecord]]]]) -> tuple[dict[int, list[tuple[DataRecordSet, PhysicalOperator, bool]]], dict[str, int]]:
         def execute_op_wrapper(operator: PhysicalOperator, source_indices: str | tuple, input: int | DataRecord | list[DataRecord] | tuple[list[DataRecord]]) -> tuple[DataRecordSet, PhysicalOperator, list[DataRecord] | list[int]]:
@@ -320,25 +301,21 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
                 executor.submit(execute_op_wrapper, operator, source_indices, input)
                 for operator, source_indices, input in final_op_inputs
             ]
+
             output_record_sets = []
-            while len(futures) > 0:
-                done_futures, not_done_futures = wait(futures, timeout=PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS)
-                for future in done_futures:
-                    # update output record sets
-                    record_set, operator, source_indices, input = future.result()
-                    output_record_sets.append((record_set, operator, source_indices, input))
+            for future in as_completed(futures):
+                # update output record sets
+                record_set, operator, source_indices, input = future.result()
+                output_record_sets.append((record_set, operator, source_indices, input))
 
-                    # update cache
-                    op_input_hash = get_hash(operator, input)
-                    self.cache[op_input_hash] = (record_set, operator)
+                # update cache
+                op_input_hash = get_hash(operator, input)
+                self.cache[op_input_hash] = (record_set, operator)
 
-                    # update progress manager
-                    if self._is_llm_op(operator):
-                        num_llm_ops += 1
-                        self.progress_manager.incr(unique_logical_op_id, num_samples=1, total_cost=record_set.get_total_cost())
-
-                # update futures
-                futures = list(not_done_futures)
+                # update progress manager
+                if self._is_llm_op(operator):
+                    num_llm_ops += 1
+                    self.progress_manager.incr(unique_logical_op_id, num_samples=1, total_cost=record_set.get_total_cost())
 
             # update mapping from source_indices to record sets and operators
             for record_set, operator, source_indices, input in output_record_sets:
