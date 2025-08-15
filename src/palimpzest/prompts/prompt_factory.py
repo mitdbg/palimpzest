@@ -14,8 +14,15 @@ from palimpzest.constants import (
     PromptStrategy,
 )
 from palimpzest.core.elements.records import DataRecord
-from palimpzest.core.lib.schemas import ImageBase64, ImageFilepath, ImageURL
+from palimpzest.core.lib.schemas import AudioBase64, AudioFilepath, ImageBase64, ImageFilepath, ImageURL
 from palimpzest.prompts.convert_prompts import (
+    COT_QA_AUDIO_DISCLAIMER,
+    COT_QA_AUDIO_EXAMPLE_ANSWER,
+    COT_QA_AUDIO_EXAMPLE_CONTEXT,
+    COT_QA_AUDIO_EXAMPLE_INPUT_FIELDS,
+    COT_QA_AUDIO_EXAMPLE_OUTPUT_FIELDS,
+    COT_QA_AUDIO_EXAMPLE_REASONING,
+    COT_QA_AUDIO_JOB_INSTRUCTION,
     COT_QA_BASE_SYSTEM_PROMPT,
     COT_QA_BASE_USER_PROMPT,
     COT_QA_EXAMPLE_ANSWER,
@@ -43,6 +50,12 @@ from palimpzest.prompts.critique_and_refine_convert_prompts import (
     COT_QA_REFINEMENT_FINISH_INSTRUCTION,
 )
 from palimpzest.prompts.filter_prompts import (
+    COT_BOOL_AUDIO_DISCLAIMER,
+    COT_BOOL_AUDIO_EXAMPLE_CONTEXT,
+    COT_BOOL_AUDIO_EXAMPLE_FILTER_CONDITION,
+    COT_BOOL_AUDIO_EXAMPLE_INPUT_FIELDS,
+    COT_BOOL_AUDIO_EXAMPLE_REASONING,
+    COT_BOOL_AUDIO_JOB_INSTRUCTION,
     COT_BOOL_BASE_SYSTEM_PROMPT,
     COT_BOOL_BASE_USER_PROMPT,
     COT_BOOL_EXAMPLE_CONTEXT,
@@ -58,6 +71,14 @@ from palimpzest.prompts.filter_prompts import (
     COT_BOOL_JOB_INSTRUCTION,
 )
 from palimpzest.prompts.join_prompts import (
+    COT_JOIN_AUDIO_DISCLAIMER,
+    COT_JOIN_AUDIO_EXAMPLE_CONTEXT,
+    COT_JOIN_AUDIO_EXAMPLE_INPUT_FIELDS,
+    COT_JOIN_AUDIO_EXAMPLE_JOIN_CONDITION,
+    COT_JOIN_AUDIO_EXAMPLE_REASONING,
+    COT_JOIN_AUDIO_JOB_INSTRUCTION,
+    COT_JOIN_AUDIO_RIGHT_EXAMPLE_CONTEXT,
+    COT_JOIN_AUDIO_RIGHT_EXAMPLE_INPUT_FIELDS,
     COT_JOIN_BASE_SYSTEM_PROMPT,
     COT_JOIN_BASE_USER_PROMPT,
     COT_JOIN_EXAMPLE_CONTEXT,
@@ -73,6 +94,7 @@ from palimpzest.prompts.join_prompts import (
     COT_JOIN_IMAGE_RIGHT_EXAMPLE_CONTEXT,
     COT_JOIN_IMAGE_RIGHT_EXAMPLE_INPUT_FIELDS,
     COT_JOIN_JOB_INSTRUCTION,
+    COT_JOIN_RIGHT_AUDIO_DISCLAIMER,
     COT_JOIN_RIGHT_EXAMPLE_CONTEXT,
     COT_JOIN_RIGHT_EXAMPLE_INPUT_FIELDS,
     COT_JOIN_RIGHT_IMAGE_DISCLAIMER,
@@ -120,10 +142,13 @@ class PromptFactory:
 
     BASE_SYSTEM_PROMPT_MAP = {
         PromptStrategy.COT_BOOL: COT_BOOL_BASE_SYSTEM_PROMPT,
+        PromptStrategy.COT_BOOL_AUDIO: COT_BOOL_BASE_SYSTEM_PROMPT,
         PromptStrategy.COT_BOOL_IMAGE: COT_BOOL_BASE_SYSTEM_PROMPT,
         PromptStrategy.COT_JOIN: COT_JOIN_BASE_SYSTEM_PROMPT,
+        PromptStrategy.COT_JOIN_AUDIO: COT_JOIN_BASE_SYSTEM_PROMPT,
         PromptStrategy.COT_JOIN_IMAGE: COT_JOIN_BASE_SYSTEM_PROMPT,
         PromptStrategy.COT_QA: COT_QA_BASE_SYSTEM_PROMPT,
+        PromptStrategy.COT_QA_AUDIO: COT_QA_BASE_SYSTEM_PROMPT,
         PromptStrategy.COT_QA_CRITIC: None,
         PromptStrategy.COT_QA_REFINE: None,
         PromptStrategy.COT_QA_IMAGE: COT_QA_BASE_SYSTEM_PROMPT,
@@ -137,10 +162,13 @@ class PromptFactory:
     }
     BASE_USER_PROMPT_MAP = {
         PromptStrategy.COT_BOOL: COT_BOOL_BASE_USER_PROMPT,
+        PromptStrategy.COT_BOOL_AUDIO: COT_BOOL_BASE_USER_PROMPT,
         PromptStrategy.COT_BOOL_IMAGE: COT_BOOL_BASE_USER_PROMPT,
         PromptStrategy.COT_JOIN: COT_JOIN_BASE_USER_PROMPT,
+        PromptStrategy.COT_JOIN_AUDIO: COT_JOIN_BASE_USER_PROMPT,
         PromptStrategy.COT_JOIN_IMAGE: COT_JOIN_BASE_USER_PROMPT,
         PromptStrategy.COT_QA: COT_QA_BASE_USER_PROMPT,
+        PromptStrategy.COT_QA_AUDIO: COT_QA_BASE_USER_PROMPT,
         PromptStrategy.COT_QA_CRITIC: BASE_CRITIQUE_PROMPT,
         PromptStrategy.COT_QA_REFINE: BASE_REFINEMENT_PROMPT,
         PromptStrategy.COT_QA_IMAGE: COT_QA_BASE_USER_PROMPT,
@@ -379,10 +407,13 @@ class PromptFactory:
         """
         prompt_strategy_to_job_instruction = {
             PromptStrategy.COT_BOOL: COT_BOOL_JOB_INSTRUCTION,
+            PromptStrategy.COT_BOOL_AUDIO: COT_BOOL_AUDIO_JOB_INSTRUCTION,
             PromptStrategy.COT_BOOL_IMAGE: COT_BOOL_IMAGE_JOB_INSTRUCTION,
             PromptStrategy.COT_JOIN: COT_JOIN_JOB_INSTRUCTION,
+            PromptStrategy.COT_JOIN_AUDIO: COT_JOIN_AUDIO_JOB_INSTRUCTION,
             PromptStrategy.COT_JOIN_IMAGE: COT_JOIN_IMAGE_JOB_INSTRUCTION,
             PromptStrategy.COT_QA: COT_QA_JOB_INSTRUCTION,
+            PromptStrategy.COT_QA_AUDIO: COT_QA_AUDIO_JOB_INSTRUCTION,
             PromptStrategy.COT_QA_IMAGE: COT_QA_IMAGE_JOB_INSTRUCTION,
             PromptStrategy.COT_MOA_PROPOSER: COT_MOA_PROPOSER_JOB_INSTRUCTION,
             PromptStrategy.COT_MOA_PROPOSER_IMAGE: COT_MOA_PROPOSER_IMAGE_JOB_INSTRUCTION,
@@ -446,10 +477,13 @@ class PromptFactory:
         """
         prompt_strategy_to_example_input_fields = {
             PromptStrategy.COT_BOOL: COT_BOOL_EXAMPLE_INPUT_FIELDS,
+            PromptStrategy.COT_BOOL_AUDIO: COT_BOOL_AUDIO_EXAMPLE_INPUT_FIELDS,
             PromptStrategy.COT_BOOL_IMAGE: COT_BOOL_IMAGE_EXAMPLE_INPUT_FIELDS,
             PromptStrategy.COT_JOIN: COT_JOIN_EXAMPLE_INPUT_FIELDS,
+            PromptStrategy.COT_JOIN_AUDIO: COT_JOIN_AUDIO_EXAMPLE_INPUT_FIELDS,
             PromptStrategy.COT_JOIN_IMAGE: COT_JOIN_IMAGE_EXAMPLE_INPUT_FIELDS,
             PromptStrategy.COT_QA: COT_QA_EXAMPLE_INPUT_FIELDS,
+            PromptStrategy.COT_QA_AUDIO: COT_QA_AUDIO_EXAMPLE_INPUT_FIELDS,
             PromptStrategy.COT_QA_IMAGE: COT_QA_IMAGE_EXAMPLE_INPUT_FIELDS,
             PromptStrategy.COT_MOA_PROPOSER: COT_MOA_PROPOSER_EXAMPLE_INPUT_FIELDS,
             PromptStrategy.COT_MOA_PROPOSER_IMAGE: COT_MOA_PROPOSER_IMAGE_EXAMPLE_INPUT_FIELDS,
@@ -467,6 +501,7 @@ class PromptFactory:
         """
         prompt_strategy_to_right_example_input_fields = {
             PromptStrategy.COT_JOIN: COT_JOIN_RIGHT_EXAMPLE_INPUT_FIELDS,
+            PromptStrategy.COT_JOIN_AUDIO: COT_JOIN_AUDIO_RIGHT_EXAMPLE_INPUT_FIELDS,
             PromptStrategy.COT_JOIN_IMAGE: COT_JOIN_IMAGE_RIGHT_EXAMPLE_INPUT_FIELDS,
         }
 
@@ -481,6 +516,7 @@ class PromptFactory:
         """
         prompt_strategy_to_example_output_fields = {
             PromptStrategy.COT_QA: COT_QA_EXAMPLE_OUTPUT_FIELDS,
+            PromptStrategy.COT_QA_AUDIO: COT_QA_AUDIO_EXAMPLE_OUTPUT_FIELDS,
             PromptStrategy.COT_QA_IMAGE: COT_QA_IMAGE_EXAMPLE_OUTPUT_FIELDS,
             PromptStrategy.COT_MOA_PROPOSER: COT_MOA_PROPOSER_EXAMPLE_OUTPUT_FIELDS,
             PromptStrategy.COT_MOA_PROPOSER_IMAGE: COT_MOA_PROPOSER_IMAGE_EXAMPLE_OUTPUT_FIELDS,
@@ -498,10 +534,13 @@ class PromptFactory:
         """
         prompt_strategy_to_example_context = {
             PromptStrategy.COT_BOOL: COT_BOOL_EXAMPLE_CONTEXT,
+            PromptStrategy.COT_BOOL_AUDIO: COT_BOOL_AUDIO_EXAMPLE_CONTEXT,
             PromptStrategy.COT_BOOL_IMAGE: COT_BOOL_IMAGE_EXAMPLE_CONTEXT,
             PromptStrategy.COT_JOIN: COT_JOIN_EXAMPLE_CONTEXT,
+            PromptStrategy.COT_JOIN_AUDIO: COT_JOIN_AUDIO_EXAMPLE_CONTEXT,
             PromptStrategy.COT_JOIN_IMAGE: COT_JOIN_IMAGE_EXAMPLE_CONTEXT,
             PromptStrategy.COT_QA: COT_QA_EXAMPLE_CONTEXT,
+            PromptStrategy.COT_QA_AUDIO: COT_QA_AUDIO_EXAMPLE_CONTEXT,
             PromptStrategy.COT_QA_IMAGE: COT_QA_IMAGE_EXAMPLE_CONTEXT,
             PromptStrategy.COT_MOA_PROPOSER: COT_MOA_PROPOSER_EXAMPLE_CONTEXT,
             PromptStrategy.COT_MOA_PROPOSER_IMAGE: COT_MOA_PROPOSER_IMAGE_EXAMPLE_CONTEXT,
@@ -519,6 +558,7 @@ class PromptFactory:
         """
         prompt_strategy_to_right_example_context = {
             PromptStrategy.COT_JOIN: COT_JOIN_RIGHT_EXAMPLE_CONTEXT,
+            PromptStrategy.COT_JOIN_AUDIO: COT_JOIN_AUDIO_RIGHT_EXAMPLE_CONTEXT,
             PromptStrategy.COT_JOIN_IMAGE: COT_JOIN_IMAGE_RIGHT_EXAMPLE_CONTEXT,
         }
 
@@ -541,6 +581,22 @@ class PromptFactory:
 
         return prompt_strategy_to_image_disclaimer.get(self.prompt_strategy, "")
 
+    def _get_audio_disclaimer(self) -> str:
+        """
+        Returns the audio disclaimer for the prompt. The disclaimer must be an empty string
+        for text prompts.
+
+        Returns:
+            str: The audio disclaimer. If this is a text prompt then it is an empty string.
+        """
+        prompt_strategy_to_audio_disclaimer = {
+            PromptStrategy.COT_BOOL_AUDIO: COT_BOOL_AUDIO_DISCLAIMER,
+            PromptStrategy.COT_JOIN_AUDIO: COT_JOIN_AUDIO_DISCLAIMER,
+            PromptStrategy.COT_QA_AUDIO: COT_QA_AUDIO_DISCLAIMER,
+        }
+
+        return prompt_strategy_to_audio_disclaimer.get(self.prompt_strategy, "")
+
     def _get_right_image_disclaimer(self) -> str:
         """
         Returns the right image disclaimer for the prompt. The disclaimer must be an empty string
@@ -555,6 +611,20 @@ class PromptFactory:
 
         return prompt_strategy_to_image_disclaimer.get(self.prompt_strategy, "")
 
+    def _get_right_audio_disclaimer(self) -> str:
+        """
+        Returns the right audio disclaimer for the prompt. The disclaimer must be an empty string
+        for text prompts.
+
+        Returns:
+            str: The right audio disclaimer. If this is a text prompt then it is an empty string.
+        """
+        prompt_strategy_to_audio_disclaimer = {
+            PromptStrategy.COT_JOIN_AUDIO: COT_JOIN_RIGHT_AUDIO_DISCLAIMER,
+        }
+
+        return prompt_strategy_to_audio_disclaimer.get(self.prompt_strategy, "")
+
     def _get_example_filter_condition(self) -> str | None:
         """
         Returns the example filter condition for the prompt.
@@ -564,6 +634,7 @@ class PromptFactory:
         """
         prompt_strategy_to_example_filter_condition = {
             PromptStrategy.COT_BOOL: COT_BOOL_EXAMPLE_FILTER_CONDITION,
+            PromptStrategy.COT_BOOL_AUDIO: COT_BOOL_AUDIO_EXAMPLE_FILTER_CONDITION,
             PromptStrategy.COT_BOOL_IMAGE: COT_BOOL_IMAGE_EXAMPLE_FILTER_CONDITION,
         }
 
@@ -578,6 +649,7 @@ class PromptFactory:
         """
         prompt_strategy_to_example_join_condition = {
             PromptStrategy.COT_JOIN: COT_JOIN_EXAMPLE_JOIN_CONDITION,
+            PromptStrategy.COT_JOIN_AUDIO: COT_JOIN_AUDIO_EXAMPLE_JOIN_CONDITION,
             PromptStrategy.COT_JOIN_IMAGE: COT_JOIN_IMAGE_EXAMPLE_JOIN_CONDITION,
         }
 
@@ -592,10 +664,13 @@ class PromptFactory:
         """
         prompt_strategy_to_example_reasoning = {
             PromptStrategy.COT_BOOL: COT_BOOL_EXAMPLE_REASONING,
+            PromptStrategy.COT_BOOL_AUDIO: COT_BOOL_AUDIO_EXAMPLE_REASONING,
             PromptStrategy.COT_BOOL_IMAGE: COT_BOOL_IMAGE_EXAMPLE_REASONING,
             PromptStrategy.COT_JOIN: COT_JOIN_EXAMPLE_REASONING,
+            PromptStrategy.COT_JOIN_AUDIO: COT_JOIN_AUDIO_EXAMPLE_REASONING,
             PromptStrategy.COT_JOIN_IMAGE: COT_JOIN_IMAGE_EXAMPLE_REASONING,
             PromptStrategy.COT_QA: COT_QA_EXAMPLE_REASONING,
+            PromptStrategy.COT_QA_AUDIO: COT_QA_AUDIO_EXAMPLE_REASONING,
             PromptStrategy.COT_QA_IMAGE: COT_QA_IMAGE_EXAMPLE_REASONING,
         }
 
@@ -610,6 +685,7 @@ class PromptFactory:
         """
         prompt_strategy_to_example_answer = {
             PromptStrategy.COT_QA: COT_QA_EXAMPLE_ANSWER,
+            PromptStrategy.COT_QA_AUDIO: COT_QA_AUDIO_EXAMPLE_ANSWER,
             PromptStrategy.COT_QA_IMAGE: COT_QA_IMAGE_EXAMPLE_ANSWER,
             PromptStrategy.COT_MOA_PROPOSER: COT_MOA_PROPOSER_EXAMPLE_ANSWER,
             PromptStrategy.COT_MOA_PROPOSER_IMAGE: COT_MOA_PROPOSER_IMAGE_EXAMPLE_ANSWER,
@@ -666,7 +742,9 @@ class PromptFactory:
             "example_context": self._get_example_context(),
             "right_example_context": self._get_right_example_context(),
             "image_disclaimer": self._get_image_disclaimer(),
+            "audio_disclaimer": self._get_audio_disclaimer(),
             "right_image_disclaimer": self._get_right_image_disclaimer(),
+            "right_audio_disclaimer": self._get_right_audio_disclaimer(),
             "example_filter_condition": self._get_example_filter_condition(),
             "example_join_condition": self._get_example_join_condition(),
             "example_reasoning": self._get_example_reasoning(),
@@ -675,6 +753,53 @@ class PromptFactory:
 
         # return all format kwargs
         return {**input_format_kwargs, **prompt_strategy_format_kwargs}
+
+    def _create_audio_messages(self, candidate: DataRecord, input_fields: list[str]) -> list[dict]:
+        """
+        Parses the candidate record and returns the audio messages for the chat payload.
+
+        Args:
+            candidate (DataRecord): The input record.
+            input_fields (list[str]): The list of input fields.
+
+        Returns:
+            list[dict]: The audio messages for the chat payload.
+        """
+        # create a message for each audio recording in an input field with an audio (or list of audio) type
+        audio_content = []
+        for field_name in input_fields:
+            field_value = candidate[field_name]
+            field_type = candidate.get_field_type(field_name)
+
+            # audio filepath (or list of audio filepaths)
+            if field_type.annotation in [AudioFilepath, AudioFilepath | None]:
+                with open(field_value, "rb") as f:
+                    base64_audio_str = base64.b64encode(f.read()).decode("utf-8")
+                audio_content.append(
+                    {"type": "input_audio", "input_audio": {"data": base64_audio_str, "format": "wav"}}
+                )
+
+            elif field_type.annotation in [list[AudioFilepath], list[AudioFilepath] | None]:
+                for audio_filepath in field_value:
+                    with open(audio_filepath, "rb") as f:
+                        base64_audio_str = base64.b64encode(f.read()).decode("utf-8")
+                    audio_content.append(
+                        {"type": "input_audio", "input_audio": {"data": base64_audio_str, "format": "wav"}}
+                    )
+
+            # pre-encoded images (or list of pre-encoded images)
+            elif field_type.annotation in [AudioBase64, AudioBase64 | None]:
+                audio_content.append(
+                    {"type": "input_audio", "input_audio": {"data": field_value, "format": "wav"}}
+                )
+
+            elif field_type.annotation in [list[AudioBase64], list[AudioBase64] | None]:
+                for base64_audio in field_value:
+                    audio_content.append(
+                        {"type": "input_audio", "input_audio": {"data": base64_audio, "format": "wav"}}
+                    )
+
+        return [{"role": "user", "type": "image", "content": audio_content}] if len(audio_content) > 0 else []
 
     def _create_image_messages(self, candidate: DataRecord, input_fields: list[str]) -> list[dict]:
         """
@@ -768,11 +893,15 @@ class PromptFactory:
         # get any image messages for the chat payload (will be an empty list if no image fields exist)
         image_messages = self._create_image_messages(candidate, input_fields)
 
+        # get any audio messages for the chat payload (will be an empty list if no audio fields exist)
+        audio_messages = self._create_audio_messages(candidate, input_fields)
+
         # get any right image messages for the chat payload (will be an empty list if this is not a join image prompt)
-        right_image_messages = []
+        right_image_messages, right_audio_messages = [], []
         if self.prompt_strategy.is_join_prompt():
             assert right_candidate is not None, "Right candidate must be provided for join prompts."
             right_image_messages = self._create_image_messages(right_candidate, right_input_fields)
+            right_audio_messages = self._create_audio_messages(right_candidate, right_input_fields)
 
         # get any original messages for critique and refinement operations
         original_messages = kwargs.get("original_messages")
@@ -781,6 +910,8 @@ class PromptFactory:
                 "Original messages must be provided for critique and refinement operations."
             )
 
+        # TODO: in the future if we support many modalities (e.g. images and audio) in the same prompt,
+        #       then we will need to streamline this logic to handle the many different cases
         # construct the user messages based on the prompt strategy
         user_messages = []
         if self.prompt_strategy.is_critic_prompt() or self.prompt_strategy.is_refine_prompt():
@@ -791,14 +922,18 @@ class PromptFactory:
             user_messages.extend(original_messages)
             user_messages.append({"role": "user", "type": "text", "content": base_prompt_end.format(**kwargs)})
 
+        # image not join
         elif self.prompt_strategy.is_image_prompt() and not self.prompt_strategy.is_join_prompt():
+            base_prompt = base_prompt.replace("<<audio-placeholder>>", "")
             base_prompt_start, base_prompt_end = base_prompt.split("<<image-placeholder>>\n")
             user_messages.append({"role": "user", "type": "text", "content": base_prompt_start.format(**kwargs)})
             user_messages.extend(image_messages)
             user_messages.append({"role": "user", "type": "text", "content": base_prompt_end.format(**kwargs)})
 
+        # image join
         elif self.prompt_strategy.is_image_prompt() and self.prompt_strategy.is_join_prompt():
             # for join image prompts, we may have two sets of images (one from the left candidate and one from the right candidate)
+            base_prompt = base_prompt.replace("<<audio-placeholder>>", "")
             base_prompt_start, base_prompt_mid, base_prompt_end = base_prompt.split("<<image-placeholder>>\n")
             user_messages.append({"role": "user", "type": "text", "content": base_prompt_start.format(**kwargs)})
             user_messages.extend(image_messages)
@@ -806,8 +941,28 @@ class PromptFactory:
             user_messages.extend(right_image_messages)
             user_messages.append({"role": "user", "type": "text", "content": base_prompt_end.format(**kwargs)})
 
+        # audio not join
+        elif self.prompt_strategy.is_audio_prompt() and not self.prompt_strategy.is_join_prompt():
+            base_prompt = base_prompt.replace("<<image-placeholder>>", "")
+            base_prompt_start, base_prompt_end = base_prompt.split("<<audio-placeholder>>\n")
+            user_messages.append({"role": "user", "type": "text", "content": base_prompt_start.format(**kwargs)})
+            user_messages.extend(audio_messages)
+            user_messages.append({"role": "user", "type": "text", "content": base_prompt_end.format(**kwargs)})
+
+        # audio join
+        elif self.prompt_strategy.is_audio_prompt() and self.prompt_strategy.is_join_prompt():
+            # for join image prompts, we may have two sets of images (one from the left candidate and one from the right candidate)
+            base_prompt = base_prompt.replace("<<image-placeholder>>", "")
+            base_prompt_start, base_prompt_mid, base_prompt_end = base_prompt.split("<<audio-placeholder>>\n")
+            user_messages.append({"role": "user", "type": "text", "content": base_prompt_start.format(**kwargs)})
+            user_messages.extend(audio_messages)
+            user_messages.append({"role": "user", "type": "text", "content": base_prompt_mid.format(**kwargs)})
+            user_messages.extend(right_audio_messages)
+            user_messages.append({"role": "user", "type": "text", "content": base_prompt_end.format(**kwargs)})
+
         else:
             base_prompt = base_prompt.replace("<<image-placeholder>>", "")
+            base_prompt = base_prompt.replace("<<audio-placeholder>>", "")
             user_messages.append({"role": "user", "type": "text", "content": base_prompt.format(**kwargs)})
 
         return user_messages

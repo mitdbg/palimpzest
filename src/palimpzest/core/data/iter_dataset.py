@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from palimpzest import constants
 from palimpzest.core.data import dataset
 from palimpzest.core.lib.schemas import (
+    AudioFile,
     DefaultSchema,
     ImageFile,
     PDFFile,
@@ -112,6 +113,41 @@ class BaseFileDataset(IterDataset):
     def __len__(self) -> int:
         return len(self.filepaths)
 
+
+class BaseFileDirectoryDataset(IterDataset):
+    """
+    BaseFileDirectoryDataset is the base class for multiple `IterDatasets` which iterate over
+    different types of files. This class walks the entire directory tree rooted at `path`.
+    """
+
+    def __init__(self, path: str, **kwargs) -> None:
+        """
+        Constructor for the `BaseFileDataset` class.
+
+        Args:
+            path (str): The path to the file
+            kwargs (dict): Keyword arguments containing the `Dataset's` id and file-specific `Schema`
+        """
+        # check that path is a valid file or directory
+        assert os.path.isfile(path) or os.path.isdir(path), f"Path {path} is not a file nor a directory"
+
+        # get list of filepaths
+        self.filepaths = []
+        if os.path.isfile(path):
+            self.filepaths = [path]
+        else:
+            self.filepaths = []
+            for root, _, files in os.walk(path):
+                for file in files:
+                    fp = os.path.join(root, file)
+                    self.filepaths.append(fp)
+            self.filepaths = sorted(self.filepaths)
+
+        # call parent constructor to set id, operator, and schema
+        super().__init__(**kwargs)
+
+    def __len__(self) -> int:
+        return len(self.filepaths)
 
 ########################
 ### CONCRETE CLASSES ###
@@ -433,6 +469,48 @@ class XLSFileDataset(BaseFileDataset):
             "sheet_names": xls.sheet_names,
             "number_sheets": len(xls.sheet_names),
         }
+
+
+class AudioFileDataset(BaseFileDirectoryDataset):
+    """
+    AudioFileDataset returns a dictionary for each audio file in a directory. Each dictionary contains the
+    filename and the base64 encoded bytes content of a single audio file in the directory.
+    """
+    def __init__(self, id: str, path: str) -> None:
+        """
+        Constructor for the `AudioFileDataset` class. The `schema` is set to the `AudioFile` schema.
+
+        Args:
+            id (str): a string identifier for the `Dataset`
+            path (str): The path to the directory
+        """
+        super().__init__(path=path, id=id, schema=AudioFile)
+        assert all([filename.endswith(tuple(constants.AUDIO_EXTENSIONS)) for filename in self.filepaths])
+
+    def __getitem__(self, idx: int) -> dict:
+        """
+        Returns a dictionary with the filename and base64 encoded bytes content of the audio file at the
+        specified `idx`.
+
+        Args:
+            idx (int): The index of the item to return
+
+        Returns:
+            dict: A dictionary with the filename and base64 encoded bytes content of the audio file.
+
+            .. code-block:: python
+
+                {
+                    "filename": "audio.wav",
+                    "contents": b"base64 encoded audio content here",
+                }
+        """
+        filepath = self.filepaths[idx]
+        filename = os.path.basename(filepath)
+        with open(filepath, "rb") as f:
+            contents = base64.b64encode(f.read()).decode("utf-8")
+
+        return {"filename": filename, "contents": contents}
 
 
 def get_local_source(id: str, path: str | Path, **kwargs) -> dataset.Dataset:

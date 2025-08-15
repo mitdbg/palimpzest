@@ -30,6 +30,8 @@ class Model(str, Enum):
     GEMINI_2_5_FLASH = "vertex_ai/gemini-2.5-flash"
     GEMINI_2_5_PRO = "vertex_ai/gemini-2.5-pro"
     LLAMA_4_MAVERICK = "vertex_ai/meta/llama-4-maverick-17b-128e-instruct-maas"
+    GPT_4o_AUDIO_PREVIEW = "openai/gpt-4o-audio-preview"
+    GPT_4o_MINI_AUDIO_PREVIEW = "openai/gpt-4o-mini-audio-preview"
     # o1 = "o1-2024-12-17"
 
     def __repr__(self):
@@ -60,9 +62,14 @@ class Model(str, Enum):
         return "vertex_ai" in self.value.lower()
 
     def is_text_model(self):
-        non_text_models = [Model.LLAMA3_2_90B_V, Model.CLIP_VIT_B_32, Model.TEXT_EMBEDDING_3_SMALL]
+        non_text_models = [
+            Model.LLAMA3_2_90B_V,
+            Model.CLIP_VIT_B_32, Model.TEXT_EMBEDDING_3_SMALL,
+            Model.GPT_4o_AUDIO_PREVIEW, Model.GPT_4o_MINI_AUDIO_PREVIEW,
+        ]
         return self not in non_text_models
 
+    # TODO: I think SONNET and HAIKU are vision-capable too
     def is_vision_model(self):
         return self in [
             Model.LLAMA3_2_90B_V, Model.LLAMA_4_MAVERICK,
@@ -70,10 +77,22 @@ class Model(str, Enum):
             Model.GEMINI_2_0_FLASH, Model.GEMINI_2_5_FLASH, Model.GEMINI_2_5_PRO,
         ]
 
-    def is_multimodal_model(self):
+    def is_audio_model(self):
+        return self in [
+            Model.GPT_4o_AUDIO_PREVIEW, Model.GPT_4o_MINI_AUDIO_PREVIEW,
+            Model.GEMINI_2_0_FLASH, Model.GEMINI_2_5_FLASH, Model.GEMINI_2_5_PRO,
+        ]
+
+    def is_text_image_multimodal_model(self):
         return self in [
             Model.LLAMA_4_MAVERICK,
             Model.GPT_4o, Model.GPT_4o_MINI, Model.o4_MINI, Model.GPT_5, Model.GPT_5_MINI,
+            Model.GEMINI_2_0_FLASH, Model.GEMINI_2_5_FLASH, Model.GEMINI_2_5_PRO,
+        ]
+
+    def is_text_audio_multimodal_model(self):
+        return self in [
+            Model.GPT_4o_AUDIO_PREVIEW, Model.GPT_4o_MINI_AUDIO_PREVIEW,
             Model.GEMINI_2_0_FLASH, Model.GEMINI_2_5_FLASH, Model.GEMINI_2_5_PRO,
         ]
 
@@ -94,12 +113,14 @@ class PromptStrategy(str, Enum):
 
     # Chain-of-Thought Boolean with Image Prompt Strategies
     COT_BOOL_IMAGE = "chain-of-thought-bool-image"
+    COT_BOOL_AUDIO = "chain-of-thought-bool-audio"
     # COT_BOOL_IMAGE_CRITIC = "chain-of-thought-bool-image-critic"
     # COT_BOOL_IMAGE_REFINE = "chain-of-thought-bool-image-refine"
 
     # Chain-of-Thought Join Prompt Strategies
     COT_JOIN = "chain-of-thought-join"
     COT_JOIN_IMAGE = "chain-of-thought-join-image"
+    COT_JOIN_AUDIO = "chain-of-thought-join-audio"
 
     # Chain-of-Thought Question Answering Prompt Strategies
     COT_QA = "chain-of-thought-question"
@@ -111,10 +132,15 @@ class PromptStrategy(str, Enum):
     COT_QA_IMAGE_CRITIC = "chain-of-thought-question-critic-image"
     COT_QA_IMAGE_REFINE = "chain-of-thought-question-refine-image"
 
+    # Chain-of-Thought Queestion with Audio Prompt Strategies
+    COT_QA_AUDIO = "chain-of-thought-question-audio"
+    # TODO: COT_QA_AUDIO_CRITIC/REFINE
+
     # Mixture-of-Agents Prompt Strategies
     COT_MOA_PROPOSER = "chain-of-thought-mixture-of-agents-proposer"
     COT_MOA_PROPOSER_IMAGE = "chain-of-thought-mixture-of-agents-proposer-image"
     COT_MOA_AGG = "chain-of-thought-mixture-of-agents-aggregation"
+    # TODO: COT_MOA_PROPOSER_AUDIO 
 
     # Split Convert Prompt Strategies
     SPLIT_PROPOSER = "split-proposer"
@@ -122,6 +148,9 @@ class PromptStrategy(str, Enum):
 
     def is_image_prompt(self):
         return "image" in self.value
+
+    def is_audio_prompt(self):
+        return "audio" in self.value
 
     def is_bool_prompt(self):
         return "bool" in self.value
@@ -176,6 +205,7 @@ class PickOutputStrategy(str, Enum):
     ENSEMBLE = "ensemble"
 
 
+AUDIO_EXTENSIONS = [".wav"]
 IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff"]
 PDF_EXTENSIONS = [".pdf"]
 XLS_EXTENSIONS = [".xls", ".xlsx"]
@@ -320,6 +350,26 @@ DEEPSEEK_R1_DISTILL_QWEN_1_5B_MODEL_CARD = {
     ##### Agg. Benchmark #####
     "overall": 39.90, # https://www.reddit.com/r/LocalLLaMA/comments/1iserf9/deepseek_r1_distilled_models_mmlu_pro_benchmarks/
 }
+GPT_4o_AUDIO_PREVIEW_MODEL_CARD = {
+    # NOTE: COPYING OVERALL AND SECONDS_PER_OUTPUT_TOKEN FROM GPT_4o; need to update when we have audio-specific benchmarks
+    ##### Cost in USD #####
+    "usd_per_audio_input_token": 2.5 / 1e6,
+    "usd_per_output_token": 10.0 / 1e6,
+    ##### Time #####
+    "seconds_per_output_token": 0.0079,
+    ##### Agg. Benchmark #####
+    "overall": 74.1,
+}
+GPT_4o_MINI_AUDIO_PREVIEW_MODEL_CARD = {
+    # NOTE: COPYING OVERALL AND SECONDS_PER_OUTPUT_TOKEN FROM GPT_4o; need to update when we have audio-specific benchmarks
+    ##### Cost in USD #####
+    "usd_per_audio_input_token": 0.15 / 1e6,
+    "usd_per_output_token": 0.6 / 1e6,
+    ##### Time #####
+    "seconds_per_output_token": 0.0098,
+    ##### Agg. Benchmark #####
+    "overall": 62.7,
+}
 GPT_4o_MODEL_CARD = {
     # NOTE: it is unclear if the same ($ / token) costs can be applied for vision, or if we have to calculate this ourselves
     ##### Cost in USD #####
@@ -429,6 +479,7 @@ GEMINI_2_0_FLASH_MODEL_CARD = {
     ##### Cost in USD #####
     "usd_per_input_token": 0.15 / 1e6,
     "usd_per_output_token": 0.6 / 1e6,
+    "usd_per_audio_input_token": 1.0 / 1e6,
     ##### Time #####
     "seconds_per_output_token": 0.0049,
     ##### Agg. Benchmark #####
@@ -438,6 +489,7 @@ GEMINI_2_5_FLASH_MODEL_CARD = {
     ##### Cost in USD #####
     "usd_per_input_token": 0.30 / 1e6,
     "usd_per_output_token": 2.5 / 1e6,
+    "usd_per_audio_input_token": 1.0 / 1e6,
     ##### Time #####
     "seconds_per_output_token": 0.0039,
     ##### Agg. Benchmark #####
@@ -447,6 +499,7 @@ GEMINI_2_5_PRO_MODEL_CARD = {
     ##### Cost in USD #####
     "usd_per_input_token": 1.25 / 1e6,
     "usd_per_output_token": 10.0 / 1e6,
+    "usd_per_audio_input_token": 1.25 / 1e6,
     ##### Time #####
     "seconds_per_output_token": 0.0070,
     ##### Agg. Benchmark #####
@@ -471,6 +524,8 @@ MODEL_CARDS = {
     Model.DEEPSEEK_R1_DISTILL_QWEN_1_5B.value: DEEPSEEK_R1_DISTILL_QWEN_1_5B_MODEL_CARD,
     Model.GPT_4o.value: GPT_4o_MODEL_CARD,
     Model.GPT_4o_MINI.value: GPT_4o_MINI_MODEL_CARD,
+    Model.GPT_4o_AUDIO_PREVIEW.value: GPT_4o_AUDIO_PREVIEW_MODEL_CARD,
+    Model.GPT_4o_MINI_AUDIO_PREVIEW.value: GPT_4o_MINI_AUDIO_PREVIEW_MODEL_CARD,
     Model.GPT_5.value: GPT_5_MODEL_CARD,
     Model.GPT_5_MINI.value: GPT_5_MINI_MODEL_CARD,
     Model.o4_MINI.value: o4_MINI_MODEL_CARD,

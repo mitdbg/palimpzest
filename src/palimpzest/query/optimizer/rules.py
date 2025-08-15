@@ -5,7 +5,7 @@ from itertools import combinations
 
 from palimpzest.constants import AggFunc, Model, PromptStrategy
 from palimpzest.core.data.context_manager import ContextManager
-from palimpzest.core.lib.schemas import ImageBase64, ImageFilepath, ImageURL
+from palimpzest.core.lib.schemas import AudioBase64, AudioFilepath, ImageBase64, ImageFilepath, ImageURL
 from palimpzest.prompts import CONTEXT_SEARCH_PROMPT
 from palimpzest.query.operators.aggregate import ApplyGroupByOp, AverageAggregateOp, CountAggregateOp
 from palimpzest.query.operators.compute import SmolAgentsCompute
@@ -54,6 +54,16 @@ IMAGE_LIST_FIELD_TYPES = [
 IMAGE_FIELD_TYPES = IMAGE_LIST_FIELD_TYPES + [
     ImageBase64, ImageFilepath, ImageURL,
     ImageBase64 | None, ImageFilepath | None, ImageURL | None,
+]
+AUDIO_LIST_FIELD_TYPES = [
+    list[AudioBase64],
+    list[AudioFilepath],
+    list[AudioBase64] | None,
+    list[AudioFilepath] | None,
+]
+AUDIO_FIELD_TYPES = AUDIO_LIST_FIELD_TYPES + [
+    AudioBase64, AudioFilepath,
+    AudioBase64 | None, AudioFilepath | None,
 ]
 
 class Rule:
@@ -251,6 +261,24 @@ class ImplementationRule(Rule):
         ])
 
     @classmethod
+    def _get_audio_fields(cls, logical_expression: LogicalExpression) -> set[str]:
+        """Returns the set of fields which have an audio (or list[audio]) type."""
+        return set([
+            field_name.split(".")[-1]
+            for field_name, field in logical_expression.input_fields.items()
+            if field.annotation in AUDIO_FIELD_TYPES and field_name.split(".")[-1] in logical_expression.depends_on_field_names
+        ])
+
+    @classmethod
+    def _get_list_audio_fields(cls, logical_expression: LogicalExpression) -> set[str]:
+        """Returns the set of fields which have a list[audio] type."""
+        return set([
+            field_name.split(".")[-1]
+            for field_name, field in logical_expression.input_fields.items()
+            if field.annotation in AUDIO_LIST_FIELD_TYPES and field_name.split(".")[-1] in logical_expression.depends_on_field_names
+        ])
+
+    @classmethod
     def _is_image_only_operation(cls, logical_expression: LogicalExpression) -> bool:
         """Returns True if the logical_expression processes only image input(s) and False otherwise."""
         return all([
@@ -269,10 +297,28 @@ class ImplementationRule(Rule):
         ])
 
     @classmethod
+    def _is_audio_only_operation(cls, logical_expression: LogicalExpression) -> bool:
+        """Returns True if the logical_expression processes only audio input(s) and False otherwise."""
+        return all([
+            field.annotation in AUDIO_FIELD_TYPES
+            for field_name, field in logical_expression.input_fields.items()
+            if field_name.split(".")[-1] in logical_expression.depends_on_field_names
+        ])
+
+    @classmethod
+    def _is_audio_operation(cls, logical_expression: LogicalExpression) -> bool:
+        """Returns True if the logical_expression processes audio input(s) and False otherwise."""
+        return any([
+            field.annotation in AUDIO_FIELD_TYPES
+            for field_name, field in logical_expression.input_fields.items()
+            if field_name.split(".")[-1] in logical_expression.depends_on_field_names
+        ])
+
+    @classmethod
     def _is_text_only_operation(cls, logical_expression: LogicalExpression) -> bool:
         """Returns True if the logical_expression processes only text input(s) and False otherwise."""
         return all([
-            field.annotation not in IMAGE_FIELD_TYPES
+            field.annotation not in IMAGE_FIELD_TYPES + AUDIO_FIELD_TYPES
             for field_name, field in logical_expression.input_fields.items()
             if field_name.split(".")[-1] in logical_expression.depends_on_field_names
         ])
@@ -281,15 +327,21 @@ class ImplementationRule(Rule):
     def _is_text_operation(cls, logical_expression: LogicalExpression) -> bool:
         """Returns True if the logical_expression processes text input(s) and False otherwise."""
         return any([
-            field.annotation not in IMAGE_FIELD_TYPES
+            field.annotation not in IMAGE_FIELD_TYPES + AUDIO_FIELD_TYPES
             for field_name, field in logical_expression.input_fields.items()
             if field_name.split(".")[-1] in logical_expression.depends_on_field_names
         ])
 
+    # TODO: support powerset of text + image + audio (+ video) multi-modal operations
     @classmethod
-    def _is_multi_modal_operation(cls, logical_expression: LogicalExpression) -> bool:
-        """Returns True if the logical_expression processes only image input(s) and False otherwise."""
+    def _is_text_image_multimodal_operation(cls, logical_expression: LogicalExpression) -> bool:
+        """Returns True if the logical_expression processes text and image inputs and False otherwise."""
         return cls._is_image_operation(logical_expression) and cls._is_text_operation(logical_expression)
+
+    @classmethod
+    def _is_text_audio_multimodal_operation(cls, logical_expression: LogicalExpression) -> bool:
+        """Returns True if the logical_expression processes text and audio inputs and False otherwise."""
+        return cls._is_audio_operation(logical_expression) and cls._is_text_operation(logical_expression)
 
     @classmethod
     def _model_matches_input(cls, model: Model, logical_expression: LogicalExpression) -> bool:
@@ -297,6 +349,10 @@ class ImplementationRule(Rule):
         # compute how many image fields are in the input, and whether any fields are list[image] fields
         num_image_fields = len(cls._get_image_fields(logical_expression))
         has_list_image_field = len(cls._get_list_image_fields(logical_expression)) > 0
+        num_audio_fields = len(cls._get_audio_fields(logical_expression))
+        has_list_audio_field = len(cls._get_list_audio_fields(logical_expression)) > 0
+        if num_audio_fields > 0 and model.is_vertex_model():
+            import pdb; pdb.set_trace()
 
         # corner-case: for now, all operators use text or vision models for processing inputs to __call__
         if model.is_embedding_model():
@@ -304,6 +360,10 @@ class ImplementationRule(Rule):
 
         # corner-case: Llama vision models cannot handle multiple image inputs (at least using Together)
         if model.is_llama_model() and model.is_vision_model() and (num_image_fields > 1 or has_list_image_field):
+            return False
+
+        # corner-case: Gemini models cannot handle multiple audio inputs
+        if model.is_vertex_model() and model.is_audio_model() and (num_audio_fields > 1 or has_list_audio_field):
             return False
 
         # text-only input and text supporting model
@@ -315,7 +375,11 @@ class ImplementationRule(Rule):
             return True
 
         # multi-modal input and multi-modal supporting model
-        if cls._is_multi_modal_operation(logical_expression) and model.is_multimodal_model():  # noqa: SIM103
+        if cls._is_text_image_multimodal_operation(logical_expression) and model.is_text_image_multimodal_model():  # noqa: SIM103
+            return True
+
+        # multi-modal input and multi-modal supporting model
+        if cls._is_text_audio_multimodal_operation(logical_expression) and model.is_text_audio_multimodal_model():  # noqa: SIM103
             return True
 
         return False
@@ -427,7 +491,13 @@ class LLMConvertBondedRule(ImplementationRule):
 
         # create variable physical operator kwargs for each model which can implement this logical_expression
         models = [model for model in runtime_kwargs["available_models"] if cls._model_matches_input(model, logical_expression)]
-        prompt_strategy = PromptStrategy.COT_QA_IMAGE if cls._is_image_operation(logical_expression) else PromptStrategy.COT_QA
+        import pdb; pdb.set_trace()
+        # NOTE: right now we exclusively allow image or audio operations, but not both simultaneously
+        prompt_strategy = PromptStrategy.COT_QA
+        if cls._is_image_operation(logical_expression):
+            prompt_strategy = PromptStrategy.COT_QA_IMAGE
+        elif cls._is_audio_operation(logical_expression):
+            prompt_strategy = PromptStrategy.COT_QA_AUDIO
         variable_op_kwargs = [{"model": model, "prompt_strategy": prompt_strategy} for model in models]
 
         return cls._perform_substitution(logical_expression, LLMConvertBonded, runtime_kwargs, variable_op_kwargs)
@@ -475,7 +545,8 @@ class MixtureOfAgentsConvertRule(ImplementationRule):
     @classmethod
     def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
         logical_op = logical_expression.operator
-        is_match = isinstance(logical_op, ConvertScan) and logical_op.udf is None
+        # TODO: remove audio limitation once I add prompts
+        is_match = isinstance(logical_op, ConvertScan) and logical_op.udf is None and not cls._is_audio_operation(logical_expression)
         logger.debug(f"MixtureOfAgentsConvertRule matches_pattern: {is_match} for {logical_expression}")
         return is_match
 
@@ -512,7 +583,8 @@ class CriticAndRefineConvertRule(ImplementationRule):
     @classmethod
     def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
         logical_op = logical_expression.operator
-        is_match = isinstance(logical_op, ConvertScan) and logical_op.udf is None
+        # TODO: remove audio limitation once I add prompts
+        is_match = isinstance(logical_op, ConvertScan) and logical_op.udf is None and not cls._is_audio_operation(logical_expression)
         logger.debug(f"CriticAndRefineConvertRule matches_pattern: {is_match} for {logical_expression}")
         return is_match
 
@@ -625,7 +697,12 @@ class LLMFilterRule(ImplementationRule):
 
         # create variable physical operator kwargs for each model which can implement this logical_expression
         models = [model for model in runtime_kwargs["available_models"] if cls._model_matches_input(model, logical_expression)]
-        prompt_strategy = PromptStrategy.COT_BOOL_IMAGE if cls._is_image_operation(logical_expression) else PromptStrategy.COT_BOOL
+        # NOTE: right now we exclusively allow image or audio operations, but not both simultaneously
+        prompt_strategy = PromptStrategy.COT_BOOL
+        if cls._is_image_operation(logical_expression):
+            prompt_strategy = PromptStrategy.COT_BOOL_IMAGE
+        elif cls._is_audio_operation(logical_expression):
+            prompt_strategy = PromptStrategy.COT_BOOL_AUDIO
         variable_op_kwargs = [{"model": model, "prompt_strategy": prompt_strategy} for model in models]
 
         return cls._perform_substitution(logical_expression, LLMFilter, runtime_kwargs, variable_op_kwargs)
@@ -648,7 +725,12 @@ class LLMJoinRule(ImplementationRule):
 
         # create variable physical operator kwargs for each model which can implement this logical_expression
         models = [model for model in runtime_kwargs["available_models"] if cls._model_matches_input(model, logical_expression)]
-        prompt_strategy = PromptStrategy.COT_JOIN_IMAGE if cls._is_image_operation(logical_expression) else PromptStrategy.COT_JOIN
+        # NOTE: right now we exclusively allow image or audio operations, but not both simultaneously
+        prompt_strategy = PromptStrategy.COT_JOIN
+        if cls._is_image_operation(logical_expression):
+            prompt_strategy = PromptStrategy.COT_JOIN_IMAGE
+        elif cls._is_audio_operation(logical_expression):
+            prompt_strategy = PromptStrategy.COT_JOIN_AUDIO
         variable_op_kwargs = [{"model": model, "prompt_strategy": prompt_strategy} for model in models]
 
         return cls._perform_substitution(logical_expression, NestedLoopsJoin, runtime_kwargs, variable_op_kwargs)

@@ -41,7 +41,6 @@ from palimpzest.query.optimizer.tasks import (
     OptimizeLogicalExpression,
     OptimizePhysicalExpression,
 )
-from palimpzest.utils.model_helpers import get_champion_model, get_fallback_model
 
 logger = logging.getLogger(__name__)
 
@@ -172,8 +171,6 @@ class Optimizer:
         return {
             "verbose": self.verbose,
             "available_models": self.available_models,
-            "champion_model": get_champion_model(self.available_models),
-            "fallback_model": get_fallback_model(self.available_models),
         }
 
     def deepcopy_clean(self):

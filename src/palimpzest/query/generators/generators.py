@@ -298,7 +298,11 @@ class Generator(Generic[ContextType, InputType]):
         start_time = time.time()
         completion = None
         try:
-            completion_kwargs = {} if self.model.is_o_model() else {"temperature": kwargs.get("temperature", 0.0)}
+            completion_kwargs = {}
+            if not self.model.is_o_model():
+                completion_kwargs = {"temperature": kwargs.get("temperature", 0.0), **completion_kwargs}
+            if self.prompt_strategy.is_audio_prompt():
+                completion_kwargs = {"modalities": ["text"], **completion_kwargs}
             completion = litellm.completion(model=self.model_name, messages=messages, **completion_kwargs)
             end_time = time.time()
             logger.debug(f"Generated completion in {end_time - start_time:.2f} seconds")
@@ -327,8 +331,16 @@ class Generator(Generic[ContextType, InputType]):
             usage = completion.usage.model_dump()
 
             # get cost per input/output token for the model and parse number of input and output tokens
-            usd_per_input_token = MODEL_CARDS[self.model_name]["usd_per_input_token"]
-            usd_per_output_token = MODEL_CARDS[self.model_name]["usd_per_output_token"]
+            usd_per_input_token = (
+                MODEL_CARDS[self.model_name]["usd_per_audio_input_token"]
+                if self.model.is_audio_model()
+                else MODEL_CARDS[self.model_name]["usd_per_input_token"]
+            )
+            usd_per_output_token = (
+                MODEL_CARDS[self.model_name]["usd_per_audio_output_token"]
+                if self.model.is_audio_model()
+                else MODEL_CARDS[self.model_name]["usd_per_output_token"]
+            )
             input_tokens = usage["prompt_tokens"]
             output_tokens = usage["completion_tokens"]
 
