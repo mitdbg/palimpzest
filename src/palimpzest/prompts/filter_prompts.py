@@ -14,6 +14,7 @@ INPUT FIELDS:
 CONTEXT:
 {example_context}
 {image_disclaimer}
+{audio_disclaimer}
 FILTER CONDITION: {example_filter_condition}
 
 Let's think step-by-step in order to answer the question.
@@ -35,6 +36,7 @@ INPUT FIELDS:
 CONTEXT:
 {context}
 <<image-placeholder>>
+<<audio-placeholder>>
 FILTER CONDITION: {filter_condition}
 
 Let's think step-by-step in order to answer the question.
@@ -45,10 +47,13 @@ REASONING: """
 ### TEMPLATE INPUTS ###
 COT_BOOL_JOB_INSTRUCTION = """answer a TRUE / FALSE question"""
 COT_BOOL_IMAGE_JOB_INSTRUCTION = """analyze input image(s) and/or text in order to answer a TRUE / FALSE question"""
+COT_BOOL_AUDIO_JOB_INSTRUCTION = """analyze input audio and/or text in order to answer a TRUE / FALSE question"""
 
 COT_BOOL_EXAMPLE_INPUT_FIELDS = """- text: a short passage of text"""
 COT_BOOL_IMAGE_EXAMPLE_INPUT_FIELDS = """- image: an image of a scene
 - photographer: the photographer of the image"""
+COT_BOOL_AUDIO_EXAMPLE_INPUT_FIELDS = """- recording: an audio recording of a newscast
+- speaker: the name of the speaker in the recording"""
 
 COT_BOOL_EXAMPLE_CONTEXT = """{{
   "text": "The quick brown fox jumps over the lazy dog."
@@ -57,13 +62,22 @@ COT_BOOL_IMAGE_EXAMPLE_CONTEXT = """{{
   "image": <bytes>,
   "photographer": "CameraEnthusiast1"
 }}"""
+COT_BOOL_AUDIO_EXAMPLE_CONTEXT = """{{
+  "recording": <bytes>,
+  "speaker": "Walter Cronkite"
+}}"""
 
 COT_BOOL_EXAMPLE_FILTER_CONDITION = "the text mentions an animal"
 COT_BOOL_IMAGE_EXAMPLE_FILTER_CONDITION = "there's an animal in this image"
+COT_BOOL_AUDIO_EXAMPLE_FILTER_CONDITION = "the newscast discusses a flashpoint in the Cold War"
 
 COT_BOOL_IMAGE_DISCLAIMER = """
 <image content provided here; assume in this example the image shows a dog and a cat playing>
 """
+COT_BOOL_AUDIO_DISCLAIMER = """
+<audio content provided here; assume in this example the recording is about the Cuban Missile Crisis>
+"""
 
 COT_BOOL_EXAMPLE_REASONING = """the text mentions the words "fox" and "dog" which are animals, therefore the answer is TRUE."""
 COT_BOOL_IMAGE_EXAMPLE_REASONING = """the image shows a dog and a cat playing, both of which are animals, therefore the answer is TRUE."""
+COT_BOOL_AUDIO_EXAMPLE_REASONING = """the newscast discusses the Cuban Missile Crisis, which was a flashpoint in the Cold War, therefore the answer is TRUE."""

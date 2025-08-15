@@ -1,9 +1,10 @@
 import logging
 
-from palimpzest.constants import Cardinality
+from palimpzest.constants import Cardinality, Model
 from palimpzest.core.data.context import Context, TextFileContext
 from palimpzest.core.data.dataset import Dataset
 from palimpzest.core.data.iter_dataset import (
+    AudioFileDataset,
     HTMLFileDataset,
     ImageFileDataset,
     IterDataset,
@@ -32,11 +33,13 @@ logging.getLogger(__name__).addHandler(logging.NullHandler())
 __all__ = [
     # constants
     "Cardinality",
+    "Model",
     # core
     "Context",
     "TextFileContext",
     "Dataset",
     "IterDataset",
+    "AudioFileDataset",
     "MemoryDataset",
     "HTMLFileDataset",
     "ImageFileDataset",

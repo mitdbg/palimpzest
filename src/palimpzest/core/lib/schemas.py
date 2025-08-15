@@ -22,6 +22,11 @@ ImageFilepath = TypeAliasType('ImageFilepath', str)
 ImageBase64 = TypeAliasType('ImageBase64', str)
 ImageURL = TypeAliasType('ImageURL', str)
 
+# AUDIO TYPES
+AudioFilepath = TypeAliasType('AudioFilepath', str)
+AudioBase64 = TypeAliasType('AudioBase64', str)
+
+
 def get_schema_field_names(schema: type[BaseModel], id: str | None = None) -> list[str]:
     """Return the field names of a Pydantic model."""
     return list(schema.model_fields) if id is None else [f"{schema.__name__}.{id}.{field_name}" for field_name in schema.model_fields]
@@ -176,6 +181,10 @@ class ImageFile(File):
     """A file that contains an image."""
     contents: ImageBase64 = Field(description="The contents of the image encoded as a base64 string")
 
+class AudioFile(File):
+    """A file that contains audio."""
+    contents: AudioBase64 = Field(description="The contents of an audio recording encoded as a base64 string")
+
 class PDFFile(File):
     """A PDF file is a File that is a PDF. It has specialized fields, font information, etc."""
     # This class is currently very impoverished. It needs a lot more fields before it can correctly represent a PDF.
@@ -190,7 +199,6 @@ class XLSFile(File):
 class EquationImage(ImageFile):
     """An image that contains a mathematical equation."""
     equation_text: str = Field(description="The text representation of the equation in the image")
-
 
 class PlotImage(ImageFile):
     """An image that contains a plot, such as a graph or chart."""
