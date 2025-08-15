@@ -23,7 +23,10 @@ if __name__ == "__main__":
     plan = plan.sem_map(cols=[{"name": "animal", "type": str, "description": "The type of animal making the sound in the recording."}])
 
     # run plan un-optimized
-    config = pz.QueryProcessorConfig(policy=pz.MaxQuality())
+    config = pz.QueryProcessorConfig(
+        policy=pz.MaxQuality(),
+        # available_models=[pz.Model.GEMINI_2_0_FLASH, pz.Model.GEMINI_2_5_FLASH, pz.Model.GEMINI_2_5_PRO],
+    )
     output = plan.run(config)
 
     print(output.to_df())
