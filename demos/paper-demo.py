@@ -7,6 +7,7 @@ import numpy as np
 from PIL import Image
 
 import palimpzest as pz
+from palimpzest.constants import Model
 from palimpzest.core.lib.schemas import ImageFilepath
 from palimpzest.utils.udfs import xls_to_tables
 
@@ -136,7 +137,7 @@ if __name__ == "__main__":
         "--executor",
         type=str,
         help="The plan executor to use. One of sequential, pipelined, parallel",
-        default="sequential",
+        default="parallel",
     )
     parser.add_argument(
         "--policy",
@@ -180,12 +181,15 @@ if __name__ == "__main__":
 
     # create pz plan
     if workload == "enron":
-        plan = dataset.sem_add_columns(email_cols)
+        plan = pz.TextFileDataset(id="enron", path=dataset)
+        plan = plan.sem_add_columns(email_cols)
         plan = plan.sem_filter(
-            "The email is not quoting from a news article or an article written by someone outside of Enron"
+            "The email is not quoting from a news article or an article written by someone outside of Enron",
+            depends_on=["contents"],
         )
         plan = plan.sem_filter(
-            'The email refers to a fraudulent scheme (i.e., "Raptor", "Deathstar", "Chewco", and/or "Fat Boy")'
+            'The email refers to a fraudulent scheme (i.e., "Raptor", "Deathstar", "Chewco", and/or "Fat Boy")',
+            depends_on=["contents"],
         )
 
     elif workload == "real-estate":
@@ -209,7 +213,10 @@ if __name__ == "__main__":
         verbose=verbose,
         policy=policy,
         execution_strategy=args.executor,
-        progress=False,
+        available_models=[
+            model
+            for model in Model
+            if model not in [Model.GPT_5, Model.GPT_5_MINI] and (model.is_openai_model() or model.is_together_model())],
     )
     data_record_collection = plan.run(config)
     print(data_record_collection.to_df())

@@ -117,7 +117,7 @@ class DataRecord:
         return isinstance(other, DataRecord) and self.field_values == other.field_values and self.schema == other.schema
 
     def __hash__(self):
-        return hash(self.to_json_str(bytes_to_str=True))
+        return hash(self.to_json_str(bytes_to_str=True, sorted=True))
 
 
     def __iter__(self):
@@ -327,12 +327,12 @@ class DataRecord:
             for record in records
         ])
 
-    def to_json_str(self, include_bytes: bool = True, bytes_to_str: bool = False, project_cols: list[str] | None = None):
+    def to_json_str(self, include_bytes: bool = True, bytes_to_str: bool = False, project_cols: list[str] | None = None, sorted: bool = False):
         """Return a JSON representation of this DataRecord"""
-        record_dict = self.to_dict(include_bytes, bytes_to_str, project_cols)
+        record_dict = self.to_dict(include_bytes, bytes_to_str, project_cols, sorted)
         return json.dumps(record_dict, indent=2)
 
-    def to_dict(self, include_bytes: bool = True, bytes_to_str: bool = False, project_cols: list[str] | None = None):
+    def to_dict(self, include_bytes: bool = True, bytes_to_str: bool = False, project_cols: list[str] | None = None, _sorted: bool = False):
         """Return a dictionary representation of this DataRecord"""
         # TODO(chjun): In case of numpy types, the json.dumps will fail. Convert to native types.
         # Better ways to handle this.
@@ -359,6 +359,9 @@ class DataRecord:
                     dct[k] = v.decode("utf-8")
                 elif isinstance(v, list) and len(v) > 0 and any([isinstance(elt, bytes) for elt in v]):
                     dct[k] = [elt.decode("utf-8") if isinstance(elt, bytes) else elt for elt in v]
+
+        if _sorted:
+            dct = dict(sorted(dct.items()))
 
         return dct
 

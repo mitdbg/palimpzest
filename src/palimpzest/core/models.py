@@ -32,7 +32,7 @@ class GenerationStats(BaseModel):
     # the total cost of processing the output tokens; None if this operation did not use an LLM
     total_output_cost: float = 0.0
 
-    # the total cost of processing the output tokens; None if this operation did not use an LLM
+    # the total cost of processing the input and output tokens; None if this operation did not use an LLM
     cost_per_record: float = 0.0
 
     # (if applicable) the time (in seconds) spent executing a call to an LLM
@@ -345,6 +345,10 @@ class BasePlanStats(BaseModel):
     # SentinelPlanStats maps {logical_op_id -> {full_op_id -> OperatorStats}}
     operator_stats: dict = Field(default_factory=dict)
 
+    # dictionary whose values are GenerationStats objects for validation;
+    # only used by SentinelPlanStats
+    validation_gen_stats: dict[str, GenerationStats] = Field(default_factory=dict)
+
     # total runtime for the plan measured from the start to the end of PhysicalPlan.execute()
     total_plan_time: float = 0.0
 
@@ -369,9 +373,9 @@ class BasePlanStats(BaseModel):
         if self.start_time is None:
             raise RuntimeError("PlanStats.start() must be called before PlanStats.finish()")
         self.total_plan_time = time.time() - self.start_time
-        self.total_plan_cost = self.sum_op_costs()
-        self.total_input_tokens = self.sum_input_tokens()
-        self.total_output_tokens = self.sum_output_tokens()
+        self.total_plan_cost = self.sum_op_costs() + self.sum_validation_costs()
+        self.total_input_tokens = self.sum_input_tokens() + self.sum_validation_input_tokens()
+        self.total_output_tokens = self.sum_output_tokens() + self.sum_validation_output_tokens()
 
     @staticmethod
     @abstractmethod
@@ -422,6 +426,24 @@ class BasePlanStats(BaseModel):
         Return a string representation of this plan's statistics.
         """
         pass
+
+    def sum_validation_costs(self) -> float:
+        """
+        Sum the costs of all validation generations in this plan.
+        """
+        return sum([gen_stats.cost_per_record for _, gen_stats in self.validation_gen_stats.items()])
+
+    def sum_validation_input_tokens(self) -> int:
+        """
+        Sum the input tokens processed by all validation generations in this plan.
+        """
+        return sum([gen_stats.total_input_tokens for _, gen_stats in self.validation_gen_stats.items()])
+
+    def sum_validation_output_tokens(self) -> int:
+        """
+        Sum the output tokens processed by all validation generations in this plan.
+        """
+        return sum([gen_stats.total_output_tokens for _, gen_stats in self.validation_gen_stats.items()])
 
 
 class PlanStats(BasePlanStats):
@@ -568,6 +590,16 @@ class SentinelPlanStats(BasePlanStats):
             else:
                 raise ValueError(f"RecordOpStats with unique_logical_op_id {unique_logical_op_id} not found in SentinelPlanStats")
 
+    def add_validation_gen_stats(self, unique_logical_op_id: str, gen_stats: GenerationStats) -> None:
+        """
+        Add the given GenerationStats to this plan's validation generation stats for the given logical operator id.
+        """
+        if unique_logical_op_id in self.validation_gen_stats:
+            self.validation_gen_stats[unique_logical_op_id] += gen_stats
+        else:
+            self.validation_gen_stats[unique_logical_op_id] = gen_stats
+
+
     def __iadd__(self, plan_stats: SentinelPlanStats) -> None:
         """
         NOTE: we assume the execution layer guarantees:
@@ -589,6 +621,12 @@ class SentinelPlanStats(BasePlanStats):
                         self.operator_stats[unique_logical_op_id][full_op_id] = op_stats
                 else:
                     self.operator_stats[unique_logical_op_id] = physical_op_stats
+
+        for unique_logical_op_id, gen_stats in plan_stats.validation_gen_stats.items():
+            if unique_logical_op_id in self.validation_gen_stats:
+                self.validation_gen_stats[unique_logical_op_id] += gen_stats
+            else:
+                self.validation_gen_stats[unique_logical_op_id] = gen_stats
 
     def __str__(self) -> str:
         stats = f"total_plan_time={self.total_plan_time} \n"
@@ -704,7 +742,7 @@ class ExecutionStats(BaseModel):
         """
         Sum the costs of all SentinelPlans in this execution.
         """
-        return sum([plan_stats.sum_op_costs() for _, plan_stats in self.sentinel_plan_stats.items()])
+        return sum([plan_stats.sum_op_costs() + plan_stats.sum_validation_costs() for _, plan_stats in self.sentinel_plan_stats.items()])
 
     def sum_plan_costs(self) -> float:
         """

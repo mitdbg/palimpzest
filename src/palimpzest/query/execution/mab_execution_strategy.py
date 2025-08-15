@@ -1,6 +1,5 @@
-import cProfile
+
 import logging
-import pstats
 
 import numpy as np
 
@@ -665,7 +664,7 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
                     source_indices: [(record_set, op) for record_set, op, _ in record_set_tuples]
                     for source_indices, record_set_tuples in source_indices_to_record_set_tuples.items()
                 }
-                source_indices_to_all_record_sets = self._score_quality(validator, source_indices_to_all_record_sets)
+                source_indices_to_all_record_sets, val_gen_stats = self._score_quality(validator, source_indices_to_all_record_sets)
 
                 # remove records that were read from the execution cache before adding to record op stats
                 new_record_op_stats = []
@@ -676,6 +675,7 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
 
                 # update plan stats
                 plan_stats.add_record_op_stats(unique_logical_op_id, new_record_op_stats)
+                plan_stats.add_validation_gen_stats(unique_logical_op_id, val_gen_stats)
 
                 # provide the best record sets as inputs to the next logical operator
                 next_unique_logical_op_id = plan.get_next_unique_logical_op_id(unique_logical_op_id)
@@ -745,16 +745,9 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
         #       the progress manager cannot get a handle to the console 
         try:
             # execute sentinel plan by sampling records and operators
-            profiler = cProfile.Profile()
-            profiler.enable()
             plan_stats = self._execute_sentinel_plan(plan, op_frontiers, validator, plan_stats)
-            profiler.disable()
 
         finally:
-            # Create a pstats object from the profiler results
-            stats = pstats.Stats(profiler)
-            stats.dump_stats("mab_exec_results.prof")
-
             # finish progress tracking
             self.progress_manager.finish()
 

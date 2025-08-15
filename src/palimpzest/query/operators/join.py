@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 from abc import ABC, abstractmethod
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from pydantic.fields import FieldInfo
 
@@ -114,8 +115,7 @@ class NestedLoopsJoin(JoinOp):
         cardinality = selectivity * (left_source_op_cost_estimates.cardinality * right_source_op_cost_estimates.cardinality)
 
         # estimate quality of output based on the strength of the model being used
-        avg_input_quality = (left_source_op_cost_estimates.quality + right_source_op_cost_estimates.quality) / 2.0
-        quality = (MODEL_CARDS[self.model.value]["overall"] / 100.0) * avg_input_quality
+        quality = (MODEL_CARDS[self.model.value]["overall"] / 100.0)
 
         return OperatorCostEstimates(
             cardinality=cardinality,
@@ -124,6 +124,55 @@ class NestedLoopsJoin(JoinOp):
             quality=quality,
         )
 
+    def _process_join_candidate_pair(
+        self,
+        left_candidate: DataRecord,
+        right_candidate: DataRecord,
+        input_fields: list[str],
+        gen_kwargs: dict,
+    ) -> tuple[list[DataRecord], list[RecordOpStats]]:
+        start_time = time.time()
+
+        # generate output; NOTE: FieldInfo is used to indicate the output type; thus, the desc is not needed
+        fields = {"passed_operator": FieldInfo(annotation=bool, description="Whether the records satisfy the join condition")}
+        field_answers, _, generation_stats, _ = self.generator(left_candidate, fields, right_candidate=right_candidate, **gen_kwargs)
+
+        # determine whether or not the join was satisfied
+        passed_operator = field_answers["passed_operator"]
+
+        # compute output record and add to output_records
+        join_dr = DataRecord.from_join_parents(self.output_schema, left_candidate, right_candidate, project_cols=input_fields)
+        join_dr.passed_operator = passed_operator
+
+        # compute record stats and add to output_record_op_stats
+        record_op_stats = RecordOpStats(
+            record_id=join_dr.id,
+            record_parent_ids=join_dr.parent_ids,
+            record_source_indices=join_dr.source_indices,
+            record_state=join_dr.to_dict(include_bytes=False),
+            full_op_id=self.get_full_op_id(),
+            logical_op_id=self.logical_op_id,
+            op_name=self.op_name(),
+            time_per_record=time.time() - start_time,
+            cost_per_record=generation_stats.cost_per_record,
+            model_name=self.get_model_name(),
+            join_condition=self.condition,
+            total_input_tokens=generation_stats.total_input_tokens,
+            total_output_tokens=generation_stats.total_output_tokens,
+            total_input_cost=generation_stats.total_input_cost,
+            total_output_cost=generation_stats.total_output_cost,
+            llm_call_duration_secs=generation_stats.llm_call_duration_secs,
+            fn_call_duration_secs=generation_stats.fn_call_duration_secs,
+            total_llm_calls=generation_stats.total_llm_calls,
+            total_embedding_llm_calls=generation_stats.total_embedding_llm_calls,
+            answer=field_answers,
+            passed_operator=passed_operator,
+            image_operation=self.is_image_join(),
+            op_details={k: str(v) for k, v in self.get_id_params().items()},
+        )
+
+        return [join_dr], [record_op_stats]
+
     def __call__(self, left_candidates: list[DataRecord], right_candidates: list[DataRecord]) -> DataRecordSet:
         # get the set of input fields from both records in the join
         input_fields = self.get_input_fields()
@@ -131,54 +180,21 @@ class NestedLoopsJoin(JoinOp):
         # construct kwargs for generation
         gen_kwargs = {"project_cols": input_fields, "join_condition": self.condition}
 
+        # TODO: pass max_workers into __call__ from executor
         # apply the generator to each pair of candidates
         output_records, output_record_op_stats = [], []
         total_join_candidates = len(left_candidates) * len(right_candidates)
-        join_idx = 0
-        for candidate in left_candidates:
-            for right_candidate in right_candidates:
-                start_time = time.time()
+        with ThreadPoolExecutor(max_workers=64) as executor:
+            futures = []
+            for candidate in left_candidates:
+                for right_candidate in right_candidates:
+                    futures.append(executor.submit(self._process_join_candidate_pair, candidate, right_candidate, input_fields, gen_kwargs))
 
-                # generate output; NOTE: FieldInfo is used to indicate the output type; thus, the desc is not needed
-                fields = {"passed_operator": FieldInfo(annotation=bool, description="Whether the records satisfy the join condition")}
-                field_answers, _, generation_stats, _ = self.generator(candidate, fields, right_candidate=right_candidate, **gen_kwargs)
-
-                # determine whether or not the join was satisfied
-                passed_operator = field_answers["passed_operator"]
-
-                # compute output record and add to output_records
-                join_dr = DataRecord.from_join_parents(self.output_schema, candidate, right_candidate, project_cols=input_fields)
-                join_dr.passed_operator = passed_operator
-                output_records.append(join_dr)
-
-                # compute record stats and add to output_record_op_stats
-                record_op_stats = RecordOpStats(
-                    record_id=join_dr.id,
-                    record_parent_ids=join_dr.parent_ids,
-                    record_source_indices=join_dr.source_indices,
-                    record_state=join_dr.to_dict(include_bytes=False),
-                    full_op_id=self.get_full_op_id(),
-                    logical_op_id=self.logical_op_id,
-                    op_name=self.op_name(),
-                    time_per_record=time.time() - start_time,
-                    cost_per_record=generation_stats.cost_per_record,
-                    model_name=self.get_model_name(),
-                    join_condition=self.condition,
-                    total_input_tokens=generation_stats.total_input_tokens,
-                    total_output_tokens=generation_stats.total_output_tokens,
-                    total_input_cost=generation_stats.total_input_cost,
-                    total_output_cost=generation_stats.total_output_cost,
-                    llm_call_duration_secs=generation_stats.llm_call_duration_secs,
-                    fn_call_duration_secs=generation_stats.fn_call_duration_secs,
-                    total_llm_calls=generation_stats.total_llm_calls,
-                    total_embedding_llm_calls=generation_stats.total_embedding_llm_calls,
-                    answer=field_answers,
-                    passed_operator=passed_operator,
-                    image_operation=self.is_image_join(),
-                    op_details={k: str(v) for k, v in self.get_id_params().items()},
-                )
-                output_record_op_stats.append(record_op_stats)
+            for join_idx, future in enumerate(as_completed(futures)):
                 join_idx += 1
+                join_output_records, join_output_record_op_stats = future.result()
+                output_records.extend(join_output_records)
+                output_record_op_stats.extend(join_output_record_op_stats)
                 print(f"{join_idx}/{total_join_candidates} JOINED")
 
         return DataRecordSet(output_records, output_record_op_stats)

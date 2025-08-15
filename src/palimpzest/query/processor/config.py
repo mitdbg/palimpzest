@@ -10,7 +10,7 @@ class QueryProcessorConfig(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     # execution and optimization flags
-    execution_strategy: str = Field(default="sequential")            # substituted with ExecutionStrategyType
+    execution_strategy: str = Field(default="parallel")              # substituted with ExecutionStrategyType
     sentinel_execution_strategy: str | None = Field(default="auto")  # substituted with SentinelExecutionStrategyType
     optimizer_strategy: str = Field(default="pareto")                # substituted with OptimizationStrategyType
 
@@ -21,7 +21,7 @@ class QueryProcessorConfig(BaseModel):
     verbose: bool = Field(default=False)
     progress: bool = Field(default=True)
     available_models: list[Model] | None = Field(default=None)
-    max_workers: int | None = Field(default=None)
+    max_workers: int | None = Field(default=64)
 
     # operator flags
     allow_bonded_query: bool = Field(default=True)

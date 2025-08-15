@@ -178,7 +178,7 @@ class AllSamplingExecutionStrategy(SentinelExecutionStrategy):
                     source_indices: [(record_set, op) for record_set, op, _ in record_set_tuples]
                     for source_indices, record_set_tuples in source_indices_to_record_set_tuples.items()
                 }
-            source_indices_to_all_record_sets = self._score_quality(validator, source_indices_to_all_record_sets)
+            source_indices_to_all_record_sets, val_gen_stats = self._score_quality(validator, source_indices_to_all_record_sets)
 
             # remove records that were read from the execution cache before adding to record op stats
             new_record_op_stats = []
@@ -189,6 +189,7 @@ class AllSamplingExecutionStrategy(SentinelExecutionStrategy):
 
             # update plan stats
             plan_stats.add_record_op_stats(unique_logical_op_id, new_record_op_stats)
+            plan_stats.add_validation_gen_stats(unique_logical_op_id, val_gen_stats)
 
             # provide the best record sets as inputs to the next logical operator
             next_unique_logical_op_id = plan.get_next_unique_logical_op_id(unique_logical_op_id)

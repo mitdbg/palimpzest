@@ -1,5 +1,4 @@
 import logging
-import multiprocessing
 from concurrent.futures import ThreadPoolExecutor, wait
 
 from palimpzest.constants import PARALLEL_EXECUTION_SLEEP_INTERVAL_SECS
@@ -16,8 +15,6 @@ from palimpzest.utils.progress import create_progress_manager
 
 logger = logging.getLogger(__name__)
 
-import cProfile
-import pstats
 
 class ParallelExecutionStrategy(ExecutionStrategy):
     """
@@ -26,21 +23,6 @@ class ParallelExecutionStrategy(ExecutionStrategy):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.max_workers = (
-            self._get_parallel_max_workers()
-            if self.max_workers is None
-            else self.max_workers
-        )
-
-    def _get_parallel_max_workers(self):
-        # for now, return the number of system CPUs;
-        # in the future, we may want to consider the models the user has access to
-        # and whether or not they will encounter rate-limits. If they will, we should
-        # set the max workers in a manner that is designed to avoid hitting them.
-        # Doing this "right" may require considering their logical, physical plan,
-        # and tier status with LLM providers. It may also be worth dynamically
-        # changing the max_workers in response to 429 errors.
-        return max(int(0.8 * multiprocessing.cpu_count()), 1)
 
     def _any_queue_not_empty(self, queues: dict[str, list] | dict[str, dict[str, list]]) -> bool:
         """Helper function to check if any queue is not empty."""
@@ -156,9 +138,10 @@ class ParallelExecutionStrategy(ExecutionStrategy):
 
                     else:
                         source_unique_full_op_id = source_unique_full_op_ids[0]
-                        input_record = input_queues[unique_full_op_id][source_unique_full_op_id].pop(0)
-                        future = executor.submit(operator, input_record)
-                        future_queues[unique_full_op_id].append(future)
+                        for input_record in input_queues[unique_full_op_id][source_unique_full_op_id]:
+                            future = executor.submit(operator, input_record)
+                            future_queues[unique_full_op_id].append(future)
+                        input_queues[unique_full_op_id][source_unique_full_op_id].clear()
 
                 # break out of loop if the final operator is a LimitScanOp and we've reached its limit
                 if isinstance(final_op, LimitScanOp) and len(output_records) == final_op.limit:
@@ -209,21 +192,6 @@ class SequentialParallelExecutionStrategy(ExecutionStrategy):
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.max_workers = (
-            self._get_parallel_max_workers()
-            if self.max_workers is None
-            else self.max_workers
-        )
-
-    def _get_parallel_max_workers(self):
-        # for now, return the number of system CPUs;
-        # in the future, we may want to consider the models the user has access to
-        # and whether or not they will encounter rate-limits. If they will, we should
-        # set the max workers in a manner that is designed to avoid hitting them.
-        # Doing this "right" may require considering their logical, physical plan,
-        # and tier status with LLM providers. It may also be worth dynamically
-        # changing the max_workers in response to 429 errors.
-        return max(int(0.8 * multiprocessing.cpu_count()), 1)
 
     def _any_queue_not_empty(self, queues: dict[str, list] | dict[str, dict[str, list]]) -> bool:
         """Helper function to check if any queue is not empty."""
@@ -313,10 +281,10 @@ class SequentialParallelExecutionStrategy(ExecutionStrategy):
 
                 else:
                     source_unique_full_op_id = source_unique_full_op_ids[0]
-                    while len(input_queues[unique_full_op_id][source_unique_full_op_id]) > 0:
-                        input_record = input_queues[unique_full_op_id][source_unique_full_op_id].pop(0)
+                    for input_record in input_queues[unique_full_op_id][source_unique_full_op_id]:
                         future = executor.submit(operator, input_record)
                         future_queues[unique_full_op_id].append(future)
+                    input_queues[unique_full_op_id][source_unique_full_op_id].clear()
 
                 # block until all futures for this operator have completed; and add finished futures to next operator's input
                 while len(future_queues[unique_full_op_id]) > 0:
@@ -362,16 +330,9 @@ class SequentialParallelExecutionStrategy(ExecutionStrategy):
         #       because the progress manager cannot get a handle to the console 
         try:
             # execute plan
-            profiler = cProfile.Profile()
-            profiler.enable()
             output_records, plan_stats = self._execute_plan(plan, input_queues, future_queues, plan_stats)
-            profiler.disable()
 
         finally:
-            # Create a pstats object from the profiler results
-            stats = pstats.Stats(profiler)
-            stats.dump_stats("parallel_exec_results.prof")
-
             # finish progress tracking
             self.progress_manager.finish()
 

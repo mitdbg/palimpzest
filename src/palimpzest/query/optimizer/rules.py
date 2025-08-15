@@ -212,8 +212,7 @@ class PushDownFilter(TransformationRule):
                 # create final new logical expression with expr's operator pulled up
                 new_expr = LogicalExpression(
                     expr.operator.copy(),
-                    input_group_ids=[group_id]
-                    + [g_id for g_id in logical_expression.input_group_ids if g_id != input_group_id],
+                    input_group_ids=[group_id] + [g_id for g_id in logical_expression.input_group_ids if g_id != input_group_id],
                     input_fields=group.fields,
                     depends_on_field_names=expr.depends_on_field_names,
                     generated_fields=expr.generated_fields,
