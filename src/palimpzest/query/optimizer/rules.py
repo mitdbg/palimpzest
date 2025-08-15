@@ -351,8 +351,6 @@ class ImplementationRule(Rule):
         has_list_image_field = len(cls._get_list_image_fields(logical_expression)) > 0
         num_audio_fields = len(cls._get_audio_fields(logical_expression))
         has_list_audio_field = len(cls._get_list_audio_fields(logical_expression)) > 0
-        if num_audio_fields > 0 and model.is_vertex_model():
-            import pdb; pdb.set_trace()
 
         # corner-case: for now, all operators use text or vision models for processing inputs to __call__
         if model.is_embedding_model():
@@ -491,7 +489,6 @@ class LLMConvertBondedRule(ImplementationRule):
 
         # create variable physical operator kwargs for each model which can implement this logical_expression
         models = [model for model in runtime_kwargs["available_models"] if cls._model_matches_input(model, logical_expression)]
-        import pdb; pdb.set_trace()
         # NOTE: right now we exclusively allow image or audio operations, but not both simultaneously
         prompt_strategy = PromptStrategy.COT_QA
         if cls._is_image_operation(logical_expression):
