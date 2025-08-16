@@ -138,10 +138,19 @@ class ParallelExecutionStrategy(ExecutionStrategy):
 
                     else:
                         source_unique_full_op_id = source_unique_full_op_ids[0]
-                        for input_record in input_queues[unique_full_op_id][source_unique_full_op_id]:
-                            future = executor.submit(operator, input_record)
-                            future_queues[unique_full_op_id].append(future)
-                        input_queues[unique_full_op_id][source_unique_full_op_id].clear()
+                        input_records = input_queues[unique_full_op_id][source_unique_full_op_id]
+                        if self.batch_size is None:
+                            for input_record in input_records:
+                                future = executor.submit(operator, input_record)
+                                future_queues[unique_full_op_id].append(future)
+                            input_queues[unique_full_op_id][source_unique_full_op_id].clear()
+                        else:
+                            batch_size = min(self.batch_size, len(input_records))
+                            batch_input_records = input_records[:batch_size]
+                            for input_record in batch_input_records:
+                                future = executor.submit(operator, input_record)
+                                future_queues[unique_full_op_id].append(future)
+                            input_queues[unique_full_op_id][source_unique_full_op_id] = input_records[batch_size:]
 
                 # break out of loop if the final operator is a LimitScanOp and we've reached its limit
                 if isinstance(final_op, LimitScanOp) and len(output_records) == final_op.limit:

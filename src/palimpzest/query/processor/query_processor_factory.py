@@ -94,10 +94,21 @@ class QueryProcessorFactory:
         return Optimizer(cost_model=SampleBasedCostModel(), **config.to_dict())
 
     @classmethod
-    def _create_execution_strategy(cls, config: QueryProcessorConfig) -> ExecutionStrategy:
+    def _create_execution_strategy(cls, dataset: Dataset, config: QueryProcessorConfig) -> ExecutionStrategy:
         """
         Creates an execution strategy based on the configuration.
         """
+        # for parallel execution, set the batch size if there's a limit in the query
+        limit = dataset.get_limit()
+        if limit is not None and config.execution_strategy == ExecutionStrategyType.PARALLEL:
+            if config.batch_size is None:
+                config.batch_size = limit
+                logger.info(f"Setting batch size to query limit: {limit}")
+            elif config.batch_size > limit:
+                config.batch_size = limit
+                logger.info(f"Setting batch size to query limit: {limit} since it was larger than the limit")
+
+        # create the execution strategy
         execution_strategy_cls = config.execution_strategy.value
         return execution_strategy_cls(**config.to_dict())
 
@@ -136,7 +147,7 @@ class QueryProcessorFactory:
 
         # create the optimizer, execution strateg(ies), and processor
         optimizer = cls._create_optimizer(config)
-        config.execution_strategy = cls._create_execution_strategy(config)
+        config.execution_strategy = cls._create_execution_strategy(dataset, config)
         config.sentinel_execution_strategy = cls._create_sentinel_execution_strategy(config)
         processor = QueryProcessor(dataset, optimizer, train_dataset=train_dataset, validator=validator, **config.to_dict())
 
