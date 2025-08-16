@@ -97,6 +97,7 @@ class PhysicalOperator:
             "input_schema": self.input_schema,
             "depends_on": self.depends_on,
             "logical_op_id": self.logical_op_id,
+            "unique_logical_op_id": self.unique_logical_op_id,
             "logical_op_name": self.logical_op_name,
             "verbose": self.verbose,
         }

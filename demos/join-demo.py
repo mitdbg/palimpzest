@@ -21,6 +21,7 @@ def run_text_join():
     config = pz.QueryProcessorConfig(
         policy=pz.MaxQuality(),
         execution_strategy="parallel",
+        join_parallelism=64,
     )
     data_record_collection = ds3.run(config)
     print(data_record_collection.to_df())
@@ -34,6 +35,7 @@ def run_image_join():
     config = pz.QueryProcessorConfig(
         policy=pz.MaxQuality(),
         execution_strategy="parallel",
+        join_parallelism=64,
     )
     data_record_collection = ds3.run(config)
     print(data_record_collection.to_df())
@@ -47,6 +49,7 @@ def run_text_image_join():
     config = pz.QueryProcessorConfig(
         policy=pz.MaxQuality(),
         execution_strategy="parallel",
+        join_parallelism=64,
     )
     data_record_collection = ds3.run(config)
     print(data_record_collection.to_df())

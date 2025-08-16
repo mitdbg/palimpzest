@@ -94,6 +94,7 @@ class QueryProcessor:
         dataset = self.dataset.copy()
         if train_dataset is not None:
             dataset._set_root_datasets(train_dataset)
+            dataset._generate_unique_logical_op_ids()
 
         # get the sentinel plan for the given dataset
         sentinel_plans = optimizer.optimize(dataset)

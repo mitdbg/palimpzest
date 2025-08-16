@@ -21,7 +21,9 @@ class QueryProcessorConfig(BaseModel):
     verbose: bool = Field(default=False)
     progress: bool = Field(default=True)
     available_models: list[Model] | None = Field(default=None)
+    remove_models: list[Model] | None = Field(default=None)
     max_workers: int | None = Field(default=64)
+    join_parallelism: int = Field(default=64)
 
     # operator flags
     allow_bonded_query: bool = Field(default=True)

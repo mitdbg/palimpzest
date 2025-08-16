@@ -54,12 +54,14 @@ class NestedLoopsJoin(JoinOp):
         self,
         model: Model,
         prompt_strategy: PromptStrategy = PromptStrategy.COT_JOIN,
+        join_parallelism: int = 64,
         *args,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
         self.model = model
         self.prompt_strategy = prompt_strategy
+        self.join_parallelism = join_parallelism
         self.generator = Generator(model, prompt_strategy, Cardinality.ONE_TO_ONE, self.verbose)
 
     def get_id_params(self):
@@ -184,7 +186,7 @@ class NestedLoopsJoin(JoinOp):
         # apply the generator to each pair of candidates
         output_records, output_record_op_stats = [], []
         total_join_candidates = len(left_candidates) * len(right_candidates)
-        with ThreadPoolExecutor(max_workers=64) as executor:
+        with ThreadPoolExecutor(max_workers=self.join_parallelism) as executor:
             futures = []
             for candidate in left_candidates:
                 for right_candidate in right_candidates:

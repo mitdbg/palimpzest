@@ -145,8 +145,9 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
                     if isinstance(op, LLMConvert) and op.cardinality is Cardinality.ONE_TO_ONE:
                         fields = op.generated_fields
                         input_record: DataRecord = record_set.input
-                        output = record_set.data_records[0].to_json_str(project_cols=fields, bytes_to_str=True, sorted=True)
-                        full_hash = f"{hash(input_record)}{hash(output)}"
+                        output = record_set.data_records[0].to_dict(project_cols=fields)
+                        output_str = record_set.data_records[0].to_json_str(project_cols=fields, bytes_to_str=True, sorted=True)
+                        full_hash = f"{hash(input_record)}{hash(output_str)}"
                         if full_hash not in full_hashes:
                             full_hashes.add(full_hash)
                             futures.append(executor.submit(validator._score_map, op, fields, input_record, output, full_hash))
@@ -155,10 +156,11 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
                     elif isinstance(op, LLMConvert) and op.cardinality is Cardinality.ONE_TO_MANY:
                         fields = op.generated_fields
                         input_record: DataRecord = record_set.input
-                        output = []
+                        output, output_strs = [], []
                         for data_record in record_set.data_records:
-                            output.append(data_record.to_json_str(project_cols=fields, bytes_to_str=True, sorted=True))
-                        full_hash = f"{hash(input_record)}{hash(tuple(sorted(output)))}"
+                            output.append(data_record.to_dict(project_cols=fields))
+                            output_strs.append(data_record.to_json_str(project_cols=fields, bytes_to_str=True, sorted=True))
+                        full_hash = f"{hash(input_record)}{hash(tuple(sorted(output_strs)))}"
                         if full_hash not in full_hashes:
                             full_hashes.add(full_hash)
                             futures.append(executor.submit(validator._score_flat_map, op, fields, input_record, output, full_hash))
@@ -167,8 +169,9 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
                     elif isinstance(op, RetrieveOp):
                         fields = op.generated_fields
                         input_record: DataRecord = record_set.input
-                        output = record_set.data_records[0].to_json_str(project_cols=fields, bytes_to_str=True, sorted=True)
-                        full_hash = f"{hash(input_record)}{hash(output)}"
+                        output = record_set.data_records[0].to_dict(project_cols=fields)
+                        output_str = record_set.data_records[0].to_json_str(project_cols=fields, bytes_to_str=True, sorted=True)
+                        full_hash = f"{hash(input_record)}{hash(output_str)}"
                         if full_hash not in full_hashes:
                             full_hashes.add(full_hash)
                             futures.append(executor.submit(validator._score_retrieve, op, fields, input_record, output, full_hash))
@@ -210,17 +213,17 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
                 if isinstance(op, LLMConvert) and op.cardinality is Cardinality.ONE_TO_ONE:
                     fields = op.generated_fields
                     input_record: DataRecord = record_set.input
-                    output = record_set.data_records[0].to_json_str(project_cols=fields, bytes_to_str=True, sorted=True)
-                    full_hash = f"{hash(input_record)}{hash(output)}"
+                    output_str = record_set.data_records[0].to_json_str(project_cols=fields, bytes_to_str=True, sorted=True)
+                    full_hash = f"{hash(input_record)}{hash(output_str)}"
                     record_set.record_op_stats[0].quality = full_hash_to_score[full_hash]
 
                 elif isinstance(op, LLMConvert) and op.cardinality is Cardinality.ONE_TO_MANY:
                     fields = op.generated_fields
                     input_record: DataRecord = record_set.input
-                    output = []
+                    output_strs = []
                     for data_record in record_set.data_records:
-                        output.append(data_record.to_json_str(project_cols=fields, bytes_to_str=True, sorted=True))
-                    full_hash = f"{hash(input_record)}{hash(tuple(sorted(output)))}"
+                        output_strs.append(data_record.to_json_str(project_cols=fields, bytes_to_str=True, sorted=True))
+                    full_hash = f"{hash(input_record)}{hash(tuple(sorted(output_strs)))}"
                     score = full_hash_to_score[full_hash]
                     for record_op_stats in record_set.record_op_stats:
                         record_op_stats.quality = score
@@ -230,8 +233,8 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
                 elif isinstance(op, RetrieveOp):
                     fields = op.generated_fields
                     input_record: DataRecord = record_set.input
-                    output = record_set.data_records[0].to_json_str(project_cols=fields, bytes_to_str=True, sorted=True)
-                    full_hash = f"{hash(input_record)}{hash(output)}"
+                    output_str = record_set.data_records[0].to_json_str(project_cols=fields, bytes_to_str=True, sorted=True)
+                    full_hash = f"{hash(input_record)}{hash(output_str)}"
                     score = full_hash_to_score[full_hash]
                     record_set.record_op_stats[0].quality = score
 
