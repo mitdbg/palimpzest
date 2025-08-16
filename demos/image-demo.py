@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """This scripts is a demo for image processing, it is simply an abridged version of simpleDemo.py"""
 
-import argparse
 import os
 import time
 
@@ -30,23 +29,15 @@ def build_image_plan(dataset):
 if __name__ == "__main__":
     # parse arguments
     start_time = time.time()
-
-    parser = argparse.ArgumentParser(description="Run a simple demo")
-    parser.add_argument("--cache", action="store_true", help="Use cached results",default=False)
-
-    args = parser.parse_args()
-    cache = args.cache
-    if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None:
-        print("WARNING: Both OPENAI_API_KEY and TOGETHER_API_KEY are unset")
+    if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None and os.getenv("ANTHROPIC_API_KEY") is None:
+        print("WARNING: OPENAI_API_KEY, TOGETHER_API_KEY, and ANTHROPIC_API_KEY are unset")
 
     print("Starting image task")
     policy = pz.MaxQuality()
     plan = build_image_plan("testdata/images-tiny")
     config = pz.QueryProcessorConfig(
         policy=policy,
-        cache=cache,
         verbose=True,
-        processing_strategy="no_sentinel",
     )
     data_record_collection = plan.run(config)
 

@@ -9,15 +9,14 @@ from palimpzest.query.operators.convert import NonLLMConvert as _NonLLMConvert
 from palimpzest.query.operators.filter import FilterOp as _FilterOp
 from palimpzest.query.operators.filter import LLMFilter as _LLMFilter
 from palimpzest.query.operators.filter import NonLLMFilter as _NonLLMFilter
+from palimpzest.query.operators.join import JoinOp as _JoinOp
+from palimpzest.query.operators.join import NestedLoopsJoin as _NestedLoopsJoin
 from palimpzest.query.operators.limit import LimitScanOp as _LimitScanOp
 from palimpzest.query.operators.logical import (
     Aggregate as _Aggregate,
 )
 from palimpzest.query.operators.logical import (
     BaseScan as _BaseScan,
-)
-from palimpzest.query.operators.logical import (
-    CacheScan as _CacheScan,
 )
 from palimpzest.query.operators.logical import (
     ConvertScan as _ConvertScan,
@@ -27,6 +26,9 @@ from palimpzest.query.operators.logical import (
 )
 from palimpzest.query.operators.logical import (
     GroupByAggregate as _GroupByAggregate,
+)
+from palimpzest.query.operators.logical import (
+    JoinOp as _LogicalJoinOp,
 )
 from palimpzest.query.operators.logical import (
     LimitScan as _LimitScan,
@@ -44,7 +46,6 @@ from palimpzest.query.operators.mixture_of_agents_convert import MixtureOfAgents
 from palimpzest.query.operators.physical import PhysicalOperator as _PhysicalOperator
 from palimpzest.query.operators.project import ProjectOp as _ProjectOp
 from palimpzest.query.operators.retrieve import RetrieveOp as _RetrieveOp
-from palimpzest.query.operators.scan import CacheScanDataOp as _CacheScanDataOp
 from palimpzest.query.operators.scan import MarshalAndScanDataOp as _MarshalAndScanDataOp
 from palimpzest.query.operators.scan import ScanPhysicalOp as _ScanPhysicalOp
 
@@ -52,10 +53,10 @@ LOGICAL_OPERATORS = [
     _LogicalOperator,
     _Aggregate,
     _BaseScan,
-    _CacheScan,
     _ConvertScan,
     _FilteredScan,
     _GroupByAggregate,
+    _LogicalJoinOp,
     _LimitScan,
     _Project,
     _RetrieveScan,
@@ -67,9 +68,11 @@ PHYSICAL_OPERATORS = (
     # convert
     + [_ConvertOp, _NonLLMConvert, _LLMConvert, _LLMConvertBonded]
     # scan
-    + [_ScanPhysicalOp, _MarshalAndScanDataOp, _CacheScanDataOp]
+    + [_ScanPhysicalOp, _MarshalAndScanDataOp]
     # filter
     + [_FilterOp, _NonLLMFilter, _LLMFilter]
+    # join
+    + [_JoinOp, _NestedLoopsJoin]
     # limit
     + [_LimitScanOp]
     # mixture-of-agents

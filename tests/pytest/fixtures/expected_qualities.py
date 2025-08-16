@@ -62,8 +62,8 @@ def scan_convert_filter_varied_qualities(scan_convert_filter_varied_execution_da
                             # by construction, champion model expects odd record outputs but GPT-3.5 outputs even records,
                             # so all records get quality 0.0
                             quality = 0.0
-                        elif str(Model.MIXTRAL) in record_op_stats.full_op_id:
-                            # by construction, champion model expects odd record outputs but Mixtral outputs all records,
+                        elif str(Model.LLAMA3_1_8B) in record_op_stats.full_op_id:
+                            # by construction, champion model expects odd record outputs but LLAMA3_1_8B outputs all records,
                             # so even records get quality 0.0 and odd records get quality 1.0
                             quality = int(bool(source_idx % 2))
 
@@ -95,26 +95,26 @@ def scan_convert_filter_varied_override_qualities(scan_convert_filter_varied_exe
                     elif record_op_stats.logical_op_id == "convert1-logical":
                         # by construction, expected output is used to score records with idx % 3 > 0, i.e. records 1, 2, 4, 5, 7, 8
                         # for expected outputs w/record idx < 6 (i.e. records 1, 2, 4, 5) the expected `bar` value is f"bar{idx}-{str(Model.GPT_4o_MINI)}";
-                        # for expected outputs w/record idx >= 6 (i.e. records 7, 8) the expected `bar` value is f"bar{idx}-{str(Model.MIXTRAL)}";
+                        # for expected outputs w/record idx >= 6 (i.e. records 7, 8) the expected `bar` value is f"bar{idx}-{str(Model.LLAMA3_1_8B)}";
                         # for records 0, 3, 6, 9; the champion model expects outputs f"bar{idx}-{str(Model.GPT_4o)}"
                         if source_idx % 3 > 0 and source_idx < 6:
                             quality = 1.0 if str(Model.GPT_4o_MINI) in record_op_stats.full_op_id else 0.5
                         elif source_idx % 3 > 0:
-                            quality = 1.0 if str(Model.MIXTRAL) in record_op_stats.full_op_id else 0.5
+                            quality = 1.0 if str(Model.LLAMA3_1_8B) in record_op_stats.full_op_id else 0.5
                         else:
                             quality = 1.0 if str(Model.GPT_4o) in record_op_stats.full_op_id else 0.5
 
                     elif record_op_stats.logical_op_id == "filter1-logical":
                         # by construction, expected output passes all records with idx % 3 > 0, i.e. records 1, 2, 4, 5, 7, 8
                         # - it expects GPT-3.5 for records with idx < 6 (i.e. records 1, 2, 4, 5)
-                        # - it expects MIXTRAL for records with idx >= 6 (i.e. records 7, 8)
+                        # - it expects LLAMA3_1_8B for records with idx >= 6 (i.e. records 7, 8)
                         # champion model passes all odd records
 
                         # using expected_record and match found
                         if source_idx % 3 > 0 and source_idx < 6 and str(Model.GPT_4o_MINI) in record_op_stats.full_op_id:  # noqa: SIM114
                             quality = int(record_op_stats.passed_operator)
                         
-                        elif source_idx % 3 > 0 and source_idx >= 6 and str(Model.MIXTRAL) in record_op_stats.full_op_id:  # noqa: SIM114
+                        elif source_idx % 3 > 0 and source_idx >= 6 and str(Model.LLAMA3_1_8B) in record_op_stats.full_op_id:  # noqa: SIM114
                             quality = int(record_op_stats.passed_operator)
 
                         # using champion record and it thinks record should pass

@@ -7,7 +7,8 @@ import numpy as np
 from PIL import Image
 
 import palimpzest as pz
-from palimpzest.core.lib.fields import ImageFilepathField, ListField
+from palimpzest.constants import Model
+from palimpzest.core.lib.schemas import ImageFilepath
 from palimpzest.utils.udfs import xls_to_tables
 
 # Addresses far from MIT; we use a simple lookup like this to make the
@@ -73,7 +74,7 @@ case_data_cols = [
 real_estate_listing_cols = [
     {"name": "listing", "type": str, "desc": "The name of the listing"},
     {"name": "text_content", "type": str, "desc": "The content of the listing's text description"},
-    {"name": "image_filepaths", "type": ListField(ImageFilepathField), "desc": "A list of the filepaths for each image of the listing"},
+    {"name": "image_filepaths", "type": list[ImageFilepath], "desc": "A list of the filepaths for each image of the listing"},
 ]
 
 real_estate_text_cols = [
@@ -94,21 +95,12 @@ table_cols = [
 ]
 
 
-# class RealEstateListingFiles(Schema):
-#     """The source text and image data for a real estate listing."""
-
-#     listing = StringField(desc="The name of the listing")
-#     text_content = StringField(desc="The content of the listing's text description")
-#     image_filepaths = ListField(
-#         element_type=ImageFilepathField,
-#         desc="A list of the filepaths for each image of the listing",
-#     )
-
-class RealEstateListingReader(pz.DataReader):
+class RealEstateListingDataset(pz.IterDataset):
     def __init__(self, listings_dir):
-        super().__init__(real_estate_listing_cols)
+        super().__init__(id="real-estate", schema=real_estate_listing_cols)
         self.listings_dir = listings_dir
         self.listings = sorted(os.listdir(self.listings_dir))
+        self.listings = [file for file in self.listings if not file.startswith(".")]
 
     def __len__(self):
         return len(self.listings)
@@ -145,7 +137,7 @@ if __name__ == "__main__":
         "--executor",
         type=str,
         help="The plan executor to use. One of sequential, pipelined, parallel",
-        default="sequential",
+        default="parallel",
     )
     parser.add_argument(
         "--policy",
@@ -184,21 +176,24 @@ if __name__ == "__main__":
         print("Policy not supported for this demo")
         exit(1)
 
-    if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None:
-        print("WARNING: Both OPENAI_API_KEY and TOGETHER_API_KEY are unset")
+    if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None and os.getenv("ANTHROPIC_API_KEY") is None:
+        print("WARNING: OPENAI_API_KEY, TOGETHER_API_KEY, and ANTHROPIC_API_KEY are unset")
 
     # create pz plan
     if workload == "enron":
-        plan = pz.Dataset(dataset).sem_add_columns(email_cols)
+        plan = pz.TextFileDataset(id="enron", path=dataset)
+        plan = plan.sem_add_columns(email_cols)
         plan = plan.sem_filter(
-            "The email is not quoting from a news article or an article written by someone outside of Enron"
+            "The email is not quoting from a news article or an article written by someone outside of Enron",
+            depends_on=["contents"],
         )
         plan = plan.sem_filter(
-            'The email refers to a fraudulent scheme (i.e., "Raptor", "Deathstar", "Chewco", and/or "Fat Boy")'
+            'The email refers to a fraudulent scheme (i.e., "Raptor", "Deathstar", "Chewco", and/or "Fat Boy")',
+            depends_on=["contents"],
         )
 
     elif workload == "real-estate":
-        plan = pz.Dataset(RealEstateListingReader(dataset))
+        plan = RealEstateListingDataset(dataset)
         plan = plan.sem_add_columns(real_estate_text_cols, depends_on="text_content")
         plan = plan.sem_add_columns(real_estate_image_cols, depends_on="image_filepaths")
         plan = plan.sem_filter(
@@ -209,17 +204,19 @@ if __name__ == "__main__":
         plan = plan.filter(in_price_range, depends_on="price")
 
     elif workload == "medical-schema-matching":
-        plan = pz.Dataset(dataset)
-        plan = plan.add_columns(xls_to_tables, cols=table_cols, cardinality=pz.Cardinality.ONE_TO_MANY)
+        plan = dataset.add_columns(xls_to_tables, cols=table_cols, cardinality=pz.Cardinality.ONE_TO_MANY)
         plan = plan.sem_filter("The rows of the table contain the patient age")
         plan = plan.sem_add_columns(case_data_cols, cardinality=pz.Cardinality.ONE_TO_MANY)
 
     # construct config and run plan
     config = pz.QueryProcessorConfig(
-        cache=False,
         verbose=verbose,
         policy=policy,
         execution_strategy=args.executor,
+        available_models=[
+            model
+            for model in Model
+            if model not in [Model.GPT_5, Model.GPT_5_MINI] and (model.is_openai_model() or model.is_together_model())],
     )
     data_record_collection = plan.run(config)
     print(data_record_collection.to_df())

@@ -50,9 +50,7 @@ def run_workload():
     policy = pz.MinCost()
     config = pz.QueryProcessorConfig(
         policy=policy,
-        cache=False,
-        allow_code_synth=False,
-        processing_strategy="streaming",
+        processing_strategy="streaming", # NOTE: processing_strategy and streaming are deprecated; we will need to update this demo
         execution_strategy="sequential",
         optimizer_strategy="pareto",
     )
@@ -96,8 +94,6 @@ if run_pz:
     policy = pz.MaxQuality()
     config = pz.QueryProcessorConfig(
         policy=policy,
-        cache=False,
-        allow_code_synth=False,
         processing_strategy="streaming",
         execution_strategy="sequential",
         optimizer_strategy="pareto",

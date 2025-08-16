@@ -3,8 +3,8 @@
 import os
 import sys
 
-from palimpzest.core.lib.fields import NumericField, StringField
-from palimpzest.core.lib.schemas import Schema
+from pydantic import BaseModel, Field
+
 from palimpzest.query.operators.physical import PhysicalOperator
 
 sys.path.append("./tests/")
@@ -16,18 +16,18 @@ if not os.environ.get("OPENAI_API_KEY"):
     load_env()
 
 
-class SimpleSchema(Schema):
-    name = StringField(desc="The name of the person")
-    age = NumericField(desc="The age of the person")
+class SimpleSchema(BaseModel):
+    name: str = Field(description="The name of the person")
+    age: int = Field(description="The age of the person")
 
-class SimpleSchemaTwo(Schema):
-    name = StringField(desc="The name of the person")
-    age = NumericField(desc="The age of the person")
-    height = NumericField(desc="The height of the person")
+class SimpleSchemaTwo(BaseModel):
+    name: str = Field(description="The name of the person")
+    age: int = Field(description="The age of the person")
+    height: int | float = Field(description="The height of the person in cm")
 
 def test_physical_operator_init():
     """Test basic initialization of PhysicalOperator"""
-    
+
     op = PhysicalOperator(
         output_schema=SimpleSchema,
         input_schema=SimpleSchema,
@@ -44,17 +44,14 @@ def test_physical_operator_init():
 
 def test_physical_operator_equality():
     """Test equality comparison between PhysicalOperators"""
-    schema1 = SimpleSchema()
-    schema2 = SimpleSchemaTwo()
+    op1 = PhysicalOperator(logical_op_id="abc", output_schema=SimpleSchema)
+    op2 = PhysicalOperator(logical_op_id="abc", output_schema=SimpleSchema)
+    op3 = PhysicalOperator(logical_op_id="def", output_schema=SimpleSchemaTwo)
 
-    op1 = PhysicalOperator(output_schema=schema1)
-    op2 = PhysicalOperator(output_schema=schema1)
-    op3 = PhysicalOperator(output_schema=schema2, verbose=True)
-
-    assert op1 == op2  # Same output schema
-    assert op1 == op1  # Same instance
-    assert op1 == op1.copy()  # Copy should be equal
-    assert op1 != op3  # Different parameters
+    assert op1 == op2
+    assert op1 == op1
+    assert op1 == op1.copy()
+    assert op2 != op3
 
 def test_physical_operator_str():
     """Test string representation of PhysicalOperator"""

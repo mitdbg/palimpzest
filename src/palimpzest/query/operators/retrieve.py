@@ -8,12 +8,12 @@ from chromadb.api.models.Collection import Collection
 from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
 from chromadb.utils.embedding_functions.openai_embedding_function import OpenAIEmbeddingFunction
 from openai import OpenAI
+from pydantic import BaseModel
 from sentence_transformers import SentenceTransformer
 
 from palimpzest.constants import MODEL_CARDS, Model
-from palimpzest.core.data.dataclasses import GenerationStats, OperatorCostEstimates, RecordOpStats
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
-from palimpzest.core.lib.schemas import Schema
+from palimpzest.core.models import GenerationStats, OperatorCostEstimates, RecordOpStats
 from palimpzest.query.operators.physical import PhysicalOperator
 
 
@@ -22,7 +22,7 @@ class RetrieveOp(PhysicalOperator):
         self,
         index: Collection,
         search_attr: str,
-        output_attrs: list[dict] | type[Schema],
+        output_attrs: list[dict] | type[BaseModel],
         search_func: Callable | None,
         k: int,
         *args,
@@ -41,12 +41,12 @@ class RetrieveOp(PhysicalOperator):
         super().__init__(*args, **kwargs)
 
         # extract the field names from the output_attrs
-        if isinstance(output_attrs, Schema):
-            self.output_field_names = output_attrs.field_names()
+        if issubclass(output_attrs, BaseModel):
+            self.output_field_names = list(output_attrs.model_fields)
         elif isinstance(output_attrs, list):
             self.output_field_names = [attr["name"] for attr in output_attrs]
         else:
-            raise ValueError("`output_attrs` must be a list of dicts or a Schema object.")
+            raise ValueError("`output_attrs` must be a list of dicts or a `pydantic.BaseModel` object.")
 
         if len(self.output_field_names) != 1 and search_func is None:
             raise ValueError("If `search_func` is None, `output_attrs` must have a single field.")
@@ -160,8 +160,8 @@ class RetrieveOp(PhysicalOperator):
         # construct the RecordOpStats object
         record_op_stats = RecordOpStats(
             record_id=output_dr.id,
-            record_parent_id=output_dr.parent_id,
-            record_source_idx=output_dr.source_idx,
+            record_parent_ids=output_dr.parent_ids,
+            record_source_indices=output_dr.source_indices,
             record_state=record_state,
             full_op_id=self.get_full_op_id(),
             logical_op_id=self.logical_op_id,
@@ -169,7 +169,7 @@ class RetrieveOp(PhysicalOperator):
             time_per_record=total_time,
             cost_per_record=generation_stats.cost_per_record,
             answer=answer,
-            input_fields=self.input_schema.field_names(),
+            input_fields=list(self.input_schema.model_fields),
             generated_fields=generated_fields,
             fn_call_duration_secs=total_time - generation_stats.llm_call_duration_secs,
             llm_call_duration_secs=generation_stats.llm_call_duration_secs,

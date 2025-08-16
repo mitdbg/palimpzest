@@ -49,7 +49,7 @@ def create_plan_str(flatten_ops):
                 plan_str += f'\n    Filter: "{filter_str}"'
         plan_str += "\n"
         plan_str += (
-            f"    ({','.join(in_schema.field_names())[:15]}...) -> ({','.join(out_schema.field_names())[:15]}...)"
+            f"    ({','.join(list(in_schema.model_fields))[:15]}...) -> ({','.join(list(out_schema.model_fields))[:15]}...)"
         )
         plan_str += "\n\n"
 

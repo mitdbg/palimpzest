@@ -5,9 +5,9 @@ import palimpzest as pz
 from palimpzest.core.lib.schemas import TextFile
 
 
-class EnronReader(pz.DataReader):
+class EnronDataset(pz.IterDataset):
     def __init__(self, dir: str, labels_file: str | None = None, split: str = "test"):
-        super().__init__(TextFile)
+        super().__init__(id=f"enron-{split}", schema=TextFile)
         self.filepaths = [os.path.join(dir, filename) for filename in os.listdir(dir)]
         self.filepaths = self.filepaths[:50] if split == "train" else self.filepaths[50:150]
         self.filename_to_labels = {}
@@ -35,11 +35,10 @@ class EnronReader(pz.DataReader):
 
 if __name__ == "__main__":
     # create validation data source
-    val_datareader = EnronReader(dir="testdata/enron-eval-medium", labels_file="testdata/enron-eval-medium-labels.json", split="train")
-    datareader = EnronReader(dir="testdata/enron-eval-medium", split="test")
+    train_dataset = EnronDataset(dir="testdata/enron-eval-medium", labels_file="testdata/enron-eval-medium-labels.json", split="train")
 
     # construct plan
-    plan = pz.Dataset(datareader)
+    plan = EnronDataset(dir="testdata/enron-eval-medium", split="test")
     plan = plan.sem_add_columns([
         {"name": "subject", "type": str, "desc": "The subject of the email"},
         {"name": "sender", "type": str, "desc": "The email address of the email's sender"},
@@ -50,12 +49,15 @@ if __name__ == "__main__":
     # execute pz plan
     config = pz.QueryProcessorConfig(
         policy=pz.MaxQuality(),
-        val_datasource=val_datareader,
         execution_strategy="parallel",
+        k=5,
+        j=6,
+        sample_budget=100,
         max_workers=20,
         progress=True,
     )
-    output = plan.run(config=config, k=5, j=3, sample_budget=50)
+    # output = plan.optimize_and_run(train_dataset=train_dataset, validator=pz.Validator(), config=config)
+    output = plan.optimize_and_run(train_dataset=train_dataset, validator=pz.Validator(), config=config)
 
     # print output dataframe
     print(output.to_df())

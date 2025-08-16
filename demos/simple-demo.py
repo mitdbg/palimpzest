@@ -17,9 +17,10 @@ def main():
     parser.add_argument("--verbose", default=False, action="store_true", help="Print verbose output")
     parser.add_argument("--profile", default=False, action="store_true", help="Profile execution")
     parser.add_argument("--dataset", type=str, help="Path to the dataset")
+    parser.add_argument("--join-dataset", type=str, help="Path to the join dataset (if needed)", default=None)
     parser.add_argument("--task", type=str, help="The task to run")
     parser.add_argument(
-        "--execution_strategy",
+        "--execution-strategy",
         type=str,
         help="The execution strategy to use. One of sequential, pipelined, parallel",
         default="sequential",
@@ -28,7 +29,7 @@ def main():
         "--policy",
         type=str,
         help="One of 'mincost', 'mintime', 'maxquality'",
-        default="mincost",
+        default="maxquality",
     )
 
     args = parser.parse_args()
@@ -43,6 +44,7 @@ def main():
 
     # Set up execution parameters
     dataset = args.dataset
+    join_dataset = args.join_dataset
     task = args.task
     verbose = args.verbose
     profile = args.profile
@@ -59,14 +61,15 @@ def main():
         print("Policy not supported for this demo")
         exit(1)
 
-    if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None:
-        print("WARNING: Both OPENAI_API_KEY and TOGETHER_API_KEY are unset")
+    if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None and os.getenv("ANTHROPIC_API_KEY") is None:
+        print("WARNING: OPENAI_API_KEY, TOGETHER_API_KEY, and ANTHROPIC_API_KEY are unset")
 
     # Execute task
     records, execution_stats, cols = execute_task(
         task=task,
         dataset=dataset,
         policy=policy,
+        join_dataset=join_dataset,
         verbose=verbose,
         profile=profile,
         execution_strategy=args.execution_strategy
