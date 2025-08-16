@@ -26,6 +26,7 @@ class BaseExecutionStrategy:
     def __init__(self,
                  scan_start_idx: int = 0, 
                  max_workers: int | None = None,
+                 batch_size: int | None = None,
                  num_samples: int | None = None,
                  verbose: bool = False,
                  progress: bool = True,
@@ -33,6 +34,7 @@ class BaseExecutionStrategy:
                  **kwargs):
         self.scan_start_idx = scan_start_idx
         self.max_workers = max_workers
+        self.batch_size = batch_size
         self.num_samples = num_samples
         self.verbose = verbose
         self.progress = progress

@@ -24,6 +24,7 @@ class QueryProcessorConfig(BaseModel):
     remove_models: list[Model] | None = Field(default=None)
     max_workers: int | None = Field(default=64)
     join_parallelism: int = Field(default=64)
+    batch_size: int | None = Field(default=None)
 
     # operator flags
     allow_bonded_query: bool = Field(default=True)

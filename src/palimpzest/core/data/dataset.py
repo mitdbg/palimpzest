@@ -203,6 +203,22 @@ class Dataset:
             upstream.append(source)
         return upstream
 
+    def get_limit(self) -> int | None:
+        """Get the limit applied to this Dataset, if any."""
+        if isinstance(self._operator, LimitScan):
+            return self._operator.limit
+
+        source_limits = []
+        for source in self._sources:
+            source_limit = source.get_limit()
+            if source_limit is not None:
+                source_limits.append(source_limit)
+
+        if len(source_limits) == 0:
+            return None
+
+        return min([limit for limit in source_limits if limit is not None])
+
     def copy(self):
         return Dataset(
             sources=[source.copy() for source in self._sources],
