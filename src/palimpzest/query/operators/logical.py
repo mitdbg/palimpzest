@@ -62,7 +62,10 @@ class LogicalOperator:
         return isinstance(other, self.__class__) and all_id_params_match
 
     def copy(self) -> LogicalOperator:
-        return self.__class__(**self.get_logical_op_params())
+        logical_op_copy = self.__class__(**self.get_logical_op_params())
+        logical_op_copy.logical_op_id = self.logical_op_id
+        logical_op_copy.unique_logical_op_id = self.unique_logical_op_id
+        return logical_op_copy
 
     def logical_op_name(self) -> str:
         """Name of the logical operator."""
@@ -508,6 +511,7 @@ class ComputeOperator(LogicalOperator):
         }
 
         return logical_op_params
+
 
 class SearchOperator(LogicalOperator):
     """

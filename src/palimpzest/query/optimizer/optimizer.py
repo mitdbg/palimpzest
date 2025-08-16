@@ -73,6 +73,7 @@ class Optimizer:
         policy: Policy,
         cost_model: BaseCostModel,
         available_models: list[Model],
+        join_parallelism: int = 64,
         verbose: bool = False,
         allow_bonded_query: bool = True,
         allow_rag_reduction: bool = False,
@@ -124,6 +125,7 @@ class Optimizer:
         # store optimization hyperparameters
         self.verbose = verbose
         self.available_models = available_models
+        self.join_parallelism = join_parallelism
         self.allow_bonded_query = allow_bonded_query
         self.allow_rag_reduction = allow_rag_reduction
         self.allow_mixtures = allow_mixtures
@@ -171,6 +173,7 @@ class Optimizer:
         return {
             "verbose": self.verbose,
             "available_models": self.available_models,
+            "join_parallelism": self.join_parallelism,
         }
 
     def deepcopy_clean(self):
@@ -179,6 +182,7 @@ class Optimizer:
             cost_model=SampleBasedCostModel(),
             verbose=self.verbose,
             available_models=self.available_models,
+            join_parallelism=self.join_parallelism,
             allow_bonded_query=self.allow_bonded_query,
             allow_rag_reduction=self.allow_rag_reduction,
             allow_mixtures=self.allow_mixtures,

@@ -77,6 +77,14 @@ class QueryProcessorFactory:
         available_models = getattr(config, 'available_models', [])
         if available_models is None or len(available_models) == 0:
             available_models = get_models()
+
+        # remove any models specified in the config
+        remove_models = getattr(config, 'remove_models', [])
+        if remove_models is not None and len(remove_models) > 0:
+            available_models = [model for model in available_models if model not in remove_models]
+            logger.info(f"Removed models from available models based on config: {remove_models}")
+
+        # set the final set of available models in the config
         config.available_models = available_models
 
         return config
@@ -143,7 +151,6 @@ class QueryProcessorFactory:
         validator: Validator | None = None,
     ) -> DataRecordCollection:
         logger.info(f"Creating processor for dataset: {dataset}")
-        dataset._generate_unique_logical_op_ids()
         processor = cls.create_processor(dataset, config, train_dataset, validator)
         logger.info(f"Created processor: {processor}")
 

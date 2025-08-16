@@ -47,12 +47,9 @@ class IterDataset(dataset.Dataset, ABC):
                 id (str): a string identifier for the `Dataset`
                 schema (BaseModel | list[dict]): The output schema of the records returned by the `Dataset`
         """
-        # set the id for the Dataset
-        self._id = id
-
         # compute Schema and call parent constructor
         schema = create_schema_from_fields(schema) if isinstance(schema, list) else schema
-        super().__init__(sources=None, operator=BaseScan(datasource=self, output_schema=schema), schema=schema)
+        super().__init__(sources=None, operator=BaseScan(datasource=self, output_schema=schema), schema=schema, id=id)
 
     @abstractmethod
     def __len__(self) -> int:

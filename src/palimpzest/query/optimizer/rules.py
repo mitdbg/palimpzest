@@ -728,7 +728,10 @@ class LLMJoinRule(ImplementationRule):
             prompt_strategy = PromptStrategy.COT_JOIN_IMAGE
         elif cls._is_audio_operation(logical_expression):
             prompt_strategy = PromptStrategy.COT_JOIN_AUDIO
-        variable_op_kwargs = [{"model": model, "prompt_strategy": prompt_strategy} for model in models]
+        variable_op_kwargs = [
+            {"model": model, "prompt_strategy": prompt_strategy, "join_parallelism": runtime_kwargs["join_parallelism"]}
+            for model in models
+        ]
 
         return cls._perform_substitution(logical_expression, NestedLoopsJoin, runtime_kwargs, variable_op_kwargs)
 

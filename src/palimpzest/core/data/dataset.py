@@ -149,6 +149,7 @@ class Dataset:
                 new_sources.append(old_source)
         self._sources = new_sources
 
+    # TODO: the entire way (unique) logical op ids are computed and stored needs to be rethought
     def _generate_unique_logical_op_ids(self, topo_idx: int | None = None) -> None:
         """
         Generate unique operation IDs for all operators in this dataset and its sources.
@@ -207,6 +208,7 @@ class Dataset:
             sources=[source.copy() for source in self._sources],
             operator=self._operator.copy(),
             schema=self._schema,
+            id=self.id,
         )
 
     def sem_join(self, other: Dataset, condition: str, depends_on: str | list[str] | None = None) -> Dataset:
@@ -561,6 +563,9 @@ class Dataset:
         if policy is not None:
             kwargs["policy"] = policy
 
+        # construct unique logical op ids for all operators in this dataset
+        self._generate_unique_logical_op_ids()
+
         return QueryProcessorFactory.create_and_run_processor(self, config)
 
     def optimize_and_run(self, train_dataset: dict[str, Dataset] | Dataset | None = None, validator: Validator | None = None, config: QueryProcessorConfig | None = None, **kwargs):
@@ -600,5 +605,8 @@ class Dataset:
         policy = construct_policy_from_kwargs(**kwargs)
         if policy is not None:
             kwargs["policy"] = policy
+
+        # construct unique logical op ids for all operators in this dataset
+        self._generate_unique_logical_op_ids()
 
         return QueryProcessorFactory.create_and_run_processor(self, config, train_dataset, validator)
