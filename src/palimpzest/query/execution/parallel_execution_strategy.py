@@ -57,20 +57,30 @@ class ParallelExecutionStrategy(ExecutionStrategy):
         # add the finished futures to the input queue for this operator
         output_records = []
         for future in done_futures:
-            record_set: DataRecordSet = future.result()
+            record_set: DataRecordSet | None = future.result()
+
+            # record set can be None if one side of join has no input records yet
+            if record_set is None:
+                continue
+
+            # otherwise, process records and their stats
             records = record_set.data_records
             record_op_stats = record_set.record_op_stats
             num_outputs = sum(record.passed_operator for record in records)
 
             # update the progress manager
-            self.progress_manager.incr(unique_full_op_id, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
+            if self.is_join_op[unique_full_op_id]:
+                for _ in range(num_outputs):
+                    self.progress_manager.incr(unique_full_op_id, num_outputs=1, total_cost=record_set.get_total_cost()/num_outputs)
+            else:
+                self.progress_manager.incr(unique_full_op_id, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
 
             # update plan stats
             plan_stats.add_record_op_stats(unique_full_op_id, record_op_stats)
 
             # add records which aren't filtered to the output records
             output_records.extend([record for record in records if record.passed_operator])
-        
+
         return output_records
 
     def _execute_plan(
@@ -112,7 +122,7 @@ class ParallelExecutionStrategy(ExecutionStrategy):
                     # if this operator does not have enough inputs to execute, then skip it
                     num_inputs = sum(len(inputs) for inputs in input_queues[unique_full_op_id].values())
                     agg_op_not_ready = isinstance(operator, AggregateOp) and not self._upstream_ops_finished(plan, topo_idx, operator, input_queues, future_queues)
-                    join_op_not_ready = isinstance(operator, JoinOp) and not self._upstream_ops_finished(plan, topo_idx, operator, input_queues, future_queues)
+                    join_op_not_ready = isinstance(operator, JoinOp) and not self.join_has_downstream_limit_op[unique_full_op_id] and not self._upstream_ops_finished(plan, topo_idx, operator, input_queues, future_queues)
                     if num_inputs == 0 or agg_op_not_ready or join_op_not_ready:
                         continue
 
@@ -133,9 +143,31 @@ class ParallelExecutionStrategy(ExecutionStrategy):
                         right_num_inputs = len(input_queues[unique_full_op_id][right_unique_full_source_op_id])
                         right_input_records = [input_queues[unique_full_op_id][right_unique_full_source_op_id].pop(0) for _ in range(right_num_inputs)]
 
-                        future = executor.submit(operator, left_input_records, right_input_records)
+                        # NOTE: it would be nice to use executor for join inputs here; but for now synchronizing may be necessary
+                        # future = executor.submit(operator, left_input_records, right_input_records)
+                        # future_queues[unique_full_op_id].append(future)
+                        record_set: DataRecordSet | None = operator(left_input_records, right_input_records)
+                        def no_op(rset):
+                            return rset
+                        future = executor.submit(no_op, record_set)
                         future_queues[unique_full_op_id].append(future)
 
+                    # if this operator is a limit, process one record at a time
+                    elif isinstance(operator, LimitScanOp):
+                        source_unique_full_op_id = source_unique_full_op_ids[0]
+                        num_records_to_process = min(len(input_queues[unique_full_op_id][source_unique_full_op_id]), operator.limit - len(output_records))
+                        for _ in range(num_records_to_process):
+                            input_record = input_queues[unique_full_op_id][source_unique_full_op_id].pop(0)
+                            future = executor.submit(operator, input_record)
+                            future_queues[unique_full_op_id].append(future)
+
+                        # if this is the final operator, add any finished futures to the output_records
+                        # immediately so that we can break out of the loop if we've reached the limit
+                        if unique_full_op_id == f"{topo_idx}-{final_op.get_full_op_id()}":
+                            records = self._process_future_results(unique_full_op_id, future_queues, plan_stats)
+                            output_records.extend(records)
+
+                    # otherwise, process records according to batch size
                     else:
                         source_unique_full_op_id = source_unique_full_op_ids[0]
                         input_records = input_queues[unique_full_op_id][source_unique_full_op_id]
@@ -173,6 +205,21 @@ class ParallelExecutionStrategy(ExecutionStrategy):
         # initialize input queues and future queues for each operation
         input_queues = self._create_input_queues(plan)
         future_queues = {f"{topo_idx}-{op.get_full_op_id()}": [] for topo_idx, op in enumerate(plan)}
+
+        # precompute which operators are joins and which joins have downstream limit ops
+        self.is_join_op = {f"{topo_idx}-{op.get_full_op_id()}": isinstance(op, JoinOp) for topo_idx, op in enumerate(plan)}
+        self.join_has_downstream_limit_op = {}
+        for topo_idx, op in enumerate(plan):
+            if isinstance(op, JoinOp):
+                unique_full_op_id = f"{topo_idx}-{op.get_full_op_id()}"
+                has_downstream_limit_op = False
+                for inner_topo_idx, op in enumerate(plan):
+                    if inner_topo_idx <= topo_idx:
+                        continue
+                    if isinstance(op, LimitScanOp):
+                        has_downstream_limit_op = True
+                        break
+                self.join_has_downstream_limit_op[unique_full_op_id] = has_downstream_limit_op
 
         # initialize and start the progress manager
         self.progress_manager = create_progress_manager(plan, num_samples=self.num_samples, progress=self.progress)

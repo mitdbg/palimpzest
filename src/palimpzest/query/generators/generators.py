@@ -313,7 +313,7 @@ class Generator(Generic[ContextType, InputType]):
             logger.error(f"Error generating completion: {e}")
             field_answers = (
                 {"passed_operator": False}
-                if self.prompt_strategy.is_bool_prompt()
+                if self.prompt_strategy.is_bool_prompt() or self.prompt_strategy.is_join_prompt()
                 else {field_name: None for field_name in fields}
             )
             reasoning = None
@@ -333,14 +333,10 @@ class Generator(Generic[ContextType, InputType]):
             # get cost per input/output token for the model and parse number of input and output tokens
             usd_per_input_token = (
                 MODEL_CARDS[self.model_name]["usd_per_audio_input_token"]
-                if self.model.is_audio_model()
+                if self.prompt_strategy.is_audio_prompt()
                 else MODEL_CARDS[self.model_name]["usd_per_input_token"]
             )
-            usd_per_output_token = (
-                MODEL_CARDS[self.model_name]["usd_per_audio_output_token"]
-                if self.model.is_audio_model()
-                else MODEL_CARDS[self.model_name]["usd_per_output_token"]
-            )
+            usd_per_output_token = MODEL_CARDS[self.model_name]["usd_per_output_token"]
             input_tokens = usage["prompt_tokens"]
             output_tokens = usage["completion_tokens"]
 
@@ -376,9 +372,9 @@ class Generator(Generic[ContextType, InputType]):
 
         # parse field answers
         field_answers = None 
-        if fields is not None and self.prompt_strategy.is_bool_prompt():
+        if fields is not None and (self.prompt_strategy.is_bool_prompt() or self.prompt_strategy.is_join_prompt()):
             field_answers = {"passed_operator": False}
-        elif fields is not None and not self.prompt_strategy.is_bool_prompt():
+        elif fields is not None and not (self.prompt_strategy.is_bool_prompt() or self.prompt_strategy.is_join_prompt()):
             field_answers = {field_name: None for field_name in fields}
         try:
             field_answers = self._parse_answer(completion_text, fields, json_output, **kwargs)
