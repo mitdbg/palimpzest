@@ -63,6 +63,7 @@ class BlockingNestedLoopsJoin(JoinOp):
         self.prompt_strategy = prompt_strategy
         self.join_parallelism = join_parallelism
         self.generator = Generator(model, prompt_strategy, Cardinality.ONE_TO_ONE, self.verbose)
+        self.join_idx = 0
 
     def get_id_params(self):
         id_params = super().get_id_params()
@@ -190,12 +191,12 @@ class BlockingNestedLoopsJoin(JoinOp):
                 for right_candidate in right_candidates:
                     futures.append(executor.submit(self._process_join_candidate_pair, candidate, right_candidate, gen_kwargs))
 
-            for join_idx, future in enumerate(as_completed(futures)):
-                join_idx += 1
+            for future in as_completed(futures):
+                self.join_idx += 1
                 join_output_records, join_output_record_op_stats = future.result()
                 output_records.extend(join_output_records)
                 output_record_op_stats.extend(join_output_record_op_stats)
-                print(f"{join_idx}/{total_join_candidates} JOINED")
+                print(f"{self.join_idx}/{total_join_candidates} JOINED")
 
         return DataRecordSet(output_records, output_record_op_stats)
 
@@ -214,6 +215,7 @@ class NestedLoopsJoin(JoinOp):
         self.prompt_strategy = prompt_strategy
         self.join_parallelism = join_parallelism
         self.generator = Generator(model, prompt_strategy, Cardinality.ONE_TO_ONE, self.verbose)
+        self.join_idx = 0
 
         # maintain list(s) of input records for the join
         self._left_input_records: list[DataRecord] = []
@@ -356,12 +358,12 @@ class NestedLoopsJoin(JoinOp):
                     futures.append(executor.submit(self._process_join_candidate_pair, candidate, right_candidate, gen_kwargs))
 
             # collect results as they complete
-            for join_idx, future in enumerate(as_completed(futures)):
-                join_idx += 1
+            for future in as_completed(futures):
+                self.join_idx += 1
                 join_output_records, join_output_record_op_stats = future.result()
                 output_records.extend(join_output_records)
                 output_record_op_stats.extend(join_output_record_op_stats)
-                print(f"{join_idx} JOINED")
+                print(f"{self.join_idx} JOINED")
 
         # store input records to join with new records added later
         self._left_input_records.extend(left_candidates)
