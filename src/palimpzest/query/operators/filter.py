@@ -174,13 +174,15 @@ class LLMFilter(FilterOp):
         self,
         model: Model,
         prompt_strategy: PromptStrategy = PromptStrategy.COT_BOOL,
+        reasoning_effort: str | None = None,
         *args,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
         self.model = model
         self.prompt_strategy = prompt_strategy
-        self.generator = Generator(model, prompt_strategy, Cardinality.ONE_TO_ONE, self.verbose)
+        self.reasoning_effort = reasoning_effort
+        self.generator = Generator(model, prompt_strategy, reasoning_effort, Cardinality.ONE_TO_ONE, self.verbose)
 
     def get_id_params(self):
         id_params = super().get_id_params()

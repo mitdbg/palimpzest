@@ -280,14 +280,16 @@ class LLMConvert(ConvertOp):
         self,
         model: Model,
         prompt_strategy: PromptStrategy = PromptStrategy.COT_QA,
+        reasoning_effort: str | None = None,
         *args,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
         self.model = model
         self.prompt_strategy = prompt_strategy
+        self.reasoning_effort = reasoning_effort
         if model is not None:
-            self.generator = Generator(model, prompt_strategy, self.cardinality, self.verbose)
+            self.generator = Generator(model, prompt_strategy, reasoning_effort, self.cardinality, self.verbose)
 
     def __str__(self):
         op = super().__str__()

@@ -55,6 +55,7 @@ class BlockingNestedLoopsJoin(JoinOp):
         model: Model,
         prompt_strategy: PromptStrategy = PromptStrategy.COT_JOIN,
         join_parallelism: int = 64,
+        reasoning_effort: str | None = None,
         *args,
         **kwargs,
     ):
@@ -62,7 +63,8 @@ class BlockingNestedLoopsJoin(JoinOp):
         self.model = model
         self.prompt_strategy = prompt_strategy
         self.join_parallelism = join_parallelism
-        self.generator = Generator(model, prompt_strategy, Cardinality.ONE_TO_ONE, self.verbose)
+        self.reasoning_effort = reasoning_effort
+        self.generator = Generator(model, prompt_strategy, reasoning_effort, Cardinality.ONE_TO_ONE, self.verbose)
         self.join_idx = 0
 
     def get_id_params(self):
@@ -207,6 +209,7 @@ class NestedLoopsJoin(JoinOp):
         model: Model,
         prompt_strategy: PromptStrategy = PromptStrategy.COT_JOIN,
         join_parallelism: int = 64,
+        reasoning_effort: str | None = None,
         *args,
         **kwargs,
     ):
@@ -214,7 +217,8 @@ class NestedLoopsJoin(JoinOp):
         self.model = model
         self.prompt_strategy = prompt_strategy
         self.join_parallelism = join_parallelism
-        self.generator = Generator(model, prompt_strategy, Cardinality.ONE_TO_ONE, self.verbose)
+        self.reasoning_effort = reasoning_effort
+        self.generator = Generator(model, prompt_strategy, reasoning_effort, Cardinality.ONE_TO_ONE, self.verbose)
         self.join_idx = 0
 
         # maintain list(s) of input records for the join

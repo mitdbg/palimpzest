@@ -108,6 +108,7 @@ class Generator(Generic[ContextType, InputType]):
         self,
         model: Model,
         prompt_strategy: PromptStrategy,
+        reasoning_effort: str | None = None,
         cardinality: Cardinality = Cardinality.ONE_TO_ONE,
         verbose: bool = False,
     ):
@@ -115,6 +116,7 @@ class Generator(Generic[ContextType, InputType]):
         self.model_name = model.value
         self.cardinality = cardinality
         self.prompt_strategy = prompt_strategy
+        self.reasoning_effort = reasoning_effort
         self.verbose = verbose
         self.prompt_factory = PromptFactory(prompt_strategy, model, cardinality)
 
@@ -303,6 +305,15 @@ class Generator(Generic[ContextType, InputType]):
                 completion_kwargs = {"temperature": kwargs.get("temperature", 0.0), **completion_kwargs}
             if self.prompt_strategy.is_audio_prompt():
                 completion_kwargs = {"modalities": ["text"], **completion_kwargs}
+            if self.model.is_reasoning_model():
+                if self.model.is_vertex_model():
+                    reasoning_effort = "disable" if self.reasoning_effort is None else self.reasoning_effort
+                    completion_kwargs = {"reasoning_effort": reasoning_effort, **completion_kwargs}
+                elif self.model.is_anthropic_model() and self.reasoning_effort is not None:
+                    completion_kwargs = {"reasoning_effort": self.reasoning_effort, **completion_kwargs}
+                elif self.model.is_openai_model():
+                    reasoning_effort = "low" if self.reasoning_effort is None else self.reasoning_effort
+                    completion_kwargs = {"reasoning_effort": reasoning_effort, **completion_kwargs}
             completion = litellm.completion(model=self.model_name, messages=messages, **completion_kwargs)
             end_time = time.time()
             logger.debug(f"Generated completion in {end_time - start_time:.2f} seconds")
