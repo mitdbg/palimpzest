@@ -69,11 +69,7 @@ class ParallelExecutionStrategy(ExecutionStrategy):
             num_outputs = sum(record.passed_operator for record in records)
 
             # update the progress manager
-            if self.is_join_op[unique_full_op_id]:
-                for _ in range(num_outputs):
-                    self.progress_manager.incr(unique_full_op_id, num_outputs=1, total_cost=record_set.get_total_cost()/num_outputs)
-            else:
-                self.progress_manager.incr(unique_full_op_id, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
+            self.progress_manager.incr(unique_full_op_id, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
 
             # update plan stats
             plan_stats.add_record_op_stats(unique_full_op_id, record_op_stats)
