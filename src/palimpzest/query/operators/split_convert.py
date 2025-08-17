@@ -18,11 +18,12 @@ from palimpzest.query.operators.convert import LLMConvert
 
 class SplitConvert(LLMConvert):
     def __init__(self, num_chunks: int = 2, min_size_to_chunk: int = 1000, *args, **kwargs):
+        kwargs["prompt_strategy"] = None
         super().__init__(*args, **kwargs)
         self.num_chunks = num_chunks
         self.min_size_to_chunk = min_size_to_chunk
-        self.split_generator = Generator(self.model, PromptStrategy.SPLIT_PROPOSER, self.cardinality, self.verbose)
-        self.split_merge_generator = Generator(self.model, PromptStrategy.SPLIT_MERGER, self.cardinality, self.verbose)
+        self.split_generator = Generator(self.model, PromptStrategy.SPLIT_PROPOSER, self.reasoning_effort, self.cardinality, self.verbose)
+        self.split_merge_generator = Generator(self.model, PromptStrategy.SPLIT_MERGER, self.reasoning_effort, self.cardinality, self.verbose)
 
         # crude adjustment factor for naive estimation in no-sentinel setting
         self.naive_quality_adjustment = 0.6

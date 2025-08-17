@@ -495,7 +495,14 @@ class LLMConvertBondedRule(ImplementationRule):
             prompt_strategy = PromptStrategy.COT_QA_IMAGE
         elif cls._is_audio_operation(logical_expression):
             prompt_strategy = PromptStrategy.COT_QA_AUDIO
-        variable_op_kwargs = [{"model": model, "prompt_strategy": prompt_strategy} for model in models]
+        variable_op_kwargs = [
+            {
+                "model": model,
+                "prompt_strategy": prompt_strategy,
+                "reasoning_effort": runtime_kwargs["reasoning_effort"],
+            }
+            for model in models
+        ]
 
         return cls._perform_substitution(logical_expression, LLMConvertBonded, runtime_kwargs, variable_op_kwargs)
 
@@ -522,7 +529,13 @@ class RAGConvertRule(ImplementationRule):
         # create variable physical operator kwargs for each model which can implement this logical_expression
         models = [model for model in runtime_kwargs["available_models"] if cls._model_matches_input(model, logical_expression)]
         variable_op_kwargs = [
-            {"model": model, "prompt_strategy": PromptStrategy.COT_QA, "num_chunks_per_field": num_chunks_per_field, "chunk_size": chunk_size}
+            {
+                "model": model,
+                "prompt_strategy": PromptStrategy.COT_QA,
+                "num_chunks_per_field": num_chunks_per_field,
+                "chunk_size": chunk_size,
+                "reasoning_effort": runtime_kwargs["reasoning_effort"],
+            }
             for model in models
             for num_chunks_per_field in cls.num_chunks_per_fields
             for chunk_size in cls.chunk_sizes
@@ -562,6 +575,7 @@ class MixtureOfAgentsConvertRule(ImplementationRule):
                 "aggregator_model": aggregator_model,
                 "proposer_prompt_strategy": proposer_prompt_strategy,
                 "aggregator_prompt_strategy": PromptStrategy.COT_MOA_AGG,
+                "reasoning_effort": runtime_kwargs["reasoning_effort"],
             }
             for k in cls.num_proposer_models
             for temp in cls.temperatures
@@ -593,7 +607,13 @@ class CriticAndRefineConvertRule(ImplementationRule):
         models = [model for model in runtime_kwargs["available_models"] if cls._model_matches_input(model, logical_expression)]
         prompt_strategy = PromptStrategy.COT_QA_IMAGE if cls._is_image_operation(logical_expression) else PromptStrategy.COT_QA
         variable_op_kwargs = [
-            {"model": model, "critic_model": critic_model, "refine_model": refine_model, "prompt_strategy": prompt_strategy}
+            {
+                "model": model,
+                "critic_model": critic_model,
+                "refine_model": refine_model,
+                "prompt_strategy": prompt_strategy,
+                "reasoning_effort": runtime_kwargs["reasoning_effort"],
+            }
             for model in models
             for critic_model in models
             for refine_model in models
@@ -623,7 +643,12 @@ class SplitConvertRule(ImplementationRule):
         # create variable physical operator kwargs for each model which can implement this logical_expression
         models = [model for model in runtime_kwargs["available_models"] if cls._model_matches_input(model, logical_expression)]
         variable_op_kwargs = [
-            {"model": model, "min_size_to_chunk": min_size_to_chunk, "num_chunks": num_chunks}
+            {
+                "model": model,
+                "min_size_to_chunk": min_size_to_chunk,
+                "num_chunks": num_chunks,
+                "reasoning_effort": runtime_kwargs["reasoning_effort"],
+            }
             for model in models
             for min_size_to_chunk in cls.min_size_to_chunk
             for num_chunks in cls.num_chunks
@@ -700,7 +725,14 @@ class LLMFilterRule(ImplementationRule):
             prompt_strategy = PromptStrategy.COT_BOOL_IMAGE
         elif cls._is_audio_operation(logical_expression):
             prompt_strategy = PromptStrategy.COT_BOOL_AUDIO
-        variable_op_kwargs = [{"model": model, "prompt_strategy": prompt_strategy} for model in models]
+        variable_op_kwargs = [
+            {
+                "model": model,
+                "prompt_strategy": prompt_strategy,
+                "reasoning_effort": runtime_kwargs["reasoning_effort"]
+            }
+            for model in models
+        ]
 
         return cls._perform_substitution(logical_expression, LLMFilter, runtime_kwargs, variable_op_kwargs)
 
@@ -729,7 +761,12 @@ class LLMJoinRule(ImplementationRule):
         elif cls._is_audio_operation(logical_expression):
             prompt_strategy = PromptStrategy.COT_JOIN_AUDIO
         variable_op_kwargs = [
-            {"model": model, "prompt_strategy": prompt_strategy, "join_parallelism": runtime_kwargs["join_parallelism"]}
+            {
+                "model": model,
+                "prompt_strategy": prompt_strategy,
+                "join_parallelism": runtime_kwargs["join_parallelism"],
+                "reasoning_effort": runtime_kwargs["reasoning_effort"],
+            }
             for model in models
         ]
 

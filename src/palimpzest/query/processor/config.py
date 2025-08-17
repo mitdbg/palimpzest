@@ -25,6 +25,7 @@ class QueryProcessorConfig(BaseModel):
     max_workers: int | None = Field(default=64)
     join_parallelism: int = Field(default=64)
     batch_size: int | None = Field(default=None)
+    reasoning_effort: str | None = Field(default=None)  # Gemini: "disable", "low", "medium", "high"
 
     # operator flags
     allow_bonded_query: bool = Field(default=True)

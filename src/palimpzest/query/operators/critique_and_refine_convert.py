@@ -37,8 +37,8 @@ class CriticAndRefineConvert(LLMConvert):
             raise ValueError(f"Unsupported prompt strategy: {self.prompt_strategy}")
 
         # create generators
-        self.critic_generator = Generator(self.critic_model, self.critic_prompt_strategy, self.cardinality, self.verbose)
-        self.refine_generator = Generator(self.refine_model, self.refinement_prompt_strategy, self.cardinality, self.verbose)
+        self.critic_generator = Generator(self.critic_model, self.critic_prompt_strategy, self.reasoning_effort, self.cardinality, self.verbose)
+        self.refine_generator = Generator(self.refine_model, self.refinement_prompt_strategy, self.reasoning_effort, self.cardinality, self.verbose)
 
     def __str__(self):
         op = super().__str__()

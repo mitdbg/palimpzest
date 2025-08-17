@@ -74,6 +74,7 @@ class Optimizer:
         cost_model: BaseCostModel,
         available_models: list[Model],
         join_parallelism: int = 64,
+        reasoning_effort: str | None = None,
         verbose: bool = False,
         allow_bonded_query: bool = True,
         allow_rag_reduction: bool = False,
@@ -126,6 +127,7 @@ class Optimizer:
         self.verbose = verbose
         self.available_models = available_models
         self.join_parallelism = join_parallelism
+        self.reasoning_effort = reasoning_effort
         self.allow_bonded_query = allow_bonded_query
         self.allow_rag_reduction = allow_rag_reduction
         self.allow_mixtures = allow_mixtures
@@ -174,6 +176,7 @@ class Optimizer:
             "verbose": self.verbose,
             "available_models": self.available_models,
             "join_parallelism": self.join_parallelism,
+            "reasoning_effort": self.reasoning_effort,
         }
 
     def deepcopy_clean(self):
@@ -183,6 +186,7 @@ class Optimizer:
             verbose=self.verbose,
             available_models=self.available_models,
             join_parallelism=self.join_parallelism,
+            reasoning_effort=self.reasoning_effort,
             allow_bonded_query=self.allow_bonded_query,
             allow_rag_reduction=self.allow_rag_reduction,
             allow_mixtures=self.allow_mixtures,

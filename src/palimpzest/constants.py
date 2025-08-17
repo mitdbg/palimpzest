@@ -61,6 +61,14 @@ class Model(str, Enum):
     def is_vertex_model(self):
         return "vertex_ai" in self.value.lower()
 
+    def is_reasoning_model(self):
+        reasoning_models = [
+            Model.GPT_5, Model.GPT_5_MINI, Model.o4_MINI,
+            Model.GEMINI_2_5_PRO, Model.GEMINI_2_5_FLASH, Model.GEMINI_2_0_FLASH,
+            Model.CLAUDE_3_7_SONNET,
+        ]
+        return self in reasoning_models
+
     def is_text_model(self):
         non_text_models = [
             Model.LLAMA3_2_90B_V,
