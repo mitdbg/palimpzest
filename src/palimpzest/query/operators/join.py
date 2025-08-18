@@ -110,8 +110,13 @@ class BlockingNestedLoopsJoin(JoinOp):
         )
 
         # get est. of conversion cost (in USD) per record from model card
+        usd_per_input_token = (
+            MODEL_CARDS[self.model.value]["usd_per_audio_input_token"]
+            if self.prompt_strategy.is_audio_prompt()
+            else MODEL_CARDS[self.model.value]["usd_per_input_token"]
+        )
         model_conversion_usd_per_record = (
-            MODEL_CARDS[self.model.value]["usd_per_input_token"] * est_num_input_tokens
+            usd_per_input_token * est_num_input_tokens
             + MODEL_CARDS[self.model.value]["usd_per_output_token"] * est_num_output_tokens
         )
 
@@ -269,8 +274,13 @@ class NestedLoopsJoin(JoinOp):
         )
 
         # get est. of conversion cost (in USD) per record from model card
+        usd_per_input_token = (
+            MODEL_CARDS[self.model.value]["usd_per_audio_input_token"]
+            if self.prompt_strategy.is_audio_prompt()
+            else MODEL_CARDS[self.model.value]["usd_per_input_token"]
+        )
         model_conversion_usd_per_record = (
-            MODEL_CARDS[self.model.value]["usd_per_input_token"] * est_num_input_tokens
+            usd_per_input_token * est_num_input_tokens
             + MODEL_CARDS[self.model.value]["usd_per_output_token"] * est_num_output_tokens
         )
 
