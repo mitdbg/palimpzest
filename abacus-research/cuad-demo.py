@@ -4,9 +4,10 @@ import os
 import string
 from functools import partial
 
-# import datasets  # No longer needed - loading directly from JSON
 import numpy as np
 import pandas as pd
+
+from cuad_data_loader import load_cuad_data
 
 import palimpzest as pz
 from palimpzest.constants import Model
@@ -410,8 +411,6 @@ class CUADDataReader(pz.DataReader):
 
         # convert the dataset into a list of dictionaries where each row is for a single contract
         include_labels = split == "train"
-        # Load dataset using shared data loader
-        from cuad_data_loader import load_cuad_data
         dataset = load_cuad_data(split=split)
         
         self.dataset = self._construct_dataset(dataset, num_contracts, seed, include_labels)
@@ -491,8 +490,6 @@ class CUADDataReader(pz.DataReader):
         return self.dataset[idx]
 
     def get_label_df(self):
-        # Load dataset using shared data loader
-        from cuad_data_loader import load_cuad_data
         full_dataset = load_cuad_data(split=self.split)
         
         label_dataset = self._construct_dataset(full_dataset, self.num_contracts, self.seed, True)

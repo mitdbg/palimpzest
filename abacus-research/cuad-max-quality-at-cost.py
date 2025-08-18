@@ -4,10 +4,9 @@ import os
 import string
 from functools import partial
 
-# import datasets  # No longer needed - using local data
 import numpy as np
 import pandas as pd
-from cuad_data_loader import load_cuad_data  # Use local data loader
+from cuad_data_loader import load_cuad_data
 
 import palimpzest as pz
 from palimpzest.constants import Model
