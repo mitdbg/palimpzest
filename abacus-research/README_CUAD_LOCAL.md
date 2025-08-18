@@ -15,14 +15,14 @@ python setup_cuad_data.py
 This will:
 - Create a `cuad-data/` directory
 - Download the CUAD dataset files (train and test JSON files)
-- Download the original dataset script for reference
+- Download the original dataset script from HuggingFace for reference
 
 ### 2. Updated Scripts
 
-The following scripts have been updated to use local data:
+The following scripts have been updated to use local data via `cuad_data_loader.py`:
 
-- **cuad-demo.py** - Updated to load directly from local JSON files
-- **cuad-max-quality-at-cost.py** - Updated to use `cuad_data_loader.py`
+- **cuad-demo.py**
+- **cuad-max-quality-at-cost.py**
 
 ### 3. Running the Scripts
 

@@ -410,29 +410,9 @@ class CUADDataReader(pz.DataReader):
 
         # convert the dataset into a list of dictionaries where each row is for a single contract
         include_labels = split == "train"
-        # Load dataset directly from JSON files in cuad-data directory
-        import json
-        if split == "train":
-            with open("cuad-data/train_separate_questions.json", "r") as f:
-                raw_data = json.load(f)
-        else:
-            with open("cuad-data/test.json", "r") as f:
-                raw_data = json.load(f)
-        
-        # Convert to flat format expected by _construct_dataset
-        dataset = []
-        for article in raw_data["data"]:
-            title = article.get("title", "").strip()
-            for paragraph in article["paragraphs"]:
-                context = paragraph["context"].strip()
-                for qa in paragraph["qas"]:
-                    dataset.append({
-                        "id": qa["id"],
-                        "title": title,
-                        "context": context,
-                        "question": qa["question"].strip(),
-                        "answers": qa.get("answers", [])
-                    })
+        # Load dataset using shared data loader
+        from cuad_data_loader import load_cuad_data
+        dataset = load_cuad_data(split=split)
         
         self.dataset = self._construct_dataset(dataset, num_contracts, seed, include_labels)
 
@@ -511,29 +491,9 @@ class CUADDataReader(pz.DataReader):
         return self.dataset[idx]
 
     def get_label_df(self):
-        # Load dataset directly from JSON files in cuad-data directory
-        import json
-        if self.split == "train":
-            with open("cuad-data/train_separate_questions.json", "r") as f:
-                raw_data = json.load(f)
-        else:
-            with open("cuad-data/test.json", "r") as f:
-                raw_data = json.load(f)
-        
-        # Convert to flat format
-        full_dataset = []
-        for article in raw_data["data"]:
-            title = article.get("title", "").strip()
-            for paragraph in article["paragraphs"]:
-                context = paragraph["context"].strip()
-                for qa in paragraph["qas"]:
-                    full_dataset.append({
-                        "id": qa["id"],
-                        "title": title,
-                        "context": context,
-                        "question": qa["question"].strip(),
-                        "answers": qa.get("answers", [])
-                    })
+        # Load dataset using shared data loader
+        from cuad_data_loader import load_cuad_data
+        full_dataset = load_cuad_data(split=self.split)
         
         label_dataset = self._construct_dataset(full_dataset, self.num_contracts, self.seed, True)
         final_label_dataset = []
