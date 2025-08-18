@@ -177,7 +177,7 @@ class BlockingNestedLoopsJoin(JoinOp):
 
         return [join_dr], [record_op_stats]
 
-    def __call__(self, left_candidates: list[DataRecord], right_candidates: list[DataRecord]) -> DataRecordSet:
+    def __call__(self, left_candidates: list[DataRecord], right_candidates: list[DataRecord]) -> tuple[DataRecordSet, int]:
         # get the set of input fields from both records in the join
         input_fields = self.get_input_fields()
 
@@ -185,13 +185,14 @@ class BlockingNestedLoopsJoin(JoinOp):
         gen_kwargs = {"project_cols": input_fields, "join_condition": self.condition}
 
         # apply the generator to each pair of candidates
-        output_records, output_record_op_stats = [], []
+        output_records, output_record_op_stats, num_inputs_processed = [], [], 0
         total_join_candidates = len(left_candidates) * len(right_candidates)
         with ThreadPoolExecutor(max_workers=self.join_parallelism) as executor:
             futures = []
             for candidate in left_candidates:
                 for right_candidate in right_candidates:
                     futures.append(executor.submit(self._process_join_candidate_pair, candidate, right_candidate, gen_kwargs))
+                    num_inputs_processed += 1
 
             for future in as_completed(futures):
                 self.join_idx += 1
@@ -200,7 +201,7 @@ class BlockingNestedLoopsJoin(JoinOp):
                 output_record_op_stats.extend(join_output_record_op_stats)
                 print(f"{self.join_idx}/{total_join_candidates} JOINED")
 
-        return DataRecordSet(output_records, output_record_op_stats)
+        return DataRecordSet(output_records, output_record_op_stats), num_inputs_processed
 
 
 class NestedLoopsJoin(JoinOp):
@@ -335,7 +336,7 @@ class NestedLoopsJoin(JoinOp):
 
         return [join_dr], [record_op_stats]
 
-    def __call__(self, left_candidates: list[DataRecord], right_candidates: list[DataRecord]) -> DataRecordSet | None:
+    def __call__(self, left_candidates: list[DataRecord], right_candidates: list[DataRecord]) -> tuple[DataRecordSet | None, int]:
         # get the set of input fields from both records in the join
         input_fields = self.get_input_fields()
 
@@ -343,23 +344,26 @@ class NestedLoopsJoin(JoinOp):
         gen_kwargs = {"project_cols": input_fields, "join_condition": self.condition}
 
         # apply the generator to each pair of candidates
-        output_records, output_record_op_stats = [], []
+        output_records, output_record_op_stats, num_inputs_processed = [], [], 0
         with ThreadPoolExecutor(max_workers=self.join_parallelism) as executor:
             futures = []
             # join new left candidates with new right candidates
             for candidate in left_candidates:
                 for right_candidate in right_candidates:
                     futures.append(executor.submit(self._process_join_candidate_pair, candidate, right_candidate, gen_kwargs))
+                    num_inputs_processed += 1
 
             # join new left candidates with stored right input records
             for candidate in left_candidates:
                 for right_candidate in self._right_input_records:
                     futures.append(executor.submit(self._process_join_candidate_pair, candidate, right_candidate, gen_kwargs))
+                    num_inputs_processed += 1
 
             # join new right candidates with stored left input records
             for candidate in self._left_input_records:
                 for right_candidate in right_candidates:
                     futures.append(executor.submit(self._process_join_candidate_pair, candidate, right_candidate, gen_kwargs))
+                    num_inputs_processed += 1
 
             # collect results as they complete
             for future in as_completed(futures):
@@ -375,6 +379,6 @@ class NestedLoopsJoin(JoinOp):
 
         # return None if no output records were produced
         if len(output_records) == 0:
-            return None
+            return None, num_inputs_processed
 
-        return DataRecordSet(output_records, output_record_op_stats)
+        return DataRecordSet(output_records, output_record_op_stats), num_inputs_processed

@@ -55,7 +55,7 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
                 num_outputs = sum(record.passed_operator for record in records)
 
                 # update the progress manager
-                self.progress_manager.incr(unique_full_op_id, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
+                self.progress_manager.incr(unique_full_op_id, num_inputs=1, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
 
             # if this operator is a join, process all pairs of records from the two input queues
             elif isinstance(operator, JoinOp):
@@ -67,13 +67,13 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
                 right_num_inputs = len(input_queues[unique_full_op_id][right_full_source_op_id])
                 right_input_records = [input_queues[unique_full_op_id][right_full_source_op_id].pop(0) for _ in range(right_num_inputs)]
 
-                record_set = operator(left_input_records, right_input_records)
+                record_set, num_inputs_processed = operator(left_input_records, right_input_records)
                 records = record_set.data_records
                 record_op_stats = record_set.record_op_stats
                 num_outputs = sum(record.passed_operator for record in records)
 
                 # update the progress manager
-                self.progress_manager.incr(unique_full_op_id, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
+                self.progress_manager.incr(unique_full_op_id, num_inputs=num_inputs_processed, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
 
             # otherwise, process the records in the input queue for this operator one at a time
             else:
@@ -85,7 +85,7 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
                     num_outputs = sum(record.passed_operator for record in record_set.data_records)
 
                     # update the progress manager
-                    self.progress_manager.incr(unique_full_op_id, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
+                    self.progress_manager.incr(unique_full_op_id, num_inputs=1, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
 
                     # finish early if this is a limit
                     if isinstance(operator, LimitScanOp) and len(records) == operator.limit:
@@ -210,7 +210,7 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
                     num_outputs = sum(record.passed_operator for record in records)
 
                     # update the progress manager
-                    self.progress_manager.incr(unique_full_op_id, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
+                    self.progress_manager.incr(unique_full_op_id, num_inputs=1, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
 
                 # if this operator is a join, process all pairs of records from the two input queues
                 elif isinstance(operator, JoinOp):
@@ -222,13 +222,13 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
                     right_num_inputs = len(input_queues[unique_full_op_id][right_full_source_op_id])
                     right_input_records = [input_queues[unique_full_op_id][right_full_source_op_id].pop(0) for _ in range(right_num_inputs)]
 
-                    record_set = operator(left_input_records, right_input_records)
+                    record_set, num_inputs_processed = operator(left_input_records, right_input_records)
                     records = record_set.data_records
                     record_op_stats = record_set.record_op_stats
                     num_outputs = sum(record.passed_operator for record in records)
 
                     # update the progress manager
-                    self.progress_manager.incr(unique_full_op_id, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
+                    self.progress_manager.incr(unique_full_op_id, num_inputs=num_inputs_processed, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
 
                 # otherwise, process the next record in the input queue for this operator
                 else:
@@ -240,7 +240,7 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
                     num_outputs = sum(record.passed_operator for record in records)
 
                     # update the progress manager
-                    self.progress_manager.incr(unique_full_op_id, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
+                    self.progress_manager.incr(unique_full_op_id, num_inputs=1, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
 
                 # update plan stats
                 plan_stats.add_record_op_stats(unique_full_op_id, record_op_stats)
