@@ -153,15 +153,15 @@ class Aggregate(LogicalOperator):
         *args,
         **kwargs,
     ):
-        output_schema = None
-        if agg_func == AggFunc.COUNT:
-            output_schema = Count
-        elif agg_func == AggFunc.AVERAGE:
-            output_schema = Average
-        else:
-            raise ValueError(f"Unsupported aggregation function: {agg_func}")
+        if kwargs.get("output_schema") is None:
+            if agg_func == AggFunc.COUNT:
+                kwargs["output_schema"] = Count
+            elif agg_func == AggFunc.AVERAGE:
+                kwargs["output_schema"] = Average
+            else:
+                raise ValueError(f"Unsupported aggregation function: {agg_func}")
 
-        super().__init__(*args, output_schema=output_schema, **kwargs)
+        super().__init__(*args, **kwargs)
         self.agg_func = agg_func
 
     def __str__(self):

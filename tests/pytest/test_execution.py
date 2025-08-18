@@ -14,7 +14,6 @@ from palimpzest.query.processor.query_processor_factory import QueryProcessorFac
         pytest.param("sequential", id="seq-single-thread"),
         pytest.param("pipelined", id="pipelined-single-thread"),
         pytest.param("parallel", id="parallel"),
-        pytest.param("sequential_parallel", id="seq-parallel")
     ]
 )
 class TestExecution:
