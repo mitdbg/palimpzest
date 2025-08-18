@@ -13,6 +13,7 @@ from palimpzest.core.data.iter_dataset import (
     TextFileDataset,
     XLSFileDataset,
 )
+from palimpzest.core.lib.schemas import AudioBase64, AudioFilepath, ImageBase64, ImageFilepath, ImageURL
 from palimpzest.policy import (
     MaxQuality,
     MaxQualityAtFixedCost,
@@ -46,6 +47,12 @@ __all__ = [
     "PDFFileDataset",
     "TextFileDataset",
     "XLSFileDataset",
+    # schemas
+    "AudioBase64",
+    "AudioFilepath",
+    "ImageBase64",
+    "ImageFilepath",
+    "ImageURL",
     # policy
     "MaxQuality",
     "MaxQualityAtFixedCost",

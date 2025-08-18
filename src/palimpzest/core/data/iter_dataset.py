@@ -159,7 +159,7 @@ class MemoryDataset(IterDataset):
         MemoryDataset on his branch)
     """
 
-    def __init__(self, id: str, vals: list | pd.DataFrame) -> None:
+    def __init__(self, id: str, vals: list | pd.DataFrame, schema: type[BaseModel] | list[dict] | None = None) -> None:
         """
         Constructor for the `MemoryDataset` class. The `schema` is set to the default `DefaultSchema` schema.
         If `vals` is a pd.DataFrame, then the schema is set to the schema inferred from the DataFrame.
@@ -170,7 +170,8 @@ class MemoryDataset(IterDataset):
         """
         # if list[dict] --> convert to pd.DataFrame first
         self.vals = pd.DataFrame(vals) if isinstance(vals, list) and all([isinstance(item, dict) for item in vals]) else vals
-        schema = create_schema_from_df(self.vals) if isinstance(self.vals, pd.DataFrame) else DefaultSchema
+        if schema is None:
+            schema = create_schema_from_df(self.vals) if isinstance(self.vals, pd.DataFrame) else DefaultSchema
         super().__init__(id=id, schema=schema)
 
     def __len__(self) -> int:

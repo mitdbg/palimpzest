@@ -52,6 +52,9 @@ class Model(str, Enum):
     def is_o_model(self):
         return self in [Model.o4_MINI]
 
+    def is_gpt_5_model(self):
+        return self in [Model.GPT_5, Model.GPT_5_MINI]
+
     def is_openai_model(self):
         return "openai" in self.value.lower() or self.is_text_embedding_model()
 
@@ -64,7 +67,7 @@ class Model(str, Enum):
     def is_reasoning_model(self):
         reasoning_models = [
             Model.GPT_5, Model.GPT_5_MINI, Model.o4_MINI,
-            Model.GEMINI_2_5_PRO, Model.GEMINI_2_5_FLASH, Model.GEMINI_2_0_FLASH,
+            Model.GEMINI_2_5_PRO, Model.GEMINI_2_5_FLASH,
             Model.CLAUDE_3_7_SONNET,
         ]
         return self in reasoning_models
