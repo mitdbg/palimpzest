@@ -67,6 +67,8 @@ class ApplyGroupByOp(AggregateOp):
             return state + 1
         elif func.lower() == "average":
             sum, cnt = state
+            if val is None:
+                return (sum, cnt)
             return (sum + val, cnt + 1)
         else:
             raise Exception("Unknown agg function " + func)
@@ -77,7 +79,7 @@ class ApplyGroupByOp(AggregateOp):
             return state
         elif func.lower() == "average":
             sum, cnt = state
-            return float(sum) / cnt
+            return float(sum) / cnt if cnt > 0 else None
         else:
             raise Exception("Unknown agg function " + func)
 
