@@ -4,7 +4,7 @@ import os
 import string
 from functools import partial
 
-import datasets
+# import datasets  # No longer needed - loading directly from JSON
 import numpy as np
 import pandas as pd
 
@@ -410,7 +410,30 @@ class CUADDataReader(pz.DataReader):
 
         # convert the dataset into a list of dictionaries where each row is for a single contract
         include_labels = split == "train"
-        dataset = datasets.load_dataset("theatticusproject/cuad-qa")[split]
+        # Load dataset directly from JSON files in cuad-data directory
+        import json
+        if split == "train":
+            with open("cuad-data/train_separate_questions.json", "r") as f:
+                raw_data = json.load(f)
+        else:
+            with open("cuad-data/test.json", "r") as f:
+                raw_data = json.load(f)
+        
+        # Convert to flat format expected by _construct_dataset
+        dataset = []
+        for article in raw_data["data"]:
+            title = article.get("title", "").strip()
+            for paragraph in article["paragraphs"]:
+                context = paragraph["context"].strip()
+                for qa in paragraph["qas"]:
+                    dataset.append({
+                        "id": qa["id"],
+                        "title": title,
+                        "context": context,
+                        "question": qa["question"].strip(),
+                        "answers": qa.get("answers", [])
+                    })
+        
         self.dataset = self._construct_dataset(dataset, num_contracts, seed, include_labels)
 
 
@@ -459,7 +482,9 @@ class CUADDataReader(pz.DataReader):
                     category_name = category_name.replace(" To ", " to ")
                     category_name = category_name.replace("Ip", "IP")
                     assert category_name in category_names, f"Unknown category {category_name}"
-                    contract["labels"][category_name].extend(row["answers"]["text"])
+                    # Extract text from answers list
+                    answer_texts = [ans["text"] for ans in row["answers"]] if row["answers"] else []
+                    contract["labels"][category_name].extend(answer_texts)
 
                     def score_fn(preds, labels, category_name):
                         preds = handle_empty_preds(preds)
@@ -486,7 +511,30 @@ class CUADDataReader(pz.DataReader):
         return self.dataset[idx]
 
     def get_label_df(self):
-        full_dataset = datasets.load_dataset("theatticusproject/cuad-qa")[self.split]
+        # Load dataset directly from JSON files in cuad-data directory
+        import json
+        if self.split == "train":
+            with open("cuad-data/train_separate_questions.json", "r") as f:
+                raw_data = json.load(f)
+        else:
+            with open("cuad-data/test.json", "r") as f:
+                raw_data = json.load(f)
+        
+        # Convert to flat format
+        full_dataset = []
+        for article in raw_data["data"]:
+            title = article.get("title", "").strip()
+            for paragraph in article["paragraphs"]:
+                context = paragraph["context"].strip()
+                for qa in paragraph["qas"]:
+                    full_dataset.append({
+                        "id": qa["id"],
+                        "title": title,
+                        "context": context,
+                        "question": qa["question"].strip(),
+                        "answers": qa.get("answers", [])
+                    })
+        
         label_dataset = self._construct_dataset(full_dataset, self.num_contracts, self.seed, True)
         final_label_dataset = []
         for entry in label_dataset:

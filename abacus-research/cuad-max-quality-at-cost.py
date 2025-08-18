@@ -4,9 +4,10 @@ import os
 import string
 from functools import partial
 
-import datasets
+# import datasets  # No longer needed - using local data
 import numpy as np
 import pandas as pd
+from cuad_data_loader import load_cuad_data  # Use local data loader
 
 import palimpzest as pz
 from palimpzest.constants import Model
@@ -411,7 +412,8 @@ class CUADDataReader(pz.DataReader):
 
         # convert the dataset into a list of dictionaries where each row is for a single contract
         include_labels = split == "train"
-        dataset = datasets.load_dataset("theatticusproject/cuad-qa")[split]
+        # Load dataset from local files
+        dataset = load_cuad_data(split=split)
         self.dataset = self._construct_dataset(dataset, num_contracts, seed, include_labels)
 
 
@@ -460,7 +462,12 @@ class CUADDataReader(pz.DataReader):
                     category_name = category_name.replace(" To ", " to ")
                     category_name = category_name.replace("Ip", "IP")
                     assert category_name in category_names, f"Unknown category {category_name}"
-                    contract["labels"][category_name].extend(row["answers"]["text"])
+                    # Extract text from answers list (handles both old and new format)
+                    if isinstance(row["answers"], list):
+                        answer_texts = [ans["text"] for ans in row["answers"]] if row["answers"] else []
+                    else:
+                        answer_texts = row["answers"].get("text", [])
+                    contract["labels"][category_name].extend(answer_texts)
 
                     def score_fn(preds, labels, category_name):
                         preds = handle_empty_preds(preds)
@@ -487,7 +494,8 @@ class CUADDataReader(pz.DataReader):
         return self.dataset[idx]
 
     def get_label_df(self):
-        full_dataset = datasets.load_dataset("theatticusproject/cuad-qa")[self.split]
+        # Load dataset from local files
+        full_dataset = load_cuad_data(split=self.split)
         label_dataset = self._construct_dataset(full_dataset, self.num_contracts, self.seed, True)
         final_label_dataset = []
         for entry in label_dataset:
