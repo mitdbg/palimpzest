@@ -372,6 +372,10 @@ class ImplementationRule(Rule):
         if cls._is_image_only_operation(logical_expression) and model.is_vision_model():
             return True
 
+        # audio-only input and audio supporting model
+        if cls._is_audio_only_operation(logical_expression) and model.is_audio_model():
+            return True
+
         # multi-modal input and multi-modal supporting model
         if cls._is_text_image_multimodal_operation(logical_expression) and model.is_text_image_multimodal_model():  # noqa: SIM103
             return True
