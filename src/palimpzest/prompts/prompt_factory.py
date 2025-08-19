@@ -799,7 +799,7 @@ class PromptFactory:
                         {"type": "input_audio", "input_audio": {"data": base64_audio, "format": "wav"}}
                     )
 
-        return [{"role": "user", "type": "image", "content": audio_content}] if len(audio_content) > 0 else []
+        return [{"role": "user", "type": "input_audio", "content": audio_content}] if len(audio_content) > 0 else []
 
     def _create_image_messages(self, candidate: DataRecord, input_fields: list[str]) -> list[dict]:
         """

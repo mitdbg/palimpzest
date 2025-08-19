@@ -338,7 +338,7 @@ class LLMConvert(ConvertOp):
         model_conversion_time_per_record = MODEL_CARDS[model_name]["seconds_per_output_token"] * est_num_output_tokens
 
         # get est. of conversion cost (in USD) per record from model card
-        usd_per_input_token = MODEL_CARDS[model_name]["usd_per_input_token"]
+        usd_per_input_token = MODEL_CARDS[model_name].get("usd_per_input_token")
         if getattr(self, "prompt_strategy", None) is not None and self.prompt_strategy.is_audio_prompt():
             usd_per_input_token = MODEL_CARDS[model_name]["usd_per_audio_input_token"]
 

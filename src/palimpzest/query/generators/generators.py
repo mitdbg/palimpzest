@@ -307,7 +307,11 @@ class Generator(Generic[ContextType, InputType]):
                 completion_kwargs = {"modalities": ["text"], **completion_kwargs}
             if self.model.is_reasoning_model():
                 if self.model.is_vertex_model():
-                    reasoning_effort = "disable" if self.reasoning_effort is None else self.reasoning_effort
+                    reasoning_effort = self.reasoning_effort
+                    if self.reasoning_effort is None and self.model == Model.GEMINI_2_5_PRO:
+                        reasoning_effort = "low"
+                    elif self.reasoning_effort is None:
+                        reasoning_effort = "disable"
                     completion_kwargs = {"reasoning_effort": reasoning_effort, **completion_kwargs}
                 elif self.model.is_anthropic_model() and self.reasoning_effort is not None:
                     completion_kwargs = {"reasoning_effort": self.reasoning_effort, **completion_kwargs}
@@ -368,7 +372,12 @@ class Generator(Generic[ContextType, InputType]):
         prompt = ""
         for message in messages:
             if message["role"] == "user":
-                prompt += message["content"] + "\n" if message["type"] == "text" else "<image>\n"
+                if message["type"] == "text":
+                    prompt += message["content"] + "\n"
+                elif message["type"] == "image":
+                    prompt += "<image>\n"
+                elif message["type"] == "input_audio":
+                    prompt += "<audio>\n"
         logger.debug(f"PROMPT:\n{prompt}")
         logger.debug(Fore.GREEN + f"{completion_text}\n" + Style.RESET_ALL)
 
@@ -376,9 +385,8 @@ class Generator(Generic[ContextType, InputType]):
         reasoning = None
         try:
             reasoning = self._parse_reasoning(completion_text, **kwargs)
-        except Exception:
-            # logger.error(f"Error parsing reasoning and answers: {e}")
-            logger.debug("TODO: undo this")
+        except Exception as e:
+            logger.error(f"Error parsing reasoning and answers: {e}")
             pass
 
         # parse field answers

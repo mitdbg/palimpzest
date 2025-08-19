@@ -10,7 +10,6 @@ from palimpzest.query.optimizer.optimizer import Optimizer
 from palimpzest.query.optimizer.optimizer_strategy_type import OptimizationStrategyType
 from palimpzest.query.optimizer.plan import SentinelPlan
 from palimpzest.utils.hash_helpers import hash_for_id
-from palimpzest.utils.model_helpers import get_models
 from palimpzest.validator.validator import Validator
 
 logger = logging.getLogger(__name__)
@@ -50,7 +49,6 @@ class QueryProcessor:
         self.optimizer = optimizer
         self.execution_strategy = execution_strategy
         self.sentinel_execution_strategy = sentinel_execution_strategy
-
         self.num_samples = num_samples
         self.train_dataset = train_dataset
         self.validator = validator
@@ -58,12 +56,8 @@ class QueryProcessor:
         self.verbose = verbose
         self.progress = progress
         self.max_workers = max_workers
-
         self.policy = policy
-
         self.available_models = available_models
-        if self.available_models is None or len(self.available_models) == 0:
-            self.available_models = get_models()
 
         if self.verbose:
             print("Available models: ", self.available_models)
