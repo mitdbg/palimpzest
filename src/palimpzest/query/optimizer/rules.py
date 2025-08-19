@@ -11,6 +11,7 @@ from palimpzest.query.operators.aggregate import ApplyGroupByOp, AverageAggregat
 from palimpzest.query.operators.compute import SmolAgentsCompute
 from palimpzest.query.operators.convert import LLMConvertBonded, NonLLMConvert
 from palimpzest.query.operators.critique_and_refine_convert import CriticAndRefineConvert
+from palimpzest.query.operators.distinct import DistinctOp
 from palimpzest.query.operators.filter import LLMFilter, NonLLMFilter
 from palimpzest.query.operators.join import NestedLoopsJoin
 from palimpzest.query.operators.limit import LimitScanOp
@@ -20,6 +21,7 @@ from palimpzest.query.operators.logical import (
     ComputeOperator,
     ContextScan,
     ConvertScan,
+    Distinct,
     FilteredScan,
     GroupByAggregate,
     JoinOp,
@@ -860,6 +862,7 @@ class BasicSubstitutionRule(ImplementationRule):
         # ComputeOperator: SmolAgentsCompute,
         SearchOperator: SmolAgentsSearch, # SmolAgentsManagedSearch, # SmolAgentsCustomManagedSearch
         ContextScan: ContextScanOp,
+        Distinct: DistinctOp,
         LimitScan: LimitScanOp,
         Project: ProjectOp,
         GroupByAggregate: ApplyGroupByOp,

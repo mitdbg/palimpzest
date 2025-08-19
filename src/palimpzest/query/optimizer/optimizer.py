@@ -13,6 +13,7 @@ from palimpzest.query.execution.execution_strategy_type import ExecutionStrategy
 from palimpzest.query.operators.logical import (
     ComputeOperator,
     ConvertScan,
+    Distinct,
     FilteredScan,
     JoinOp,
     LimitScan,
@@ -289,6 +290,13 @@ class Optimizer:
                 all_properties["projects"].add(op_project_str)
             else:
                 all_properties["projects"] = set([op_project_str])
+
+        elif isinstance(op, Distinct):
+            op_distinct_str = op.get_logical_op_id()
+            if "distincts" in all_properties:
+                all_properties["distincts"].add(op_distinct_str)
+            else:
+                all_properties["distincts"] = set([op_distinct_str])
 
         # TODO: temporary fix; perhaps use op_ids to identify group?
         elif isinstance(op, ComputeOperator):

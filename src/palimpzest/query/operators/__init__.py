@@ -6,6 +6,7 @@ from palimpzest.query.operators.convert import ConvertOp as _ConvertOp
 from palimpzest.query.operators.convert import LLMConvert as _LLMConvert
 from palimpzest.query.operators.convert import LLMConvertBonded as _LLMConvertBonded
 from palimpzest.query.operators.convert import NonLLMConvert as _NonLLMConvert
+from palimpzest.query.operators.distinct import DistinctOp as _DistinctOp
 from palimpzest.query.operators.filter import FilterOp as _FilterOp
 from palimpzest.query.operators.filter import LLMFilter as _LLMFilter
 from palimpzest.query.operators.filter import NonLLMFilter as _NonLLMFilter
@@ -20,6 +21,9 @@ from palimpzest.query.operators.logical import (
 )
 from palimpzest.query.operators.logical import (
     ConvertScan as _ConvertScan,
+)
+from palimpzest.query.operators.logical import (
+    Distinct as _Distinct,
 )
 from palimpzest.query.operators.logical import (
     FilteredScan as _FilteredScan,
@@ -54,6 +58,7 @@ LOGICAL_OPERATORS = [
     _Aggregate,
     _BaseScan,
     _ConvertScan,
+    _Distinct,
     _FilteredScan,
     _GroupByAggregate,
     _LogicalJoinOp,
@@ -67,6 +72,8 @@ PHYSICAL_OPERATORS = (
     [_AggregateOp, _ApplyGroupByOp, _AverageAggregateOp, _CountAggregateOp]
     # convert
     + [_ConvertOp, _NonLLMConvert, _LLMConvert, _LLMConvertBonded]
+    # distinct
+    + [_DistinctOp]
     # scan
     + [_ScanPhysicalOp, _MarshalAndScanDataOp]
     # filter
