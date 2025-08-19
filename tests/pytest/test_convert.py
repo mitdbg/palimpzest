@@ -6,8 +6,6 @@ import os
 
 import pytest
 
-# sys.path.append("./tests/")
-# sys.path.append("./tests/refactor-tests/")
 from palimpzest.constants import Model, PromptStrategy
 from palimpzest.core.lib.schemas import File, TextFile, union_schemas
 from palimpzest.query.operators.convert import LLMConvertBonded

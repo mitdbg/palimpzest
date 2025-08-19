@@ -6,6 +6,7 @@ from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.models import PlanStats
 from palimpzest.query.execution.execution_strategy import ExecutionStrategy
 from palimpzest.query.operators.aggregate import AggregateOp
+from palimpzest.query.operators.distinct import DistinctOp
 from palimpzest.query.operators.join import JoinOp
 from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.operators.physical import PhysicalOperator
@@ -169,6 +170,21 @@ class ParallelExecutionStrategy(ExecutionStrategy):
                             records = self._process_future_results(unique_full_op_id, future_queues, plan_stats)
                             output_records.extend(records)
 
+                    # if this operator is a distinct, process records sequentially
+                    # (distinct is not parallelized because it requires maintaining a set of seen records)
+                    elif isinstance(operator, DistinctOp):
+                        source_unique_full_op_id = source_unique_full_op_ids[0]
+                        input_records = input_queues[unique_full_op_id][source_unique_full_op_id]
+                        for record in input_records:
+                            record_set = operator(record)
+                            def no_op(rset):
+                                return rset
+                            future = executor.submit(no_op, record_set)
+                            future_queues[unique_full_op_id].append(future)
+
+                        # clear the input queue for this operator since we processed all records
+                        input_queues[unique_full_op_id][source_unique_full_op_id].clear()
+
                     # otherwise, process records according to batch size
                     else:
                         source_unique_full_op_id = source_unique_full_op_ids[0]
@@ -186,6 +202,7 @@ class ParallelExecutionStrategy(ExecutionStrategy):
                                 future_queues[unique_full_op_id].append(future)
                             input_queues[unique_full_op_id][source_unique_full_op_id] = input_records[batch_size:]
 
+                # TODO: change logic to stop upstream operators once a limit is reached
                 # break out of loop if the final operator is a LimitScanOp and we've reached its limit
                 if isinstance(final_op, LimitScanOp) and len(output_records) == final_op.limit:
                     break

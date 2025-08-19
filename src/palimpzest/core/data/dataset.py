@@ -15,6 +15,7 @@ from palimpzest.policy import construct_policy_from_kwargs
 from palimpzest.query.operators.logical import (
     Aggregate,
     ConvertScan,
+    Distinct,
     FilteredScan,
     GroupByAggregate,
     JoinOp,
@@ -560,6 +561,11 @@ class Dataset:
     def limit(self, n: int) -> Dataset:
         """Limit the set size to no more than n rows"""
         operator = LimitScan(input_schema=self.schema, output_schema=self.schema, limit=n)
+        return Dataset(sources=[self], operator=operator, schema=self.schema)
+
+    def distinct(self, distinct_cols: list[str] | None = None) -> Dataset:
+        """Return a new Dataset with distinct rows based on the current schema."""
+        operator = Distinct(input_schema=self.schema, output_schema=self.schema, distinct_cols=distinct_cols)
         return Dataset(sources=[self], operator=operator, schema=self.schema)
 
     def project(self, project_cols: list[str] | str) -> Dataset:

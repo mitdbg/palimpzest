@@ -145,13 +145,13 @@ class RecordOpStats(BaseModel):
 
     ##### REQUIRED FIELDS #####
     # record id; an identifier for this record
-    record_id: str
+    record_id: str | int
 
     # identifier for the parent(s) of this record
-    record_parent_ids: list[str] | None
+    record_parent_ids: list[str | int] | None
 
     # idenifier for the source indices of this record
-    record_source_indices: list[str]
+    record_source_indices: list[str | int]
 
     # a dictionary with the record state after being processed by the operator
     record_state: dict[str, Any]

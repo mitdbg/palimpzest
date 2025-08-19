@@ -287,6 +287,40 @@ class ConvertScan(LogicalOperator):
         return logical_op_params
 
 
+class Distinct(LogicalOperator):
+    def __init__(self, distinct_cols: list[str] | None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # if distinct_cols is not None, check that all columns are in the input schema
+        if distinct_cols is not None:
+            for col in distinct_cols:
+                assert col in self.input_schema.model_fields, f"Column {col} not found in input schema {self.input_schema} for Distinct operator"
+
+        # store the list of distinct columns, sorted
+        self.distinct_cols = (
+            sorted([field_name for field_name in self.input_schema.model_fields])
+            if distinct_cols is None
+            else sorted(distinct_cols)
+        )
+
+    def __str__(self):
+        return f"Distinct({self.distinct_cols})"
+
+    def get_logical_id_params(self) -> dict:
+        logical_id_params = super().get_logical_id_params()
+        logical_id_params = {"distinct_cols": self.distinct_cols, **logical_id_params}
+
+        return logical_id_params
+
+    def get_logical_op_params(self) -> dict:
+        logical_op_params = super().get_logical_op_params()
+        logical_op_params = {
+            "distinct_cols": self.distinct_cols,
+            **logical_op_params,
+        }
+
+        return logical_op_params
+
+
 class FilteredScan(LogicalOperator):
     """A FilteredScan is a logical operator that represents a scan of a particular input Dataset, with filters applied."""
 
