@@ -3,7 +3,7 @@ import os
 from palimpzest.constants import Model
 
 
-def get_models(include_embedding: bool = False) -> list[Model]:
+def get_models(include_embedding: bool = False, gemini_credentials_path: str | None = None) -> list[Model]:
     """
     Return the set of models which the system has access to based on the set environment variables.
     """
@@ -32,7 +32,12 @@ def get_models(include_embedding: bool = False) -> list[Model]:
             ]
         models.extend(anthropic_models)
 
-    if os.getenv("GEMINI_API_KEY") is not None:
+    gemini_credentials_path = (
+        os.path.join(os.path.expanduser("~"), ".config", "gcloud", "application_default_credentials.json")
+        if gemini_credentials_path is None
+        else gemini_credentials_path
+    )
+    if os.getenv("GEMINI_API_KEY") is not None or os.path.exists(gemini_credentials_path):
         vertex_models = [model for model in Model if model.is_vertex_model()]
         if not include_embedding:
             vertex_models = [
