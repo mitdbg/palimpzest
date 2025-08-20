@@ -496,11 +496,14 @@ class LLMConvertBondedRule(ImplementationRule):
         # create variable physical operator kwargs for each model which can implement this logical_expression
         models = [model for model in runtime_kwargs["available_models"] if cls._model_matches_input(model, logical_expression)]
         # NOTE: right now we exclusively allow image or audio operations, but not both simultaneously
-        prompt_strategy = PromptStrategy.COT_QA
-        if cls._is_image_operation(logical_expression):
-            prompt_strategy = PromptStrategy.COT_QA_IMAGE
+        prompt_strategy = None
+        no_reasoning = runtime_kwargs["reasoning_effort"] in [None, "minimal", "low"]
+        if cls._is_text_only_operation(logical_expression):
+            prompt_strategy = PromptStrategy.COT_QA_NO_REASONING if no_reasoning else PromptStrategy.COT_QA
+        elif cls._is_image_operation(logical_expression):
+            prompt_strategy = PromptStrategy.COT_QA_IMAGE_NO_REASONING if no_reasoning else PromptStrategy.COT_QA_IMAGE
         elif cls._is_audio_operation(logical_expression):
-            prompt_strategy = PromptStrategy.COT_QA_AUDIO
+            prompt_strategy = PromptStrategy.COT_QA_AUDIO_NO_REASONING if no_reasoning else PromptStrategy.COT_QA_AUDIO
         variable_op_kwargs = [
             {
                 "model": model,
@@ -726,11 +729,14 @@ class LLMFilterRule(ImplementationRule):
         # create variable physical operator kwargs for each model which can implement this logical_expression
         models = [model for model in runtime_kwargs["available_models"] if cls._model_matches_input(model, logical_expression)]
         # NOTE: right now we exclusively allow image or audio operations, but not both simultaneously
-        prompt_strategy = PromptStrategy.COT_BOOL
-        if cls._is_image_operation(logical_expression):
-            prompt_strategy = PromptStrategy.COT_BOOL_IMAGE
+        prompt_strategy = None
+        no_reasoning = runtime_kwargs["reasoning_effort"] in [None, "minimal", "low"]
+        if cls._is_text_only_operation(logical_expression):
+            prompt_strategy = PromptStrategy.COT_BOOL_NO_REASONING if no_reasoning else PromptStrategy.COT_BOOL
+        elif cls._is_image_operation(logical_expression):
+            prompt_strategy = PromptStrategy.COT_BOOL_IMAGE_NO_REASONING if no_reasoning else PromptStrategy.COT_BOOL_IMAGE
         elif cls._is_audio_operation(logical_expression):
-            prompt_strategy = PromptStrategy.COT_BOOL_AUDIO
+            prompt_strategy = PromptStrategy.COT_BOOL_AUDIO_NO_REASONING if no_reasoning else PromptStrategy.COT_BOOL_AUDIO
         variable_op_kwargs = [
             {
                 "model": model,
@@ -761,11 +767,14 @@ class LLMJoinRule(ImplementationRule):
         # create variable physical operator kwargs for each model which can implement this logical_expression
         models = [model for model in runtime_kwargs["available_models"] if cls._model_matches_input(model, logical_expression)]
         # NOTE: right now we exclusively allow image or audio operations, but not both simultaneously
-        prompt_strategy = PromptStrategy.COT_JOIN
-        if cls._is_image_operation(logical_expression):
-            prompt_strategy = PromptStrategy.COT_JOIN_IMAGE
+        prompt_strategy = None
+        no_reasoning = runtime_kwargs["reasoning_effort"] in [None, "minimal", "low"]
+        if cls._is_text_only_operation(logical_expression):
+            prompt_strategy = PromptStrategy.COT_JOIN_NO_REASONING if no_reasoning else PromptStrategy.COT_JOIN
+        elif cls._is_image_operation(logical_expression):
+            prompt_strategy = PromptStrategy.COT_JOIN_IMAGE_NO_REASONING if no_reasoning else PromptStrategy.COT_JOIN_IMAGE
         elif cls._is_audio_operation(logical_expression):
-            prompt_strategy = PromptStrategy.COT_JOIN_AUDIO
+            prompt_strategy = PromptStrategy.COT_JOIN_AUDIO_NO_REASONING if no_reasoning else PromptStrategy.COT_JOIN_AUDIO
         variable_op_kwargs = [
             {
                 "model": model,

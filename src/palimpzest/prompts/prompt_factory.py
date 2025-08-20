@@ -38,6 +38,8 @@ from palimpzest.prompts.convert_prompts import (
     COT_QA_IMAGE_EXAMPLE_REASONING,
     COT_QA_IMAGE_JOB_INSTRUCTION,
     COT_QA_JOB_INSTRUCTION,
+    COT_QA_NO_REASONING_BASE_SYSTEM_PROMPT,
+    COT_QA_NO_REASONING_BASE_USER_PROMPT,
 )
 from palimpzest.prompts.critique_and_refine_convert_prompts import (
     BASE_CRITIQUE_PROMPT,
@@ -69,6 +71,8 @@ from palimpzest.prompts.filter_prompts import (
     COT_BOOL_IMAGE_EXAMPLE_REASONING,
     COT_BOOL_IMAGE_JOB_INSTRUCTION,
     COT_BOOL_JOB_INSTRUCTION,
+    COT_BOOL_NO_REASONING_BASE_SYSTEM_PROMPT,
+    COT_BOOL_NO_REASONING_BASE_USER_PROMPT,
 )
 from palimpzest.prompts.join_prompts import (
     COT_JOIN_AUDIO_DISCLAIMER,
@@ -94,6 +98,8 @@ from palimpzest.prompts.join_prompts import (
     COT_JOIN_IMAGE_RIGHT_EXAMPLE_CONTEXT,
     COT_JOIN_IMAGE_RIGHT_EXAMPLE_INPUT_FIELDS,
     COT_JOIN_JOB_INSTRUCTION,
+    COT_JOIN_NO_REASONING_BASE_SYSTEM_PROMPT,
+    COT_JOIN_NO_REASONING_BASE_USER_PROMPT,
     COT_JOIN_RIGHT_AUDIO_DISCLAIMER,
     COT_JOIN_RIGHT_EXAMPLE_CONTEXT,
     COT_JOIN_RIGHT_EXAMPLE_INPUT_FIELDS,
@@ -142,16 +148,25 @@ class PromptFactory:
 
     BASE_SYSTEM_PROMPT_MAP = {
         PromptStrategy.COT_BOOL: COT_BOOL_BASE_SYSTEM_PROMPT,
+        PromptStrategy.COT_BOOL_NO_REASONING: COT_BOOL_NO_REASONING_BASE_SYSTEM_PROMPT,
         PromptStrategy.COT_BOOL_AUDIO: COT_BOOL_BASE_SYSTEM_PROMPT,
+        PromptStrategy.COT_BOOL_AUDIO_NO_REASONING: COT_BOOL_NO_REASONING_BASE_SYSTEM_PROMPT,
         PromptStrategy.COT_BOOL_IMAGE: COT_BOOL_BASE_SYSTEM_PROMPT,
+        PromptStrategy.COT_BOOL_IMAGE_NO_REASONING: COT_BOOL_NO_REASONING_BASE_SYSTEM_PROMPT,
         PromptStrategy.COT_JOIN: COT_JOIN_BASE_SYSTEM_PROMPT,
+        PromptStrategy.COT_JOIN_NO_REASONING: COT_JOIN_NO_REASONING_BASE_SYSTEM_PROMPT,
         PromptStrategy.COT_JOIN_AUDIO: COT_JOIN_BASE_SYSTEM_PROMPT,
+        PromptStrategy.COT_JOIN_AUDIO_NO_REASONING: COT_JOIN_NO_REASONING_BASE_SYSTEM_PROMPT,
         PromptStrategy.COT_JOIN_IMAGE: COT_JOIN_BASE_SYSTEM_PROMPT,
+        PromptStrategy.COT_JOIN_IMAGE_NO_REASONING: COT_JOIN_NO_REASONING_BASE_SYSTEM_PROMPT,
         PromptStrategy.COT_QA: COT_QA_BASE_SYSTEM_PROMPT,
+        PromptStrategy.COT_QA_NO_REASONING: COT_QA_NO_REASONING_BASE_SYSTEM_PROMPT,
         PromptStrategy.COT_QA_AUDIO: COT_QA_BASE_SYSTEM_PROMPT,
+        PromptStrategy.COT_QA_AUDIO_NO_REASONING: COT_QA_NO_REASONING_BASE_SYSTEM_PROMPT,
         PromptStrategy.COT_QA_CRITIC: None,
         PromptStrategy.COT_QA_REFINE: None,
         PromptStrategy.COT_QA_IMAGE: COT_QA_BASE_SYSTEM_PROMPT,
+        PromptStrategy.COT_QA_IMAGE_NO_REASONING: COT_QA_NO_REASONING_BASE_SYSTEM_PROMPT,
         PromptStrategy.COT_QA_IMAGE_CRITIC: None,
         PromptStrategy.COT_QA_IMAGE_REFINE: None,
         PromptStrategy.COT_MOA_PROPOSER: COT_MOA_PROPOSER_BASE_SYSTEM_PROMPT,
@@ -162,16 +177,25 @@ class PromptFactory:
     }
     BASE_USER_PROMPT_MAP = {
         PromptStrategy.COT_BOOL: COT_BOOL_BASE_USER_PROMPT,
+        PromptStrategy.COT_BOOL_NO_REASONING: COT_BOOL_NO_REASONING_BASE_USER_PROMPT,
         PromptStrategy.COT_BOOL_AUDIO: COT_BOOL_BASE_USER_PROMPT,
+        PromptStrategy.COT_BOOL_AUDIO_NO_REASONING: COT_BOOL_NO_REASONING_BASE_USER_PROMPT,
         PromptStrategy.COT_BOOL_IMAGE: COT_BOOL_BASE_USER_PROMPT,
+        PromptStrategy.COT_BOOL_IMAGE_NO_REASONING: COT_BOOL_NO_REASONING_BASE_USER_PROMPT,
         PromptStrategy.COT_JOIN: COT_JOIN_BASE_USER_PROMPT,
+        PromptStrategy.COT_JOIN_NO_REASONING: COT_JOIN_NO_REASONING_BASE_USER_PROMPT,
         PromptStrategy.COT_JOIN_AUDIO: COT_JOIN_BASE_USER_PROMPT,
+        PromptStrategy.COT_JOIN_AUDIO_NO_REASONING: COT_JOIN_NO_REASONING_BASE_USER_PROMPT,
         PromptStrategy.COT_JOIN_IMAGE: COT_JOIN_BASE_USER_PROMPT,
+        PromptStrategy.COT_JOIN_IMAGE_NO_REASONING: COT_JOIN_NO_REASONING_BASE_USER_PROMPT,
         PromptStrategy.COT_QA: COT_QA_BASE_USER_PROMPT,
+        PromptStrategy.COT_QA_NO_REASONING: COT_QA_NO_REASONING_BASE_USER_PROMPT,
         PromptStrategy.COT_QA_AUDIO: COT_QA_BASE_USER_PROMPT,
+        PromptStrategy.COT_QA_AUDIO_NO_REASONING: COT_QA_NO_REASONING_BASE_USER_PROMPT,
         PromptStrategy.COT_QA_CRITIC: BASE_CRITIQUE_PROMPT,
         PromptStrategy.COT_QA_REFINE: BASE_REFINEMENT_PROMPT,
         PromptStrategy.COT_QA_IMAGE: COT_QA_BASE_USER_PROMPT,
+        PromptStrategy.COT_QA_IMAGE_NO_REASONING: COT_QA_NO_REASONING_BASE_USER_PROMPT,
         PromptStrategy.COT_QA_IMAGE_CRITIC: BASE_CRITIQUE_PROMPT,
         PromptStrategy.COT_QA_IMAGE_REFINE: BASE_REFINEMENT_PROMPT,
         PromptStrategy.COT_MOA_PROPOSER: COT_MOA_PROPOSER_BASE_USER_PROMPT,
@@ -197,8 +221,9 @@ class PromptFactory:
         Returns:
             str: The context.
         """
+        # TODO: remove mask_filepaths=True after SemBench evaluation
         # get context from input record (project_cols will be None if not provided in kwargs)
-        context: dict = candidate.to_dict(include_bytes=False, project_cols=input_fields)
+        context: dict = candidate.to_dict(include_bytes=False, project_cols=input_fields, mask_filepaths=True)
 
         # TODO: MOVE THIS LOGIC INTO A CHUNKING / CONTEXT MANAGEMENT CLASS
         #   - this class should be able to:

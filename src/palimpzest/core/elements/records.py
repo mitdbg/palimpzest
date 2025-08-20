@@ -9,7 +9,16 @@ from pydantic import BaseModel
 from pydantic.fields import FieldInfo
 
 from palimpzest.core.data import context
-from palimpzest.core.lib.schemas import ImageBase64, create_schema_from_df, project, union_schemas
+from palimpzest.core.lib.schemas import (
+    AudioBase64,
+    AudioFilepath,
+    ImageBase64,
+    ImageFilepath,
+    ImageURL,
+    create_schema_from_df,
+    project,
+    union_schemas,
+)
 from palimpzest.core.models import ExecutionStats, PlanStats, RecordOpStats
 from palimpzest.utils.hash_helpers import hash_for_id, hash_for_serialized_dict
 
@@ -332,7 +341,7 @@ class DataRecord:
         record_dict = self.to_dict(include_bytes, bytes_to_str, project_cols, sorted)
         return json.dumps(record_dict, indent=2)
 
-    def to_dict(self, include_bytes: bool = True, bytes_to_str: bool = False, project_cols: list[str] | None = None, _sorted: bool = False):
+    def to_dict(self, include_bytes: bool = True, bytes_to_str: bool = False, project_cols: list[str] | None = None, _sorted: bool = False, mask_filepaths: bool = False):
         """Return a dictionary representation of this DataRecord"""
         # TODO(chjun): In case of numpy types, the json.dumps will fail. Convert to native types.
         # Better ways to handle this.
@@ -350,7 +359,7 @@ class DataRecord:
         if not include_bytes:
             for k in dct:
                 field_type = self.field_types[k]
-                if field_type.annotation in [bytes, ImageBase64, list[bytes], list[ImageBase64]]:
+                if field_type.annotation in [bytes, AudioBase64, ImageBase64, list[bytes], list[ImageBase64]]:
                     dct[k] = "<bytes>"
 
         if bytes_to_str:
@@ -362,6 +371,12 @@ class DataRecord:
 
         if _sorted:
             dct = dict(sorted(dct.items()))
+
+        if mask_filepaths:
+            for k in dct:
+                field_type = self.field_types[k]
+                if field_type.annotation in [AudioBase64, AudioFilepath, ImageBase64, ImageFilepath, ImageURL]:
+                    dct[k] = "<bytes>"
 
         return dct
 

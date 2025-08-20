@@ -316,7 +316,7 @@ class Generator(Generic[ContextType, InputType]):
                 elif self.model.is_anthropic_model() and self.reasoning_effort is not None:
                     completion_kwargs = {"reasoning_effort": self.reasoning_effort, **completion_kwargs}
                 elif self.model.is_openai_model():
-                    reasoning_effort = "low" if self.reasoning_effort is None else self.reasoning_effort
+                    reasoning_effort = "minimal" if self.reasoning_effort is None else self.reasoning_effort
                     completion_kwargs = {"reasoning_effort": reasoning_effort, **completion_kwargs}
             completion = litellm.completion(model=self.model_name, messages=messages, **completion_kwargs)
             end_time = time.time()
@@ -345,25 +345,41 @@ class Generator(Generic[ContextType, InputType]):
         if completion is not None:
             usage = completion.usage.model_dump()
 
-            # get cost per input/output token for the model and parse number of input and output tokens
-            usd_per_input_token = (
-                MODEL_CARDS[self.model_name]["usd_per_audio_input_token"]
-                if self.prompt_strategy.is_audio_prompt()
-                else MODEL_CARDS[self.model_name]["usd_per_input_token"]
-            )
+            # get cost per input/output token for the model
+            usd_per_input_token = MODEL_CARDS[self.model_name].get("usd_per_input_token", 0.0)
+            usd_per_audio_input_token = MODEL_CARDS[self.model_name].get("usd_per_audio_input_token", 0.0)
             usd_per_output_token = MODEL_CARDS[self.model_name]["usd_per_output_token"]
-            input_tokens = usage["prompt_tokens"]
+
+            # TODO: for some models (e.g. GPT-5) we cannot separate text from image prompt tokens yet;
+            #       for now, we only use tokens from prompt_token_details if it's an audio prompt
+            # get output tokens (all text) and input tokens by modality
             output_tokens = usage["completion_tokens"]
+            if self.prompt_strategy.is_audio_prompt():
+                input_audio_tokens = usage["prompt_tokens_details"].get("audio_tokens", 0)
+                input_text_tokens = usage["prompt_tokens_details"].get("text_tokens", 0)
+                input_image_tokens = 0
+            else:
+                input_audio_tokens = 0
+                input_text_tokens = usage["prompt_tokens"]
+                input_image_tokens = 0
+            input_tokens = input_audio_tokens + input_text_tokens + input_image_tokens
+
+            # compute the input and output token costs
+            total_input_cost = (input_text_tokens + input_image_tokens) * usd_per_input_token + input_audio_tokens * usd_per_audio_input_token
+            total_output_cost = output_tokens * usd_per_output_token
 
             generation_stats = GenerationStats(
                 model_name=self.model_name,
                 llm_call_duration_secs=end_time - start_time,
                 fn_call_duration_secs=0.0,
+                input_audio_tokens=input_audio_tokens,
+                input_text_tokens=input_text_tokens,
+                input_image_tokens=input_image_tokens,
                 total_input_tokens=input_tokens,
                 total_output_tokens=output_tokens,
-                total_input_cost=input_tokens * usd_per_input_token,
-                total_output_cost=output_tokens * usd_per_output_token,
-                cost_per_record=input_tokens * usd_per_input_token + output_tokens * usd_per_output_token,
+                total_input_cost=total_input_cost,
+                total_output_cost=total_output_cost,
+                cost_per_record=total_input_cost + total_output_cost,
                 total_llm_calls=1,
             )
 
