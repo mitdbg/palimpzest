@@ -18,6 +18,15 @@ class GenerationStats(BaseModel):
     # The raw answer as output from the generator (a list of strings, possibly of len 1)
     # raw_answers: Optional[List[str]] = field(default_factory=list)
 
+    # the number of input audio tokens
+    input_audio_tokens: int = 0
+
+    # the number of input text tokens
+    input_text_tokens: int = 0
+
+    # the number of input image tokens
+    input_image_tokens: int = 0
+
     # the total number of input tokens processed by this operator; None if this operation did not use an LLM
     # typed as a float because GenerationStats may be amortized (i.e. divided) across a number of output records
     total_input_tokens: float = 0.0

@@ -119,32 +119,41 @@ class PromptStrategy(str, Enum):
 
     # Chain-of-Thought Boolean Prompt Strategies
     COT_BOOL = "chain-of-thought-bool"
+    COT_BOOL_NO_REASONING = "chain-of-thought-bool-no-reasoning"
     # COT_BOOL_CRITIC = "chain-of-thought-bool-critic"
     # COT_BOOL_REFINE = "chain-of-thought-bool-refine"
 
     # Chain-of-Thought Boolean with Image Prompt Strategies
     COT_BOOL_IMAGE = "chain-of-thought-bool-image"
+    COT_BOOL_IMAGE_NO_REASONING = "chain-of-thought-bool-image"
     COT_BOOL_AUDIO = "chain-of-thought-bool-audio"
+    COT_BOOL_AUDIO_NO_REASONING = "chain-of-thought-bool-audio"
     # COT_BOOL_IMAGE_CRITIC = "chain-of-thought-bool-image-critic"
     # COT_BOOL_IMAGE_REFINE = "chain-of-thought-bool-image-refine"
 
     # Chain-of-Thought Join Prompt Strategies
     COT_JOIN = "chain-of-thought-join"
+    COT_JOIN_NO_REASONING = "chain-of-thought-join-no-reasoning"
     COT_JOIN_IMAGE = "chain-of-thought-join-image"
+    COT_JOIN_IMAGE_NO_REASONING = "chain-of-thought-join-image-no-reasoning"
     COT_JOIN_AUDIO = "chain-of-thought-join-audio"
+    COT_JOIN_AUDIO_NO_REASONING = "chain-of-thought-join-audio-no-reasoning"
 
     # Chain-of-Thought Question Answering Prompt Strategies
     COT_QA = "chain-of-thought-question"
+    COT_QA_NO_REASONING = "chain-of-thought-question-no-reasoning"
     COT_QA_CRITIC = "chain-of-thought-question-critic"
     COT_QA_REFINE = "chain-of-thought-question-refine"
 
     # Chain-of-Thought Question with Image Prompt Strategies
     COT_QA_IMAGE = "chain-of-thought-question-image"
+    COT_QA_IMAGE_NO_REASONING = "chain-of-thought-question-image-no-reasoning"
     COT_QA_IMAGE_CRITIC = "chain-of-thought-question-critic-image"
     COT_QA_IMAGE_REFINE = "chain-of-thought-question-refine-image"
 
     # Chain-of-Thought Queestion with Audio Prompt Strategies
     COT_QA_AUDIO = "chain-of-thought-question-audio"
+    COT_QA_AUDIO_NO_REASONING = "chain-of-thought-question-audio-no-reasoning"
     # TODO: COT_QA_AUDIO_CRITIC/REFINE
 
     # Mixture-of-Agents Prompt Strategies
@@ -190,6 +199,8 @@ class PromptStrategy(str, Enum):
     def is_split_merger_prompt(self):
         return "split-merger" in self.value
 
+    def is_no_reasoning_prompt(self):
+        return "no-reasoning" in self.value
 
 class AggFunc(str, Enum):
     COUNT = "count"
