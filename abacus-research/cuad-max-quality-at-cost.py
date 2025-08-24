@@ -3,9 +3,9 @@ import json
 import os
 import string
 
-import datasets
 import numpy as np
 import pandas as pd
+from cuad_data_loader import load_cuad_data
 
 import palimpzest as pz
 from palimpzest.constants import Model
@@ -266,7 +266,7 @@ NUM_FIELDS_TO_EXTRACT_PER_CONTRACT = 41
 IOU_THRESH = 0.15
 
 def get_label_df(num_contracts: int = 1, seed: int=42) -> pd.DataFrame:
-    dataset = datasets.load_dataset("theatticusproject/cuad-qa")["test"]
+    dataset = load_cuad_data(split="test")
 
     # get the set of unique contract titles; to ensure the order of the contracts is
     # preserved, we use a list rather than using python's set()
@@ -306,7 +306,14 @@ def get_label_df(num_contracts: int = 1, seed: int=42) -> pd.DataFrame:
             category_name = category_name.replace(" To ", " to ")
             category_name = category_name.replace("Ip", "IP")
             assert category_name in category_names, f"Unknown category {category_name}"
-            contract[category_name].extend(row["answers"]["text"])
+
+            # Extract text from answers list (handles both old and new format)
+            answer_texts = []
+            if isinstance(row["answers"], list):
+                answer_texts = [ans["text"] for ans in row["answers"]] if row["answers"] else []
+            else:
+                answer_texts = row["answers"].get("text", [])
+            contract[category_name].extend(answer_texts)
 
         # add the contract to the dataset
         final_label_dataset.append(contract)
@@ -431,7 +438,7 @@ class CUADValidator(pz.Validator):
 
     def _compute_contract_id_to_labels(self):
         # load full train dataset
-        dataset = datasets.load_dataset("theatticusproject/cuad-qa")["train"]
+        dataset = load_cuad_data(split="train")
 
         # get the set of unique contract titles; to ensure the order of the contracts is
         # preserved, we use a list rather than using python's set()
@@ -467,7 +474,14 @@ class CUADValidator(pz.Validator):
                 category_name = category_name.replace(" To ", " to ")
                 category_name = category_name.replace("Ip", "IP")
                 assert category_name in self.category_names, f"Unknown category {category_name}"
-                labels[category_name].extend(row["answers"]["text"])
+
+                # Extract text from answers list (handles both old and new format)
+                answer_texts = []
+                if isinstance(row["answers"], list):
+                    answer_texts = [ans["text"] for ans in row["answers"]] if row["answers"] else []
+                else:
+                    answer_texts = row["answers"].get("text", [])
+                labels[category_name].extend(answer_texts)
 
             # update the dictionary
             contract_id_to_labels[contract_id] = labels
@@ -488,10 +502,9 @@ class CUADDataset(pz.IterDataset):
         ]
         super().__init__(id="cuad", schema=input_cols)
 
-        # convert the dataset into a list of dictionaries where each row is for a single contract
-        dataset = datasets.load_dataset("theatticusproject/cuad-qa")[split]
+        # Load dataset from local files
+        dataset = load_cuad_data(split=split)
         self.dataset = self._construct_dataset(dataset, num_contracts, seed)
-
 
     def _construct_dataset(self, dataset, num_contracts, seed: int=42):
         # get the set of unique contract titles; to ensure the order of the contracts is
@@ -531,7 +544,6 @@ class CUADDataset(pz.IterDataset):
 
     def __getitem__(self, idx: int):
         return self.dataset[idx]
-
 
 # Compute the precision and recall for the entire dataset.
 # Each row in the dataframes should correspond to a contract.
