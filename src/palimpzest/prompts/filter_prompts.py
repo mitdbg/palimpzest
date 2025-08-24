@@ -12,9 +12,8 @@ INPUT FIELDS:
 {example_input_fields}
 
 CONTEXT:
-{example_context}
-{image_disclaimer}
-{audio_disclaimer}
+{example_context}{image_disclaimer}{audio_disclaimer}
+
 FILTER CONDITION: {example_filter_condition}
 
 Let's think step-by-step in order to answer the question.
@@ -36,9 +35,8 @@ INPUT FIELDS:
 {example_input_fields}
 
 CONTEXT:
-{example_context}
-{image_disclaimer}
-{audio_disclaimer}
+{example_context}{image_disclaimer}{audio_disclaimer}
+
 FILTER CONDITION: {example_filter_condition}
 
 ANSWER: TRUE
@@ -54,9 +52,8 @@ INPUT FIELDS:
 {input_fields_desc}
 
 CONTEXT:
-{context}
-<<image-placeholder>>
-<<audio-placeholder>>
+{context}<<image-placeholder>><<audio-placeholder>>
+
 FILTER CONDITION: {filter_condition}
 
 Let's think step-by-step in order to answer the question.
@@ -72,9 +69,8 @@ INPUT FIELDS:
 {input_fields_desc}
 
 CONTEXT:
-{context}
-<<image-placeholder>>
-<<audio-placeholder>>
+{context}<<image-placeholder>><<audio-placeholder>>
+
 FILTER CONDITION: {filter_condition}
 
 ANSWER: """
@@ -107,10 +103,10 @@ COT_BOOL_IMAGE_EXAMPLE_FILTER_CONDITION = "there's an animal in this image"
 COT_BOOL_AUDIO_EXAMPLE_FILTER_CONDITION = "the newscast discusses a flashpoint in the Cold War"
 
 COT_BOOL_IMAGE_DISCLAIMER = """
-<image content provided here; assume in this example the image shows a dog and a cat playing>
+\n<image content provided here; assume in this example the image shows a dog and a cat playing>
 """
 COT_BOOL_AUDIO_DISCLAIMER = """
-<audio content provided here; assume in this example the recording is about the Cuban Missile Crisis>
+\n<audio content provided here; assume in this example the recording is about the Cuban Missile Crisis>
 """
 
 COT_BOOL_EXAMPLE_REASONING = """the text mentions the words "fox" and "dog" which are animals, therefore the answer is TRUE."""

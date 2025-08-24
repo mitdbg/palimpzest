@@ -212,6 +212,9 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
         # compute quality of each output computed by this operator
         for _, record_set_tuples in source_indices_to_record_sets.items():
             for record_set, op in record_set_tuples:
+                if is_perfect_quality_op(op) or len(record_set) == 0:
+                    continue
+
                 if isinstance(op, LLMConvert) and op.cardinality is Cardinality.ONE_TO_ONE:
                     fields = op.generated_fields
                     input_record: DataRecord = record_set.input

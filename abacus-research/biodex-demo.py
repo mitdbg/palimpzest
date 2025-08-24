@@ -2,7 +2,6 @@ import argparse
 import json
 import os
 import time
-from functools import partial
 
 import chromadb
 import datasets
@@ -167,76 +166,6 @@ class BiodexDataset(pz.IterDataset):
         self.seed = seed
         self.split = split
 
-    def compute_label(self, entry: dict) -> dict:
-        """Compute the label for a BioDEX report given its entry in the dataset."""
-        reactions_lst = [
-            reaction.strip().lower().replace("'", "").replace("^", "")
-            for reaction in entry["reactions"].split(",")
-        ]
-        label_dict = {
-            "reactions": reactions_lst,
-            "reaction_labels": reactions_lst,
-            "ranked_reaction_labels": reactions_lst,
-        }
-        return label_dict
-
-    @staticmethod
-    def rank_precision_at_k(preds: list | None, targets: list, k: int):
-        if preds is None:
-            return 0.0
-
-        try:
-            # lower-case each list
-            preds = [pred.strip().lower().replace("'", "").replace("^", "") for pred in preds]
-            targets = set([target.strip().lower().replace("'", "").replace("^", "") for target in targets])
-
-            # compute rank-precision at k
-            rn = len(targets)
-            denom = min(k, rn)
-            total = 0.0
-            for i in range(k):
-                total += preds[i] in targets if i < len(preds) else 0.0
-
-            return total / denom
-
-        except Exception:
-            os.makedirs("rp@k-errors", exist_ok=True)
-            ts = time.time()
-            with open(f"rp@k-errors/error-{ts}.txt", "w") as f:
-                f.write(str(preds))
-            return 0.0
-
-    @staticmethod
-    def term_recall(preds: list | None, targets: list):
-        if preds is None:
-            return 0.0
-
-        try:
-            # normalize terms in each list
-            pred_terms = set([
-                term.strip()
-                for pred in preds
-                for term in pred.lower().replace("'", "").replace("^", "").split(" ")
-            ])
-            target_terms = ([
-                term.strip()
-                for target in targets
-                for term in target.lower().replace("'", "").replace("^", "").split(" ")
-            ])
-
-            # compute term recall and return
-            intersect = pred_terms.intersection(target_terms)
-            term_recall = len(intersect) / len(target_terms)
-
-            return term_recall
-
-        except Exception:
-            os.makedirs("term-recall-eval-errors", exist_ok=True)
-            ts = time.time()
-            with open(f"term-recall-eval-errors/error-{ts}.txt", "w") as f:
-                f.write(str(preds))
-            return 0.0
-
     def __len__(self):
         return len(self.dataset)
 
@@ -251,21 +180,7 @@ class BiodexDataset(pz.IterDataset):
         fulltext = entry["fulltext"]
 
         # create item with fields
-        item = {"fields": {}, "labels": {}, "score_fn": {}}
-        item["fields"]["pmid"] = pmid
-        item["fields"]["title"] = title
-        item["fields"]["abstract"] = abstract
-        item["fields"]["fulltext"] = fulltext
-
-        if self.split == "train":
-            # add label info
-            item["labels"] = self.compute_label(entry)
-
-            # add scoring functions for list fields
-            rank_precision_at_k = partial(BiodexDataset.rank_precision_at_k, k=self.rp_at_k)
-            item["score_fn"]["reactions"] = BiodexDataset.term_recall
-            item["score_fn"]["reaction_labels"] = BiodexDataset.term_recall
-            item["score_fn"]["ranked_reaction_labels"] = rank_precision_at_k
+        item = {"pmid": pmid, "title": title, "abstract": abstract, "fulltext": fulltext}
 
         return item
 

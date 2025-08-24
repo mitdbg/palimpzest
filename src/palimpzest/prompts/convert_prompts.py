@@ -16,9 +16,8 @@ OUTPUT FIELDS:
 {example_output_fields}
 
 CONTEXT:
-{example_context}
-{image_disclaimer}
-{audio_disclaimer}
+{example_context}{image_disclaimer}{audio_disclaimer}
+
 Let's think step-by-step in order to answer the question.
 
 REASONING: {example_reasoning}
@@ -43,9 +42,7 @@ OUTPUT FIELDS:
 {example_output_fields}
 
 CONTEXT:
-{example_context}
-{image_disclaimer}
-{audio_disclaimer}
+{example_context}{image_disclaimer}{audio_disclaimer}
 
 ANSWER:
 {example_answer}
@@ -66,9 +63,8 @@ OUTPUT FIELDS:
 {output_fields_desc}
 
 CONTEXT:
-{context}
-<<image-placeholder>>
-<<audio-placeholder>>
+{context}<<image-placeholder>><<audio-placeholder>>
+
 Let's think step-by-step in order to answer the question.
 
 REASONING: """
@@ -86,9 +82,7 @@ OUTPUT FIELDS:
 {output_fields_desc}
 
 CONTEXT:
-{context}
-<<image-placeholder>>
-<<audio-placeholder>>
+{context}<<image-placeholder>><<audio-placeholder>>
 
 ANSWER: """
 
@@ -125,10 +119,10 @@ COT_QA_AUDIO_EXAMPLE_CONTEXT = """{{
 }}"""
 
 COT_QA_IMAGE_DISCLAIMER = """
-<image content provided here; assume in this example the image shows a dog and a cat playing>
+\n<image content provided here; assume in this example the image shows a dog and a cat playing>
 """
 COT_QA_AUDIO_DISCLAIMER = """
-<audio content provided here; assume in this example the recording is about the Cuban Missile Crisis and spoken in English>
+\n<audio content provided here; assume in this example the recording is about the Cuban Missile Crisis and spoken in English>
 """
 
 COT_QA_EXAMPLE_REASONING = """the text passage mentions the scientist's name as "Augusta Ada King, Countess of Lovelace, also known as Ada Lovelace" and the scientist's birthday as "December 10, 1815". Therefore, the name of the scientist is "Augusta Ada King" and the birth year is 1815."""

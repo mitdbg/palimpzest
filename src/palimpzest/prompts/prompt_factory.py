@@ -307,7 +307,7 @@ class PromptFactory:
         if self.prompt_strategy.is_convert_prompt():
             assert output_schema is not None, "Output schema must be provided for convert prompts."
 
-            for field_name in output_fields:
+            for field_name in sorted(output_fields):
                 desc = output_schema.model_fields[field_name].description
                 output_fields_desc += f"- {field_name}: {'no description available' if desc is None else desc}\n"
 
@@ -950,7 +950,7 @@ class PromptFactory:
         # image not join
         elif self.prompt_strategy.is_image_prompt() and not self.prompt_strategy.is_join_prompt():
             base_prompt = base_prompt.replace("<<audio-placeholder>>", "")
-            base_prompt_start, base_prompt_end = base_prompt.split("<<image-placeholder>>\n")
+            base_prompt_start, base_prompt_end = base_prompt.split("<<image-placeholder>>")
             user_messages.append({"role": "user", "type": "text", "content": base_prompt_start.format(**kwargs)})
             user_messages.extend(image_messages)
             user_messages.append({"role": "user", "type": "text", "content": base_prompt_end.format(**kwargs)})
@@ -959,7 +959,7 @@ class PromptFactory:
         elif self.prompt_strategy.is_image_prompt() and self.prompt_strategy.is_join_prompt():
             # for join image prompts, we may have two sets of images (one from the left candidate and one from the right candidate)
             base_prompt = base_prompt.replace("<<audio-placeholder>>", "")
-            base_prompt_start, base_prompt_mid, base_prompt_end = base_prompt.split("<<image-placeholder>>\n")
+            base_prompt_start, base_prompt_mid, base_prompt_end = base_prompt.split("<<image-placeholder>>")
             user_messages.append({"role": "user", "type": "text", "content": base_prompt_start.format(**kwargs)})
             user_messages.extend(image_messages)
             user_messages.append({"role": "user", "type": "text", "content": base_prompt_mid.format(**kwargs)})
@@ -969,7 +969,7 @@ class PromptFactory:
         # audio not join
         elif self.prompt_strategy.is_audio_prompt() and not self.prompt_strategy.is_join_prompt():
             base_prompt = base_prompt.replace("<<image-placeholder>>", "")
-            base_prompt_start, base_prompt_end = base_prompt.split("<<audio-placeholder>>\n")
+            base_prompt_start, base_prompt_end = base_prompt.split("<<audio-placeholder>>")
             user_messages.append({"role": "user", "type": "text", "content": base_prompt_start.format(**kwargs)})
             user_messages.extend(audio_messages)
             user_messages.append({"role": "user", "type": "text", "content": base_prompt_end.format(**kwargs)})
@@ -978,7 +978,7 @@ class PromptFactory:
         elif self.prompt_strategy.is_audio_prompt() and self.prompt_strategy.is_join_prompt():
             # for join image prompts, we may have two sets of images (one from the left candidate and one from the right candidate)
             base_prompt = base_prompt.replace("<<image-placeholder>>", "")
-            base_prompt_start, base_prompt_mid, base_prompt_end = base_prompt.split("<<audio-placeholder>>\n")
+            base_prompt_start, base_prompt_mid, base_prompt_end = base_prompt.split("<<audio-placeholder>>")
             user_messages.append({"role": "user", "type": "text", "content": base_prompt_start.format(**kwargs)})
             user_messages.extend(audio_messages)
             user_messages.append({"role": "user", "type": "text", "content": base_prompt_mid.format(**kwargs)})

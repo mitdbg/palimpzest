@@ -2,7 +2,6 @@ import argparse
 import json
 import os
 import string
-from functools import partial
 
 import datasets
 import numpy as np
@@ -11,7 +10,7 @@ import pandas as pd
 import palimpzest as pz
 from palimpzest.constants import Model
 
-cuad_categories = [
+CUAD_CATEGORIES = [
     {
         "Category": "Document Name",
         "Description": "The name of the contract",
@@ -265,6 +264,55 @@ NUM_FIELDS_TO_EXTRACT_PER_CONTRACT = 41
 # 0.15 is used in the Doc-ETL paper. It should be 0.5 for the actual benchmark.
 IOU_THRESH = 0.15
 
+def get_label_df(num_contracts: int = 1, seed: int=42) -> pd.DataFrame:
+    dataset = datasets.load_dataset("theatticusproject/cuad-qa")["test"]
+
+    # get the set of unique contract titles; to ensure the order of the contracts is
+    # preserved, we use a list rather than using python's set()
+    contract_titles = []
+    for row in dataset:
+        if row["title"] not in contract_titles:
+            contract_titles.append(row["title"])
+
+    # shuffle the contracts for the given seed
+    rng = np.random.default_rng(seed=seed)
+    rng.shuffle(contract_titles)
+
+    # get the first num_contracts
+    contract_titles = contract_titles[:num_contracts]
+
+    # construct the dataset one contract at a time
+    final_label_dataset = []
+    for title in contract_titles:
+        # get the rows for this contract
+        contract_rows = [row for row in dataset if row["title"] == title]
+
+        # construct the contract; we get the contract_id and contract text from the first row
+        contract = {
+            "contract_id": contract_rows[0]["id"],
+            "title": title,
+            "contract": contract_rows[0]["context"],
+        }
+
+        # add the labels
+        category_names = list(map(lambda category: category["Category"], CUAD_CATEGORIES))
+        contract.update({category_name: [] for category_name in category_names})
+        for row in contract_rows:
+            category_name = row["id"].split("__")[-1].split("_")[0].strip()
+            category_name = category_name.replace(" For ", " for ")
+            category_name = category_name.replace(" Of ", " of ")
+            category_name = category_name.replace(" On ", " on ")
+            category_name = category_name.replace(" Or ", " or ")
+            category_name = category_name.replace(" To ", " to ")
+            category_name = category_name.replace("Ip", "IP")
+            assert category_name in category_names, f"Unknown category {category_name}"
+            contract[category_name].extend(row["answers"]["text"])
+
+        # add the contract to the dataset
+        final_label_dataset.append(contract)
+
+    return pd.DataFrame(final_label_dataset)
+
 
 #  Return the Jaccard similarity between two strings
 def get_jaccard(label, pred):
@@ -343,7 +391,6 @@ def evaluate_entry(labels, preds, substr_ok):
     return tp, fp, fn
 
 
-# TODO(Siva): This is a temporary fix to handle the case where the preds are empty.
 def handle_empty_preds(preds):
     if preds is None or (  # noqa: SIM114
         isinstance(preds, str) and (preds == "" or preds == " " or preds == "null" or preds == "None")
@@ -356,43 +403,78 @@ def handle_empty_preds(preds):
     return preds
 
 
-# Compute the precision and recall for the entire dataset.
-# Each row in the dataframes should correspond to a contract.
-# The columns should be the extracted fields (categories in cuad_categories).
-def compute_precision_recall(label_df, preds_df):
-    tp, fp, fn = 0, 0, 0
+class CUADValidator(pz.Validator):
+    def __init__(self, num_contracts: int = 1, seed: int=42):
+        super().__init__()
+        self.num_contracts = num_contracts
+        self.seed = seed
 
-    label_df = label_df.sort_values("contract_id").reset_index(drop=True)
-    preds_df = preds_df.sort_values("contract_id").reset_index(drop=True)
+        # get clean names for the categories
+        self.category_names = list(map(lambda category: category["Category"], CUAD_CATEGORIES))
 
-    assert label_df.shape == preds_df.shape, (
-        f"Label and prediction dataframes have different shapes, label shape: {label_df.shape} vs preds shape {preds_df.shape}"
-    )
+        # compute mapping from contract_id --> label
+        self.contract_id_to_label = self._compute_contract_id_to_labels()
 
-    categories = [category["Category"] for category in cuad_categories]
+    def map_score_fn(self, fields: list[str], input_record: dict, output: dict) -> float | None:
+        tps, fps, fns = 0, 0, 0
+        for field in fields:
+            preds = handle_empty_preds(output.get(field))
+            labels = self.contract_id_to_label[input_record["contract_id"]][field]
+            entry_tp, entry_fp, entry_fn = evaluate_entry(labels, preds, substr_ok=True) if field == "Parties" else evaluate_entry(labels, preds, substr_ok=False)
+            tps += entry_tp
+            fps += entry_fp
+            fns += entry_fn
+        precision = tps / (tps + fps) if tps + fps > 0 else 0.0
+        recall = tps / (tps + fns) if tps + fns > 0 else 0.0
+        f1 = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0.0
 
-    for label_row, pred_row in zip(label_df.iterrows(), preds_df.iterrows()):
-        assert label_row[1]["contract_id"] == pred_row[1]["contract_id"], (
-            f"IDs do not match. label id: {label_row[1]['contract_id']} vs pred id: {pred_row[1]['contract_id']}"
-        )
-        for category in categories:
-            substr_ok = "Parties" in category
+        return f1
 
-            labels = label_row[1][category]
-            assert isinstance(labels, list)
+    def _compute_contract_id_to_labels(self):
+        # load full train dataset
+        dataset = datasets.load_dataset("theatticusproject/cuad-qa")["train"]
 
-            preds = pred_row[1][category]
-            preds = handle_empty_preds(preds)
+        # get the set of unique contract titles; to ensure the order of the contracts is
+        # preserved, we use a list rather than using python's set()
+        contract_titles = []
+        for row in dataset:
+            if row["title"] not in contract_titles:
+                contract_titles.append(row["title"])
 
-            entry_tp, entry_fp, entry_fn = evaluate_entry(labels, preds, substr_ok)
-            tp += entry_tp
-            fp += entry_fp
-            fn += entry_fn
+        # shuffle the contracts for the given seed
+        rng = np.random.default_rng(seed=self.seed)
+        rng.shuffle(contract_titles)
 
-    precision = tp / (tp + fp) if tp + fp > 0 else np.nan
-    recall = tp / (tp + fn) if tp + fn > 0 else np.nan
+        # get the first num_contracts
+        contract_titles = contract_titles[:self.num_contracts]
 
-    return precision, recall
+        # construct the mapping from contract_id to labels
+        contract_id_to_labels = {}
+        for title in contract_titles:
+            # get the rows for this contract
+            contract_rows = [row for row in dataset if row["title"] == title]
+
+            # get the contract_id from the first row
+            contract_id = contract_rows[0]["id"]
+
+            # get the labels
+            labels = {category: [] for category in self.category_names}
+            for row in contract_rows:
+                category_name = row["id"].split("__")[-1].split("_")[0].strip()
+                category_name = category_name.replace(" For ", " for ")
+                category_name = category_name.replace(" Of ", " of ")
+                category_name = category_name.replace(" On ", " on ")
+                category_name = category_name.replace(" Or ", " or ")
+                category_name = category_name.replace(" To ", " to ")
+                category_name = category_name.replace("Ip", "IP")
+                assert category_name in self.category_names, f"Unknown category {category_name}"
+                labels[category_name].extend(row["answers"]["text"])
+
+            # update the dictionary
+            contract_id_to_labels[contract_id] = labels
+
+        return contract_id_to_labels
+
 
 class CUADDataset(pz.IterDataset):
     def __init__(self, num_contracts: int = 1, split: str = "train", seed: int=42):
@@ -405,15 +487,14 @@ class CUADDataset(pz.IterDataset):
             {"name": "title", "type": str, "desc": "The title of the the contract to be analyzed"},
             {"name": "contract", "type": str, "desc": "The content of the the contract to be analyzed"},
         ]
-        super().__init__(id=f"cuad-{split}", schema=input_cols)
+        super().__init__(id="cuad", schema=input_cols)
 
         # convert the dataset into a list of dictionaries where each row is for a single contract
-        include_labels = split == "train"
         dataset = datasets.load_dataset("theatticusproject/cuad-qa")[split]
-        self.dataset = self._construct_dataset(dataset, num_contracts, seed, include_labels)
+        self.dataset = self._construct_dataset(dataset, num_contracts, seed)
 
 
-    def _construct_dataset(self, dataset, num_contracts, seed: int=42, include_labels: bool=False):
+    def _construct_dataset(self, dataset, num_contracts, seed: int=42):
         # get the set of unique contract titles; to ensure the order of the contracts is
         # preserved, we use a list rather than using python's set()
         contract_titles = []
@@ -441,38 +522,6 @@ class CUADDataset(pz.IterDataset):
                 "contract": contract_rows[0]["context"],
             }
 
-            # for train / validation data, add the labels
-            if include_labels:
-                contract = {"fields": contract}
-
-                # add the labels
-                category_names = list(map(lambda category: category["Category"], cuad_categories))
-                contract["labels"] = {category: [] for category in category_names}
-                contract["score_fn"] = {category: None for category in category_names}
-                for row in contract_rows:
-                    category_name = row["id"].split("__")[-1].split("_")[0].strip()
-                    category_name = category_name.replace(" For ", " for ")
-                    category_name = category_name.replace(" Of ", " of ")
-                    category_name = category_name.replace(" On ", " on ")
-                    category_name = category_name.replace(" Or ", " or ")
-                    category_name = category_name.replace(" To ", " to ")
-                    category_name = category_name.replace("Ip", "IP")
-                    assert category_name in category_names, f"Unknown category {category_name}"
-                    contract["labels"][category_name].extend(row["answers"]["text"])
-
-                    def score_fn(preds, labels, category_name):
-                        preds = handle_empty_preds(preds)
-                        entry_tp, _, entry_fn = evaluate_entry(labels, preds, substr_ok=True) if category_name == "Parties" else evaluate_entry(labels, preds, substr_ok=False)
-                        score = None
-                        if len(labels) > 0:  # noqa: SIM108
-                            score = entry_tp / (entry_tp + entry_fn)
-                        else:
-                            score = 1.0 if len(preds) == 0 else 0.0
-
-                        return score
-
-                    contract["score_fn"][category_name] = partial(score_fn, category_name=category_name)
-
             # add the rows to the dataset
             new_dataset.append(contract)
 
@@ -484,19 +533,44 @@ class CUADDataset(pz.IterDataset):
     def __getitem__(self, idx: int):
         return self.dataset[idx]
 
-    def get_label_df(self):
-        full_dataset = datasets.load_dataset("theatticusproject/cuad-qa")[self.split]
-        label_dataset = self._construct_dataset(full_dataset, self.num_contracts, self.seed, True)
-        final_label_dataset = []
-        for entry in label_dataset:
-            row = {}
-            row["contract_id"] = entry["fields"]["contract_id"]
-            row["title"] = entry["fields"]["title"]
-            row["contract"] = entry["fields"]["contract"]
-            row = {**row, **entry["labels"]}
-            final_label_dataset.append(row)
 
-        return pd.DataFrame(final_label_dataset)
+# Compute the precision and recall for the entire dataset.
+# Each row in the dataframes should correspond to a contract.
+# The columns should be the extracted fields (categories in CUAD_CATEGORIES).
+def compute_precision_recall(label_df, preds_df):
+    tp, fp, fn = 0, 0, 0
+
+    label_df = label_df.sort_values("contract_id").reset_index(drop=True)
+    preds_df = preds_df.sort_values("contract_id").reset_index(drop=True)
+
+    assert label_df.shape == preds_df.shape, (
+        f"Label and prediction dataframes have different shapes, label shape: {label_df.shape} vs preds shape {preds_df.shape}"
+    )
+
+    categories = [category["Category"] for category in CUAD_CATEGORIES]
+
+    for label_row, pred_row in zip(label_df.iterrows(), preds_df.iterrows()):
+        assert label_row[1]["contract_id"] == pred_row[1]["contract_id"], (
+            f"IDs do not match. label id: {label_row[1]['contract_id']} vs pred id: {pred_row[1]['contract_id']}"
+        )
+        for category in categories:
+            substr_ok = "Parties" in category
+
+            labels = label_row[1][category]
+            assert isinstance(labels, list)
+
+            preds = pred_row[1][category]
+            preds = handle_empty_preds(preds)
+
+            entry_tp, entry_fp, entry_fn = evaluate_entry(labels, preds, substr_ok)
+            tp += entry_tp
+            fp += entry_fp
+            fn += entry_fn
+
+    precision = tp / (tp + fp) if tp + fp > 0 else np.nan
+    recall = tp / (tp + fn) if tp + fn > 0 else np.nan
+
+    return precision, recall
 
 
 def parse_arguments():
@@ -580,20 +654,20 @@ def build_cuad_query(dataset, mode):
 
     if mode == "one-convert":
         cols = []
-        for category in cuad_categories:
+        for category in CUAD_CATEGORIES:
             desc = (
-                f"Extract the text spans (if they exist) from the contract corresponding to {category['Description']}"
+                f"Extract the text spans (if they exist) from the contract corresponding to: {category['Description']}. If no spans exist, return an empty list. Quote text spans verbatim (do not summarize or paraphrase)."
             )
             cols.append({"name": category["Category"], "type": list[str], "desc": desc})
 
         desc = "Extract the text spans (if they exist) from the contract."
-        dataset = dataset.sem_add_columns(cols, depends_on=["contract"])
+        dataset = dataset.sem_map(cols, depends_on=["contract"])
     elif mode == "separate-converts":
-        for category in cuad_categories:
+        for category in CUAD_CATEGORIES:
             desc = (
-                f"Extract the text spans (if they exist) from the contract corresponding to {category['Description']}"
+                f"Extract the text spans (if they exist) from the contract corresponding to: {category['Description']}. If no spans exist, return an empty list. Quote text spans verbatim (do not summarize or paraphrase)."
             )
-            dataset = dataset.sem_add_columns(
+            dataset = dataset.sem_map(
                 [{"name": category["Category"], "type": list[str], "desc": desc}],
                 depends_on=["contract"],
             )
@@ -610,12 +684,16 @@ def main():
     # create directory for profiling data
     os.makedirs("opt-profiling-data", exist_ok=True)
 
-    # Create a data reader for the CUAD dataset
+    # create validator for CUAD
+    validator = CUADValidator(num_contracts=25, seed=args.seed)
+
+    # create datasets for CUAD
     dataset = CUADDataset(split="test", num_contracts=100, seed=args.seed)
     train_dataset = CUADDataset(split="train", num_contracts=25, seed=args.seed)
-    print("Created data reader")
+    train_dataset = {train_dataset.id: train_dataset}
+    print("Created datasets")
 
-    # Build and run the CUAD query
+    # build and run the CUAD query
     query = build_cuad_query(dataset, args.mode)
     print("Built query; Starting query execution")
 
@@ -676,7 +754,7 @@ def main():
     )
 
     print(f"EXPERIMENT NAME: {exp_name}")
-    data_record_collection = query.optimize_and_run(config=config, train_dataset=train_dataset, validator=pz.Validator())
+    data_record_collection = query.optimize_and_run(config=config, train_dataset=train_dataset, validator=validator)
     print("Query execution completed")
 
     # save statistics
@@ -685,7 +763,7 @@ def main():
         json.dump(execution_stats_dict, f)
 
     pred_df = data_record_collection.to_df()
-    label_df = dataset.get_label_df()
+    label_df = get_label_df(num_contracts=100, seed=seed)
     # pred_df.to_csv(f"{exp_name}-pred.csv", index=False)
     # label_df.to_csv(f"{exp_name}-label.csv", index=False)
     final_plan_id = list(data_record_collection.execution_stats.plan_stats.keys())[0]

@@ -496,18 +496,21 @@ class LLMConvertBondedRule(ImplementationRule):
         # create variable physical operator kwargs for each model which can implement this logical_expression
         models = [model for model in runtime_kwargs["available_models"] if cls._model_matches_input(model, logical_expression)]
         # NOTE: right now we exclusively allow image or audio operations, but not both simultaneously
-        prompt_strategy = None
+        prompt_strategy, no_reasoning_prompt_strategy = None, None
         no_reasoning = runtime_kwargs["reasoning_effort"] in [None, "minimal", "low"]
         if cls._is_text_only_operation(logical_expression):
-            prompt_strategy = PromptStrategy.COT_QA_NO_REASONING if no_reasoning else PromptStrategy.COT_QA
+            prompt_strategy = PromptStrategy.COT_QA
+            no_reasoning_prompt_strategy = PromptStrategy.COT_QA_NO_REASONING
         elif cls._is_image_operation(logical_expression):
-            prompt_strategy = PromptStrategy.COT_QA_IMAGE_NO_REASONING if no_reasoning else PromptStrategy.COT_QA_IMAGE
+            prompt_strategy = PromptStrategy.COT_QA_IMAGE
+            no_reasoning_prompt_strategy = PromptStrategy.COT_QA_IMAGE_NO_REASONING
         elif cls._is_audio_operation(logical_expression):
-            prompt_strategy = PromptStrategy.COT_QA_AUDIO_NO_REASONING if no_reasoning else PromptStrategy.COT_QA_AUDIO
+            prompt_strategy = PromptStrategy.COT_QA_AUDIO
+            no_reasoning_prompt_strategy = PromptStrategy.COT_QA_AUDIO_NO_REASONING
         variable_op_kwargs = [
             {
                 "model": model,
-                "prompt_strategy": prompt_strategy,
+                "prompt_strategy": no_reasoning_prompt_strategy if model.is_reasoning_model() and no_reasoning else prompt_strategy,
                 "reasoning_effort": runtime_kwargs["reasoning_effort"],
             }
             for model in models
@@ -729,18 +732,21 @@ class LLMFilterRule(ImplementationRule):
         # create variable physical operator kwargs for each model which can implement this logical_expression
         models = [model for model in runtime_kwargs["available_models"] if cls._model_matches_input(model, logical_expression)]
         # NOTE: right now we exclusively allow image or audio operations, but not both simultaneously
-        prompt_strategy = None
+        prompt_strategy, no_reasoning_prompt_strategy = None, None
         no_reasoning = runtime_kwargs["reasoning_effort"] in [None, "minimal", "low"]
         if cls._is_text_only_operation(logical_expression):
-            prompt_strategy = PromptStrategy.COT_BOOL_NO_REASONING if no_reasoning else PromptStrategy.COT_BOOL
+            prompt_strategy = PromptStrategy.COT_BOOL
+            no_reasoning_prompt_strategy = PromptStrategy.COT_BOOL_NO_REASONING
         elif cls._is_image_operation(logical_expression):
-            prompt_strategy = PromptStrategy.COT_BOOL_IMAGE_NO_REASONING if no_reasoning else PromptStrategy.COT_BOOL_IMAGE
+            prompt_strategy = PromptStrategy.COT_BOOL_IMAGE
+            no_reasoning_prompt_strategy = PromptStrategy.COT_BOOL_IMAGE_NO_REASONING
         elif cls._is_audio_operation(logical_expression):
-            prompt_strategy = PromptStrategy.COT_BOOL_AUDIO_NO_REASONING if no_reasoning else PromptStrategy.COT_BOOL_AUDIO
+            prompt_strategy = PromptStrategy.COT_BOOL_AUDIO
+            no_reasoning_prompt_strategy = PromptStrategy.COT_BOOL_AUDIO_NO_REASONING
         variable_op_kwargs = [
             {
                 "model": model,
-                "prompt_strategy": prompt_strategy,
+                "prompt_strategy": no_reasoning_prompt_strategy if model.is_reasoning_model() and no_reasoning else prompt_strategy,
                 "reasoning_effort": runtime_kwargs["reasoning_effort"]
             }
             for model in models
@@ -767,18 +773,21 @@ class LLMJoinRule(ImplementationRule):
         # create variable physical operator kwargs for each model which can implement this logical_expression
         models = [model for model in runtime_kwargs["available_models"] if cls._model_matches_input(model, logical_expression)]
         # NOTE: right now we exclusively allow image or audio operations, but not both simultaneously
-        prompt_strategy = None
+        prompt_strategy, no_reasoning_prompt_strategy = None, None
         no_reasoning = runtime_kwargs["reasoning_effort"] in [None, "minimal", "low"]
         if cls._is_text_only_operation(logical_expression):
-            prompt_strategy = PromptStrategy.COT_JOIN_NO_REASONING if no_reasoning else PromptStrategy.COT_JOIN
+            prompt_strategy = PromptStrategy.COT_JOIN
+            no_reasoning_prompt_strategy = PromptStrategy.COT_JOIN_NO_REASONING
         elif cls._is_image_operation(logical_expression):
-            prompt_strategy = PromptStrategy.COT_JOIN_IMAGE_NO_REASONING if no_reasoning else PromptStrategy.COT_JOIN_IMAGE
+            prompt_strategy = PromptStrategy.COT_JOIN_IMAGE
+            no_reasoning_prompt_strategy = PromptStrategy.COT_JOIN_IMAGE_NO_REASONING
         elif cls._is_audio_operation(logical_expression):
-            prompt_strategy = PromptStrategy.COT_JOIN_AUDIO_NO_REASONING if no_reasoning else PromptStrategy.COT_JOIN_AUDIO
+            prompt_strategy = PromptStrategy.COT_JOIN_AUDIO
+            no_reasoning_prompt_strategy = PromptStrategy.COT_JOIN_AUDIO_NO_REASONING
         variable_op_kwargs = [
             {
                 "model": model,
-                "prompt_strategy": prompt_strategy,
+                "prompt_strategy": no_reasoning_prompt_strategy if model.is_reasoning_model() and no_reasoning else prompt_strategy,
                 "join_parallelism": runtime_kwargs["join_parallelism"],
                 "reasoning_effort": runtime_kwargs["reasoning_effort"],
             }

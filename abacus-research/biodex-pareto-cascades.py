@@ -2,7 +2,6 @@ import argparse
 import json
 import os
 import time
-from functools import partial
 
 import chromadb
 import datasets
@@ -31,45 +30,43 @@ biodex_ranked_reactions_labels_cols = [
     {"name": "ranked_reaction_labels", "type": list[str], "desc": "The ranked list of medical conditions experienced by the patient. The most relevant label occurs first in the list. Be sure to rank ALL of the inputs."},
 ]
 
-
-class BiodexDataset(pz.IterDataset):
+class BiodexValidator(pz.Validator):
     def __init__(
         self,
         rp_at_k: int = 5,
         num_samples: int = 5,
-        split: str = "test",
         shuffle: bool = False,
         seed: int = 42,
     ):
-        super().__init__(id=f"biodex-{split}", schema=biodex_entry_cols)
+        super().__init__()
 
-        self.dataset = datasets.load_dataset("BioDEX/BioDEX-Reactions", split=split).to_pandas()
+        # read dataset and prepare entries
+        dataset = datasets.load_dataset("BioDEX/BioDEX-Reactions", split="train").to_pandas()
         if shuffle:
-            self.dataset = self.dataset.sample(n=num_samples, random_state=seed).to_dict(orient="records")
+            dataset = dataset.sample(n=num_samples, random_state=seed).to_dict(orient="records")
         else:
-            self.dataset = self.dataset.to_dict(orient="records")[:num_samples]
+            dataset = dataset.to_dict(orient="records")[:num_samples]
 
-        self.rp_at_k = rp_at_k
-        self.num_samples = num_samples
-        self.shuffle = shuffle
-        self.seed = seed
-        self.split = split
+        # compute mapping from pmid --> label (i.e. reactions list)
+        self.pmid_to_label = self._compute_pmid_to_label(dataset)
 
-    def compute_label(self, entry: dict) -> dict:
+        # store rp_at_k for computing rank-precision at k metric
+        self.k = rp_at_k
+
+    def _compute_pmid_to_label(self, dataset: list[dict]) -> dict:
         """Compute the label for a BioDEX report given its entry in the dataset."""
-        reactions_lst = [
-            reaction.strip().lower().replace("'", "").replace("^", "")
-            for reaction in entry["reactions"].split(",")
-        ]
-        label_dict = {
-            "reactions": reactions_lst,
-            "reaction_labels": reactions_lst,
-            "ranked_reaction_labels": reactions_lst,
-        }
-        return label_dict
+        pmid_to_label = {}
+        for entry in dataset:
+            pmid = str(entry["pmid"])
+            reactions_lst = [
+                reaction.strip().lower().replace("'", "").replace("^", "")
+                for reaction in entry["reactions"].split(",")
+            ]
+            pmid_to_label[pmid] = reactions_lst
 
-    @staticmethod
-    def rank_precision_at_k(preds: list | None, targets: list, k: int):
+        return pmid_to_label
+
+    def rank_precision_at_k(self, preds: list | None, targets: list):
         if preds is None:
             return 0.0
 
@@ -80,9 +77,9 @@ class BiodexDataset(pz.IterDataset):
 
             # compute rank-precision at k
             rn = len(targets)
-            denom = min(k, rn)
+            denom = min(self.k, rn)
             total = 0.0
-            for i in range(k):
+            for i in range(self.k):
                 total += preds[i] in targets if i < len(preds) else 0.0
 
             return total / denom
@@ -94,8 +91,7 @@ class BiodexDataset(pz.IterDataset):
                 f.write(str(preds))
             return 0.0
 
-    @staticmethod
-    def term_recall(preds: list | None, targets: list):
+    def term_recall(self, preds: list | None, targets: list):
         if preds is None:
             return 0.0
 
@@ -125,6 +121,52 @@ class BiodexDataset(pz.IterDataset):
                 f.write(str(preds))
             return 0.0
 
+    def map_score_fn(self, fields: list[str], input_record: dict, output: dict) -> float | None:
+        field_name = fields[0]
+        if field_name == "reactions":
+            preds = output.get(field_name)
+            targets = self.pmid_to_label[str(input_record["pmid"])]
+            return self.term_recall(preds, targets)
+        elif field_name == "ranked_reaction_labels":
+            preds = output.get(field_name)
+            targets = self.pmid_to_label[str(input_record["pmid"])]
+            return self.rank_precision_at_k(preds, targets)
+        else:
+            raise NotImplementedError(f"Validator.map_score_fn not implemented for field {field_name}.")
+
+    def retrieve_score_fn(self, fields: list[str], input_record: dict, output: dict) -> float | None:
+        field_name = fields[0]
+        if field_name == "reaction_labels":
+            preds = output.get(field_name)
+            targets = self.pmid_to_label[input_record["pmid"]]
+            return self.term_recall(preds, targets)
+        else:
+            raise NotImplementedError(f"Validator.retrieve_score_fn not implemented for field {field_name}.")
+
+
+class BiodexDataset(pz.IterDataset):
+    def __init__(
+        self,
+        rp_at_k: int = 5,
+        num_samples: int = 5,
+        split: str = "test",
+        shuffle: bool = False,
+        seed: int = 42,
+    ):
+        super().__init__(id="biodex", schema=biodex_entry_cols)
+
+        self.dataset = datasets.load_dataset("BioDEX/BioDEX-Reactions", split=split).to_pandas()
+        if shuffle:
+            self.dataset = self.dataset.sample(n=num_samples, random_state=seed).to_dict(orient="records")
+        else:
+            self.dataset = self.dataset.to_dict(orient="records")[:num_samples]
+
+        self.rp_at_k = rp_at_k
+        self.num_samples = num_samples
+        self.shuffle = shuffle
+        self.seed = seed
+        self.split = split
+
     def __len__(self):
         return len(self.dataset)
 
@@ -144,16 +186,6 @@ class BiodexDataset(pz.IterDataset):
         item["fields"]["title"] = title
         item["fields"]["abstract"] = abstract
         item["fields"]["fulltext"] = fulltext
-
-        if self.split == "train":
-            # add label info
-            item["labels"] = self.compute_label(entry)
-
-            # add scoring functions for list fields
-            rank_precision_at_k = partial(BiodexDataset.rank_precision_at_k, k=self.rp_at_k)
-            item["score_fn"]["reactions"] = BiodexDataset.term_recall
-            item["score_fn"]["reaction_labels"] = BiodexDataset.term_recall
-            item["score_fn"]["ranked_reaction_labels"] = rank_precision_at_k
 
         return item
 
@@ -261,10 +293,10 @@ if __name__ == "__main__":
     if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None and os.getenv("ANTHROPIC_API_KEY") is None:
         print("WARNING: OPENAI_API_KEY, TOGETHER_API_KEY, and ANTHROPIC_API_KEY are unset")
 
-    # create data source
-    dataset = BiodexDataset(
-        split="test",
-        num_samples=250,
+    # create validator
+    validator = BiodexValidator(
+        rp_at_k=5,
+        num_samples=val_examples,
         shuffle=True,
         seed=seed,
     )
@@ -276,6 +308,7 @@ if __name__ == "__main__":
         shuffle=True,
         seed=seed,
     )
+    train_dataset = {train_dataset.id: train_dataset}
 
     # load index [text-embedding-3-small]
     chroma_client = chromadb.PersistentClient(".chroma-biodex")
@@ -311,17 +344,15 @@ if __name__ == "__main__":
         return {"reaction_labels": final_sorted_results[:k]}
 
     # construct plan
-    plan = dataset.sem_add_columns(biodex_reactions_cols)
+    plan = BiodexDataset(split="test", num_samples=250, shuffle=True, seed=seed)
+    plan = plan.sem_map(biodex_reactions_cols)
     plan = plan.retrieve(
         index=index,
         search_func=search_func,
         search_attr="reactions",
         output_attrs=biodex_reaction_labels_cols,
     )
-    plan = plan.sem_add_columns(biodex_ranked_reactions_labels_cols, depends_on=["title", "abstract", "fulltext", "reaction_labels"])
-
-    # only use final op quality
-    use_final_op_quality = True
+    plan = plan.sem_map(biodex_ranked_reactions_labels_cols, depends_on=["title", "abstract", "fulltext", "reaction_labels"])
 
     # execute pz plan
     config = pz.QueryProcessorConfig(
@@ -329,7 +360,7 @@ if __name__ == "__main__":
         optimizer_strategy=optimizer_strategy,
         sentinel_execution_strategy=sentinel_execution_strategy,
         execution_strategy=execution_strategy,
-        use_final_op_quality=use_final_op_quality,
+        use_final_op_quality=True,
         max_workers=64,
         verbose=verbose,
         available_models=[
@@ -353,7 +384,7 @@ if __name__ == "__main__":
         priors=priors,
     )
 
-    data_record_collection = plan.run(config=config, train_dataset=train_dataset, validator=pz.Validator())
+    data_record_collection = plan.optimize_and_run(config=config, train_dataset=train_dataset, validator=validator)
 
     print(data_record_collection.to_df())
     data_record_collection.to_df().to_csv(f"pareto-cascades-data/{exp_name}-output.csv", index=False)

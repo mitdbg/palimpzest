@@ -79,19 +79,18 @@ def get_json_from_answer(answer: str):
     return json.loads(answer)
 
 
-class MMQADataset(pz.IterDataset):
+class MMQAValidator(pz.Validator):
     def __init__(
         self,
         num_samples: int = 5,
-        split: str = "dev",
         shuffle: bool = False,
         seed: int = 42,
     ):
-        super().__init__(id=f"mmqa-{split}", schema=mmqa_entry_cols)
+        super().__init__()
 
         # read the appropriate dataset
         dataset = []
-        with open(f"data/MMQA_{split}.jsonl") as f:
+        with open("data/MMQA_train.jsonl") as f:
             for line in f:
                 dict_line = json.loads(line)
                 if "image" in dict_line["metadata"]["modalities"] and len(dict_line["metadata"]["modalities"]) > 1:
@@ -107,33 +106,37 @@ class MMQADataset(pz.IterDataset):
         self.num_samples = num_samples
         self.shuffle = shuffle
         self.seed = seed
-        self.split = split
 
-    def compute_label(self, entry: dict) -> dict:
+        # compute qid to label mapping
+        self.qid_to_labels = self._compute_qid_to_labels()
+
+    def _compute_qid_to_labels(self) -> dict:
         """Compute the label for a MMQA question given its entry in the dataset."""
-        # get the answers
-        answers = [answer["answer"] for answer in entry["answers"]]
-        supporting_text_doc_ids = [context["doc_id"] for context in entry["supporting_context"] if context["doc_part"] == "text"]
-        supporting_table_doc_ids = [context["doc_id"] for context in entry["supporting_context"] if context["doc_part"] == "table"]
-        supporting_image_doc_ids = [context["doc_id"] for context in entry["supporting_context"] if context["doc_part"] == "image"]
+        qid_to_labels = {}
+        for entry in self.dataset:
+            # get the answers
+            answers = [answer["answer"] for answer in entry["answers"]]
+            supporting_text_doc_ids = [context["doc_id"] for context in entry["supporting_context"] if context["doc_part"] == "text"]
+            supporting_table_doc_ids = [context["doc_id"] for context in entry["supporting_context"] if context["doc_part"] == "table"]
+            supporting_image_doc_ids = [context["doc_id"] for context in entry["supporting_context"] if context["doc_part"] == "image"]
 
-        # NOTE: inside the optimizer, our qualities will effectively be divided by two,
-        #       because we are not providing a label for supporting texts, tables, and images,
-        #       however this should be okay b/c it will affect all records equally
-        label_dict = {
-            "answers": answers,
-            "supporting_text_ids": supporting_text_doc_ids,
-            "supporting_table_ids": supporting_table_doc_ids,
-            "supporting_image_ids": supporting_image_doc_ids,
-            "supporting_texts": [],
-            "supporting_tables": [],
-            "supporting_images": [],
-        }
+            # NOTE: inside the optimizer, our qualities will effectively be divided by two,
+            #       because we are not providing a label for supporting texts, tables, and images,
+            #       however this should be okay b/c it will affect all records equally
+            label_dict = {
+                "answers": answers,
+                "supporting_text_ids": supporting_text_doc_ids,
+                "supporting_table_ids": supporting_table_doc_ids,
+                "supporting_image_ids": supporting_image_doc_ids,
+                "supporting_texts": [],
+                "supporting_tables": [],
+                "supporting_images": [],
+            }
+            qid_to_labels[entry["qid"]] = label_dict
 
-        return label_dict
+        return qid_to_labels
 
-    @staticmethod
-    def recall(preds: list | None, targets: list):
+    def recall(self, preds: list | None, targets: list):
         if preds is None or len(targets) == 0:
             return 0.0
 
@@ -163,8 +166,7 @@ class MMQADataset(pz.IterDataset):
                 f.write(str(preds))
             return 0.0
 
-    @staticmethod
-    def f1(preds: list | None, targets: list):
+    def f1(self, preds: list | None, targets: list):
         if preds is None or len(targets) == 0:
             return 0.0
 
@@ -202,6 +204,58 @@ class MMQADataset(pz.IterDataset):
                 f.write(str(preds))
             return 0.0
 
+    def map_score_fn(self, fields: list[str], input_record: dict, output: dict) -> float | None:
+        preds = output.get("answers")
+        targets = self.qid_to_labels[str(input_record["qid"])]["answers"]
+        return self.f1(preds, targets)
+
+    def retrieve_score_fn(self, fields: list[str], input_record: dict, output: dict) -> float | None:
+        if "supporting_text_ids" in fields:
+            preds = output.get("supporting_text_ids")
+            targets = self.qid_to_labels[str(input_record["qid"])]["supporting_text_ids"]
+            return self.recall(preds, targets)
+        elif "supporting_table_ids" in fields:
+            preds = output.get("supporting_table_ids")
+            targets = self.qid_to_labels[str(input_record["qid"])]["supporting_table_ids"]
+            return self.recall(preds, targets)
+        elif "supporting_image_ids" in fields:
+            preds = output.get("supporting_image_ids")
+            targets = self.qid_to_labels[str(input_record["qid"])]["supporting_image_ids"]
+            return self.recall(preds, targets)
+        else:
+            raise NotImplementedError(f"Validator.retrieve_score_fn not implemented for fields {fields}.")
+
+
+class MMQADataset(pz.IterDataset):
+    def __init__(
+        self,
+        num_samples: int = 5,
+        split: str = "dev",
+        shuffle: bool = False,
+        seed: int = 42,
+    ):
+        super().__init__(id="mmqa", schema=mmqa_entry_cols)
+
+        # read the appropriate dataset
+        dataset = []
+        with open(f"data/MMQA_{split}.jsonl") as f:
+            for line in f:
+                dict_line = json.loads(line)
+                if "image" in dict_line["metadata"]["modalities"] and len(dict_line["metadata"]["modalities"]) > 1:
+                    dataset.append(dict_line)
+
+        # shuffle the questions for the given seed
+        if shuffle:
+            rng = np.random.default_rng(seed=seed)
+            rng.shuffle(dataset)
+
+        # trim to number of samples
+        self.dataset = dataset[:num_samples]
+        self.num_samples = num_samples
+        self.shuffle = shuffle
+        self.seed = seed
+        self.split = split
+
     def __len__(self):
         return len(self.dataset)
 
@@ -214,19 +268,7 @@ class MMQADataset(pz.IterDataset):
         question = entry["question"]
 
         # create item with fields
-        item = {"fields": {}, "labels": {}, "score_fn": {}}
-        item["fields"]["qid"] = qid
-        item["fields"]["question"] = question
-
-        if self.split == "train":
-            # add label info
-            item["labels"] = self.compute_label(entry)
-
-            # add scoring functions for list fields
-            item["score_fn"]["answers"] = MMQADataset.f1
-            item["score_fn"]["supporting_text_ids"] = MMQADataset.recall
-            item["score_fn"]["supporting_table_ids"] = MMQADataset.recall
-            item["score_fn"]["supporting_image_ids"] = MMQADataset.recall
+        item = {"qid": qid, "question": question}
 
         return item
 
@@ -377,21 +419,12 @@ if __name__ == "__main__":
     if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None and os.getenv("ANTHROPIC_API_KEY") is None:
         print("WARNING: OPENAI_API_KEY, TOGETHER_API_KEY, and ANTHROPIC_API_KEY are unset")
 
-    # create data source
-    dataset = MMQADataset(
-        split="dev",
-        num_samples=100,
-        shuffle=True,
-        seed=seed,
-    )
+    # create validator for MMQA
+    validator = MMQAValidator(num_samples=val_examples, shuffle=True, seed=seed)
 
-    # create validation data source
-    train_dataset = MMQADataset(
-        split="train",
-        num_samples=val_examples,
-        shuffle=True,
-        seed=seed,
-    )
+    # create datasets for MMQA
+    train_dataset = MMQADataset(split="train", num_samples=val_examples, shuffle=True, seed=seed)
+    train_dataset = {train_dataset.id: train_dataset}
 
     # load index [text-embedding-3-small]
     chroma_client = chromadb.PersistentClient(".chroma-mmqa")
@@ -466,7 +499,8 @@ if __name__ == "__main__":
         return {"supporting_images": results, "supporting_image_ids": result_ids}
 
     # construct plan
-    plan = dataset.retrieve(
+    plan = MMQADataset(split="dev", num_samples=100, shuffle=True, seed=seed)
+    plan = plan.retrieve(
         index=text_index,
         search_func=text_search_func,
         search_attr="question",
@@ -484,7 +518,7 @@ if __name__ == "__main__":
         search_attr="question",
         output_attrs=mmqa_image_cols,
     )
-    plan = plan.sem_add_columns(mmqa_answer_cols)
+    plan = plan.sem_map(mmqa_answer_cols)
 
     # execute pz plan
     config = pz.QueryProcessorConfig(
@@ -510,7 +544,7 @@ if __name__ == "__main__":
         exp_name=exp_name,
     )
 
-    data_record_collection = plan.run(config=config, train_dataset=train_dataset, validator=pz.Validator())
+    data_record_collection = plan.optimize_and_run(config=config, train_dataset=train_dataset, validator=validator)
 
     print(data_record_collection.to_df())
     data_record_collection.to_df().to_csv(f"opt-profiling-data/{exp_name}-output.csv", index=False)
@@ -532,11 +566,6 @@ if __name__ == "__main__":
 
     with open(records_path, "w") as f:
         json.dump(record_jsons, f)
-
-    # # save statistics
-    # execution_stats_dict = data_record_collection.execution_stats.to_json()
-    # with open(stats_path, "w") as f:
-    #     json.dump(execution_stats_dict, f)
 
     # read the appropriate dataset
     dataset = []

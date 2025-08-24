@@ -74,7 +74,6 @@ class Validator:
             total_llm_calls=1,
         )
 
-    # TODO: cache map outputs and their scores, as common field extractions are likely to repeat
     def _default_map_score_fn(self, op: LLMConvert, fields: list[str], input_record: DataRecord, output: dict) -> tuple[float | None, GenerationStats]:
         """
         Compute the quality of the generated output for the given fields and input_record.
