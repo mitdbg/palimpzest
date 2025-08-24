@@ -1,3 +1,6 @@
+"""
+NOTE: this script worked with the tag `abacus-paper-experiments` but is no longer compatible with the main branch.
+"""
 import argparse
 import json
 import os
