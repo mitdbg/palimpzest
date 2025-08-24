@@ -1,7 +1,20 @@
 import logging
 
-from palimpzest.constants import Cardinality
-from palimpzest.core.data.datareaders import DataReader
+from palimpzest.constants import Cardinality, Model
+from palimpzest.core.data.context import Context, TextFileContext
+from palimpzest.core.data.dataset import Dataset
+from palimpzest.core.data.iter_dataset import (
+    AudioFileDataset,
+    HTMLFileDataset,
+    ImageFileDataset,
+    IterDataset,
+    MemoryDataset,
+    PDFFileDataset,
+    TextFileDataset,
+    XLSFileDataset,
+)
+from palimpzest.core.elements.groupbysig import GroupBySig
+from palimpzest.core.lib.schemas import AudioBase64, AudioFilepath, ImageBase64, ImageFilepath, ImageURL
 from palimpzest.policy import (
     MaxQuality,
     MaxQualityAtFixedCost,
@@ -14,7 +27,7 @@ from palimpzest.policy import (
     Policy,
 )
 from palimpzest.query.processor.config import QueryProcessorConfig
-from palimpzest.sets import Dataset
+from palimpzest.validator.validator import Validator
 
 # Initialize the root logger
 logging.getLogger(__name__).addHandler(logging.NullHandler())
@@ -22,8 +35,26 @@ logging.getLogger(__name__).addHandler(logging.NullHandler())
 __all__ = [
     # constants
     "Cardinality",
+    "Model",
     # core
-    "DataReader",
+    "GroupBySig",
+    "Context",
+    "TextFileContext",
+    "Dataset",
+    "IterDataset",
+    "AudioFileDataset",
+    "MemoryDataset",
+    "HTMLFileDataset",
+    "ImageFileDataset",
+    "PDFFileDataset",
+    "TextFileDataset",
+    "XLSFileDataset",
+    # schemas
+    "AudioBase64",
+    "AudioFilepath",
+    "ImageBase64",
+    "ImageFilepath",
+    "ImageURL",
     # policy
     "MaxQuality",
     "MaxQualityAtFixedCost",
@@ -36,6 +67,6 @@ __all__ = [
     "Policy",
     # query
     "QueryProcessorConfig",
-    # sets
-    "Dataset",
+    # validator
+    "Validator",
 ]

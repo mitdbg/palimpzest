@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from pydantic.fields import FieldInfo
+
 from palimpzest.constants import MODEL_CARDS, Model, PromptStrategy
-from palimpzest.core.data.dataclasses import GenerationStats, OperatorCostEstimates
 from palimpzest.core.elements.records import DataRecord
-from palimpzest.core.lib.fields import Field
-from palimpzest.query.generators.generators import generator_factory
+from palimpzest.core.models import GenerationStats, OperatorCostEstimates
+from palimpzest.query.generators.generators import Generator
 from palimpzest.query.operators.convert import LLMConvert
 
 # TYPE DEFINITIONS
@@ -20,7 +21,6 @@ class MixtureOfAgentsConvert(LLMConvert):
         aggregator_model: Model,
         proposer_prompt_strategy: PromptStrategy = PromptStrategy.COT_MOA_PROPOSER,
         aggregator_prompt_strategy: PromptStrategy = PromptStrategy.COT_MOA_AGG,
-        proposer_prompt: str | None = None,
         *args,
         **kwargs,
     ):
@@ -33,14 +33,13 @@ class MixtureOfAgentsConvert(LLMConvert):
         self.aggregator_model = aggregator_model
         self.proposer_prompt_strategy = proposer_prompt_strategy
         self.aggregator_prompt_strategy = aggregator_prompt_strategy
-        self.proposer_prompt = proposer_prompt
 
         # create generators
         self.proposer_generators = [
-            generator_factory(model, self.proposer_prompt_strategy, self.cardinality, self.verbose)
+            Generator(model, self.proposer_prompt_strategy, self.reasoning_effort, self.cardinality, self.verbose)
             for model in proposer_models
         ]
-        self.aggregator_generator = generator_factory(aggregator_model, self.aggregator_prompt_strategy, self.cardinality, self.verbose)
+        self.aggregator_generator = Generator(aggregator_model, self.aggregator_prompt_strategy, self.reasoning_effort, self.cardinality, self.verbose)
 
     def __str__(self):
         op = super().__str__()
@@ -77,6 +76,9 @@ class MixtureOfAgentsConvert(LLMConvert):
 
         return op_params
 
+    def is_image_conversion(self) -> bool:
+        return self.proposer_prompt_strategy.is_image_prompt()
+
     def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         """
         Currently, we are using multiple proposer models with different temperatures to synthesize
@@ -111,7 +113,7 @@ class MixtureOfAgentsConvert(LLMConvert):
 
         return naive_op_cost_estimates
 
-    def convert(self, candidate: DataRecord, fields: dict[str, Field]) -> tuple[dict[str, list], GenerationStats]:
+    def convert(self, candidate: DataRecord, fields: dict[str, FieldInfo]) -> tuple[dict[str, list], GenerationStats]:
         # get input fields
         input_fields = self.get_input_fields()
 

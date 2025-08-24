@@ -1,14 +1,11 @@
 import pytest
 
-from palimpzest.constants import Model
 from palimpzest.policy import MaxQuality, MaxQualityAtFixedCost, MinCost, MinCostAtFixedQuality
 
 pytest_plugins = [
     "fixtures.champion_outputs",
-    "fixtures.cost_est_data",
-    "fixtures.datareaders",
+    "fixtures.datasets",
     "fixtures.execution_data",
-    "fixtures.expected_cost_est_results",
     "fixtures.expected_physical_plans",
     "fixtures.expected_qualities",
     "fixtures.expected_records",
@@ -25,13 +22,13 @@ pytest_plugins = [
 #       and cache the result. Thus, we minimize recomputation and don't
 #       need to, for example, re-register datasets for each individual test.
 @pytest.fixture
-def datareader(request, enron_eval_tiny, real_estate_eval_tiny):
-    datareader_id = request.param
-    datareader_id_to_datareader = {
+def dataset(request, enron_eval_tiny, real_estate_eval_tiny):
+    dataset_id = request.param
+    dataset_id_to_dataset = {
         "enron-eval-tiny": enron_eval_tiny,
         "real-estate-eval-tiny": real_estate_eval_tiny,
     }
-    return datareader_id_to_datareader[datareader_id]
+    return dataset_id_to_dataset[dataset_id]
 
 
 @pytest.fixture
@@ -73,11 +70,9 @@ def physical_plan(
     non_llm_filter_plan,
     llm_filter_plan,
     bonded_llm_convert_plan,
-    code_synth_convert_plan,
     rag_convert_plan,
     image_convert_plan,
     one_to_many_convert_plan,
-    simple_plan_factory,
 ):
     physical_plan_id = request.param
     physical_plan_id_to_physical_plan = {
@@ -85,37 +80,9 @@ def physical_plan(
         "non-llm-filter": non_llm_filter_plan,
         "llm-filter": llm_filter_plan,
         "bonded-llm-convert": bonded_llm_convert_plan,
-        "code-synth-convert": code_synth_convert_plan,
         "rag-convert": rag_convert_plan,
         "image-convert": image_convert_plan,
         "one-to-many-convert": one_to_many_convert_plan,
-        "cost-est-simple-plan-gpt4-gpt4": simple_plan_factory(
-            convert_model=Model.GPT_4o, filter_model=Model.GPT_4o,
-        ),
-        "cost-est-simple-plan-gpt4-gpt4m": simple_plan_factory(
-            convert_model=Model.GPT_4o, filter_model=Model.GPT_4o_MINI,
-        ),
-        "cost-est-simple-plan-gpt4-mixtral": simple_plan_factory(
-            convert_model=Model.GPT_4o, filter_model=Model.MIXTRAL,
-        ),
-        "cost-est-simple-plan-gpt4m-gpt4": simple_plan_factory(
-            convert_model=Model.GPT_4o_MINI, filter_model=Model.GPT_4o,
-        ),
-        "cost-est-simple-plan-gpt4m-gpt4m": simple_plan_factory(
-            convert_model=Model.GPT_4o_MINI, filter_model=Model.GPT_4o_MINI,
-        ),
-        "cost-est-simple-plan-gpt4m-mixtral": simple_plan_factory(
-            convert_model=Model.GPT_4o_MINI, filter_model=Model.MIXTRAL,
-        ),
-        "cost-est-simple-plan-mixtral-gpt4": simple_plan_factory(
-            convert_model=Model.MIXTRAL, filter_model=Model.GPT_4o,
-        ),
-        "cost-est-simple-plan-mixtral-gpt4m": simple_plan_factory(
-            convert_model=Model.MIXTRAL, filter_model=Model.GPT_4o_MINI,
-        ),
-        "cost-est-simple-plan-mixtral-mixtral": simple_plan_factory(
-            convert_model=Model.MIXTRAL, filter_model=Model.MIXTRAL,
-        ),
     }
     return physical_plan_id_to_physical_plan[physical_plan_id]
 
@@ -229,45 +196,6 @@ def side_effect(
         "real-estate-one-to-many-convert": real_estate_one_to_many_convert,
     }
     return side_effect_id_to_side_effect[side_effect_id]
-
-
-@pytest.fixture
-def expected_cost_est_results(
-    request,
-    simple_plan_expected_results_factory,
-):
-    cost_est_results_id = request.param
-    cost_est_results_id_to_cost_est_results = {
-        "cost-est-simple-plan-gpt4-gpt4": simple_plan_expected_results_factory(
-            convert_model=Model.GPT_4o, filter_model=Model.GPT_4o,
-        ),
-        "cost-est-simple-plan-gpt4-gpt4m": simple_plan_expected_results_factory(
-            convert_model=Model.GPT_4o, filter_model=Model.GPT_4o_MINI,
-        ),
-        "cost-est-simple-plan-gpt4-mixtral": simple_plan_expected_results_factory(
-            convert_model=Model.GPT_4o, filter_model=Model.MIXTRAL,
-        ),
-        "cost-est-simple-plan-gpt4m-gpt4": simple_plan_expected_results_factory(
-            convert_model=Model.GPT_4o_MINI, filter_model=Model.GPT_4o,
-        ),
-        "cost-est-simple-plan-gpt4m-gpt4m": simple_plan_expected_results_factory(
-            convert_model=Model.GPT_4o_MINI, filter_model=Model.GPT_4o_MINI,
-        ),
-        "cost-est-simple-plan-gpt4m-mixtral": simple_plan_expected_results_factory(
-            convert_model=Model.GPT_4o_MINI, filter_model=Model.MIXTRAL,
-        ),
-        "cost-est-simple-plan-mixtral-gpt4": simple_plan_expected_results_factory(
-            convert_model=Model.MIXTRAL, filter_model=Model.GPT_4o,
-        ),
-        "cost-est-simple-plan-mixtral-gpt4m": simple_plan_expected_results_factory(
-            convert_model=Model.MIXTRAL, filter_model=Model.GPT_4o_MINI,
-        ),
-        "cost-est-simple-plan-mixtral-mixtral": simple_plan_expected_results_factory(
-            convert_model=Model.MIXTRAL, filter_model=Model.MIXTRAL,
-        ),
-    }
-
-    return cost_est_results_id_to_cost_est_results[cost_est_results_id]
 
 
 @pytest.fixture

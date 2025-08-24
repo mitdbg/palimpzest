@@ -1,7 +1,5 @@
 import pytest
 
-from palimpzest.sets import Dataset
-
 
 ### UDFs ###
 def within_two_miles_of_mit(record):
@@ -39,7 +37,7 @@ def in_price_range(record):
 ### WORKLOADS ###
 @pytest.fixture
 def enron_workload(enron_eval_tiny, email_schema):
-    emails = Dataset(enron_eval_tiny)
+    emails = enron_eval_tiny
     emails = emails.sem_add_columns(email_schema)
     emails = emails.sem_filter(
         'The email refers to a fraudulent scheme (i.e., "Raptor", "Deathstar", "Chewco", and/or "Fat Boy")'
@@ -56,7 +54,7 @@ def real_estate_workload(
     text_real_estate_listing_schema,
     image_real_estate_listing_schema,
 ):
-    listings = Dataset(real_estate_eval_tiny)
+    listings = real_estate_eval_tiny
     listings = listings.sem_add_columns(text_real_estate_listing_schema, depends_on="text_content")
     listings = listings.sem_add_columns(image_real_estate_listing_schema, depends_on="image_filepaths")
     listings = listings.sem_filter(
@@ -77,7 +75,7 @@ def real_estate_workload(
 @pytest.fixture
 def three_converts_workload(enron_eval_tiny, email_schema, foobar_schema, baz_schema):
     # construct plan with three converts
-    dataset = Dataset(enron_eval_tiny)
+    dataset = enron_eval_tiny
     dataset = dataset.sem_add_columns(email_schema)
     dataset = dataset.sem_add_columns(foobar_schema)
     dataset = dataset.sem_add_columns(baz_schema)
@@ -87,7 +85,7 @@ def three_converts_workload(enron_eval_tiny, email_schema, foobar_schema, baz_sc
 @pytest.fixture
 def one_filter_one_convert_workload(enron_eval_tiny, email_schema):
     # construct plan with two converts and two filters
-    dataset = Dataset(enron_eval_tiny)
+    dataset = enron_eval_tiny
     dataset = dataset.sem_filter("filter1")
     dataset = dataset.sem_add_columns(email_schema)
 
@@ -96,7 +94,7 @@ def one_filter_one_convert_workload(enron_eval_tiny, email_schema):
 @pytest.fixture
 def two_converts_two_filters_workload(enron_eval_tiny, email_schema, foobar_schema):
     # construct plan with two converts and two filters
-    dataset = Dataset(enron_eval_tiny)
+    dataset = enron_eval_tiny
     dataset = dataset.sem_add_columns(email_schema)
     dataset = dataset.sem_add_columns(foobar_schema)
     dataset = dataset.sem_filter("filter1", depends_on=["sender"])

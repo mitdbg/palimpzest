@@ -4,6 +4,8 @@ import time
 from abc import ABC, abstractmethod
 from typing import Any
 
+from pydantic.fields import FieldInfo
+
 from palimpzest.constants import (
     MODEL_CARDS,
     NAIVE_EST_FILTER_SELECTIVITY,
@@ -12,19 +14,17 @@ from palimpzest.constants import (
     Model,
     PromptStrategy,
 )
-from palimpzest.core.data.dataclasses import GenerationStats, OperatorCostEstimates, RecordOpStats
 from palimpzest.core.elements.filters import Filter
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
-from palimpzest.core.lib.fields import BooleanField
-from palimpzest.query.generators.generators import generator_factory
+from palimpzest.core.models import GenerationStats, OperatorCostEstimates, RecordOpStats
+from palimpzest.query.generators.generators import Generator
 from palimpzest.query.operators.physical import PhysicalOperator
-from palimpzest.utils.model_helpers import get_vision_models
 
 
 class FilterOp(PhysicalOperator, ABC):
     def __init__(self, filter: Filter, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        assert self.input_schema.get_desc() == self.output_schema.get_desc(), "Input and output schemas must match for FilterOp"
+        assert self.input_schema == self.output_schema, "Input and output schemas must match for FilterOp"
         self.filter_obj = filter
 
     def __str__(self):
@@ -81,8 +81,8 @@ class FilterOp(PhysicalOperator, ABC):
         # create RecordOpStats object
         record_op_stats = RecordOpStats(
             record_id=dr.id,
-            record_parent_id=dr.parent_id,
-            record_source_idx=dr.source_idx,
+            record_parent_ids=dr.parent_ids,
+            record_source_indices=dr.source_indices,
             record_state=dr.to_dict(include_bytes=False),
             full_op_id=self.get_full_op_id(),
             logical_op_id=self.logical_op_id,
@@ -174,13 +174,15 @@ class LLMFilter(FilterOp):
         self,
         model: Model,
         prompt_strategy: PromptStrategy = PromptStrategy.COT_BOOL,
+        reasoning_effort: str | None = None,
         *args,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
         self.model = model
         self.prompt_strategy = prompt_strategy
-        self.generator = generator_factory(model, prompt_strategy, Cardinality.ONE_TO_ONE, self.verbose)
+        self.reasoning_effort = reasoning_effort
+        self.generator = Generator(model, prompt_strategy, reasoning_effort, Cardinality.ONE_TO_ONE, self.verbose)
 
     def get_id_params(self):
         id_params = super().get_id_params()
@@ -206,7 +208,7 @@ class LLMFilter(FilterOp):
         return self.model.value
 
     def is_image_filter(self) -> bool:
-        return self.model in get_vision_models()
+        return self.prompt_strategy is PromptStrategy.COT_BOOL_IMAGE
 
     def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates):
         # estimate number of input tokens from source
@@ -225,8 +227,13 @@ class LLMFilter(FilterOp):
         )
 
         # get est. of conversion cost (in USD) per record from model card
+        usd_per_input_token = (
+            MODEL_CARDS[self.model.value]["usd_per_audio_input_token"]
+            if self.prompt_strategy.is_audio_prompt()
+            else MODEL_CARDS[self.model.value]["usd_per_input_token"]
+        )
         model_conversion_usd_per_record = (
-            MODEL_CARDS[self.model.value]["usd_per_input_token"] * est_num_input_tokens
+            usd_per_input_token * est_num_input_tokens
             + MODEL_CARDS[self.model.value]["usd_per_output_token"] * est_num_output_tokens
         )
 
@@ -235,7 +242,7 @@ class LLMFilter(FilterOp):
         cardinality = selectivity * source_op_cost_estimates.cardinality
 
         # estimate quality of output based on the strength of the model being used
-        quality = (MODEL_CARDS[self.model.value]["overall"] / 100.0) * source_op_cost_estimates.quality
+        quality = (MODEL_CARDS[self.model.value]["overall"] / 100.0)
 
         return OperatorCostEstimates(
             cardinality=cardinality,
@@ -251,8 +258,8 @@ class LLMFilter(FilterOp):
         # construct kwargs for generation
         gen_kwargs = {"project_cols": input_fields, "filter_condition": self.filter_obj.filter_condition}
 
-        # generate output; NOTE: BooleanField is used to indicate the output type; thus, the desc is not needed
-        fields = {"passed_operator": BooleanField(desc="")}
+        # generate output; NOTE: FieldInfo is used to indicate the output type; thus, the desc is not needed
+        fields = {"passed_operator": FieldInfo(annotation=bool, description="Whether the record passed the filter operation")}
         field_answers, _, generation_stats, _ = self.generator(candidate, fields, **gen_kwargs)
 
         return field_answers, generation_stats
