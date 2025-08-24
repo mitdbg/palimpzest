@@ -308,6 +308,7 @@ def get_label_df(num_contracts: int = 1, seed: int=42) -> pd.DataFrame:
             assert category_name in category_names, f"Unknown category {category_name}"
 
             # Extract text from answers list (handles both old and new format)
+            answer_texts = []
             if isinstance(row["answers"], list):
                 answer_texts = [ans["text"] for ans in row["answers"]] if row["answers"] else []
             else:
@@ -473,7 +474,9 @@ class CUADValidator(pz.Validator):
                 category_name = category_name.replace(" To ", " to ")
                 category_name = category_name.replace("Ip", "IP")
                 assert category_name in self.category_names, f"Unknown category {category_name}"
+
                 # Extract text from answers list (handles both old and new format)
+                answer_texts = []
                 if isinstance(row["answers"], list):
                     answer_texts = [ans["text"] for ans in row["answers"]] if row["answers"] else []
                 else:
@@ -499,11 +502,9 @@ class CUADDataset(pz.IterDataset):
         ]
         super().__init__(id="cuad", schema=input_cols)
 
-        # convert the dataset into a list of dictionaries where each row is for a single contract
         # Load dataset from local files
         dataset = load_cuad_data(split=split)
         self.dataset = self._construct_dataset(dataset, num_contracts, seed)
-
 
     def _construct_dataset(self, dataset, num_contracts, seed: int=42):
         # get the set of unique contract titles; to ensure the order of the contracts is
@@ -543,7 +544,6 @@ class CUADDataset(pz.IterDataset):
 
     def __getitem__(self, idx: int):
         return self.dataset[idx]
-
 
 # Compute the precision and recall for the entire dataset.
 # Each row in the dataframes should correspond to a contract.
