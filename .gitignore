@@ -51,3 +51,8 @@ testdata/enron-eval/*.txt
 pyrightconfig.json
 
 myenv/
+
+# abacus-research data
+abacus-research/cuad-data/*
+abacus-research/opt-profiling-data/*
+abacus-research/parse-answer-errors/*
