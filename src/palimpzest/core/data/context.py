@@ -28,7 +28,7 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
-# Define columns for semantic map (sem_add_columns) operation; each column is specified
+# Define columns for semantic map (sem_map) operation; each column is specified
 # with a dictionary containing the following keys:
 # - "name": the name of the field to compute
 # - "type": the type of the field to compute
@@ -40,7 +40,7 @@ paper_cols = [
 
 # construct the data processing pipeline with PZ
 ds = pz.TextFileDataset(id="papers", path="path/to/papers")
-ds = ds.sem_add_columns(cols)
+ds = ds.sem_map(cols)
 
 # optimize and execute the PZ program
 validator = pz.Validator()
@@ -75,7 +75,7 @@ ds = pz.TextFileDataset(id="files", path="path/to/files")
 
 Palimpzest has two primary **semantic operators** which you can use to construct data processing pipelines:
 - sem_filter(predicate: str): executes a semantic filter specified by the natural language predicate on a given PZ dataset
-- sem_add_columns(cols: list[dict]): executes a semantic map to compute the `cols` on a given PZ dataset
+- sem_map(cols: list[dict]): executes a semantic map to compute the `cols` on a given PZ dataset
 
 As a second example, consider the following PZ program which filters for papers about batteries that are from MIT
 and computes a summary for each one:
@@ -90,7 +90,7 @@ load_dotenv()
 ds = pz.TextFileDataset(id="papers", path="path/to/research-papers")
 ds = ds.sem_filter("The paper is about batteries")
 ds = ds.sem_filter("The paper is from MIT")
-ds = ds.sem_add_columns([{"name": "summary", "type": str, "description": "A summary of the paper"}])
+ds = ds.sem_map([{"name": "summary", "type": str, "description": "A summary of the paper"}])
 
 # optimize and execute the PZ program
 validator = pz.Validator()
