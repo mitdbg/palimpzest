@@ -8,7 +8,6 @@ import pandas as pd
 from PIL import Image
 
 import palimpzest as pz
-from palimpzest.constants import Model
 from palimpzest.core.lib.schemas import ImageFilepath
 from palimpzest.utils.udfs import xls_to_tables
 
@@ -234,10 +233,6 @@ if __name__ == "__main__":
         verbose=verbose,
         policy=policy,
         execution_strategy=args.executor,
-        available_models=[
-            model
-            for model in Model
-            if model not in [Model.GPT_5, Model.GPT_5_MINI] and (model.is_openai_model() or model.is_together_model())],
     )
     data_record_collection = plan.run(config)
     print(data_record_collection.to_df())
