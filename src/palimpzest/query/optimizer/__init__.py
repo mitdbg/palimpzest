@@ -1,14 +1,9 @@
+from palimpzest.query.optimizer.rules import AddContextsBeforeComputeRule as _AddContextsBeforeComputeRule
 from palimpzest.query.optimizer.rules import (
     AggregateRule as _AggregateRule,
 )
 from palimpzest.query.optimizer.rules import (
     BasicSubstitutionRule as _BasicSubstitutionRule,
-)
-from palimpzest.query.optimizer.rules import (
-    CodeSynthesisConvertRule as _CodeSynthesisConvertRule,
-)
-from palimpzest.query.optimizer.rules import (
-    CodeSynthesisConvertSingleRule as _CodeSynthesisConvertSingleRule,
 )
 from palimpzest.query.optimizer.rules import (
     CriticAndRefineConvertRule as _CriticAndRefineConvertRule,
@@ -21,6 +16,9 @@ from palimpzest.query.optimizer.rules import (
 )
 from palimpzest.query.optimizer.rules import (
     LLMFilterRule as _LLMFilterRule,
+)
+from palimpzest.query.optimizer.rules import (
+    LLMJoinRule as _LLMJoinRule,
 )
 from palimpzest.query.optimizer.rules import (
     MixtureOfAgentsConvertRule as _MixtureOfAgentsConvertRule,
@@ -51,14 +49,14 @@ from palimpzest.query.optimizer.rules import (
 )
 
 ALL_RULES = [
+    _AddContextsBeforeComputeRule,
     _AggregateRule,
     _BasicSubstitutionRule,
-    _CodeSynthesisConvertRule,
-    _CodeSynthesisConvertSingleRule,
     _CriticAndRefineConvertRule,
     _ImplementationRule,
     _LLMConvertBondedRule,
     _LLMFilterRule,
+    _LLMJoinRule,
     _MixtureOfAgentsConvertRule,
     _NonLLMConvertRule,
     _NonLLMFilterRule,
@@ -74,7 +72,7 @@ IMPLEMENTATION_RULES = [
     rule
     for rule in ALL_RULES
     if issubclass(rule, _ImplementationRule)
-    and rule not in [_CodeSynthesisConvertRule, _ImplementationRule]
+    and rule not in [_ImplementationRule]
 ]
 
 TRANSFORMATION_RULES = [

@@ -6,10 +6,8 @@ import os
 
 import pytest
 
-# sys.path.append("./tests/")
-# sys.path.append("./tests/refactor-tests/")
 from palimpzest.constants import Model, PromptStrategy
-from palimpzest.core.lib.schemas import File, TextFile
+from palimpzest.core.lib.schemas import File, TextFile, union_schemas
 from palimpzest.query.operators.convert import LLMConvertBonded
 from palimpzest.query.operators.scan import MarshalAndScanDataOp
 
@@ -28,12 +26,13 @@ if not os.environ.get("OPENAI_API_KEY"):
 )
 def test_convert(mocker, convert_op, side_effect, email_schema, enron_eval_tiny):
     """Test whether convert operators"""
-    scan_op = MarshalAndScanDataOp(output_schema=TextFile, datareader=enron_eval_tiny)
+    scan_op = MarshalAndScanDataOp(datasource=enron_eval_tiny, output_schema=TextFile, logical_op_id="test_scan")
     convert_op = convert_op(
         input_schema=File,
         output_schema=email_schema,
         model=Model.GPT_4o,
         prompt_strategy=PromptStrategy.COT_QA,
+        logical_op_id="test_convert",
     )
 
     # mock out calls to generators used by the plans which parameterize this test
@@ -48,5 +47,5 @@ def test_convert(mocker, convert_op, side_effect, email_schema, enron_eval_tiny)
         outputs.extend(record_set.data_records)
 
     assert len(outputs) == 1
-    assert outputs[0].schema == email_schema.union(TextFile)
+    assert outputs[0].schema == union_schemas([email_schema, TextFile])
     assert sorted(outputs[0].get_field_names()) == ["contents", "filename", "sender", "subject"]

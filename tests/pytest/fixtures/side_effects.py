@@ -1,6 +1,6 @@
 import pytest
 
-from palimpzest.core.data.dataclasses import GenerationStats
+from palimpzest.core.models import GenerationStats
 
 
 ### Side-Effects for Mocking LLM Calls ###

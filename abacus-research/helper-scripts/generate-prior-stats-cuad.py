@@ -1,3 +1,6 @@
+"""
+NOTE: this script worked with the tag `abacus-paper-experiments` but is no longer compatible with the main branch.
+"""
 import argparse
 import json
 import os
@@ -10,7 +13,6 @@ import pandas as pd
 
 import palimpzest as pz
 from palimpzest.constants import Model
-from palimpzest.core.lib.fields import ListField, StringField
 
 cuad_categories = [
     {
@@ -395,7 +397,7 @@ def compute_precision_recall(label_df, preds_df):
 
     return precision, recall
 
-class CUADDataReader(pz.DataReader):
+class CUADDataset(pz.IterDataset):
     def __init__(self, num_contracts: int = 1, split: str = "train", seed: int=42):
         self.num_contracts = num_contracts
         self.split = split
@@ -406,7 +408,7 @@ class CUADDataReader(pz.DataReader):
             {"name": "title", "type": str, "desc": "The title of the the contract to be analyzed"},
             {"name": "contract", "type": str, "desc": "The content of the the contract to be analyzed"},
         ]
-        super().__init__(input_cols)
+        super().__init__(id=f"cuad-{split}", schema=input_cols)
 
         # convert the dataset into a list of dictionaries where each row is for a single contract
         include_labels = split == "train"
@@ -510,7 +512,6 @@ def parse_arguments():
 
 def build_cuad_query(dataset, mode):
     assert mode in ["one-convert", "separate-converts"]
-    ds = pz.Dataset(dataset)
 
     if mode == "one-convert":
         cols = []
@@ -518,27 +519,27 @@ def build_cuad_query(dataset, mode):
             desc = (
                 f"Extract the text spans (if they exist) from the contract corresponding to {category['Description']}"
             )
-            cols.append({"name": category["Category"], "type": ListField(StringField), "desc": desc})
+            cols.append({"name": category["Category"], "type": list[str], "desc": desc})
 
         desc = "Extract the text spans (if they exist) from the contract."
-        ds = ds.sem_add_columns(cols, desc=desc, depends_on=["contract"])
+        dataset = dataset.sem_add_columns(cols, desc=desc, depends_on=["contract"])
     elif mode == "separate-converts":
         for category in cuad_categories:
             desc = (
                 f"Extract the text spans (if they exist) from the contract corresponding to {category['Description']}"
             )
-            ds = ds.sem_add_columns(
-                [{"name": category["Category"], "type": ListField(StringField), "desc": desc}],
+            dataset = dataset.sem_add_columns(
+                [{"name": category["Category"], "type": list[str], "desc": desc}],
                 desc=category["Description"],
                 depends_on=["contract"],
             )
 
-    return ds
+    return dataset
 
 
 def main():
-    if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None:
-        print("WARNING: Both OPENAI_API_KEY and TOGETHER_API_KEY are unset")
+    if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None and os.getenv("ANTHROPIC_API_KEY") is None:
+        print("WARNING: OPENAI_API_KEY, TOGETHER_API_KEY, and ANTHROPIC_API_KEY are unset")
 
     args = parse_arguments()
 
@@ -546,22 +547,21 @@ def main():
     os.makedirs("opt-profiling-data", exist_ok=True)
 
     # Create a data reader for the CUAD dataset
-    data_reader = CUADDataReader(split="test", num_contracts=1)
-    val_data_reader = CUADDataReader(split="train", num_contracts=5)
+    dataset = CUADDataset(split="test", num_contracts=1)
+    train_dataset = CUADDataset(split="train", num_contracts=5)
     print("Created data reader")
 
     # Build and run the CUAD query
-    query = build_cuad_query(data_reader, args.mode)
+    query = build_cuad_query(dataset, args.mode)
     print("Built query; Starting query execution")
 
-    processing_strategy = "sentinel"
     execution_strategy = "parallel"
     sentinel_execution_strategy = "all"
     optimizer_strategy = "pareto"
+    seed = 0
+    exp_name = f"cuad-priors-{optimizer_strategy}-seed{seed}"
     config = pz.QueryProcessorConfig(
         verbose=False,
-        val_datasource=val_data_reader,
-        processing_strategy=processing_strategy,
         optimizer_strategy=optimizer_strategy,
         sentinel_execution_strategy=sentinel_execution_strategy,
         execution_strategy=execution_strategy,
@@ -573,27 +573,22 @@ def main():
             Model.LLAMA3_1_8B,
             Model.LLAMA3_3_70B,
             # Model.LLAMA3_2_90B_V,
-            Model.MIXTRAL,
+            # Model.MIXTRAL, # NOTE: only available in tag `abacus-paper-experiments`
             # Model.DEEPSEEK_V3,
             Model.DEEPSEEK_R1_DISTILL_QWEN_1_5B,
         ],
         allow_bonded_query=True,
-        allow_code_synth=False,
         allow_critic=True,
         allow_mixtures=True,
         allow_rag_reduction=True,
         progress=True,
-    )
-    seed = 0
-    exp_name = f"cuad-priors-{optimizer_strategy}-seed{seed}"
-    data_record_collection = query.run(
-        config=config,
         k=-1,
         j=-1,
         sample_budget=1014*5,
         seed=seed,
         exp_name=exp_name,
     )
+    data_record_collection = query.optimize_and_run(config=config, train_dataset=train_dataset, validator=pz.Validator())
     print("Query execution completed")
 
     # save statistics

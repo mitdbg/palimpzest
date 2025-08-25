@@ -7,15 +7,15 @@ This method is a simple wrapper for different methods, e.g., from_csv, from_yml,
 
 import json
 import os
+from typing import Any
 
 import pandas as pd
 import yaml
+from pydantic import BaseModel
 from pyld import jsonld
 
-import palimpzest.core.lib.fields as pz_fields
 import palimpzest.core.lib.schemas as pz_schemas
-from palimpzest.core.lib.fields import Field
-from palimpzest.core.lib.schemas import Schema
+from palimpzest.core.lib.schemas import create_schema_from_fields
 
 
 class SchemaBuilder:
@@ -24,19 +24,17 @@ class SchemaBuilder:
     def from_file(cls,
         schema_file: str,
         schema_name: str = "",
-        schema_description: str = "",
         include_attributes: list = None,
         exclude_attributes: list = None,
-        schema_type: Schema = None,
+        schema_type: BaseModel = None,
         ):
         """
         Inputs:
             schema_file: str - the path to the file
-            description (optional): str - the description of the schema
             name (optional): str - the name of the schema
             include_attributes (optional): list - a list of attribute names to include in the schema. If None, all attributes are included.
             exclude_attributes (optional): list - a list of attribute names to exclude from the schema. If None, no attributes are excluded.
-            schema_type (optional): Schema - the parent type of the schema to generate, e.g. ScientificPapers have a schema_type of PDFFile. If None, a generic Schema type is used.
+            schema_type (optional): BaseModel - the parent type of the schema to generate, e.g. ScientificPapers have a schema_type of PDFFile. If None, a generic Schema type is used.
         Outputs:
             A class object - the dynamically generated class
         """
@@ -64,12 +62,6 @@ class SchemaBuilder:
             else:
                 schema_name = "".join([word.capitalize() for word in basename.split("_")])
 
-        if not schema_description:
-            if schema_data['description']:
-                schema_description = schema_data['description']
-            else:
-                schema_description = f"A schema generated from the {file_extension} file {basename}."
-
         if include_attributes is None:
            include_attributes = []
         if exclude_attributes is None:
@@ -78,14 +70,16 @@ class SchemaBuilder:
         if schema_type is None:
             if schema_data.get('type', None):
                 # Find if the schema type is a valid class in pz
-                parsed_type = getattr(pz_schemas
-                                      , schema_data['type'], Schema)
-                schema_type = parsed_type if issubclass(parsed_type, Schema) else Schema
+                parsed_type = getattr(pz_schemas, schema_data['type'], BaseModel)
+                schema_type = parsed_type if issubclass(parsed_type, BaseModel) else BaseModel
             else:
-                schema_type = Schema
+                schema_type = BaseModel
 
         # Generate the schema class dynamically
-        attributes = {"__doc__": schema_description}
+        fields = [
+            {"name": field_name, "description": field.description, "type": field.annotation}
+            for field_name, field in schema_type.model_fields.items()
+        ]
         include_attributes_lower = set([a.lower() for a in include_attributes])
         exclude_attributes_lower = set([a.lower() for a in exclude_attributes])
         for field in schema_data['fields']:
@@ -96,15 +90,9 @@ class SchemaBuilder:
                 continue
             name = field['name']
             description = field.get('description', '')
-            field_type = field.get('type', 'Field')
-            field_type = getattr(pz_fields, field_type, Field)
-            if not issubclass(field_type, Field):
-                field_type = Field
-                  
-            attributes[name] = field_type(desc=description)
+            fields.append({"name": name, "description": description, "type": Any})
 
-        # Create the class dynamically
-        return type(schema_name, (schema_type,), attributes)
+        return create_schema_from_fields(fields)
 
     @classmethod
     def from_csv(
@@ -189,9 +177,8 @@ class SchemaBuilder:
             cls,
             schema_file: str,
             schema_name: str = "",
-            schema_description: str = "",
             include_attributes: list = None,
-            schema_type: Schema = None,
+            schema_type: BaseModel = None,
     )-> dict:
         """
         The attributes are extracted from the JSON objects.

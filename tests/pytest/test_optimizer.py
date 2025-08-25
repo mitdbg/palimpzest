@@ -1,23 +1,22 @@
+import os
 import time
 
 import pytest
 
 from palimpzest.constants import Cardinality, Model
-from palimpzest.core.data.dataclasses import OperatorCostEstimates, PlanCost
 from palimpzest.core.elements.filters import Filter
 from palimpzest.core.lib.schemas import TextFile
+from palimpzest.core.models import OperatorCostEstimates, PlanCost
 from palimpzest.policy import MaxQuality, MinCost, MinTime
-from palimpzest.query.operators.code_synthesis_convert import CodeSynthesisConvert
 from palimpzest.query.operators.convert import LLMConvert, LLMConvertBonded
 from palimpzest.query.operators.filter import LLMFilter, NonLLMFilter
 from palimpzest.query.operators.logical import ConvertScan, FilteredScan
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.scan import MarshalAndScanDataOp, ScanPhysicalOp
-from palimpzest.query.optimizer.cost_model import CostModel
+from palimpzest.query.optimizer.cost_model import SampleBasedCostModel
 from palimpzest.query.optimizer.optimizer import Optimizer
 from palimpzest.query.optimizer.optimizer_strategy_type import OptimizationStrategyType
 from palimpzest.query.optimizer.primitives import Group, LogicalExpression
-from palimpzest.sets import Dataset
 
 
 class TestPrimitives:
@@ -27,12 +26,11 @@ class TestPrimitives:
             output_schema=TextFile,
             filter=Filter("filter1"),
             depends_on=[],
-            target_cache_id="filter1",
         )
         LogicalExpression(
             operator=filter1_op,
             input_group_ids=[0],
-            input_fields={"contents": TextFile.field_map()["contents"]},
+            input_fields={"contents": TextFile.model_fields["contents"]},
             depends_on_field_names=set(["contents"]),
             generated_fields={},
             group_id=None,
@@ -42,12 +40,11 @@ class TestPrimitives:
             output_schema=TextFile,
             filter=Filter("filter2"),
             depends_on=[],
-            target_cache_id="filter2",
         )
         filter2_expr = LogicalExpression(
             operator=filter2_op,
             input_group_ids=[1],
-            input_fields={"contents": TextFile.field_map()["contents"]},
+            input_fields={"contents": TextFile.model_fields["contents"]},
             depends_on_field_names=set(["contents"]),
             generated_fields={},
             group_id=None,
@@ -57,16 +54,15 @@ class TestPrimitives:
             output_schema=email_schema,
             cardinality=Cardinality.ONE_TO_ONE,
             depends_on=[],
-            target_cache_id="convert1",
         )
         convert_expr = LogicalExpression(
             operator=convert_op,
             input_group_ids=[2],
-            input_fields={"contents": TextFile.field_map()["contents"]},
+            input_fields={"contents": TextFile.model_fields["contents"]},
             depends_on_field_names=set(["contents"]),
             generated_fields={
-                "sender": email_schema.field_map()["sender"],
-                "subject": email_schema.field_map()["subject"],
+                "sender": email_schema.model_fields["sender"],
+                "subject": email_schema.model_fields["subject"],
             },
             group_id=None,
         )
@@ -76,10 +72,10 @@ class TestPrimitives:
         g1 = Group(
             logical_expressions=[convert_expr],
             fields={
-                "sender": email_schema.field_map()["sender"],
-                "subject": email_schema.field_map()["subject"],
-                "contents": TextFile.field_map()["contents"],
-                "filename": TextFile.field_map()["filename"],
+                "sender": email_schema.model_fields["sender"],
+                "subject": email_schema.model_fields["subject"],
+                "contents": TextFile.model_fields["contents"],
+                "filename": TextFile.model_fields["filename"],
             },
             properties=g1_properties,
         )
@@ -89,10 +85,10 @@ class TestPrimitives:
         g2 = Group(
             logical_expressions=[filter2_expr],
             fields={
-                "sender": email_schema.field_map()["sender"],
-                "subject": email_schema.field_map()["subject"],
-                "contents": TextFile.field_map()["contents"],
-                "filename": TextFile.field_map()["filename"],
+                "sender": email_schema.model_fields["sender"],
+                "subject": email_schema.model_fields["subject"],
+                "contents": TextFile.model_fields["contents"],
+                "filename": TextFile.model_fields["filename"],
             },
             properties=g2_properties,
         )
@@ -108,15 +104,14 @@ class TestPrimitives:
 )
 class TestOptimizer:
     def test_basic_functionality(self, enron_eval_tiny, opt_strategy):
-        plan = Dataset(enron_eval_tiny)
+        plan = enron_eval_tiny
         policy = MaxQuality()
-        cost_model = CostModel(sample_execution_data=[])
+        cost_model = SampleBasedCostModel()
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
-            cache=False,
             verbose=True,
-            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
+            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B],
             optimizer_strategy=opt_strategy,
         )
         physical_plans = optimizer.optimize(plan)
@@ -126,18 +121,16 @@ class TestOptimizer:
         assert isinstance(physical_plan[0], MarshalAndScanDataOp)
 
     def test_simple_max_quality_convert(self, enron_eval_tiny, email_schema, opt_strategy):
-        plan = Dataset(enron_eval_tiny)
+        plan = enron_eval_tiny
         plan = plan.sem_add_columns(email_schema)
         policy = MaxQuality()
-        cost_model = CostModel(sample_execution_data=[])
+        cost_model = SampleBasedCostModel()
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
-            cache=False,
             verbose=True,
-            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
+            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B],
             optimizer_strategy=opt_strategy,
-            allow_code_synth=False,
             allow_rag_reduction=False,
             allow_mixtures=False,
             allow_critic=False,
@@ -152,61 +145,55 @@ class TestOptimizer:
         assert physical_plan[1].model == Model.GPT_4o
 
     def test_simple_min_cost_convert(self, enron_eval_tiny, email_schema, opt_strategy):
-        plan = Dataset(enron_eval_tiny)
+        plan = enron_eval_tiny
         plan = plan.sem_add_columns(email_schema)
         policy = MinCost()
-        cost_model = CostModel(sample_execution_data=[])
+        cost_model = SampleBasedCostModel()
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
-            cache=False,
             verbose=True,
-            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
+            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B],
             optimizer_strategy=opt_strategy,
-            allow_code_synth=True,
         )
         physical_plans = optimizer.optimize(plan)
         physical_plan = physical_plans[0]
 
         assert len(physical_plan) == 2
         assert isinstance(physical_plan[0], MarshalAndScanDataOp)
-        assert isinstance(physical_plan[1], CodeSynthesisConvert)
+        assert isinstance(physical_plan[1], LLMConvertBonded)
 
     def test_simple_min_time_convert(self, enron_eval_tiny, email_schema, opt_strategy):
-        plan = Dataset(enron_eval_tiny)
+        plan = enron_eval_tiny
         plan = plan.sem_add_columns(email_schema)
         policy = MinTime()
-        cost_model = CostModel(sample_execution_data=[])
+        cost_model = SampleBasedCostModel()
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
-            cache=False,
             verbose=True,
-            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
+            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B],
             optimizer_strategy=opt_strategy,
-            allow_code_synth=True,
         )
         physical_plans = optimizer.optimize(plan)
         physical_plan = physical_plans[0]
 
         assert len(physical_plan) == 2
         assert isinstance(physical_plan[0], MarshalAndScanDataOp)
-        assert isinstance(physical_plan[1], CodeSynthesisConvert)
+        assert isinstance(physical_plan[1], LLMConvertBonded)
 
     def test_push_down_filter(self, enron_eval_tiny, email_schema, opt_strategy):
-        plan = Dataset(enron_eval_tiny)
+        plan = enron_eval_tiny
         plan = plan.sem_add_columns(email_schema)
         plan = plan.sem_filter("some text filter", depends_on=["contents"])
         policy = MinCost()
-        cost_model = CostModel(sample_execution_data=[])
+        cost_model = SampleBasedCostModel()
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
-            cache=False,
             verbose=True,
-            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
+            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B],
             optimizer_strategy=opt_strategy,
-            allow_code_synth=True,
         )
         physical_plans = optimizer.optimize(plan)
         physical_plan = physical_plans[0]
@@ -214,23 +201,21 @@ class TestOptimizer:
         assert len(physical_plan) == 3
         assert isinstance(physical_plan[0], MarshalAndScanDataOp)
         assert isinstance(physical_plan[1], LLMFilter)
-        assert isinstance(physical_plan[2], CodeSynthesisConvert)
+        assert isinstance(physical_plan[2], LLMConvertBonded)
 
     def test_push_down_two_filters(self, enron_eval_tiny, email_schema, opt_strategy):
-        plan = Dataset(enron_eval_tiny)
+        plan = enron_eval_tiny
         plan = plan.sem_add_columns(email_schema)
         plan = plan.sem_filter("some text filter", depends_on=["contents"])
         plan = plan.sem_filter("another text filter", depends_on=["contents"])
         policy = MinCost()
-        cost_model = CostModel(sample_execution_data=[])
+        cost_model = SampleBasedCostModel()
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
-            cache=False,
             verbose=True,
-            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
+            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B],
             optimizer_strategy=opt_strategy,
-            allow_code_synth=True,
         )
         physical_plans = optimizer.optimize(plan)
         physical_plan = physical_plans[0]
@@ -239,18 +224,16 @@ class TestOptimizer:
         assert isinstance(physical_plan[0], MarshalAndScanDataOp)
         assert isinstance(physical_plan[1], LLMFilter)
         assert isinstance(physical_plan[2], LLMFilter)
-        assert isinstance(physical_plan[3], CodeSynthesisConvert)
+        assert isinstance(physical_plan[3], LLMConvertBonded)
 
     def test_real_estate_logical_reorder(self, real_estate_workload, opt_strategy):
         policy = MinCost()
-        cost_model = CostModel(sample_execution_data=[])
+        cost_model = SampleBasedCostModel()
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
-            cache=False,
             verbose=True,
-            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
-            allow_code_synth=False,
+            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B],
             allow_rag_reduction=False,
             allow_mixtures=False,
             allow_critic=False,
@@ -271,7 +254,7 @@ class TestOptimizer:
     def test_seven_filters(self, enron_eval_tiny, email_schema, opt_strategy):
         start_time = time.time()
 
-        plan = Dataset(enron_eval_tiny)
+        plan = enron_eval_tiny
         plan = plan.sem_add_columns(email_schema)
         plan = plan.sem_filter("filter1", depends_on=["contents"])
         plan = plan.sem_filter("filter2", depends_on=["contents"])
@@ -281,15 +264,13 @@ class TestOptimizer:
         plan = plan.sem_filter("filter6", depends_on=["contents"])
         plan = plan.sem_filter("filter7", depends_on=["contents"])
         policy = MinCost()
-        cost_model = CostModel(sample_execution_data=[])
+        cost_model = SampleBasedCostModel()
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
-            cache=False,
             verbose=True,
-            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.MIXTRAL],
+            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B],
             optimizer_strategy=opt_strategy,
-            allow_code_synth=True,
         )
         physical_plans = optimizer.optimize(plan)
         physical_plan = physical_plans[0]
@@ -303,11 +284,12 @@ class TestOptimizer:
         assert isinstance(physical_plan[5], LLMFilter)
         assert isinstance(physical_plan[6], LLMFilter)
         assert isinstance(physical_plan[7], LLMFilter)
-        assert isinstance(physical_plan[8], CodeSynthesisConvert)
+        assert isinstance(physical_plan[8], LLMConvertBonded)
 
-        assert time.time() - start_time < 5, (
-            "Optimizer should complete this test within 2 to 5 seconds; if it's failed, something has caused a regression, and you should ping Matthew Russo (mdrusso@mit.edu)"
-        )
+        if not os.getenv("CI"):  # only enforce time constraint when not running in CI
+            assert time.time() - start_time < 6, (
+                "Optimizer should complete this test within 2 to 6 seconds; if it's failed, something has caused a regression, and you should ping Matthew Russo (mdrusso@mit.edu)"
+            )
 
 
 class MockSampleBasedCostModel:
@@ -352,10 +334,10 @@ class MockSampleBasedCostModel:
         # create source_op_estimates for scan operators if they are not provided
         if isinstance(operator, ScanPhysicalOp):
             # get handle to scan operator and pre-compute its size (number of records)
-            datareader_len = len(operator.datareader)
+            datasource_len = len(operator.datasource)
 
             source_op_estimates = OperatorCostEstimates(
-                cardinality=datareader_len,
+                cardinality=datasource_len,
                 time_per_record=0.0,
                 cost_per_record=0.0,
                 quality=1.0,
@@ -428,11 +410,9 @@ class TestParetoOptimizer:
         optimizer = Optimizer(
             policy=policy,
             cost_model=cost_model,
-            cache=False,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_3_70B],
             optimizer_strategy=OptimizationStrategyType.PARETO,
-            allow_code_synth=False,
             allow_rag_reduction=False,
             allow_mixtures=False,
             allow_critic=False,

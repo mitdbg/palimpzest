@@ -45,11 +45,14 @@ eval-results/
 
 testdata/enron-eval/*.txt
 
-src/palimpzest/agents/
-
 # your zed using open source contributor who only installs in a virtual environment
 .venv
 .zed
 pyrightconfig.json
 
 myenv/
+
+# abacus-research data
+abacus-research/cuad-data/*
+abacus-research/opt-profiling-data/*
+abacus-research/parse-answer-errors/*

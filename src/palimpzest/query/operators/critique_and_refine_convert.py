@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from typing import Any
 
+from pydantic.fields import FieldInfo
+
 from palimpzest.constants import MODEL_CARDS, Model, PromptStrategy
-from palimpzest.core.data.dataclasses import GenerationStats, OperatorCostEstimates
 from palimpzest.core.elements.records import DataRecord
-from palimpzest.query.generators.generators import generator_factory
+from palimpzest.core.models import GenerationStats, OperatorCostEstimates
+from palimpzest.query.generators.generators import Generator
 from palimpzest.query.operators.convert import LLMConvert
 
 # TYPE DEFINITIONS
@@ -35,8 +37,8 @@ class CriticAndRefineConvert(LLMConvert):
             raise ValueError(f"Unsupported prompt strategy: {self.prompt_strategy}")
 
         # create generators
-        self.critic_generator = generator_factory(self.critic_model, self.critic_prompt_strategy, self.cardinality, self.verbose)
-        self.refine_generator = generator_factory(self.refine_model, self.refinement_prompt_strategy, self.cardinality, self.verbose)
+        self.critic_generator = Generator(self.critic_model, self.critic_prompt_strategy, self.reasoning_effort, self.api_base, self.cardinality, self.verbose)
+        self.refine_generator = Generator(self.refine_model, self.refinement_prompt_strategy, self.reasoning_effort, self.api_base, self.cardinality, self.verbose)
 
     def __str__(self):
         op = super().__str__()
@@ -86,7 +88,7 @@ class CriticAndRefineConvert(LLMConvert):
 
         return naive_op_cost_estimates
 
-    def convert(self, candidate: DataRecord, fields: list[str]) -> tuple[dict[FieldName, list[Any]], GenerationStats]:
+    def convert(self, candidate: DataRecord, fields: dict[str, FieldInfo]) -> tuple[dict[FieldName, list[Any]], GenerationStats]:
         # get input fields
         input_fields = self.get_input_fields()
 

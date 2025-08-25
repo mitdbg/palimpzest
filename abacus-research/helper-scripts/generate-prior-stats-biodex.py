@@ -1,3 +1,6 @@
+"""
+NOTE: this script worked with the tag `abacus-paper-experiments` but is no longer compatible with the main branch.
+"""
 import argparse
 import json
 import os
@@ -29,14 +32,14 @@ biodex_ranked_reactions_labels_cols = [
 ]
 
 
-class BiodexReader(pz.DataReader):
+class BiodexDataset(pz.IterDataset):
     def __init__(
         self,
         rp_at_k: int = 5,
         num_samples: int = 5,
         split: str = "test",
     ):
-        super().__init__(biodex_entry_cols)
+        super().__init__(id=f"biodex-{split}", schema=biodex_entry_cols)
 
         if split == "test":
             self.dataset = datasets.load_dataset("BioDEX/BioDEX-Reactions", split=split).to_pandas().to_dict(orient="records")[:num_samples]
@@ -148,8 +151,8 @@ class BiodexReader(pz.DataReader):
             item["labels"] = self.compute_label(entry)
 
             # add scoring functions for list fields
-            rank_precision_at_k = partial(BiodexReader.rank_precision_at_k, k=self.rp_at_k)
-            item["score_fn"]["reaction_labels"] = BiodexReader.term_recall
+            rank_precision_at_k = partial(BiodexDataset.rank_precision_at_k, k=self.rp_at_k)
+            item["score_fn"]["reaction_labels"] = BiodexDataset.term_recall
             item["score_fn"]["ranked_reaction_labels"] = rank_precision_at_k
 
         return item
@@ -168,23 +171,22 @@ if __name__ == "__main__":
     verbose = args.verbose
     progress = args.progress
     seed = 123 # NOTE: unique to cascades run
-    processing_strategy = "sentinel"
     execution_strategy = "parallel"
     sentinel_execution_strategy = "all"
     optimizer_strategy = "pareto"
     exp_name = f"biodex-priors-{optimizer_strategy}-seed{seed}-second-convert-cascades" # NOTE: unique to cascades run
 
-    if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None:
-        print("WARNING: Both OPENAI_API_KEY and TOGETHER_API_KEY are unset")
+    if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None and os.getenv("ANTHROPIC_API_KEY") is None:
+        print("WARNING: OPENAI_API_KEY, TOGETHER_API_KEY, and ANTHROPIC_API_KEY are unset")
 
     # create data source
-    datareader = BiodexReader(
+    dataset = BiodexDataset(
         split="test",
         num_samples=1,
     )
 
     # create validation data source
-    val_datasource = BiodexReader(
+    train_dataset = BiodexDataset(
         split="train",
         num_samples=5,
     )
@@ -223,8 +225,7 @@ if __name__ == "__main__":
         return {"reaction_labels": final_sorted_results[:k]}
 
     # construct plan
-    plan = pz.Dataset(datareader)
-    plan = plan.retrieve(
+    plan = dataset.retrieve(
         index=index,
         search_func=search_func,
         search_attr="reactions",
@@ -232,15 +233,11 @@ if __name__ == "__main__":
     )
     plan = plan.sem_add_columns(biodex_ranked_reactions_labels_cols, depends_on=["title", "abstract", "fulltext", "reaction_labels"])
 
-
     # only use final op quality
     use_final_op_quality = True
 
     # execute pz plan
     config = pz.QueryProcessorConfig(
-        cache=False,
-        val_datasource=val_datasource,
-        processing_strategy=processing_strategy,
         optimizer_strategy=optimizer_strategy,
         sentinel_execution_strategy=sentinel_execution_strategy,
         execution_strategy=execution_strategy,
@@ -254,26 +251,23 @@ if __name__ == "__main__":
             Model.LLAMA3_1_8B,
             Model.LLAMA3_3_70B,
             Model.LLAMA3_2_90B_V,
-            Model.MIXTRAL,
+            # Model.MIXTRAL, # NOTE: only available in tag `abacus-paper-experiments`
             # Model.DEEPSEEK_V3,
             Model.DEEPSEEK_R1_DISTILL_QWEN_1_5B,
         ],
         allow_bonded_query=True,
-        allow_code_synth=False,
         allow_critic=True,
         allow_mixtures=True,
         allow_rag_reduction=True,
         progress=progress,
-    )
-
-    data_record_collection = plan.run(
-        config=config,
         k=-1,
         j=-1,
         sample_budget=5*1014 + 5*7,
         seed=seed,
         exp_name=exp_name,
     )
+
+    data_record_collection = plan.optimize_and_run(config=config, train_dataset=train_dataset, validator=pz.Validator())
 
     print(data_record_collection.to_df())
     data_record_collection.to_df().to_csv(f"priors-data/{exp_name}-output.csv", index=False)

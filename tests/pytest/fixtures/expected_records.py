@@ -12,7 +12,7 @@ from palimpzest.core.lib.schemas import File
 def enron_all_expected_records(enron_eval_tiny_data_path):
     data_records = []
     for source_idx, file in enumerate(sorted(os.listdir(enron_eval_tiny_data_path))):
-        dr = DataRecord(schema=File, source_idx=source_idx)
+        dr = DataRecord(schema=File, source_indices=[source_idx])
         dr.filename = file
         with open(os.path.join(enron_eval_tiny_data_path, file), "rb") as f:
             dr.contents = f.read()
@@ -39,7 +39,9 @@ def real_estate_all_expected_records(real_estate_eval_tiny_data_path, image_real
 
     data_records = []
     for source_idx, listing in enumerate(expected_listings):
-        dr = DataRecord(schema=image_real_estate_listing_schema, source_idx=source_idx)
+        if listing == ".DS_Store":
+            continue
+        dr = DataRecord(schema=image_real_estate_listing_schema, source_indices=[source_idx])
         dr.listing = listing
         dr.is_modern_and_attractive = listing_to_modern_and_attractive[listing]
         dr.has_natural_sunlight = listing_to_has_natural_sunlight[listing]
@@ -59,8 +61,10 @@ def real_estate_one_to_many_expected_records(real_estate_eval_tiny_data_path, ro
 
     data_records = []
     for source_idx, listing in enumerate(expected_listings):
+        if listing == ".DS_Store":
+            continue
         for room in listing_to_rooms[listing]:
-            dr = DataRecord(schema=room_real_estate_listing_schema, source_idx=source_idx)
+            dr = DataRecord(schema=room_real_estate_listing_schema, source_indices=[source_idx])
             dr.listing = listing
             dr.room = room
             data_records.append(dr)
@@ -74,7 +78,7 @@ def scan_convert_filter_expected_outputs(foobar_schema):
     expected_outputs = {}
     for source_idx in range(10):
         if source_idx % 2:
-            dr = DataRecord(foobar_schema, source_idx)
+            dr = DataRecord(foobar_schema, [source_idx])
             dr.filename = f"file{source_idx}"
             dr.contents = None
             dr.foo = f"foo{source_idx}"
@@ -96,11 +100,11 @@ def scan_convert_filter_varied_expected_outputs(foobar_schema):
     expected_outputs = {}
     for source_idx in range(10):
         if source_idx % 3 > 0:
-            dr = DataRecord(foobar_schema, source_idx)
+            dr = DataRecord(foobar_schema, [source_idx])
             dr.filename = f"file{source_idx}"
             dr.contents = None
             dr.foo = f"foo{source_idx}"
-            dr.bar = f"bar{source_idx}-{str(Model.GPT_4o_MINI)}" if source_idx < 6 else f"bar{source_idx}-{str(Model.MIXTRAL)}"
+            dr.bar = f"bar{source_idx}-{str(Model.GPT_4o_MINI)}" if source_idx < 6 else f"bar{source_idx}-{str(Model.LLAMA3_1_8B)}"
             dr.passed_operator = True
             expected_outputs[source_idx] = DataRecordSet([dr], None)
 
@@ -123,7 +127,7 @@ def scan_multi_convert_multi_filter_expected_outputs(foobar_schema, baz_schema):
             if source_idx == 0 and one_to_many_idx == 1:
                 continue
 
-            dr = DataRecord(foobar_schema, source_idx)
+            dr = DataRecord(foobar_schema, [source_idx])
             dr.filename = f"file{source_idx}"
             dr.contents = None
             dr.foo = f"foo{source_idx}-one-to-many-{one_to_many_idx}"
