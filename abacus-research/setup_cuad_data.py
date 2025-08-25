@@ -5,9 +5,9 @@ This replaces the need for HuggingFace datasets library.
 """
 
 import os
-import zipfile
 import urllib.request
-import shutil
+import zipfile
+
 
 def setup_cuad_data():
     # Create cuad-data directory

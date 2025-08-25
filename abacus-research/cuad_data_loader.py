@@ -5,6 +5,7 @@ All CUAD scripts should import from this module.
 
 import json
 import os
+
 import numpy as np
 
 # Default data directory
@@ -35,9 +36,9 @@ def load_cuad_data(split="test", data_dir=None):
             f"Please run 'python setup_cuad_data.py' first to download the data."
         )
     
-    with open(file_path, "r") as f:
+    with open(file_path) as f:
         raw_data = json.load(f)
-    
+
     # Convert to flat format
     dataset = []
     for article in raw_data["data"]:

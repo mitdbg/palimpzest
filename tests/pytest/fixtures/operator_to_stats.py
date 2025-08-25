@@ -17,7 +17,7 @@ def get_three_converts_logical_and_full_op_ids(three_converts_workload, enron_ev
     scan_node_id = three_converts_workload._sources[0]._sources[0]._sources[0].id
     first_convert_node_id = three_converts_workload._sources[0]._sources[0].id
     second_convert_node_id = three_converts_workload._sources[0].id
-    third_convert_node_id = three_converts_workload.id
+    # third_convert_node_id = three_converts_workload.id
 
     # get full and logical op id for scan operator
     scan_logical_op = BaseScan(datasource=enron_eval_tiny, output_schema=TextFile)
@@ -199,7 +199,7 @@ def get_one_filter_one_convert_logical_and_full_op_ids(one_filter_one_convert_wo
     # extract node id's from workload Datasets
     scan_node_id = dataset_nodes[0].id
     first_filter_node_id = dataset_nodes[1].id
-    first_convert_node_id = dataset_nodes[2].id
+    # first_convert_node_id = dataset_nodes[2].id
 
     # get full and logical op id for scan operator
     scan_logical_op = BaseScan(datasource=enron_eval_tiny, output_schema=TextFile)
@@ -265,9 +265,9 @@ def get_two_converts_two_filters_logical_and_full_op_ids(two_converts_two_filter
     # extract node id's from workload Datasets
     scan_node_id = two_converts_two_filters_workload._sources[0]._sources[0]._sources[0]._sources[0].id
     first_convert_node_id = two_converts_two_filters_workload._sources[0]._sources[0]._sources[0].id
-    second_convert_node_id = two_converts_two_filters_workload._sources[0]._sources[0].id
-    first_filter_node_id = two_converts_two_filters_workload._sources[0].id
-    second_filter_node_id = two_converts_two_filters_workload.id
+    # second_convert_node_id = two_converts_two_filters_workload._sources[0]._sources[0].id
+    # first_filter_node_id = two_converts_two_filters_workload._sources[0].id
+    # second_filter_node_id = two_converts_two_filters_workload.id
 
     # get full and logical op id for scan operator
     scan_logical_op = BaseScan(datasource=enron_eval_tiny, output_schema=TextFile)
