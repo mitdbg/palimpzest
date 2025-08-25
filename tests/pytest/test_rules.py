@@ -34,7 +34,7 @@ def test_substitute_methods(base_scan_op):
     )
 
     # Apply the BasicSubstitutionRule
-    physical_exprs = BasicSubstitutionRule.substitute(logical_expr, verbose=False)
+    physical_exprs = BasicSubstitutionRule.substitute(logical_expr, verbose=False, api_base=None)
 
     # Verify the substitution
     assert len(physical_exprs) == 1

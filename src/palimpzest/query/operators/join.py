@@ -64,7 +64,7 @@ class BlockingNestedLoopsJoin(JoinOp):
         self.prompt_strategy = prompt_strategy
         self.join_parallelism = join_parallelism
         self.reasoning_effort = reasoning_effort
-        self.generator = Generator(model, prompt_strategy, reasoning_effort, Cardinality.ONE_TO_ONE, self.verbose)
+        self.generator = Generator(model, prompt_strategy, reasoning_effort, self.api_base, Cardinality.ONE_TO_ONE, self.verbose)
         self.join_idx = 0
 
     def get_id_params(self):
@@ -72,6 +72,8 @@ class BlockingNestedLoopsJoin(JoinOp):
         id_params = {
             "model": self.model.value,
             "prompt_strategy": self.prompt_strategy.value,
+            "join_parallelism": self.join_parallelism,
+            "reasoning_effort": self.reasoning_effort,
             **id_params,
         }
 
@@ -82,6 +84,8 @@ class BlockingNestedLoopsJoin(JoinOp):
         op_params = {
             "model": self.model,
             "prompt_strategy": self.prompt_strategy,
+            "join_parallelism": self.join_parallelism,
+            "reasoning_effort": self.reasoning_effort,
             **op_params,
         }
 
@@ -224,7 +228,7 @@ class NestedLoopsJoin(JoinOp):
         self.prompt_strategy = prompt_strategy
         self.join_parallelism = join_parallelism
         self.reasoning_effort = reasoning_effort
-        self.generator = Generator(model, prompt_strategy, reasoning_effort, Cardinality.ONE_TO_ONE, self.verbose)
+        self.generator = Generator(model, prompt_strategy, reasoning_effort, self.api_base, Cardinality.ONE_TO_ONE, self.verbose)
         self.join_idx = 0
 
         # maintain list(s) of input records for the join
@@ -236,6 +240,8 @@ class NestedLoopsJoin(JoinOp):
         id_params = {
             "model": self.model.value,
             "prompt_strategy": self.prompt_strategy.value,
+            "join_parallelism": self.join_parallelism,
+            "reasoning_effort": self.reasoning_effort,
             **id_params,
         }
 
@@ -246,6 +252,8 @@ class NestedLoopsJoin(JoinOp):
         op_params = {
             "model": self.model,
             "prompt_strategy": self.prompt_strategy,
+            "join_parallelism": self.join_parallelism,
+            "reasoning_effort": self.reasoning_effort,
             **op_params,
         }
 

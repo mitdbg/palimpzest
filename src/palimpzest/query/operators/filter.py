@@ -182,13 +182,14 @@ class LLMFilter(FilterOp):
         self.model = model
         self.prompt_strategy = prompt_strategy
         self.reasoning_effort = reasoning_effort
-        self.generator = Generator(model, prompt_strategy, reasoning_effort, Cardinality.ONE_TO_ONE, self.verbose)
+        self.generator = Generator(model, prompt_strategy, reasoning_effort, self.api_base, Cardinality.ONE_TO_ONE, self.verbose)
 
     def get_id_params(self):
         id_params = super().get_id_params()
         id_params = {
             "model": self.model.value,
             "prompt_strategy": self.prompt_strategy.value,
+            "reasoning_effort": self.reasoning_effort,
             **id_params,
         }
 
@@ -199,6 +200,7 @@ class LLMFilter(FilterOp):
         op_params = {
             "model": self.model,
             "prompt_strategy": self.prompt_strategy,
+            "reasoning_effort": self.reasoning_effort,
             **op_params,
         }
 

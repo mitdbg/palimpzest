@@ -27,6 +27,7 @@ class QueryProcessorConfig(BaseModel):
     batch_size: int | None = Field(default=None)
     reasoning_effort: str | None = Field(default=None)  # Gemini: "disable", "low", "medium", "high"
     gemini_credentials_path: str | None = Field(default=None)  # Path to Gemini credentials file
+    api_base: str | None = Field(default=None)  # API base URL for vLLM
 
     # operator flags
     allow_bonded_query: bool = Field(default=True)

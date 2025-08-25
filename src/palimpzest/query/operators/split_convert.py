@@ -22,8 +22,8 @@ class SplitConvert(LLMConvert):
         super().__init__(*args, **kwargs)
         self.num_chunks = num_chunks
         self.min_size_to_chunk = min_size_to_chunk
-        self.split_generator = Generator(self.model, PromptStrategy.SPLIT_PROPOSER, self.reasoning_effort, self.cardinality, self.verbose)
-        self.split_merge_generator = Generator(self.model, PromptStrategy.SPLIT_MERGER, self.reasoning_effort, self.cardinality, self.verbose)
+        self.split_generator = Generator(self.model, PromptStrategy.SPLIT_PROPOSER, self.reasoning_effort, self.api_base, self.cardinality, self.verbose)
+        self.split_merge_generator = Generator(self.model, PromptStrategy.SPLIT_MERGER, self.reasoning_effort, self.api_base, self.cardinality, self.verbose)
 
         # crude adjustment factor for naive estimation in no-sentinel setting
         self.naive_quality_adjustment = 0.6

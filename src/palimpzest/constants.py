@@ -32,6 +32,7 @@ class Model(str, Enum):
     LLAMA_4_MAVERICK = "vertex_ai/meta/llama-4-maverick-17b-128e-instruct-maas"
     GPT_4o_AUDIO_PREVIEW = "openai/gpt-4o-audio-preview"
     GPT_4o_MINI_AUDIO_PREVIEW = "openai/gpt-4o-mini-audio-preview"
+    VLLM_QWEN_1_5_0_5B_CHAT = "hosted_vllm/qwen/Qwen1.5-0.5B-Chat"
     # o1 = "o1-2024-12-17"
 
     def __repr__(self):
@@ -63,6 +64,9 @@ class Model(str, Enum):
 
     def is_vertex_model(self):
         return "vertex_ai" in self.value.lower()
+
+    def is_vllm_model(self):
+        return "hosted_vllm" in self.value.lower()
 
     def is_reasoning_model(self):
         reasoning_models = [
@@ -536,6 +540,15 @@ LLAMA_4_MAVERICK_MODEL_CARD = {
     ##### Agg. Benchmark #####
     "overall": 79.4,
 }
+VLLM_QWEN_1_5_0_5B_CHAT_MODEL_CARD = {
+    ##### Cost in USD #####
+    "usd_per_input_token": 0.0 / 1e6,
+    "usd_per_output_token": 0.0 / 1e6,
+    ##### Time #####
+    "seconds_per_output_token": 0.1000, # TODO: fill-in with a better estimate
+    ##### Agg. Benchmark #####
+    "overall": 30.0, # TODO: fill-in with a better estimate
+}
 
 MODEL_CARDS = {
     Model.LLAMA3_2_3B.value: LLAMA3_2_3B_INSTRUCT_MODEL_CARD,
@@ -561,4 +574,5 @@ MODEL_CARDS = {
     Model.GEMINI_2_5_FLASH.value: GEMINI_2_5_FLASH_MODEL_CARD,
     Model.GEMINI_2_5_PRO.value: GEMINI_2_5_PRO_MODEL_CARD,
     Model.LLAMA_4_MAVERICK.value: LLAMA_4_MAVERICK_MODEL_CARD,
+    Model.VLLM_QWEN_1_5_0_5B_CHAT.value: VLLM_QWEN_1_5_0_5B_CHAT_MODEL_CARD,
 }

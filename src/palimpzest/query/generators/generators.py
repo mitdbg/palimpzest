@@ -109,6 +109,7 @@ class Generator(Generic[ContextType, InputType]):
         model: Model,
         prompt_strategy: PromptStrategy,
         reasoning_effort: str | None = None,
+        api_base: str | None = None,
         cardinality: Cardinality = Cardinality.ONE_TO_ONE,
         verbose: bool = False,
     ):
@@ -117,6 +118,7 @@ class Generator(Generic[ContextType, InputType]):
         self.cardinality = cardinality
         self.prompt_strategy = prompt_strategy
         self.reasoning_effort = reasoning_effort
+        self.api_base = api_base
         self.verbose = verbose
         self.prompt_factory = PromptFactory(prompt_strategy, model, cardinality)
 
@@ -318,6 +320,8 @@ class Generator(Generic[ContextType, InputType]):
                 elif self.model.is_openai_model():
                     reasoning_effort = "minimal" if self.reasoning_effort is None else self.reasoning_effort
                     completion_kwargs = {"reasoning_effort": reasoning_effort, **completion_kwargs}
+            if self.model.is_vllm_model():
+                completion_kwargs = {"api_base": self.api_base, **completion_kwargs}
             completion = litellm.completion(model=self.model_name, messages=messages, **completion_kwargs)
             end_time = time.time()
             logger.debug(f"Generated completion in {end_time - start_time:.2f} seconds")

@@ -76,7 +76,7 @@ class QueryProcessorFactory:
         # get available models
         available_models = getattr(config, 'available_models', [])
         if available_models is None or len(available_models) == 0:
-            available_models = get_models(gemini_credentials_path=config.gemini_credentials_path)
+            available_models = get_models(gemini_credentials_path=config.gemini_credentials_path, api_base=config.api_base)
 
         # remove any models specified in the config
         remove_models = getattr(config, 'remove_models', [])

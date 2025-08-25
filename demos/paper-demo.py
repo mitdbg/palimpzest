@@ -4,12 +4,33 @@ import os
 
 import gradio as gr
 import numpy as np
+import pandas as pd
 from PIL import Image
 
 import palimpzest as pz
 from palimpzest.constants import Model
 from palimpzest.core.lib.schemas import ImageFilepath
 from palimpzest.utils.udfs import xls_to_tables
+
+
+def print_table(records, cols=None, plan_str=None):
+    """Helper function to print execution results using Gradio"""
+    if len(records) == 0:
+        print("No records met search criteria")
+        return
+
+    records = [record.to_dict() for record in records]
+    records_df = pd.DataFrame(records)
+    print_cols = records_df.columns if cols is None else cols
+
+    with gr.Blocks() as demo:
+        gr.Dataframe(records_df[print_cols])
+
+        if plan_str is not None:
+            gr.Textbox(value=plan_str, info="Physical Plan")
+
+    demo.launch()
+
 
 # Addresses far from MIT; we use a simple lookup like this to make the
 # experiments re-producible w/out needed a Google API key for geocoding lookups
@@ -230,8 +251,6 @@ if __name__ == "__main__":
 
     # visualize output in Gradio
     if visualize:
-        from palimpzest.utils.demo_helpers import print_table
-
         plan_str = list(data_record_collection.execution_stats.plan_strs.values())[-1]
         if workload == "enron":
             print_table(data_record_collection.data_records, cols=["sender", "subject"], plan_str=plan_str)

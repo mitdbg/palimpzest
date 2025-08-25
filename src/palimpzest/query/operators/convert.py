@@ -289,11 +289,12 @@ class LLMConvert(ConvertOp):
         self.prompt_strategy = prompt_strategy
         self.reasoning_effort = reasoning_effort
         if model is not None:
-            self.generator = Generator(model, prompt_strategy, reasoning_effort, self.cardinality, self.verbose)
+            self.generator = Generator(model, prompt_strategy, reasoning_effort, self.api_base, self.cardinality, self.verbose)
 
     def __str__(self):
         op = super().__str__()
         op += f"    Prompt Strategy: {self.prompt_strategy}\n"
+        op += f"    Reasoning Effort: {self.reasoning_effort}\n"
         return op
 
     def get_id_params(self):
@@ -301,6 +302,7 @@ class LLMConvert(ConvertOp):
         id_params = {
             "model": None if self.model is None else self.model.value,
             "prompt_strategy": None if self.prompt_strategy is None else self.prompt_strategy.value,
+            "reasoning_effort": self.reasoning_effort,
             **id_params,
         }
 
@@ -311,6 +313,7 @@ class LLMConvert(ConvertOp):
         op_params = {
             "model": self.model,
             "prompt_strategy": self.prompt_strategy,
+            "reasoning_effort": self.reasoning_effort,
             **op_params,
         }
 

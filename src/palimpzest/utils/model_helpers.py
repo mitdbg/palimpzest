@@ -3,7 +3,7 @@ import os
 from palimpzest.constants import Model
 
 
-def get_models(include_embedding: bool = False, gemini_credentials_path: str | None = None) -> list[Model]:
+def get_models(include_embedding: bool = False, gemini_credentials_path: str | None = None, api_base: str | None = None) -> list[Model]:
     """
     Return the set of models which the system has access to based on the set environment variables.
     """
@@ -44,5 +44,13 @@ def get_models(include_embedding: bool = False, gemini_credentials_path: str | N
                 model for model in vertex_models if not model.is_embedding_model()
             ]
         models.extend(vertex_models)
+
+    if api_base is not None:
+        vllm_models = [model for model in Model if model.is_vllm_model()]
+        if not include_embedding:
+            vllm_models = [
+                model for model in vllm_models if not model.is_embedding_model()
+            ]
+        models.extend(vllm_models)
 
     return models

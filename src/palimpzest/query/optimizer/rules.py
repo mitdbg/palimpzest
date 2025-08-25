@@ -402,6 +402,7 @@ class ImplementationRule(Rule):
                 "logical_op_id": logical_op.get_logical_op_id(),
                 "unique_logical_op_id": logical_op.get_unique_logical_op_id(),
                 "logical_op_name": logical_op.logical_op_name(),
+                "api_base": runtime_kwargs["api_base"],
             }
         )
 

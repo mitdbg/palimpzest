@@ -24,6 +24,7 @@ class PhysicalOperator:
         logical_op_id: str | None = None,
         unique_logical_op_id: str | None = None,
         logical_op_name: str | None = None,
+        api_base: str | None = None,
         verbose: bool = False,
         *args,
         **kwargs,
@@ -34,6 +35,7 @@ class PhysicalOperator:
         self.logical_op_id = logical_op_id
         self.unique_logical_op_id = unique_logical_op_id
         self.logical_op_name = logical_op_name
+        self.api_base = api_base
         self.verbose = verbose
         self.op_id = None
 
@@ -99,6 +101,7 @@ class PhysicalOperator:
             "logical_op_id": self.logical_op_id,
             "unique_logical_op_id": self.unique_logical_op_id,
             "logical_op_name": self.logical_op_name,
+            "api_base": self.api_base,
             "verbose": self.verbose,
         }
 
