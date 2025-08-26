@@ -61,7 +61,7 @@ class Model(str, Enum):
         return self in [Model.o4_MINI]
 
     def is_gpt_5_model(self):
-        return self in [Model.GPT_5, Model.GPT_5_MINI]
+        return self in [Model.GPT_5, Model.GPT_5_MINI, Model.GPT_5_NANO]
 
     def is_openai_model(self):
         return "openai" in self.value.lower() or self.is_text_embedding_model()
