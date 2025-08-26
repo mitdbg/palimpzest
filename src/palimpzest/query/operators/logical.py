@@ -256,12 +256,14 @@ class ConvertScan(LogicalOperator):
         self,
         cardinality: Cardinality = Cardinality.ONE_TO_ONE,
         udf: Callable | None = None,
+        desc: str | None = None,
         *args,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
         self.cardinality = cardinality
         self.udf = udf
+        self.desc = desc
 
     def __str__(self):
         return f"ConvertScan({self.input_schema} -> {str(self.output_schema)})"
@@ -271,6 +273,7 @@ class ConvertScan(LogicalOperator):
         logical_id_params = {
             "cardinality": self.cardinality,
             "udf": self.udf,
+            "desc": self.desc,
             **logical_id_params,
         }
 
@@ -281,6 +284,7 @@ class ConvertScan(LogicalOperator):
         logical_op_params = {
             "cardinality": self.cardinality,
             "udf": self.udf,
+            "desc": self.desc,
             **logical_op_params,
         }
 
@@ -327,11 +331,13 @@ class FilteredScan(LogicalOperator):
     def __init__(
         self,
         filter: Filter,
+        desc: str | None = None,
         *args,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
         self.filter = filter
+        self.desc = desc
 
     def __str__(self):
         return f"FilteredScan({str(self.output_schema)}, {str(self.filter)})"
@@ -340,6 +346,7 @@ class FilteredScan(LogicalOperator):
         logical_id_params = super().get_logical_id_params()
         logical_id_params = {
             "filter": self.filter,
+            "desc": self.desc,
             **logical_id_params,
         }
 
@@ -349,6 +356,7 @@ class FilteredScan(LogicalOperator):
         logical_op_params = super().get_logical_op_params()
         logical_op_params = {
             "filter": self.filter,
+            "desc": self.desc,
             **logical_op_params,
         }
 
@@ -390,16 +398,17 @@ class GroupByAggregate(LogicalOperator):
 
 
 class JoinOp(LogicalOperator):
-    def __init__(self, condition: str, *args, **kwargs):
+    def __init__(self, condition: str, desc: str | None = None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.condition = condition
+        self.desc = desc
 
     def __str__(self):
         return f"Join(condition={self.condition})"
 
     def get_logical_id_params(self) -> dict:
         logical_id_params = super().get_logical_id_params()
-        logical_id_params = {"condition": self.condition, **logical_id_params}
+        logical_id_params = {"condition": self.condition, "desc": self.desc, **logical_id_params}
 
         return logical_id_params
 
@@ -407,6 +416,7 @@ class JoinOp(LogicalOperator):
         logical_op_params = super().get_logical_op_params()
         logical_op_params = {
             "condition": self.condition,
+            "desc": self.desc,
             **logical_op_params,
         }
 

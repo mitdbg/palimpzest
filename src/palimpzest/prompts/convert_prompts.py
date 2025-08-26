@@ -53,7 +53,7 @@ ANSWER:
 COT_QA_BASE_USER_PROMPT = """You are a helpful assistant whose job is to {job_instruction}.
 You will be presented with a context and a set of output fields to generate. Your task is to generate a JSON object which fills in the output fields with the correct values.
 You will be provided with a description of each input field and each output field. All of the fields in the output JSON object can be derived using information from the context.
-
+{desc_section}
 {output_format_instruction} Finish your response with a newline character followed by ---
 ---
 INPUT FIELDS:
@@ -72,7 +72,7 @@ REASONING: """
 COT_QA_NO_REASONING_BASE_USER_PROMPT = """You are a helpful assistant whose job is to {job_instruction}.
 You will be presented with a context and a set of output fields to generate. Your task is to generate a JSON object which fills in the output fields with the correct values.
 You will be provided with a description of each input field and each output field. All of the fields in the output JSON object can be derived using information from the context.
-
+{desc_section}
 {output_format_instruction} Finish your response with a newline character followed by ---
 ---
 INPUT FIELDS:

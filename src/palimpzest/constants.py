@@ -18,8 +18,12 @@ class Model(str, Enum):
     DEEPSEEK_R1_DISTILL_QWEN_1_5B = "together_ai/deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"
     GPT_4o = "openai/gpt-4o-2024-08-06"
     GPT_4o_MINI = "openai/gpt-4o-mini-2024-07-18"
-    GPT_5 = "openai/gpt-5"
-    GPT_5_MINI = "openai/gpt-5-mini"
+    GPT_4_1 = "openai/gpt-4.1-2025-04-14"
+    GPT_4_1_MINI = "openai/gpt-4.1-mini-2025-04-14"
+    GPT_4_1_NANO = "openai/gpt-4.1-nano-2025-04-14"
+    GPT_5 = "openai/gpt-5-2025-08-07"
+    GPT_5_MINI = "openai/gpt-5-mini-2025-08-07"
+    GPT_5_NANO = "openai/gpt-5-nano-2025-08-07"
     o4_MINI = "openai/o4-mini-2025-04-16"  # noqa: N815
     TEXT_EMBEDDING_3_SMALL = "text-embedding-3-small"
     CLIP_VIT_B_32 = "clip-ViT-B-32"
@@ -29,6 +33,9 @@ class Model(str, Enum):
     GEMINI_2_0_FLASH = "vertex_ai/gemini-2.0-flash"
     GEMINI_2_5_FLASH = "vertex_ai/gemini-2.5-flash"
     GEMINI_2_5_PRO = "vertex_ai/gemini-2.5-pro"
+    GOOGLE_GEMINI_2_5_FLASH = "google/gemini-2.5-flash"
+    GOOGLE_GEMINI_2_5_FLASH_LITE = "google/gemini-2.5-flash-lite"
+    GOOGLE_GEMINI_2_5_PRO = "google/gemini-2.5-pro"
     LLAMA_4_MAVERICK = "vertex_ai/meta/llama-4-maverick-17b-128e-instruct-maas"
     GPT_4o_AUDIO_PREVIEW = "openai/gpt-4o-audio-preview"
     GPT_4o_MINI_AUDIO_PREVIEW = "openai/gpt-4o-mini-audio-preview"
@@ -54,7 +61,7 @@ class Model(str, Enum):
         return self in [Model.o4_MINI]
 
     def is_gpt_5_model(self):
-        return self in [Model.GPT_5, Model.GPT_5_MINI]
+        return self in [Model.GPT_5, Model.GPT_5_MINI, Model.GPT_5_NANO]
 
     def is_openai_model(self):
         return "openai" in self.value.lower() or self.is_text_embedding_model()
@@ -65,6 +72,9 @@ class Model(str, Enum):
     def is_vertex_model(self):
         return "vertex_ai" in self.value.lower()
 
+    def is_google_model(self):
+        return "google" in self.value.lower()
+
     def is_vllm_model(self):
         return "hosted_vllm" in self.value.lower()
 
@@ -72,6 +82,7 @@ class Model(str, Enum):
         reasoning_models = [
             Model.GPT_5, Model.GPT_5_MINI, Model.o4_MINI,
             Model.GEMINI_2_5_PRO, Model.GEMINI_2_5_FLASH,
+            Model.GOOGLE_GEMINI_2_5_PRO, Model.GOOGLE_GEMINI_2_5_FLASH, Model.GOOGLE_GEMINI_2_5_FLASH_LITE,
             Model.CLAUDE_3_7_SONNET,
         ]
         return self in reasoning_models
@@ -88,27 +99,31 @@ class Model(str, Enum):
     def is_vision_model(self):
         return self in [
             Model.LLAMA3_2_90B_V, Model.LLAMA_4_MAVERICK,
-            Model.GPT_4o, Model.GPT_4o_MINI, Model.o4_MINI, Model.GPT_5, Model.GPT_5_MINI,
+            Model.GPT_4o, Model.GPT_4o_MINI, Model.GPT_4_1, Model.GPT_4_1_MINI, Model.GPT_4_1_NANO, Model.o4_MINI, Model.GPT_5, Model.GPT_5_MINI, Model.GPT_5_NANO,
             Model.GEMINI_2_0_FLASH, Model.GEMINI_2_5_FLASH, Model.GEMINI_2_5_PRO,
+            Model.GOOGLE_GEMINI_2_5_PRO, Model.GOOGLE_GEMINI_2_5_FLASH, Model.GOOGLE_GEMINI_2_5_FLASH_LITE,
         ]
 
     def is_audio_model(self):
         return self in [
             Model.GPT_4o_AUDIO_PREVIEW, Model.GPT_4o_MINI_AUDIO_PREVIEW,
             Model.GEMINI_2_0_FLASH, Model.GEMINI_2_5_FLASH, Model.GEMINI_2_5_PRO,
+            Model.GOOGLE_GEMINI_2_5_PRO, Model.GOOGLE_GEMINI_2_5_FLASH, Model.GOOGLE_GEMINI_2_5_FLASH_LITE,
         ]
 
     def is_text_image_multimodal_model(self):
         return self in [
             Model.LLAMA_4_MAVERICK,
-            Model.GPT_4o, Model.GPT_4o_MINI, Model.o4_MINI, Model.GPT_5, Model.GPT_5_MINI,
+            Model.GPT_4o, Model.GPT_4o_MINI, Model.GPT_4_1, Model.GPT_4_1_MINI, Model.GPT_4_1_NANO, Model.o4_MINI, Model.GPT_5, Model.GPT_5_MINI, Model.GPT_5_NANO,
             Model.GEMINI_2_0_FLASH, Model.GEMINI_2_5_FLASH, Model.GEMINI_2_5_PRO,
+            Model.GOOGLE_GEMINI_2_5_PRO, Model.GOOGLE_GEMINI_2_5_FLASH, Model.GOOGLE_GEMINI_2_5_FLASH_LITE,
         ]
 
     def is_text_audio_multimodal_model(self):
         return self in [
             Model.GPT_4o_AUDIO_PREVIEW, Model.GPT_4o_MINI_AUDIO_PREVIEW,
             Model.GEMINI_2_0_FLASH, Model.GEMINI_2_5_FLASH, Model.GEMINI_2_5_PRO,
+            Model.GOOGLE_GEMINI_2_5_PRO, Model.GOOGLE_GEMINI_2_5_FLASH, Model.GOOGLE_GEMINI_2_5_FLASH_LITE,
         ]
 
     def is_embedding_model(self):
@@ -327,7 +342,7 @@ LLAMA3_2_3B_INSTRUCT_MODEL_CARD = {
     "usd_per_input_token": 0.06 / 1e6,
     "usd_per_output_token": 0.06 / 1e6,
     ##### Time #####
-    "seconds_per_output_token": 0.0064,
+    "seconds_per_output_token": 0.0079,
     ##### Agg. Benchmark #####
     "overall": 36.50, # https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct/discussions/13
 }
@@ -336,7 +351,7 @@ LLAMA3_1_8B_INSTRUCT_MODEL_CARD = {
     "usd_per_input_token": 0.18 / 1e6,
     "usd_per_output_token": 0.18 / 1e6,
     ##### Time #####
-    "seconds_per_output_token": 0.0059,
+    "seconds_per_output_token": 0.0050,
     ##### Agg. Benchmark #####
     "overall": 44.25,
 }
@@ -345,7 +360,7 @@ LLAMA3_3_70B_INSTRUCT_MODEL_CARD = {
     "usd_per_input_token": 0.88 / 1e6,
     "usd_per_output_token": 0.88 / 1e6,
     ##### Time #####
-    "seconds_per_output_token": 0.0139,
+    "seconds_per_output_token": 0.0122,
     ##### Agg. Benchmark #####
     "overall": 69.9,
 }
@@ -354,7 +369,7 @@ LLAMA3_2_90B_V_MODEL_CARD = {
     "usd_per_input_token": 1.2 / 1e6,
     "usd_per_output_token": 1.2 / 1e6,
     ##### Time #####
-    "seconds_per_output_token": 0.0222,
+    "seconds_per_output_token": 0.0303,
     ##### Agg. Benchmark #####
     "overall": 65.00, # set to be slightly higher than gpt-4o-mini
 }
@@ -363,7 +378,7 @@ DEEPSEEK_V3_MODEL_CARD = {
     "usd_per_input_token": 1.25 / 1E6,
     "usd_per_output_token": 1.25 / 1E6,
     ##### Time #####
-    "seconds_per_output_token": 0.0769,
+    "seconds_per_output_token": 0.0114,
     ##### Agg. Benchmark #####
     "overall": 73.8,
 }
@@ -372,7 +387,7 @@ DEEPSEEK_R1_DISTILL_QWEN_1_5B_MODEL_CARD = {
     "usd_per_input_token": 0.18 / 1E6,
     "usd_per_output_token": 0.18 / 1E6,
     ##### Time #####
-    "seconds_per_output_token": 0.0026,
+    "seconds_per_output_token": 0.0050, # NOTE: copied to be same as LLAMA3_1_8B_INSTRUCT_MODEL_CARD; need to update when we have data
     ##### Agg. Benchmark #####
     "overall": 39.90, # https://www.reddit.com/r/LocalLLaMA/comments/1iserf9/deepseek_r1_distilled_models_mmlu_pro_benchmarks/
 }
@@ -382,7 +397,7 @@ GPT_4o_AUDIO_PREVIEW_MODEL_CARD = {
     "usd_per_audio_input_token": 2.5 / 1e6,
     "usd_per_output_token": 10.0 / 1e6,
     ##### Time #####
-    "seconds_per_output_token": 0.0079,
+    "seconds_per_output_token": 0.0080,
     ##### Agg. Benchmark #####
     "overall": 74.1,
 }
@@ -392,7 +407,7 @@ GPT_4o_MINI_AUDIO_PREVIEW_MODEL_CARD = {
     "usd_per_audio_input_token": 0.15 / 1e6,
     "usd_per_output_token": 0.6 / 1e6,
     ##### Time #####
-    "seconds_per_output_token": 0.0098,
+    "seconds_per_output_token": 0.0159,
     ##### Agg. Benchmark #####
     "overall": 62.7,
 }
@@ -402,7 +417,7 @@ GPT_4o_MODEL_CARD = {
     "usd_per_input_token": 2.5 / 1e6,
     "usd_per_output_token": 10.0 / 1e6,
     ##### Time #####
-    "seconds_per_output_token": 0.0079,
+    "seconds_per_output_token": 0.0080,
     ##### Agg. Benchmark #####
     "overall": 74.1,
 }
@@ -412,9 +427,39 @@ GPT_4o_MINI_MODEL_CARD = {
     "usd_per_input_token": 0.15 / 1e6,
     "usd_per_output_token": 0.6 / 1e6,
     ##### Time #####
-    "seconds_per_output_token": 0.0098,
+    "seconds_per_output_token": 0.0159,
     ##### Agg. Benchmark #####
     "overall": 62.7,
+}
+GPT_4_1_MODEL_CARD = {
+    # NOTE: it is unclear if the same ($ / token) costs can be applied for vision, or if we have to calculate this ourselves
+    ##### Cost in USD #####
+    "usd_per_input_token": 2.0 / 1e6,
+    "usd_per_output_token": 8.0 / 1e6,
+    ##### Time #####
+    "seconds_per_output_token": 0.0076,
+    ##### Agg. Benchmark #####
+    "overall": 80.5,
+}
+GPT_4_1_MINI_MODEL_CARD = {
+    # NOTE: it is unclear if the same ($ / token) costs can be applied for vision, or if we have to calculate this ourselves
+    ##### Cost in USD #####
+    "usd_per_input_token": 0.4 / 1e6,
+    "usd_per_output_token": 1.6 / 1e6,
+    ##### Time #####
+    "seconds_per_output_token": 0.0161,
+    ##### Agg. Benchmark #####
+    "overall": 77.2,
+}
+GPT_4_1_NANO_MODEL_CARD = {
+    # NOTE: it is unclear if the same ($ / token) costs can be applied for vision, or if we have to calculate this ourselves
+    ##### Cost in USD #####
+    "usd_per_input_token": 0.1 / 1e6,
+    "usd_per_output_token": 0.4 / 1e6,
+    ##### Time #####
+    "seconds_per_output_token": 0.0060,
+    ##### Agg. Benchmark #####
+    "overall": 62.3,
 }
 GPT_5_MODEL_CARD = {
     # NOTE: it is unclear if the same ($ / token) costs can be applied for vision, or if we have to calculate this ourselves
@@ -422,7 +467,7 @@ GPT_5_MODEL_CARD = {
     "usd_per_input_token": 1.25 / 1e6,
     "usd_per_output_token": 10.0 / 1e6,
     ##### Time #####
-    "seconds_per_output_token": 0.0139,
+    "seconds_per_output_token": 0.0060,
     ##### Agg. Benchmark #####
     "overall": 87.00,
 }
@@ -432,9 +477,19 @@ GPT_5_MINI_MODEL_CARD = {
     "usd_per_input_token": 0.25 / 1e6,
     "usd_per_output_token": 2.0 / 1e6,
     ##### Time #####
-    "seconds_per_output_token": 0.0094,
+    "seconds_per_output_token": 0.0135,
     ##### Agg. Benchmark #####
     "overall": 82.50,
+}
+GPT_5_NANO_MODEL_CARD = {
+    # NOTE: it is unclear if the same ($ / token) costs can be applied for vision, or if we have to calculate this ourselves
+    ##### Cost in USD #####
+    "usd_per_input_token": 0.05 / 1e6,
+    "usd_per_output_token": 0.4 / 1e6,
+    ##### Time #####
+    "seconds_per_output_token": 0.0055,
+    ##### Agg. Benchmark #####
+    "overall": 77.9,
 }
 o4_MINI_MODEL_CARD = {  # noqa: N816
     # NOTE: it is unclear if the same ($ / token) costs can be applied for vision, or if we have to calculate this ourselves
@@ -442,20 +497,20 @@ o4_MINI_MODEL_CARD = {  # noqa: N816
     "usd_per_input_token": 1.1 / 1e6,
     "usd_per_output_token": 4.4 / 1e6,
     ##### Time #####
-    "seconds_per_output_token": 0.0093,
+    "seconds_per_output_token": 0.0092,
     ##### Agg. Benchmark #####
     "overall": 80.6,  # using number reported for o3-mini; true number is likely higher
 }
-o1_MODEL_CARD = {  # noqa: N816
-    # NOTE: it is unclear if the same ($ / token) costs can be applied for vision, or if we have to calculate this ourselves
-    ##### Cost in USD #####
-    "usd_per_input_token": 15 / 1e6,
-    "usd_per_output_token": 60 / 1e6,
-    ##### Time #####
-    "seconds_per_output_token": 0.0110,
-    ##### Agg. Benchmark #####
-    "overall": 83.50,
-}
+# o1_MODEL_CARD = {  # noqa: N816
+#     # NOTE: it is unclear if the same ($ / token) costs can be applied for vision, or if we have to calculate this ourselves
+#     ##### Cost in USD #####
+#     "usd_per_input_token": 15 / 1e6,
+#     "usd_per_output_token": 60 / 1e6,
+#     ##### Time #####
+#     "seconds_per_output_token": 0.0110,
+#     ##### Agg. Benchmark #####
+#     "overall": 83.50,
+# }
 TEXT_EMBEDDING_3_SMALL_MODEL_CARD = {
     ##### Cost in USD #####
     "usd_per_input_token": 0.02 / 1e6,
@@ -479,7 +534,7 @@ CLAUDE_3_5_SONNET_MODEL_CARD = {
     "usd_per_input_token": 3.0 / 1e6,
     "usd_per_output_token": 15.0 / 1e6,
     ##### Time #####
-    "seconds_per_output_token": 0.0127,
+    "seconds_per_output_token": 0.0154,
     ##### Agg. Benchmark #####
     "overall": 78.4,
 }
@@ -488,7 +543,7 @@ CLAUDE_3_7_SONNET_MODEL_CARD = {
     "usd_per_input_token": 3.0 / 1e6,
     "usd_per_output_token": 15.0 / 1e6,
     ##### Time #####
-    "seconds_per_output_token": 0.0130,
+    "seconds_per_output_token": 0.0156,
     ##### Agg. Benchmark #####
     "overall": 80.7,
 }
@@ -497,7 +552,7 @@ CLAUDE_3_5_HAIKU_MODEL_CARD = {
     "usd_per_input_token": 0.8 / 1e6,
     "usd_per_output_token": 4.0 / 1e6,
     ##### Time #####
-    "seconds_per_output_token": 0.0152,
+    "seconds_per_output_token": 0.0189,
     ##### Agg. Benchmark #####
     "overall": 64.1,
 }
@@ -507,9 +562,19 @@ GEMINI_2_0_FLASH_MODEL_CARD = {
     "usd_per_output_token": 0.6 / 1e6,
     "usd_per_audio_input_token": 1.0 / 1e6,
     ##### Time #####
-    "seconds_per_output_token": 0.0049,
+    "seconds_per_output_token": 0.0054,
     ##### Agg. Benchmark #####
     "overall": 77.40,
+}
+GEMINI_2_5_FLASH_LITE_MODEL_CARD = {
+    ##### Cost in USD #####
+    "usd_per_input_token": 0.1 / 1e6,
+    "usd_per_output_token": 0.4 / 1e6,
+    "usd_per_audio_input_token": 0.3 / 1e6,
+    ##### Time #####
+    "seconds_per_output_token": 0.0034,
+    ##### Agg. Benchmark #####
+    "overall": 79.1, # NOTE: interpolated between gemini 2.5 flash and gemini 2.0 flash
 }
 GEMINI_2_5_FLASH_MODEL_CARD = {
     ##### Cost in USD #####
@@ -517,7 +582,7 @@ GEMINI_2_5_FLASH_MODEL_CARD = {
     "usd_per_output_token": 2.5 / 1e6,
     "usd_per_audio_input_token": 1.0 / 1e6,
     ##### Time #####
-    "seconds_per_output_token": 0.0039,
+    "seconds_per_output_token": 0.0044,
     ##### Agg. Benchmark #####
     "overall": 80.75, # NOTE: interpolated between gemini 2.0 flash and gemini 2.5 pro
 }
@@ -527,7 +592,7 @@ GEMINI_2_5_PRO_MODEL_CARD = {
     "usd_per_output_token": 10.0 / 1e6,
     "usd_per_audio_input_token": 1.25 / 1e6,
     ##### Time #####
-    "seconds_per_output_token": 0.0070,
+    "seconds_per_output_token": 0.0072,
     ##### Agg. Benchmark #####
     "overall": 84.10,
 }
@@ -536,7 +601,7 @@ LLAMA_4_MAVERICK_MODEL_CARD = {
     "usd_per_input_token": 0.35 / 1e6,
     "usd_per_output_token": 1.15 / 1e6,
     ##### Time #####
-    "seconds_per_output_token": 0.0058,
+    "seconds_per_output_token": 0.0122,
     ##### Agg. Benchmark #####
     "overall": 79.4,
 }
@@ -561,8 +626,12 @@ MODEL_CARDS = {
     Model.GPT_4o_MINI.value: GPT_4o_MINI_MODEL_CARD,
     Model.GPT_4o_AUDIO_PREVIEW.value: GPT_4o_AUDIO_PREVIEW_MODEL_CARD,
     Model.GPT_4o_MINI_AUDIO_PREVIEW.value: GPT_4o_MINI_AUDIO_PREVIEW_MODEL_CARD,
+    Model.GPT_4_1.value: GPT_4_1_MODEL_CARD,
+    Model.GPT_4_1_MINI.value: GPT_4_1_MINI_MODEL_CARD,
+    Model.GPT_4_1_NANO.value: GPT_4_1_NANO_MODEL_CARD,
     Model.GPT_5.value: GPT_5_MODEL_CARD,
     Model.GPT_5_MINI.value: GPT_5_MINI_MODEL_CARD,
+    Model.GPT_5_NANO.value: GPT_5_NANO_MODEL_CARD,
     Model.o4_MINI.value: o4_MINI_MODEL_CARD,
     # Model.o1.value: o1_MODEL_CARD,
     Model.TEXT_EMBEDDING_3_SMALL.value: TEXT_EMBEDDING_3_SMALL_MODEL_CARD,
@@ -573,6 +642,9 @@ MODEL_CARDS = {
     Model.GEMINI_2_0_FLASH.value: GEMINI_2_0_FLASH_MODEL_CARD,
     Model.GEMINI_2_5_FLASH.value: GEMINI_2_5_FLASH_MODEL_CARD,
     Model.GEMINI_2_5_PRO.value: GEMINI_2_5_PRO_MODEL_CARD,
+    Model.GOOGLE_GEMINI_2_5_FLASH.value: GEMINI_2_5_FLASH_MODEL_CARD,
+    Model.GOOGLE_GEMINI_2_5_FLASH_LITE.value: GEMINI_2_5_FLASH_LITE_MODEL_CARD,
+    Model.GOOGLE_GEMINI_2_5_PRO.value: GEMINI_2_5_PRO_MODEL_CARD,
     Model.LLAMA_4_MAVERICK.value: LLAMA_4_MAVERICK_MODEL_CARD,
     Model.VLLM_QWEN_1_5_0_5B_CHAT.value: VLLM_QWEN_1_5_0_5B_CHAT_MODEL_CARD,
 }
