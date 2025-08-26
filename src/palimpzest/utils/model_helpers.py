@@ -3,7 +3,8 @@ import os
 from palimpzest.constants import Model
 
 
-def get_models(include_embedding: bool = False, gemini_credentials_path: str | None = None, api_base: str | None = None) -> list[Model]:
+# TODO: better handle vertex vs. google for gemini models
+def get_models(include_embedding: bool = False, use_vertex: bool = True, gemini_credentials_path: str | None = None, api_base: str | None = None) -> list[Model]:
     """
     Return the set of models which the system has access to based on the set environment variables.
     """
@@ -39,11 +40,15 @@ def get_models(include_embedding: bool = False, gemini_credentials_path: str | N
     )
     if os.getenv("GEMINI_API_KEY") is not None or os.path.exists(gemini_credentials_path):
         vertex_models = [model for model in Model if model.is_vertex_model()]
+        google_models = [model for model in Model if model.is_google_model()]
         if not include_embedding:
             vertex_models = [
                 model for model in vertex_models if not model.is_embedding_model()
             ]
-        models.extend(vertex_models)
+        if use_vertex:
+            models.extend(vertex_models)
+        else:
+            models.extend(google_models)
 
     if api_base is not None:
         vllm_models = [model for model in Model if model.is_vllm_model()]

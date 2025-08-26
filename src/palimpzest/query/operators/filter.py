@@ -22,10 +22,11 @@ from palimpzest.query.operators.physical import PhysicalOperator
 
 
 class FilterOp(PhysicalOperator, ABC):
-    def __init__(self, filter: Filter, *args, **kwargs):
+    def __init__(self, filter: Filter, desc: str | None = None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         assert self.input_schema == self.output_schema, "Input and output schemas must match for FilterOp"
         self.filter_obj = filter
+        self.desc = desc
 
     def __str__(self):
         op = super().__str__()
@@ -34,11 +35,11 @@ class FilterOp(PhysicalOperator, ABC):
 
     def get_id_params(self):
         id_params = super().get_id_params()
-        return {"filter": str(self.filter_obj), **id_params}
+        return {"filter": str(self.filter_obj), "desc": self.desc, **id_params}
 
     def get_op_params(self):
         op_params = super().get_op_params()
-        return {"filter": self.filter_obj, **op_params}
+        return {"filter": self.filter_obj, "desc": self.desc, **op_params}
 
     @abstractmethod
     def is_image_filter(self) -> bool:
@@ -182,7 +183,7 @@ class LLMFilter(FilterOp):
         self.model = model
         self.prompt_strategy = prompt_strategy
         self.reasoning_effort = reasoning_effort
-        self.generator = Generator(model, prompt_strategy, reasoning_effort, self.api_base, Cardinality.ONE_TO_ONE, self.verbose)
+        self.generator = Generator(model, prompt_strategy, reasoning_effort, self.api_base, Cardinality.ONE_TO_ONE, self.desc, self.verbose)
 
     def get_id_params(self):
         id_params = super().get_id_params()

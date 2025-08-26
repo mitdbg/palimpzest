@@ -21,10 +21,11 @@ from palimpzest.query.operators.physical import PhysicalOperator
 
 
 class JoinOp(PhysicalOperator, ABC):
-    def __init__(self, condition: str, *args, **kwargs):
+    def __init__(self, condition: str, desc: str | None = None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         assert self.input_schema == self.output_schema, "Input and output schemas must match for JoinOp"
         self.condition = condition
+        self.desc = desc
 
     def __str__(self):
         op = super().__str__()
@@ -33,11 +34,11 @@ class JoinOp(PhysicalOperator, ABC):
 
     def get_id_params(self):
         id_params = super().get_id_params()
-        return {"condition": self.condition, **id_params}
+        return {"condition": self.condition, "desc": self.desc, **id_params}
 
     def get_op_params(self):
         op_params = super().get_op_params()
-        return {"condition": self.condition, **op_params}
+        return {"condition": self.condition, "desc": self.desc, **op_params}
 
     @abstractmethod
     def is_image_join(self) -> bool:
@@ -64,7 +65,7 @@ class BlockingNestedLoopsJoin(JoinOp):
         self.prompt_strategy = prompt_strategy
         self.join_parallelism = join_parallelism
         self.reasoning_effort = reasoning_effort
-        self.generator = Generator(model, prompt_strategy, reasoning_effort, self.api_base, Cardinality.ONE_TO_ONE, self.verbose)
+        self.generator = Generator(model, prompt_strategy, reasoning_effort, self.api_base, Cardinality.ONE_TO_ONE, self.desc, self.verbose)
         self.join_idx = 0
 
     def get_id_params(self):
@@ -228,7 +229,7 @@ class NestedLoopsJoin(JoinOp):
         self.prompt_strategy = prompt_strategy
         self.join_parallelism = join_parallelism
         self.reasoning_effort = reasoning_effort
-        self.generator = Generator(model, prompt_strategy, reasoning_effort, self.api_base, Cardinality.ONE_TO_ONE, self.verbose)
+        self.generator = Generator(model, prompt_strategy, reasoning_effort, self.api_base, Cardinality.ONE_TO_ONE, self.desc, self.verbose)
         self.join_idx = 0
 
         # maintain list(s) of input records for the join

@@ -27,7 +27,7 @@ ANSWER: {example_answer}
 COT_SPLIT_PROPOSER_BASE_USER_PROMPT = """You are a helpful assistant whose job is to {job_instruction}.
 You will be presented with a context and a set of output fields to generate. Your task is to generate a paragraph or two which describes what you believe is the correct value for each output field.
 Be sure to cite information from the context as evidence of why your answers are correct. Do not hallucinate evidence.
-
+{desc_section}
 You will be provided with a description of each input field and each output field.
 ---
 INPUT FIELDS:

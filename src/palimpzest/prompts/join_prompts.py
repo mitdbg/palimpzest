@@ -57,7 +57,7 @@ ANSWER: TRUE
 
 COT_JOIN_BASE_USER_PROMPT = """You are a helpful assistant whose job is to {job_instruction}.
 You will be presented with two data records and a join condition. Output TRUE if the two data records satisfy the join condition, and FALSE otherwise.
-
+{desc_section}
 Remember, your answer must be TRUE or FALSE. Finish your response with a newline character followed by ---
 ---
 LEFT INPUT FIELDS:
@@ -80,7 +80,7 @@ REASONING: """
 
 COT_JOIN_NO_REASONING_BASE_USER_PROMPT = """You are a helpful assistant whose job is to {job_instruction}.
 You will be presented with two data records and a join condition. Output TRUE if the two data records satisfy the join condition, and FALSE otherwise.
-
+{desc_section}
 Remember, your answer must be TRUE or FALSE. Finish your response with a newline character followed by ---
 ---
 LEFT INPUT FIELDS:

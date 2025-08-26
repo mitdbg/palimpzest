@@ -12,3 +12,8 @@ REASONING: """
 COT_ANSWER_INSTRUCTION = """Let's think step-by-step in order to answer the question.
 
 ANSWER: """
+
+DESC_SECTION = """
+The user has additionally provided you with this description of the task you need to perform:
+{desc}
+"""
