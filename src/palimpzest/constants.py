@@ -80,7 +80,7 @@ class Model(str, Enum):
 
     def is_reasoning_model(self):
         reasoning_models = [
-            Model.GPT_5, Model.GPT_5_MINI, Model.o4_MINI,
+            Model.GPT_5, Model.GPT_5_MINI, Model.GPT_5_NANO, Model.o4_MINI,
             Model.GEMINI_2_5_PRO, Model.GEMINI_2_5_FLASH,
             Model.GOOGLE_GEMINI_2_5_PRO, Model.GOOGLE_GEMINI_2_5_FLASH, Model.GOOGLE_GEMINI_2_5_FLASH_LITE,
             Model.CLAUDE_3_7_SONNET,
