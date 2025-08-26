@@ -45,7 +45,7 @@ ANSWER: TRUE
 
 COT_BOOL_BASE_USER_PROMPT = """You are a helpful assistant whose job is to {job_instruction}.
 You will be presented with a context and a filter condition. Output TRUE if the context satisfies the filter condition, and FALSE otherwise.
-
+{desc_section}
 Remember, your answer must be TRUE or FALSE. Finish your response with a newline character followed by ---
 ---
 INPUT FIELDS:
@@ -62,7 +62,7 @@ REASONING: """
 
 COT_BOOL_NO_REASONING_BASE_USER_PROMPT = """You are a helpful assistant whose job is to {job_instruction}.
 You will be presented with a context and a filter condition. Output TRUE if the context satisfies the filter condition, and FALSE otherwise.
-
+{desc_section}
 Remember, your answer must be TRUE or FALSE. Finish your response with a newline character followed by ---
 ---
 INPUT FIELDS:

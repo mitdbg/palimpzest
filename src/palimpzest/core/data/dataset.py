@@ -228,7 +228,7 @@ class Dataset:
             id=self.id,
         )
 
-    def sem_join(self, other: Dataset, condition: str, depends_on: str | list[str] | None = None) -> Dataset:
+    def sem_join(self, other: Dataset, condition: str, desc: str | None = None, depends_on: str | list[str] | None = None) -> Dataset:
         """
         Perform a semantic (inner) join on the specified join predicate
         """
@@ -244,6 +244,7 @@ class Dataset:
             input_schema=combined_schema,
             output_schema=combined_schema,
             condition=condition,
+            desc=desc,
             depends_on=depends_on,
         )
 
@@ -277,6 +278,7 @@ class Dataset:
     def sem_filter(
         self,
         filter: str,
+        desc: str | None = None,
         depends_on: str | list[str] | None = None,
     ) -> Dataset:
         """Add a natural language description of a filter to the Set. This filter will possibly restrict the items that are returned later."""
@@ -292,12 +294,13 @@ class Dataset:
             depends_on = [depends_on]
 
         # construct logical operator
-        operator = FilteredScan(input_schema=self.schema, output_schema=self.schema, filter=f, depends_on=depends_on)
+        operator = FilteredScan(input_schema=self.schema, output_schema=self.schema, filter=f, desc=desc, depends_on=depends_on)
 
         return Dataset(sources=[self], operator=operator, schema=self.schema)
 
     def _sem_map(self, cols: list[dict] | type[BaseModel] | None,
                  cardinality: Cardinality,
+                 desc: str | None = None,
                  depends_on: str | list[str] | None = None) -> Dataset:
         """Execute the semantic map operation with the appropriate cardinality."""
         # construct new output schema
@@ -322,6 +325,7 @@ class Dataset:
             output_schema=new_output_schema,
             cardinality=cardinality,
             udf=None,
+            desc=desc,
             depends_on=depends_on,
         )
 
@@ -330,6 +334,7 @@ class Dataset:
 
     def sem_add_columns(self, cols: list[dict] | type[BaseModel],
                         cardinality: Cardinality = Cardinality.ONE_TO_ONE,
+                        desc: str | None = None,
                         depends_on: str | list[str] | None = None) -> Dataset:
         """
         NOTE: we are renaming this function to `sem_map` and deprecating `sem_add_columns` in the next
@@ -354,9 +359,9 @@ class Dataset:
             stacklevel=2
         )
 
-        return self._sem_map(cols, cardinality, depends_on)
+        return self._sem_map(cols, cardinality, desc, depends_on)
 
-    def sem_map(self, cols: list[dict] | type[BaseModel], depends_on: str | list[str] | None = None) -> Dataset:
+    def sem_map(self, cols: list[dict] | type[BaseModel], desc: str | None = None, depends_on: str | list[str] | None = None) -> Dataset:
         """
         Compute new field(s) by specifying their names, descriptions, and types. For each input there will
         be one output. The field(s) will be computed during the execution of the Dataset.
@@ -368,9 +373,9 @@ class Dataset:
                  {'name': 'full_name', 'desc': 'The name of the person', 'type': str}]
             )
         """
-        return self._sem_map(cols, Cardinality.ONE_TO_ONE, depends_on)
+        return self._sem_map(cols, Cardinality.ONE_TO_ONE, desc, depends_on)
 
-    def sem_flat_map(self, cols: list[dict] | type[BaseModel], depends_on: str | list[str] | None = None) -> Dataset:
+    def sem_flat_map(self, cols: list[dict] | type[BaseModel], desc: str | None = None, depends_on: str | list[str] | None = None) -> Dataset:
         """
         Compute new field(s) by specifying their names, descriptions, and types. For each input there will
         be one or more output(s). The field(s) will be computed during the execution of the Dataset.
@@ -384,7 +389,7 @@ class Dataset:
                 ]
             )
         """
-        return self._sem_map(cols, Cardinality.ONE_TO_MANY, depends_on)
+        return self._sem_map(cols, Cardinality.ONE_TO_MANY, desc, depends_on)
 
     def _map(self, udf: Callable,
             cols: list[dict] | type[BaseModel] | None,

@@ -36,10 +36,10 @@ class MixtureOfAgentsConvert(LLMConvert):
 
         # create generators
         self.proposer_generators = [
-            Generator(model, self.proposer_prompt_strategy, self.reasoning_effort, self.api_base, self.cardinality, self.verbose)
+            Generator(model, self.proposer_prompt_strategy, self.reasoning_effort, self.api_base, self.cardinality, self.desc, self.verbose)
             for model in proposer_models
         ]
-        self.aggregator_generator = Generator(aggregator_model, self.aggregator_prompt_strategy, self.reasoning_effort, self.api_base, self.cardinality, self.verbose)
+        self.aggregator_generator = Generator(aggregator_model, self.aggregator_prompt_strategy, self.reasoning_effort, self.api_base, self.cardinality, self.desc, self.verbose)
 
     def __str__(self):
         op = super().__str__()

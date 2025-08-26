@@ -138,6 +138,7 @@ from palimpzest.prompts.split_proposer_prompts import (
     SPLIT_PROPOSER_JOB_INSTRUCTION,
 )
 from palimpzest.prompts.util_phrases import (
+    DESC_SECTION,
     ONE_TO_MANY_OUTPUT_FORMAT_INSTRUCTION,
     ONE_TO_ONE_OUTPUT_FORMAT_INSTRUCTION,
 )
@@ -205,10 +206,11 @@ class PromptFactory:
         PromptStrategy.SPLIT_MERGER: COT_SPLIT_MERGER_BASE_USER_PROMPT,
     }
 
-    def __init__(self, prompt_strategy: PromptStrategy, model: Model, cardinality: Cardinality) -> None:
+    def __init__(self, prompt_strategy: PromptStrategy, model: Model, cardinality: Cardinality, desc: str | None = None) -> None:
         self.prompt_strategy = prompt_strategy
         self.model = model
         self.cardinality = cardinality
+        self.desc = desc
 
     def _get_context(self, candidate: DataRecord, input_fields: list[str]) -> str:
         """
@@ -445,6 +447,19 @@ class PromptFactory:
             PromptStrategy.SPLIT_PROPOSER: SPLIT_PROPOSER_JOB_INSTRUCTION,
         }
         return prompt_strategy_to_job_instruction.get(self.prompt_strategy)
+
+    def _get_desc_section(self) -> str:
+        """
+        Returns the description section for the prompt.
+
+        Returns:
+            str: The description section (if applicable).
+        """
+        desc_section = ""
+        if self.desc is not None:
+            desc_section = DESC_SECTION.format(desc=self.desc)
+
+        return desc_section
 
     def _get_critique_criteria(self) -> str | None:
         """
@@ -758,6 +773,7 @@ class PromptFactory:
         prompt_strategy_format_kwargs = {
             "output_format_instruction": self._get_output_format_instruction(),
             "job_instruction": self._get_job_instruction(),
+            "desc_section": self._get_desc_section(),
             "critique_criteria": self._get_critique_criteria(),
             "refinement_criteria": self._get_refinement_criteria(),
             "finish_instruction": self._get_finish_instruction(),
