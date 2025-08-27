@@ -163,7 +163,7 @@ class Validator:
             validator_op.model = Model.o4_MINI
             try:
                 target_record_set = validator_op(input_record)
-                label = target_record_set[0].passed_operator
+                label = target_record_set[0]._passed_operator
                 self.filter_cache[filter_input_hash] = label
                 score = label == output
                 record_op_stats = target_record_set.record_op_stats[0]
@@ -196,7 +196,7 @@ class Validator:
             validator_op.model = Model.o4_MINI
             try:
                 target_record_set = validator_op([left_input_record], [right_input_record])
-                label = target_record_set[0].passed_operator
+                label = target_record_set[0]._passed_operator
                 self.join_cache[join_input_hash] = label
                 score = label == output
                 record_op_stats = target_record_set.record_op_stats[0]

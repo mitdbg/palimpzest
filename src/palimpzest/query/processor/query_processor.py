@@ -114,8 +114,8 @@ class QueryProcessor:
         execution_stats = ExecutionStats(execution_id=self.execution_id())
         execution_stats.start()
 
-        # if the user provides a train_dataset or validator, we perform optimization
-        if self.train_dataset is not None or self.validator is not None:
+        # if the user provides a validator, we perform optimization
+        if self.validator is not None:
             # create sentinel plan
             sentinel_plan = self._create_sentinel_plan(self.train_dataset)
 

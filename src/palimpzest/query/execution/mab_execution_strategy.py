@@ -2,6 +2,7 @@
 import logging
 
 import numpy as np
+from chromadb.api.models.Collection import Collection
 
 from palimpzest.core.data.dataset import Dataset
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
@@ -9,9 +10,11 @@ from palimpzest.core.models import OperatorStats, RecordOpStats, SentinelPlanSta
 from palimpzest.policy import Policy
 from palimpzest.query.execution.execution_strategy import SentinelExecutionStrategy
 from palimpzest.query.operators.aggregate import AggregateOp
-from palimpzest.query.operators.filter import FilterOp
+from palimpzest.query.operators.convert import LLMConvert
+from palimpzest.query.operators.filter import FilterOp, LLMFilter
 from palimpzest.query.operators.join import JoinOp
 from palimpzest.query.operators.physical import PhysicalOperator
+from palimpzest.query.operators.retrieve import RetrieveOp
 from palimpzest.query.operators.scan import ContextScanOp, ScanPhysicalOp
 from palimpzest.query.optimizer.plan import SentinelPlan
 from palimpzest.utils.progress import create_progress_manager
@@ -74,6 +77,10 @@ class OpFrontier:
         self.is_filter_op = isinstance(sample_op, FilterOp)
         self.is_aggregate_op = isinstance(sample_op, AggregateOp)
         self.is_llm_join = isinstance(sample_op, JoinOp)
+        is_llm_convert = isinstance(sample_op, LLMConvert)
+        is_llm_filter = isinstance(sample_op, LLMFilter)
+        is_llm_retrieve = isinstance(sample_op, RetrieveOp) and isinstance(sample_op.index, Collection)
+        self.is_llm_op = is_llm_convert or is_llm_filter or is_llm_retrieve or self.is_llm_join
 
         # set the initial inputs for this logical operator; we maintain a mapping from source_unique_logical_op_id --> source_indices --> input;
         # for each unique source and (tuple of) source indices, we store its output, which is an input to this operator
@@ -215,7 +222,7 @@ class OpFrontier:
         op_source_indices_pairs = []
 
         # if this operator is not being optimized: we don't request inputs, but simply process what we are given / told to (in the case of scans)
-        if not self.is_llm_join and len(self.frontier_ops) == 1:
+        if not self.is_llm_op and len(self.frontier_ops) == 1:
             return [(self.frontier_ops[0], None)]
 
         # otherwise, sample (operator, source_indices) pairs
@@ -255,15 +262,15 @@ class OpFrontier:
                     all_inputs.extend(inputs)
             return [(op, tuple(), all_inputs)]
 
-        # if this is an un-optimized (non-scan, non-join) operator, flatten inputs and run on each one
-        elif not self.is_scan_op and not self.is_llm_join and len(self.frontier_ops) == 1:
-            op_inputs = []
-            op = self.frontier_ops[0]
-            for _, source_indices_to_inputs in self.source_indices_to_inputs.items():
-                for source_indices, inputs in source_indices_to_inputs.items():
-                    for input in inputs:
-                        op_inputs.append((op, source_indices, input))
-            return op_inputs
+        # # if this is an un-optimized (non-scan, non-llm) operator, flatten inputs and run on each one
+        # elif not self.is_scan_op and not self.is_llm_op and len(self.frontier_ops) == 1:
+        #     op_inputs = []
+        #     op = self.frontier_ops[0]
+        #     for _, source_indices_to_inputs in self.source_indices_to_inputs.items():
+        #         for source_indices, inputs in source_indices_to_inputs.items():
+        #             for input in inputs:
+        #                 op_inputs.append((op, source_indices, input))
+        #     return op_inputs
 
         ### for optimized operators
         # get the list of (op, source_indices) pairs which this operator needs to execute
@@ -583,10 +590,9 @@ class OpFrontier:
             input = []
             max_quality_record_set = self.pick_highest_quality_output(record_sets)
             for record in max_quality_record_set:
-                input.append(record if record.passed_operator else None)
+                input.append(record if record._passed_operator else None)
 
             self.source_indices_to_inputs[source_unique_logical_op_id][source_indices] = input
-
 
 class MABExecutionStrategy(SentinelExecutionStrategy):
     """

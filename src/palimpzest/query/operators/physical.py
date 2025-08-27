@@ -18,8 +18,8 @@ class PhysicalOperator:
 
     def __init__(
         self,
-        output_schema: BaseModel,
-        input_schema: BaseModel | None = None,
+        output_schema: type[BaseModel],
+        input_schema: type[BaseModel] | None = None,
         depends_on: list[str] | None = None,
         logical_op_id: str | None = None,
         unique_logical_op_id: str | None = None,

@@ -595,7 +595,7 @@ class Dataset:
 
         return QueryProcessorFactory.create_and_run_processor(self, config)
 
-    def optimize_and_run(self, train_dataset: dict[str, Dataset] | Dataset | None = None, validator: Validator | None = None, config: QueryProcessorConfig | None = None, **kwargs):
+    def optimize_and_run(self, config: QueryProcessorConfig | None = None, train_dataset: dict[str, Dataset] | Dataset | None = None, validator: Validator | None = None, **kwargs):
         """Optimize the PZ program using the train_dataset and validator before running the optimized plan."""
         # TODO: this import currently needs to be here to avoid a circular import; we should fix this in a subsequent PR
         from palimpzest.query.processor.query_processor_factory import QueryProcessorFactory

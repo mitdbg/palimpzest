@@ -159,9 +159,9 @@ class RetrieveOp(PhysicalOperator):
 
         # construct the RecordOpStats object
         record_op_stats = RecordOpStats(
-            record_id=output_dr.id,
-            record_parent_ids=output_dr.parent_ids,
-            record_source_indices=output_dr.source_indices,
+            record_id=output_dr._id,
+            record_parent_ids=output_dr._parent_ids,
+            record_source_indices=output_dr._source_indices,
             record_state=record_state,
             full_op_id=self.get_full_op_id(),
             logical_op_id=self.logical_op_id,

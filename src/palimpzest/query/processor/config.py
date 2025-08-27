@@ -40,8 +40,8 @@ class QueryProcessorConfig(BaseModel):
     use_final_op_quality: bool = Field(default=False)
 
     # sentinel optimization flags
-    k: int = Field(default=5)
-    j: int = Field(default=5)
+    k: int = Field(default=6)
+    j: int = Field(default=4)
     sample_budget: int = Field(default=100)
     seed: int = Field(default=42)
     exp_name: str | None = Field(default=None)
