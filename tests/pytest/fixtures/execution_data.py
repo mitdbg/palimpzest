@@ -40,11 +40,11 @@ def scan_convert_filter_execution_data(scan_convert_filter_sentinel_plan, foobar
     # create execution data entries for scan operator
     for scan_dr in scan_drs:
         full_op_id = op_sets[0][0].get_full_op_id()
-        source_idx = scan_dr.source_indices[0]
+        source_idx = scan_dr._source_indices[0]
         record_op_stats = RecordOpStats(
-            record_id=scan_dr.id,
-            record_parent_ids=scan_dr.parent_ids,
-            record_source_indices=scan_dr.source_indices,
+            record_id=scan_dr._id,
+            record_parent_ids=scan_dr._parent_ids,
+            record_source_indices=scan_dr._source_indices,
             full_op_id=full_op_id,
             op_name="MarshalAndScanDataOp",
             time_per_record=1.0,
@@ -64,9 +64,9 @@ def scan_convert_filter_execution_data(scan_convert_filter_sentinel_plan, foobar
             record_idx = op_idx * len(op_sets) + source_idx
             convert_dr = convert_drs[record_idx]
             record_op_stats = RecordOpStats(
-                record_id=convert_dr.id,
-                record_parent_ids=convert_dr.parent_ids,
-                record_source_indices=convert_dr.source_indices,
+                record_id=convert_dr._id,
+                record_parent_ids=convert_dr._parent_ids,
+                record_source_indices=convert_dr._source_indices,
                 full_op_id=full_op_id,
                 op_name="LLMConvertBonded",
                 time_per_record=1.0,
@@ -89,9 +89,9 @@ def scan_convert_filter_execution_data(scan_convert_filter_sentinel_plan, foobar
             record_idx = op_idx * len(op_sets) + source_idx
             filter_dr = filter_drs[record_idx]
             record_op_stats = RecordOpStats(
-                record_id=filter_dr.id,
-                record_parent_ids=filter_dr.parent_ids,
-                record_source_indices=filter_dr.source_indices,
+                record_id=filter_dr._id,
+                record_parent_ids=filter_dr._parent_ids,
+                record_source_indices=filter_dr._source_indices,
                 full_op_id=full_op_id,
                 op_name="LLMFilter",
                 time_per_record=1.0,
@@ -144,11 +144,11 @@ def scan_convert_filter_varied_execution_data(scan_convert_filter_sentinel_plan,
 
     # create execution data entries for scan operator
     for scan_dr in scan_drs:
-        source_idx = scan_dr.source_indices[0]
+        source_idx = scan_dr._source_indices[0]
         record_op_stats = RecordOpStats(
-            record_id=scan_dr.id,
-            record_parent_ids=scan_dr.parent_ids,
-            record_source_indices=scan_dr.source_indices,
+            record_id=scan_dr._id,
+            record_parent_ids=scan_dr._parent_ids,
+            record_source_indices=scan_dr._source_indices,
             full_op_id="scan1-phys",
             op_name="MarshalAndScanDataOp",
             time_per_record=1.0,
@@ -163,12 +163,12 @@ def scan_convert_filter_varied_execution_data(scan_convert_filter_sentinel_plan,
 
     # create execution data entries for convert operator
     for idx, convert_dr in enumerate(convert_drs):
-        source_idx = convert_dr.source_indices[0]
+        source_idx = convert_dr._source_indices[0]
         model = models[idx // 10]
         record_op_stats = RecordOpStats(
-            record_id=convert_dr.id,
-            record_parent_ids=convert_dr.parent_ids,
-            record_source_indices=convert_dr.source_indices,
+            record_id=convert_dr._id,
+            record_parent_ids=convert_dr._parent_ids,
+            record_source_indices=convert_dr._source_indices,
             full_op_id=f"convert1-phys-{str(model)}",
             op_name="LLMConvertBonded",
             time_per_record=1.0,
@@ -186,7 +186,7 @@ def scan_convert_filter_varied_execution_data(scan_convert_filter_sentinel_plan,
 
     # create execution data entries for filter operator
     for idx, filter_dr in enumerate(filter_drs):
-        source_idx = filter_dr.source_indices[0]
+        source_idx = filter_dr._source_indices[0]
         model = models[idx // 10]
 
         # GPT-4o passes odd examples
@@ -201,9 +201,9 @@ def scan_convert_filter_varied_execution_data(scan_convert_filter_sentinel_plan,
             passed_operator = True
 
         record_op_stats = RecordOpStats(
-            record_id=filter_dr.id,
-            record_parent_ids=filter_dr.parent_ids,
-            record_source_indices=filter_dr.source_indices,
+            record_id=filter_dr._id,
+            record_parent_ids=filter_dr._parent_ids,
+            record_source_indices=filter_dr._source_indices,
             full_op_id=f"filter1-phys-{str(model)}",
             op_name="LLMFilter",
             time_per_record=1.0,
@@ -275,11 +275,11 @@ def scan_multi_convert_multi_filter_execution_data(scan_multi_convert_multi_filt
 
     # create execution data entries for scan operator
     for scan_dr in scan_drs:
-        source_idx = scan_dr.source_indices[0]
+        source_idx = scan_dr._source_indices[0]
         record_op_stats = RecordOpStats(
-            record_id=scan_dr.id,
-            record_parent_ids=scan_dr.parent_ids,
-            record_source_indices=scan_dr.source_indices,
+            record_id=scan_dr._id,
+            record_parent_ids=scan_dr._parent_ids,
+            record_source_indices=scan_dr._source_indices,
             full_op_id="scan1-phys",
             op_name="MarshalAndScanDataOp",
             time_per_record=1.0,
@@ -299,11 +299,11 @@ def scan_multi_convert_multi_filter_execution_data(scan_multi_convert_multi_filt
             for one_to_many_idx in range(2):
                 abs_idx = model_idx * 20 + record_idx * 2 + one_to_many_idx
                 convert_dr = convert1_drs[abs_idx]
-                source_idx = convert_dr.source_indices[0]
+                source_idx = convert_dr._source_indices[0]
                 record_op_stats = RecordOpStats(
-                    record_id=convert_dr.id,
-                    record_parent_ids=convert_dr.parent_ids,
-                    record_source_indices=convert_dr.source_indices,
+                    record_id=convert_dr._id,
+                    record_parent_ids=convert_dr._parent_ids,
+                    record_source_indices=convert_dr._source_indices,
                     full_op_id=f"convert1-phys-{str(models[model_idx])}",
                     op_name="LLMConvertBonded",
                     time_per_record=1.0,
@@ -327,7 +327,7 @@ def scan_multi_convert_multi_filter_execution_data(scan_multi_convert_multi_filt
             for one_to_many_idx in range(2):
                 abs_idx = model_idx * 20 + record_idx * 2 + one_to_many_idx
                 filter_dr = filter1_drs[abs_idx]
-                source_idx = filter_dr.source_indices[0]
+                source_idx = filter_dr._source_indices[0]
                 model = models[model_idx]
 
                 # GPT-4 filters final 6 records it sees
@@ -343,9 +343,9 @@ def scan_multi_convert_multi_filter_execution_data(scan_multi_convert_multi_filt
                 # LLAMA3_1_8B passes all records
 
                 record_op_stats = RecordOpStats(
-                    record_id=filter_dr.id,
-                    record_parent_ids=filter_dr.parent_ids,
-                    record_source_indices=filter_dr.source_indices,
+                    record_id=filter_dr._id,
+                    record_parent_ids=filter_dr._parent_ids,
+                    record_source_indices=filter_dr._source_indices,
                     full_op_id=f"filter1-phys-{str(model)}",
                     op_name="LLMFilter",
                     time_per_record=1.0,
@@ -367,7 +367,7 @@ def scan_multi_convert_multi_filter_execution_data(scan_multi_convert_multi_filt
             for one_to_many_idx in range(2):
                 abs_idx = model_idx * 14 + record_idx * 2 + one_to_many_idx
                 filter_dr = filter2_drs[abs_idx]
-                source_idx = filter_dr.source_indices[0]
+                source_idx = filter_dr._source_indices[0]
                 model = models[model_idx]
 
                 # TODO: this makes # of records seen by convert2 more complicated
@@ -384,9 +384,9 @@ def scan_multi_convert_multi_filter_execution_data(scan_multi_convert_multi_filt
 
                 # filter out records with abs_idx >= 30
                 record_op_stats = RecordOpStats(
-                    record_id=filter_dr.id,
-                    record_parent_ids=filter_dr.parent_ids,
-                    record_source_indices=filter_dr.source_indices,
+                    record_id=filter_dr._id,
+                    record_parent_ids=filter_dr._parent_ids,
+                    record_source_indices=filter_dr._source_indices,
                     full_op_id=f"filter2-phys-{str(model)}",
                     op_name="LLMFilter",
                     time_per_record=1.0,
@@ -408,11 +408,11 @@ def scan_multi_convert_multi_filter_execution_data(scan_multi_convert_multi_filt
             for one_to_many_idx in range(2):
                 abs_idx = model_idx * 10 + record_idx * 2 + one_to_many_idx
                 convert_dr = convert2_drs[abs_idx]
-                source_idx = convert_dr.source_indices[0]
+                source_idx = convert_dr._source_indices[0]
                 record_op_stats = RecordOpStats(
-                    record_id=convert_dr.id,
-                    record_parent_ids=convert_dr.parent_ids,
-                    record_source_indices=convert_dr.source_indices,
+                    record_id=convert_dr._id,
+                    record_parent_ids=convert_dr._parent_ids,
+                    record_source_indices=convert_dr._source_indices,
                     full_op_id=f"convert1-phys-{str(models[model_idx])}",
                     op_name="LLMConvertBonded",
                     time_per_record=1.0,

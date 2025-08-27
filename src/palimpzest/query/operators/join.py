@@ -156,13 +156,13 @@ class BlockingNestedLoopsJoin(JoinOp):
 
         # compute output record and add to output_records
         join_dr = DataRecord.from_join_parents(self.output_schema, left_candidate, right_candidate)
-        join_dr.passed_operator = passed_operator
+        join_dr._passed_operator = passed_operator
 
         # compute record stats and add to output_record_op_stats
         record_op_stats = RecordOpStats(
-            record_id=join_dr.id,
-            record_parent_ids=join_dr.parent_ids,
-            record_source_indices=join_dr.source_indices,
+            record_id=join_dr._id,
+            record_parent_ids=join_dr._parent_ids,
+            record_source_indices=join_dr._source_indices,
             record_state=join_dr.to_dict(include_bytes=False),
             full_op_id=self.get_full_op_id(),
             logical_op_id=self.logical_op_id,
@@ -324,13 +324,13 @@ class NestedLoopsJoin(JoinOp):
 
         # compute output record and add to output_records
         join_dr = DataRecord.from_join_parents(self.output_schema, left_candidate, right_candidate)
-        join_dr.passed_operator = passed_operator
+        join_dr._passed_operator = passed_operator
 
         # compute record stats and add to output_record_op_stats
         record_op_stats = RecordOpStats(
-            record_id=join_dr.id,
-            record_parent_ids=join_dr.parent_ids,
-            record_source_indices=join_dr.source_indices,
+            record_id=join_dr._id,
+            record_parent_ids=join_dr._parent_ids,
+            record_source_indices=join_dr._source_indices,
             record_state=join_dr.to_dict(include_bytes=False),
             full_op_id=self.get_full_op_id(),
             logical_op_id=self.logical_op_id,

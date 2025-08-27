@@ -132,9 +132,9 @@ class ApplyGroupByOp(AggregateOp):
         record_op_stats_lst = []
         for dr in drs:
             record_op_stats = RecordOpStats(
-                record_id=dr.id,
-                record_parent_ids=dr.parent_ids,
-                record_source_indices=dr.source_indices,
+                record_id=dr._id,
+                record_parent_ids=dr._parent_ids,
+                record_source_indices=dr._source_indices,
                 record_state=dr.to_dict(include_bytes=False),
                 full_op_id=self.get_full_op_id(),
                 logical_op_id=self.logical_op_id,
@@ -209,9 +209,9 @@ class AverageAggregateOp(AggregateOp):
 
         # create RecordOpStats object
         record_op_stats = RecordOpStats(
-            record_id=dr.id,
-            record_parent_ids=dr.parent_ids,
-            record_source_indices=dr.source_indices,
+            record_id=dr._id,
+            record_parent_ids=dr._parent_ids,
+            record_source_indices=dr._source_indices,
             record_state=dr.to_dict(include_bytes=False),
             full_op_id=self.get_full_op_id(),
             logical_op_id=self.logical_op_id,
@@ -265,9 +265,9 @@ class CountAggregateOp(AggregateOp):
 
         # create RecordOpStats object
         record_op_stats = RecordOpStats(
-            record_id=dr.id,
-            record_parent_ids=dr.parent_ids,
-            record_source_indices=dr.source_indices,
+            record_id=dr._id,
+            record_parent_ids=dr._parent_ids,
+            record_source_indices=dr._source_indices,
             record_state=dr.to_dict(include_bytes=False),
             full_op_id=self.get_full_op_id(),
             logical_op_id=self.logical_op_id,

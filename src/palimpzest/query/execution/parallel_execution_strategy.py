@@ -77,7 +77,7 @@ class ParallelExecutionStrategy(ExecutionStrategy):
             plan_stats.add_record_op_stats(unique_full_op_id, record_op_stats)
 
             # add records which aren't filtered to the output records
-            output_records.extend([record for record in records if record.passed_operator])
+            output_records.extend([record for record in records if record._passed_operator])
 
         # update the progress manager
         if total_inputs_processed > 0:

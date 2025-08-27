@@ -34,7 +34,7 @@ class TestDataRecord:
         """Test basic record creation and attribute access"""
         assert sample_record.name == "test"
         assert sample_record.value == 42
-        assert sample_record.source_indices == [0]
+        assert sample_record._source_indices == [0]
 
     def test_record_equality(self, sample_record):
         """Test record equality comparison"""
@@ -66,8 +66,8 @@ class TestDataRecord:
         """Test auto-schema generation from DataFrame"""
         records = DataRecord.from_df(sample_df)  # No schema provided
         assert len(records) == 2
-        assert 'name' in records[0].schema.model_fields
-        assert 'value' in records[0].schema.model_fields
+        assert 'name' in records[0]._schema.model_fields
+        assert 'value' in records[0]._schema.model_fields
 
     def test_invalid_attribute(self, sample_record):
         """Test accessing non-existent attribute"""

@@ -16,7 +16,7 @@ class GroupBySig:
         self.agg_funcs = agg_funcs
         self.agg_fields = agg_fields
 
-    def validate_schema(self, input_schema: BaseModel) -> tuple[bool, str | None]:
+    def validate_schema(self, input_schema: type[BaseModel]) -> tuple[bool, str | None]:
         for f in self.group_by_fields:
             if f not in input_schema.model_fields:
                 return (False, "Supplied schema has no field " + f)

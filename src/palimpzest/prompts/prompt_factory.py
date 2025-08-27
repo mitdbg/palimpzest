@@ -305,7 +305,7 @@ class PromptFactory:
             str: The output fields description.
         """
         output_fields_desc = ""
-        output_schema: BaseModel = kwargs.get("output_schema")
+        output_schema: type[BaseModel] = kwargs.get("output_schema")
         if self.prompt_strategy.is_convert_prompt():
             assert output_schema is not None, "Output schema must be provided for convert prompts."
 

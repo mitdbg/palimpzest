@@ -52,7 +52,7 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
                 record_set = operator(candidates=input_queues[unique_full_op_id][source_unique_full_op_id])
                 records = record_set.data_records
                 record_op_stats = record_set.record_op_stats
-                num_outputs = sum(record.passed_operator for record in records)
+                num_outputs = sum(record._passed_operator for record in records)
 
                 # update the progress manager
                 self.progress_manager.incr(unique_full_op_id, num_inputs=1, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
@@ -70,7 +70,7 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
                 record_set, num_inputs_processed = operator(left_input_records, right_input_records)
                 records = record_set.data_records
                 record_op_stats = record_set.record_op_stats
-                num_outputs = sum(record.passed_operator for record in records)
+                num_outputs = sum(record._passed_operator for record in records)
 
                 # update the progress manager
                 self.progress_manager.incr(unique_full_op_id, num_inputs=num_inputs_processed, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
@@ -82,7 +82,7 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
                     record_set = operator(input_record)
                     records.extend(record_set.data_records)
                     record_op_stats.extend(record_set.record_op_stats)
-                    num_outputs = sum(record.passed_operator for record in record_set.data_records)
+                    num_outputs = sum(record._passed_operator for record in record_set.data_records)
 
                     # update the progress manager
                     self.progress_manager.incr(unique_full_op_id, num_inputs=1, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
@@ -95,7 +95,7 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
             plan_stats.add_record_op_stats(unique_full_op_id, record_op_stats)
 
             # update next input_queue (if it exists)
-            output_records = [record for record in records if record.passed_operator]
+            output_records = [record for record in records if record._passed_operator]
             next_unique_full_op_id = plan.get_next_unique_full_op_id(topo_idx, operator)
             if next_unique_full_op_id is not None:
                 input_queues[next_unique_full_op_id][unique_full_op_id] = output_records
@@ -207,7 +207,7 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
                     record_set = operator(candidates=input_records)
                     records = record_set.data_records
                     record_op_stats = record_set.record_op_stats
-                    num_outputs = sum(record.passed_operator for record in records)
+                    num_outputs = sum(record._passed_operator for record in records)
 
                     # update the progress manager
                     self.progress_manager.incr(unique_full_op_id, num_inputs=1, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
@@ -225,7 +225,7 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
                     record_set, num_inputs_processed = operator(left_input_records, right_input_records)
                     records = record_set.data_records
                     record_op_stats = record_set.record_op_stats
-                    num_outputs = sum(record.passed_operator for record in records)
+                    num_outputs = sum(record._passed_operator for record in records)
 
                     # update the progress manager
                     self.progress_manager.incr(unique_full_op_id, num_inputs=num_inputs_processed, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
@@ -237,7 +237,7 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
                     record_set = operator(input_record)
                     records = record_set.data_records
                     record_op_stats = record_set.record_op_stats
-                    num_outputs = sum(record.passed_operator for record in records)
+                    num_outputs = sum(record._passed_operator for record in records)
 
                     # update the progress manager
                     self.progress_manager.incr(unique_full_op_id, num_inputs=1, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
@@ -246,7 +246,7 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
                 plan_stats.add_record_op_stats(unique_full_op_id, record_op_stats)
 
                 # update next input_queue or final_output_records
-                output_records = [record for record in records if record.passed_operator]
+                output_records = [record for record in records if record._passed_operator]
                 next_unique_full_op_id = plan.get_next_unique_full_op_id(topo_idx, operator)
                 if next_unique_full_op_id is not None:
                     input_queues[next_unique_full_op_id][unique_full_op_id].extend(output_records)
