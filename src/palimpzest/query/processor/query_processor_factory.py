@@ -62,13 +62,17 @@ class QueryProcessorFactory:
             print("WARNING: Both `progress` and `verbose` are set to True, but only one can be True at a time; defaulting to `progress=True`")
             config.verbose = False
 
+        # if the user provides a training dataset, but no validator, create a default validator
+        if train_dataset is not None and validator is None:
+            validator = Validator()
+            logger.info("No validator provided; using default Validator")
+
         # boolean flag for whether we're performing optimization or not
-        optimization = train_dataset is not None or validator is not None
-        val_based_opt = train_dataset is None and validator is not None
+        optimization = validator is not None
 
         # handle "auto" default for sentinel execution strategies
         if config.sentinel_execution_strategy == "auto":
-            config.sentinel_execution_strategy = ("validator" if val_based_opt else "mab") if optimization else None
+            config.sentinel_execution_strategy = "mab" if optimization else None
 
         # convert the config values for processing, execution, and optimization strategies to enums
         config = cls._normalize_strategies(config)
@@ -87,7 +91,7 @@ class QueryProcessorFactory:
         # set the final set of available models in the config
         config.available_models = available_models
 
-        return config
+        return config, validator
 
     @classmethod
     def _create_optimizer(cls, config: QueryProcessorConfig) -> Optimizer:
@@ -143,7 +147,7 @@ class QueryProcessorFactory:
             config = QueryProcessorConfig()
 
         # apply any additional keyword arguments to the config and validate its contents
-        config = cls._config_validation_and_normalization(config, train_dataset, validator)
+        config, validator = cls._config_validation_and_normalization(config, train_dataset, validator)
 
         # create the optimizer, execution strateg(ies), and processor
         optimizer = cls._create_optimizer(config)
