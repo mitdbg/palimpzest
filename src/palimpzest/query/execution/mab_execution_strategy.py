@@ -6,7 +6,7 @@ from chromadb.api.models.Collection import Collection
 
 from palimpzest.core.data.dataset import Dataset
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
-from palimpzest.core.models import OperatorStats, RecordOpStats, SentinelPlanStats
+from palimpzest.core.models import OperatorCostEstimates, OperatorStats, RecordOpStats, SentinelPlanStats
 from palimpzest.policy import Policy
 from palimpzest.query.execution.execution_strategy import SentinelExecutionStrategy
 from palimpzest.query.operators.aggregate import AggregateOp
@@ -58,6 +58,17 @@ class OpFrontier:
         # store the prior beliefs on operator performance (if provided)
         self.priors = priors
 
+        # boolean indication of the type of operator in this OpFrontier
+        sample_op = op_set[0]
+        self.is_scan_op = isinstance(sample_op, (ScanPhysicalOp, ContextScanOp))
+        self.is_filter_op = isinstance(sample_op, FilterOp)
+        self.is_aggregate_op = isinstance(sample_op, AggregateOp)
+        self.is_llm_join = isinstance(sample_op, JoinOp)
+        is_llm_convert = isinstance(sample_op, LLMConvert)
+        is_llm_filter = isinstance(sample_op, LLMFilter)
+        is_llm_retrieve = isinstance(sample_op, RetrieveOp) and isinstance(sample_op.index, Collection)
+        self.is_llm_op = is_llm_convert or is_llm_filter or is_llm_retrieve or self.is_llm_join
+
         # get order in which we will sample physical operators for this logical operator
         sample_op_indices = self._get_op_index_order(op_set, seed)
 
@@ -70,17 +81,6 @@ class OpFrontier:
         self.full_op_id_to_sources_processed = {op.get_full_op_id(): set() for op in op_set}
         self.full_op_id_to_sources_not_processed = {op.get_full_op_id(): source_indices for op in op_set}
         self.max_inputs = len(source_indices)
-
-        # boolean indication of the type of operator in this OpFrontier
-        sample_op = op_set[0]
-        self.is_scan_op = isinstance(sample_op, (ScanPhysicalOp, ContextScanOp))
-        self.is_filter_op = isinstance(sample_op, FilterOp)
-        self.is_aggregate_op = isinstance(sample_op, AggregateOp)
-        self.is_llm_join = isinstance(sample_op, JoinOp)
-        is_llm_convert = isinstance(sample_op, LLMConvert)
-        is_llm_filter = isinstance(sample_op, LLMFilter)
-        is_llm_retrieve = isinstance(sample_op, RetrieveOp) and isinstance(sample_op.index, Collection)
-        self.is_llm_op = is_llm_convert or is_llm_filter or is_llm_retrieve or self.is_llm_join
 
         # set the initial inputs for this logical operator; we maintain a mapping from source_unique_logical_op_id --> source_indices --> input;
         # for each unique source and (tuple of) source indices, we store its output, which is an input to this operator
@@ -156,15 +156,43 @@ class OpFrontier:
         
         return op_id_to_pareto_distance
 
+    def _compute_naive_priors(self, op_set: list[PhysicalOperator]) -> dict[str, dict[str, float]]:
+        naive_priors = {}
+        for op in op_set:
+            # use naive cost estimates with dummy source estimates to compute priors
+            source_op_estimates = OperatorCostEstimates(quality=1.0, cost_per_record=0.0, time_per_record=0.0, cardinality=100)
+            op_estimates = (
+                op.naive_cost_estimates(source_op_estimates, source_op_estimates)
+                if self.is_llm_join
+                else op.naive_cost_estimates(source_op_estimates)
+            )
+
+            # get op_id for this operator
+            op_id = op.get_op_id()
+
+            # set the naive quality, cost, and time priors for this operator
+            naive_priors[op_id] = {
+                "quality": op_estimates.quality,
+                "cost": op_estimates.cost_per_record,
+                "time": op_estimates.time_per_record,
+            }
+
+        return naive_priors
+
     def _get_op_index_order(self, op_set: list[PhysicalOperator], seed: int) -> list[int]:
         """
         Returns a list of indices for the operators in the op_set.
         """
-        if self.priors is None or any([op_id not in self.priors for op_id in map(lambda op: op.get_op_id(), op_set)]):
+        # if this is not an llm-operator, we simply return the indices in random order
+        if not self.is_llm_op:
             rng = np.random.default_rng(seed=seed)
             op_indices = np.arange(len(op_set))
             rng.shuffle(op_indices)
             return op_indices
+
+        # if this is an llm-operator, but we do not have priors, we first compute naive priors
+        if self.priors is None or any([op_id not in self.priors for op_id in map(lambda op: op.get_op_id(), op_set)]):
+            self.priors = self._compute_naive_priors(op_set)
 
         # NOTE: self.priors is a dictionary with format:
         # {op_id: {"quality": quality, "cost": cost, "time": time}}
