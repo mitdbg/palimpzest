@@ -101,7 +101,7 @@ def get_json_from_answer(answer: str, model: Model, cardinality: Cardinality) ->
 # TODO: make sure answer parsing works with custom prompts / parsers (can defer this)
 class Generator(Generic[ContextType, InputType]):
     """
-    Abstract base class for Generators.
+    Class for generating new fields for a record using an LLM.
     """
 
     def __init__(
@@ -276,7 +276,7 @@ class Generator(Generic[ContextType, InputType]):
         # extract the per-field answers from the completion text
         field_answers = (
             self._parse_bool_answer(completion_text)
-            if self.prompt_strategy.is_bool_prompt() or self.prompt_strategy.is_join_prompt()
+            if self.prompt_strategy.is_filter_prompt() or self.prompt_strategy.is_join_prompt()
             else self._parse_convert_answer(completion_text, fields, json_output)
         )
 
@@ -299,6 +299,7 @@ class Generator(Generic[ContextType, InputType]):
 
         # generate a list of messages which can be used to construct a payload
         messages = self.prompt_factory.create_messages(candidate, fields, right_candidate, **kwargs)
+        is_audio_op = any(msg.get("type") == "input_audio" for msg in messages)
 
         # generate the text completion
         start_time = time.time()
@@ -307,7 +308,7 @@ class Generator(Generic[ContextType, InputType]):
             completion_kwargs = {}
             if not self.model.is_o_model() and not self.model.is_gpt_5_model():
                 completion_kwargs = {"temperature": kwargs.get("temperature", 0.0), **completion_kwargs}
-            if self.prompt_strategy.is_audio_prompt():
+            if is_audio_op:
                 completion_kwargs = {"modalities": ["text"], **completion_kwargs}
             if self.model.is_reasoning_model():
                 if self.model.is_vertex_model():
@@ -334,7 +335,7 @@ class Generator(Generic[ContextType, InputType]):
             logger.error(f"Error generating completion: {e}")
             field_answers = (
                 {"passed_operator": False}
-                if self.prompt_strategy.is_bool_prompt() or self.prompt_strategy.is_join_prompt()
+                if self.prompt_strategy.is_filter_prompt() or self.prompt_strategy.is_join_prompt()
                 else {field_name: None for field_name in fields}
             )
             reasoning = None
@@ -360,7 +361,7 @@ class Generator(Generic[ContextType, InputType]):
             #       for now, we only use tokens from prompt_token_details if it's an audio prompt
             # get output tokens (all text) and input tokens by modality
             output_tokens = usage["completion_tokens"]
-            if self.prompt_strategy.is_audio_prompt():
+            if is_audio_op:
                 input_audio_tokens = usage["prompt_tokens_details"].get("audio_tokens", 0)
                 input_text_tokens = usage["prompt_tokens_details"].get("text_tokens", 0)
                 input_image_tokens = 0
@@ -415,9 +416,9 @@ class Generator(Generic[ContextType, InputType]):
 
         # parse field answers
         field_answers = None 
-        if fields is not None and (self.prompt_strategy.is_bool_prompt() or self.prompt_strategy.is_join_prompt()):
+        if fields is not None and (self.prompt_strategy.is_filter_prompt() or self.prompt_strategy.is_join_prompt()):
             field_answers = {"passed_operator": False}
-        elif fields is not None and not (self.prompt_strategy.is_bool_prompt() or self.prompt_strategy.is_join_prompt()):
+        elif fields is not None and not (self.prompt_strategy.is_filter_prompt() or self.prompt_strategy.is_join_prompt()):
             field_answers = {field_name: None for field_name in fields}
         try:
             field_answers = self._parse_answer(completion_text, fields, json_output, **kwargs)

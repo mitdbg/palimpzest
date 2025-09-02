@@ -270,6 +270,10 @@ class TestOptimizer:
             cost_model=cost_model,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B],
+            allow_rag_reduction=False,
+            allow_mixtures=False,
+            allow_critic=False,
+            allow_split_merge=False,
             optimizer_strategy=opt_strategy,
         )
         physical_plans = optimizer.optimize(plan)

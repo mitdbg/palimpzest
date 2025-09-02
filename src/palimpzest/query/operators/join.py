@@ -41,11 +41,6 @@ class JoinOp(PhysicalOperator, ABC):
         return {"condition": self.condition, "desc": self.desc, **op_params}
 
     @abstractmethod
-    def is_image_join(self) -> bool:
-        """Return True if the join operation processes image(s), False otherwise."""
-        pass
-
-    @abstractmethod
     def naive_cost_estimates(self, left_source_op_cost_estimates: OperatorCostEstimates, right_source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         pass
 
@@ -54,7 +49,7 @@ class BlockingNestedLoopsJoin(JoinOp):
     def __init__(
         self,
         model: Model,
-        prompt_strategy: PromptStrategy = PromptStrategy.COT_JOIN,
+        prompt_strategy: PromptStrategy = PromptStrategy.JOIN,
         join_parallelism: int = 64,
         reasoning_effort: str | None = None,
         *args,
@@ -95,13 +90,10 @@ class BlockingNestedLoopsJoin(JoinOp):
     def get_model_name(self):
         return self.model.value
 
-    def is_image_join(self) -> bool:
-        return self.prompt_strategy is PromptStrategy.COT_JOIN_IMAGE
-
     def naive_cost_estimates(self, left_source_op_cost_estimates: OperatorCostEstimates, right_source_op_cost_estimates: OperatorCostEstimates):
         # estimate number of input tokens from source
         est_num_input_tokens = 2 * NAIVE_EST_NUM_INPUT_TOKENS
-        if self.is_image_join():
+        if self.is_image_op():
             est_num_input_tokens = 2 * 765 / 10  # 1024x1024 image is 765 tokens
 
         # NOTE: the output often generates an entire reasoning sentence, thus the true value may be higher
@@ -117,7 +109,7 @@ class BlockingNestedLoopsJoin(JoinOp):
         # get est. of conversion cost (in USD) per record from model card
         usd_per_input_token = (
             MODEL_CARDS[self.model.value]["usd_per_audio_input_token"]
-            if self.prompt_strategy.is_audio_prompt()
+            if self.is_audio_op()
             else MODEL_CARDS[self.model.value]["usd_per_input_token"]
         )
         model_conversion_usd_per_record = (
@@ -181,7 +173,6 @@ class BlockingNestedLoopsJoin(JoinOp):
             total_embedding_llm_calls=generation_stats.total_embedding_llm_calls,
             answer=field_answers,
             passed_operator=passed_operator,
-            image_operation=self.is_image_join(),
             op_details={k: str(v) for k, v in self.get_id_params().items()},
         )
 
@@ -218,7 +209,7 @@ class NestedLoopsJoin(JoinOp):
     def __init__(
         self,
         model: Model,
-        prompt_strategy: PromptStrategy = PromptStrategy.COT_JOIN,
+        prompt_strategy: PromptStrategy = PromptStrategy.JOIN,
         join_parallelism: int = 64,
         reasoning_effort: str | None = None,
         *args,
@@ -263,13 +254,10 @@ class NestedLoopsJoin(JoinOp):
     def get_model_name(self):
         return self.model.value
 
-    def is_image_join(self) -> bool:
-        return self.prompt_strategy is PromptStrategy.COT_JOIN_IMAGE
-
     def naive_cost_estimates(self, left_source_op_cost_estimates: OperatorCostEstimates, right_source_op_cost_estimates: OperatorCostEstimates):
         # estimate number of input tokens from source
         est_num_input_tokens = 2 * NAIVE_EST_NUM_INPUT_TOKENS
-        if self.is_image_join():
+        if self.is_image_op():
             est_num_input_tokens = 2 * 765 / 10  # 1024x1024 image is 765 tokens
 
         # NOTE: the output often generates an entire reasoning sentence, thus the true value may be higher
@@ -285,7 +273,7 @@ class NestedLoopsJoin(JoinOp):
         # get est. of conversion cost (in USD) per record from model card
         usd_per_input_token = (
             MODEL_CARDS[self.model.value]["usd_per_audio_input_token"]
-            if self.prompt_strategy.is_audio_prompt()
+            if self.is_audio_op()
             else MODEL_CARDS[self.model.value]["usd_per_input_token"]
         )
         model_conversion_usd_per_record = (
@@ -349,7 +337,6 @@ class NestedLoopsJoin(JoinOp):
             total_embedding_llm_calls=generation_stats.total_embedding_llm_calls,
             answer=field_answers,
             passed_operator=passed_operator,
-            image_operation=self.is_image_join(),
             op_details={k: str(v) for k, v in self.get_id_params().items()},
         )
 

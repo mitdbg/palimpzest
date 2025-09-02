@@ -248,9 +248,6 @@ class RecordOpStats(BaseModel):
     # (if applicable) a boolean indicating whether this is the statistics captured from a failed convert operation
     failed_convert: bool | None = None
 
-    # (if applicable) a boolean indicating whether this is an image convert/filter operation
-    image_operation: bool | None = None
-
     # an OPTIONAL dictionary with more detailed information about this operation;
     op_details: dict[str, Any] = Field(default_factory=dict)
 

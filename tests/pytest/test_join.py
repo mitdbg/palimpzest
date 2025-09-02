@@ -1,4 +1,4 @@
-"""This script contains tests for the PhysicalOperator class."""
+"""This script contains tests for physical operators for join."""
 
 import os
 

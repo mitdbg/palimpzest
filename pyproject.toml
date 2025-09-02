@@ -16,7 +16,7 @@ dependencies = [
     "datasets>=4.0.0",
     "fastapi~=0.115.0",
     "gradio>=5.26.0",
-    "litellm>=1.73.1",
+    "litellm>=1.76.1",
     "numpy==2.0.2",
     "openai>=1.0",
     "pandas>=2.1.1",

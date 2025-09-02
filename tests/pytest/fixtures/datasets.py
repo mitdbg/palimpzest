@@ -21,6 +21,8 @@ class RealEstateListingDataset(IterDataset):
             for listing in sorted(os.listdir(self.listings_dir))
             if os.path.isdir(os.path.join(self.listings_dir, listing))
         ]
+        if len(self.listings) == 0:
+            raise ValueError(f"No listings found in directory: {self.listings_dir}")
 
     def __len__(self):
         return len(self.listings)

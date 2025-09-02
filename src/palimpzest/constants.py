@@ -136,69 +136,38 @@ class PromptStrategy(str, Enum):
     performing some task with a specified Model.
     """
 
-    # Chain-of-Thought Boolean Prompt Strategies
-    COT_BOOL = "chain-of-thought-bool"
-    COT_BOOL_NO_REASONING = "chain-of-thought-bool-no-reasoning"
-    # COT_BOOL_CRITIC = "chain-of-thought-bool-critic"
-    # COT_BOOL_REFINE = "chain-of-thought-bool-refine"
+    # filter prompt strategies
+    FILTER = "filter"
+    FILTER_NO_REASONING = "filter-no-reasoning"
+    FILTER_CRITIC = "filter-critic"
+    FILTER_REFINE = "filter-refine"
+    FILTER_MOA_PROPOSER = "filter-mixture-of-agents-proposer"
+    FILTER_MOA_AGG = "filter-mixture-of-agents-aggregation"
+    FILTER_SPLIT_PROPOSER = "filter-split-proposer"
+    FILTER_SPLIT_MERGER = "filter-split-merger"
 
-    # Chain-of-Thought Boolean with Image Prompt Strategies
-    COT_BOOL_IMAGE = "chain-of-thought-bool-image"
-    COT_BOOL_IMAGE_NO_REASONING = "chain-of-thought-bool-image"
-    COT_BOOL_AUDIO = "chain-of-thought-bool-audio"
-    COT_BOOL_AUDIO_NO_REASONING = "chain-of-thought-bool-audio"
-    # COT_BOOL_IMAGE_CRITIC = "chain-of-thought-bool-image-critic"
-    # COT_BOOL_IMAGE_REFINE = "chain-of-thought-bool-image-refine"
+    # join prompt strategies
+    JOIN = "join"
+    JOIN_NO_REASONING = "join-no-reasoning"
 
-    # Chain-of-Thought Join Prompt Strategies
-    COT_JOIN = "chain-of-thought-join"
-    COT_JOIN_NO_REASONING = "chain-of-thought-join-no-reasoning"
-    COT_JOIN_IMAGE = "chain-of-thought-join-image"
-    COT_JOIN_IMAGE_NO_REASONING = "chain-of-thought-join-image-no-reasoning"
-    COT_JOIN_AUDIO = "chain-of-thought-join-audio"
-    COT_JOIN_AUDIO_NO_REASONING = "chain-of-thought-join-audio-no-reasoning"
+    # map prompt strategies
+    MAP = "map"
+    MAP_NO_REASONING = "map-no-reasoning"
+    MAP_CRITIC = "map-critic"
+    MAP_REFINE = "map-refine"
+    MAP_MOA_PROPOSER = "map-mixture-of-agents-proposer"
+    MAP_MOA_AGG = "map-mixture-of-agents-aggregation"
+    MAP_SPLIT_PROPOSER = "map-split-proposer"
+    MAP_SPLIT_MERGER = "map-split-merger"
 
-    # Chain-of-Thought Question Answering Prompt Strategies
-    COT_QA = "chain-of-thought-question"
-    COT_QA_NO_REASONING = "chain-of-thought-question-no-reasoning"
-    COT_QA_CRITIC = "chain-of-thought-question-critic"
-    COT_QA_REFINE = "chain-of-thought-question-refine"
-
-    # Chain-of-Thought Question with Image Prompt Strategies
-    COT_QA_IMAGE = "chain-of-thought-question-image"
-    COT_QA_IMAGE_NO_REASONING = "chain-of-thought-question-image-no-reasoning"
-    COT_QA_IMAGE_CRITIC = "chain-of-thought-question-critic-image"
-    COT_QA_IMAGE_REFINE = "chain-of-thought-question-refine-image"
-
-    # Chain-of-Thought Queestion with Audio Prompt Strategies
-    COT_QA_AUDIO = "chain-of-thought-question-audio"
-    COT_QA_AUDIO_NO_REASONING = "chain-of-thought-question-audio-no-reasoning"
-    # TODO: COT_QA_AUDIO_CRITIC/REFINE
-
-    # Mixture-of-Agents Prompt Strategies
-    COT_MOA_PROPOSER = "chain-of-thought-mixture-of-agents-proposer"
-    COT_MOA_PROPOSER_IMAGE = "chain-of-thought-mixture-of-agents-proposer-image"
-    COT_MOA_AGG = "chain-of-thought-mixture-of-agents-aggregation"
-    # TODO: COT_MOA_PROPOSER_AUDIO 
-
-    # Split Convert Prompt Strategies
-    SPLIT_PROPOSER = "split-proposer"
-    SPLIT_MERGER = "split-merger"
-
-    def is_image_prompt(self):
-        return "image" in self.value
-
-    def is_audio_prompt(self):
-        return "audio" in self.value
-
-    def is_bool_prompt(self):
-        return "bool" in self.value
+    def is_filter_prompt(self):
+        return "filter" in self.value
 
     def is_join_prompt(self):
         return "join" in self.value
 
-    def is_convert_prompt(self):
-        return "bool" not in self.value and "join" not in self.value
+    def is_map_prompt(self):
+        return "map" in self.value
 
     def is_critic_prompt(self):
         return "critic" in self.value
@@ -220,6 +189,13 @@ class PromptStrategy(str, Enum):
 
     def is_no_reasoning_prompt(self):
         return "no-reasoning" in self.value
+
+
+class Modality(str, Enum):
+    TEXT = "text"
+    IMAGE = "image"
+    AUDIO = "audio"
+
 
 class AggFunc(str, Enum):
     COUNT = "count"
@@ -527,7 +503,7 @@ CLIP_VIT_B_32_MODEL_CARD = {
     ##### Time #####
     "seconds_per_output_token": 0.0098,  # NOTE: just copying TEXT_EMBEDDING_3_SMALL_MODEL_CARD for now
     ##### Agg. Benchmark #####
-    "overall": 63.3,  # NOTE: ImageNet top-1 accuracy
+    "overall": 63.3,  # NOTE: imageNet top-1 accuracy
 }
 CLAUDE_3_5_SONNET_MODEL_CARD = {
     ##### Cost in USD #####
