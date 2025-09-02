@@ -177,7 +177,7 @@ class CritiqueAndRefineFilter(LLMFilter):
         # execute the initial model
         original_gen_kwargs = {"project_cols": input_fields, "filter_condition": self.filter_obj.filter_condition}
         field_answers, reasoning, original_gen_stats, original_messages = self.generator(candidate, fields, **original_gen_kwargs)
-        original_output = f"REASONING: {reasoning}\nANSWER: {field_answers}\n"
+        original_output = f"REASONING: {reasoning}\nANSWER: {str(field_answers['passed_operator']).upper()}\n"
 
         # execute the critic model
         critic_gen_kwargs = {"original_output": original_output, "original_messages": original_messages, **original_gen_kwargs}

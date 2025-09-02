@@ -110,7 +110,7 @@ class MixtureOfAgentsConvert(LLMConvert):
         for proposer_generator, temperature in zip(self.proposer_generators, self.temperatures):
             gen_kwargs = {"project_cols": input_fields, "output_schema": self.output_schema, "temperature": temperature}
             _, reasoning, generation_stats, _ = proposer_generator(candidate, fields, json_output=False, **gen_kwargs)
-            proposer_text = f"REASONING:{reasoning}\n"
+            proposer_text = f"REASONING: {reasoning}\n"
             proposer_model_final_answers.append(proposer_text)
             proposer_model_generation_stats.append(generation_stats)
 
@@ -228,7 +228,7 @@ class MixtureOfAgentsFilter(LLMFilter):
         for proposer_generator, temperature in zip(self.proposer_generators, self.temperatures):
             gen_kwargs = {"project_cols": input_fields, "filter_condition": self.filter_obj.filter_condition, "temperature": temperature}
             _, reasoning, generation_stats, _ = proposer_generator(candidate, fields, json_output=False, **gen_kwargs)
-            proposer_text = f"REASONING:{reasoning}\n"
+            proposer_text = f"REASONING: {reasoning}\n"
             proposer_model_final_answers.append(proposer_text)
             proposer_model_generation_stats.append(generation_stats)
 

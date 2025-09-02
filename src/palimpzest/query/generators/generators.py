@@ -181,11 +181,11 @@ class Generator(Generic[ContextType, InputType]):
 
         return None
 
-    def _check_bool_answer_text(self, answer_text: str) -> dict | None:
+    def _check_bool_answer_text(self, answer_text: str, throw_exception: bool=False) -> dict | None:
         """
         Return {"passed_operator": True} if and only if "true" is in the answer text.
         Return {"passed_operator": False} if and only if "false" is in the answer text.
-        Otherwise, return None.
+        Otherwise, raise an exception.
         """
         # NOTE: we may be able to eliminate this condition by specifying this JSON output in the prompt;
         # however, that would also need to coincide with a change to allow the parse_answer_fn to set "passed_operator"
@@ -193,6 +193,9 @@ class Generator(Generic[ContextType, InputType]):
             return {"passed_operator": True}
         elif "false" in answer_text.lower():
             return {"passed_operator": False}
+
+        if throw_exception:
+            raise Exception(f"Could not parse answer from completion text: {answer_text}")
 
         return None
 
@@ -235,7 +238,7 @@ class Generator(Generic[ContextType, InputType]):
 
         return self._check_convert_answer_text(completion_text, fields, throw_exception=True)
 
-    def _parse_bool_answer(self, completion_text: str) -> dict[str, list]:
+    def _parse_bool_answer(self, completion_text: str, json_output: bool) -> dict[str, list]:
         """Extract the answer from the completion object for filter and join operations."""
         # if the model followed the default instructions, the completion text will place
         # its answer between "ANSWER:" and "---"
@@ -243,6 +246,12 @@ class Generator(Generic[ContextType, InputType]):
         matches = regex.findall(completion_text)
         if len(matches) > 0:
             answer_text = matches[0].strip()
+
+            # if we don't expect a JSON output, return the answer text as is
+            if not json_output:
+                return answer_text
+
+            # otherwise, try to parse the answer text into a JSON object
             field_answers = self._check_bool_answer_text(answer_text)
             if field_answers is not None:
                 return field_answers
@@ -252,16 +261,21 @@ class Generator(Generic[ContextType, InputType]):
         matches = regex.findall(completion_text)
         if len(matches) > 0:
             answer_text = matches[0].strip()
+
+            # if we don't expect a JSON output, return the answer text as is
+            if not json_output:
+                return answer_text
+
+            # otherwise, try to parse the answer text into a JSON object
             field_answers = self._check_bool_answer_text(answer_text)
             if field_answers is not None:
                 return field_answers
 
-        # finally, try taking all of the text; throw an exception if this doesn't work
-        field_answers = self._check_bool_answer_text(completion_text)
-        if field_answers is None:
-            raise Exception(f"Could not parse answer from completion text: {completion_text}")
+        # finally, try taking all of the text; for JSON output, throw an exception if parsing fails
+        if not json_output:
+            return completion_text
 
-        return field_answers
+        return self._check_bool_answer_text(completion_text, throw_exception=True)
 
     def _parse_answer(self, completion_text: str, fields: dict[str, FieldInfo] | None, json_output: bool, **kwargs) -> dict[str, list]:
         """Extract the answer from the completion object."""
@@ -275,7 +289,7 @@ class Generator(Generic[ContextType, InputType]):
 
         # extract the per-field answers from the completion text
         field_answers = (
-            self._parse_bool_answer(completion_text)
+            self._parse_bool_answer(completion_text, json_output)
             if self.prompt_strategy.is_filter_prompt() or self.prompt_strategy.is_join_prompt()
             else self._parse_convert_answer(completion_text, fields, json_output)
         )

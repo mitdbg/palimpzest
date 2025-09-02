@@ -199,7 +199,7 @@ class LLMFilter(FilterOp):
         return op_params
 
     def get_model_name(self):
-        return self.model.value
+        return None if self.model is None else self.model.value
 
     def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates):
         # estimate number of input tokens from source
