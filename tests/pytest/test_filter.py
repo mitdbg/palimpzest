@@ -49,35 +49,21 @@ def mock_generator_call(candidate, fields, right_candidate=None, json_output=Tru
 
 
 @pytest.mark.parametrize(
-    argnames=("input_schema", "physical_op_class"),
-    argvalues=[
-        pytest.param(TextInputSchema, LLMFilter, id="text-only-llm-filter"),
-        pytest.param(ImageInputSchema, LLMFilter, id="image-only-llm-filter"),
-        pytest.param(AudioInputSchema, LLMFilter, id="audio-only-llm-filter"),
-        pytest.param(TextImageInputSchema, LLMFilter, id="text-image-llm-filter"),
-        pytest.param(TextAudioInputSchema, LLMFilter, id="text-audio-llm-filter"),
-        pytest.param(ImageAudioInputSchema, LLMFilter, id="image-audio-llm-filter"),
-        pytest.param(TextImageAudioInputSchema, LLMFilter, id="text-image-audio-llm-filter"),
-        pytest.param(TextInputSchema, RAGFilter, id="text-only-rag-filter"),
-        pytest.param(TextInputSchema, SplitFilter, id="text-only-split-filter"),
-        pytest.param(TextInputSchema, CritiqueAndRefineFilter, id="text-only-critique-and-refine-filter"),
-        pytest.param(ImageInputSchema, CritiqueAndRefineFilter, id="image-only-critique-and-refine-filter"),
-        pytest.param(AudioInputSchema, CritiqueAndRefineFilter, id="audio-only-critique-and-refine-filter"),
-        pytest.param(TextImageInputSchema, CritiqueAndRefineFilter, id="text-image-critique-and-refine-filter"),
-        pytest.param(TextAudioInputSchema, CritiqueAndRefineFilter, id="text-audio-critique-and-refine-filter"),
-        pytest.param(ImageAudioInputSchema, CritiqueAndRefineFilter, id="image-audio-critique-and-refine-filter"),
-        pytest.param(TextImageAudioInputSchema, CritiqueAndRefineFilter, id="text-image-audio-critique-and-refine-filter"),
-        pytest.param(TextInputSchema, MixtureOfAgentsFilter, id="text-only-mixture-of-agents-filter"),
-        pytest.param(ImageInputSchema, MixtureOfAgentsFilter, id="image-only-mixture-of-agents-filter"),
-        pytest.param(AudioInputSchema, MixtureOfAgentsFilter, id="audio-only-mixture-of-agents-filter"),
-        pytest.param(TextImageInputSchema, MixtureOfAgentsFilter, id="text-image-mixture-of-agents-filter"),
-        pytest.param(TextAudioInputSchema, MixtureOfAgentsFilter, id="text-audio-mixture-of-agents-filter"),
-        pytest.param(ImageAudioInputSchema, MixtureOfAgentsFilter, id="image-audio-mixture-of-agents-filter"),
-        pytest.param(TextImageAudioInputSchema, MixtureOfAgentsFilter, id="text-image-audio-mixture-of-agents-filter"),
-    ]
+    "input_schema",
+    [TextInputSchema, ImageInputSchema, AudioInputSchema, TextImageInputSchema, TextAudioInputSchema, ImageAudioInputSchema, TextImageAudioInputSchema],
+    ids=["text-only", "image-only", "audio-only", "text-image", "text-audio", "image-audio", "text-image-audio"],
+)
+@pytest.mark.parametrize(
+    "physical_op_class",
+    [LLMFilter, RAGFilter, SplitFilter, CritiqueAndRefineFilter, MixtureOfAgentsFilter],
+    ids=["llm-filter", "rag-filter", "split-filter", "critique-and-refine-filter", "mixture-of-agents-filter"],
 )
 def test_filter(mocker, input_schema, physical_op_class):
     """Test filter operators on simple input"""
+    # RAGFilter and SplitFilter only support text input currently
+    if physical_op_class in [RAGFilter, SplitFilter] and input_schema != TextInputSchema:
+        pytest.skip(f"{physical_op_class} only supports text input currently")
+
     # construct the kwargs for the physical operator
     filter = Filter(filter_condition="The animal is an elephant.")
     physical_op_kwargs = {"input_schema": input_schema, "output_schema": input_schema, "filter": filter, "logical_op_id": "test-filter"}
