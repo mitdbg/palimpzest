@@ -196,28 +196,25 @@ class NestedLoopsJoin(JoinOp):
         # construct kwargs for generation
         gen_kwargs = {"project_cols": input_fields, "join_condition": self.condition}
 
+        # create the set of candidates to join
+        join_candidates = []
+        for candidate in left_candidates:
+            for right_candidate in right_candidates:
+                join_candidates.append((candidate, right_candidate))
+            for right_candidate in self._right_input_records:
+                join_candidates.append((candidate, right_candidate))
+        for candidate in self._left_input_records:
+            for right_candidate in right_candidates:
+                join_candidates.append((candidate, right_candidate))
+
         # apply the generator to each pair of candidates
-        output_records, output_record_op_stats, num_inputs_processed = [], [], 0
+        output_records, output_record_op_stats = [], []
         with ThreadPoolExecutor(max_workers=self.join_parallelism) as executor:
-            futures = []
-            # join new left candidates with new right candidates
-            for candidate in left_candidates:
-                for right_candidate in right_candidates:
-                    futures.append(executor.submit(self._process_join_candidate_pair, candidate, right_candidate, gen_kwargs))
-                    num_inputs_processed += 1
-
-            # join new left candidates with stored right input records
-            for candidate in left_candidates:
-                for right_candidate in self._right_input_records:
-                    futures.append(executor.submit(self._process_join_candidate_pair, candidate, right_candidate, gen_kwargs))
-                    num_inputs_processed += 1
-
-            # join new right candidates with stored left input records
-            for candidate in self._left_input_records:
-                for right_candidate in right_candidates:
-                    futures.append(executor.submit(self._process_join_candidate_pair, candidate, right_candidate, gen_kwargs))
-                    num_inputs_processed += 1
-
+            futures = [
+                executor.submit(self._process_join_candidate_pair, candidate, right_candidate, gen_kwargs)
+                for candidate, right_candidate in join_candidates
+            ]
+  
             # collect results as they complete
             for future in as_completed(futures):
                 self.join_idx += 1
@@ -225,6 +222,9 @@ class NestedLoopsJoin(JoinOp):
                 output_records.append(join_output_record)
                 output_record_op_stats.append(join_output_record_op_stats)
                 print(f"{self.join_idx} JOINED")
+
+        # compute the number of inputs processed
+        num_inputs_processed = len(join_candidates)
 
         # store input records to join with new records added later
         self._left_input_records.extend(left_candidates)
@@ -422,106 +422,97 @@ class EmbeddingJoin(JoinOp):
         # construct kwargs for generation
         gen_kwargs = {"project_cols": input_fields, "join_condition": self.condition}
 
-        # TODO: need to ensure that futures are executed and collected before embedding sims are used
-        # apply the generator to each pair of candidates
+        # TODO: add embeddings to join candidates
+        # create the set of candidates to join
+        join_candidates = []
+        for candidate, embedding in zip(left_candidates, left_embeddings):
+            for right_candidate, right_embedding in zip(right_candidates, right_embeddings):
+                embedding_sim = compute_similarity(embedding, right_embedding)
+                join_candidates.append((candidate, right_candidate, embedding_sim))
+            for right_candidate, right_embedding in self._right_input_records:
+                embedding_sim = compute_similarity(embedding, right_embedding)
+                join_candidates.append((candidate, right_candidate, embedding_sim))
+        for candidate, embedding in self._left_input_records:
+            for right_candidate, right_embedding in zip(right_candidates, right_embeddings):
+                embedding_sim = compute_similarity(embedding, right_embedding)
+                join_candidates.append((candidate, right_candidate, embedding_sim))
+
+        # prepare list of output records and their stats
         output_records, output_record_op_stats, num_inputs_processed = [], [], 0
-        with ThreadPoolExecutor(max_workers=self.join_parallelism) as executor:
-            futures = []
-            # join new left candidates with new right candidates
-            for candidate, embedding in zip(left_candidates, left_embeddings):
-                for right_candidate, right_embedding in zip(right_candidates, right_embeddings):
-                    # compute similarity between embeddings and determine if LLM call is needed
-                    embedding_sim = compute_similarity(embedding, right_embedding)
+
+        # draw samples until num_samples is reached
+        if self.samples_drawn < self.num_samples:
+            samples_to_draw = min(self.num_samples - self.samples_drawn, len(join_candidates))
+            join_candidate_samples = join_candidates[:samples_to_draw]
+            join_candidates = join_candidates[samples_to_draw:]
+
+            # apply the generator to each pair of candidates
+            with ThreadPoolExecutor(max_workers=self.join_parallelism) as executor:
+                futures = [
+                    executor.submit(self._process_join_candidate_pair, left_candidate, right_candidate, gen_kwargs, embedding_sim)
+                    for left_candidate, right_candidate, embedding_sim in join_candidate_samples
+                ]
+
+                # collect results as they complete
+                for future in as_completed(futures):
+                    self.join_idx += 1
+                    join_output_record, join_output_record_op_stats, embedding_sim = future.result()
+                    output_records.append(join_output_record)
+                    output_record_op_stats.append(join_output_record_op_stats)
+                    print(f"{self.join_idx} JOINED")
+
+                    # update similarity thresholds
+                    records_joined = join_output_record._passed_operator
+                    if not records_joined and embedding_sim > self.max_non_matching_sim:
+                        self.max_non_matching_sim = embedding_sim
+                    if records_joined and embedding_sim < self.min_matching_sim:
+                        self.min_matching_sim = embedding_sim
+            
+            # update samples drawn and num_inputs_processed
+            self.samples_drawn += samples_to_draw
+            num_inputs_processed += samples_to_draw
+
+        # process remaining candidates based on embedding similarity
+        if len(join_candidates) > 0:
+             assert self.samples_drawn == self.num_samples, "All samples should have been drawn before processing remaining candidates"
+             with ThreadPoolExecutor(max_workers=self.join_parallelism) as executor:
+                futures = []
+                for left_candidate, right_candidate, embedding_sim in join_candidates:
                     llm_call_needed = self.min_matching_sim <= embedding_sim <= self.max_non_matching_sim
 
-                    if self.samples_drawn < self.num_samples or llm_call_needed:
-                        futures.append(executor.submit(self._process_join_candidate_pair, candidate, right_candidate, gen_kwargs, embedding_sim))
-                        self.samples_drawn += 1
+                    if llm_call_needed:
+                        futures.append(executor.submit(self._process_join_candidate_pair, left_candidate, right_candidate, gen_kwargs, embedding_sim))
 
                     elif embedding_sim < self.min_matching_sim:
                         self.join_idx += 1
-                        output_record, record_op_stats = self._process_join_candidate_with_sim(candidate, right_candidate, passed_operator=False)
+                        output_record, record_op_stats = self._process_join_candidate_with_sim(left_candidate, right_candidate, passed_operator=False)
                         output_records.append(output_record)
                         output_record_op_stats.append(record_op_stats)
                         print(f"{self.join_idx} SKIPPED (low sim: {embedding_sim:.4f} < {self.min_matching_sim:.4f})")
 
                     elif embedding_sim > self.max_non_matching_sim:
                         self.join_idx += 1
-                        output_record, record_op_stats = self._process_join_candidate_with_sim(candidate, right_candidate, passed_operator=True)
+                        output_record, record_op_stats = self._process_join_candidate_with_sim(left_candidate, right_candidate, passed_operator=True)
                         output_records.append(output_record)
                         output_record_op_stats.append(record_op_stats)
                         print(f"{self.join_idx} JOINED (high sim: {embedding_sim:.4f} > {self.max_non_matching_sim:.4f})")
 
                     num_inputs_processed += 1
 
-            # join new left candidates with stored right input records
-            for candidate, embedding in zip(left_candidates, left_embeddings):
-                for right_candidate, right_embedding in self._right_input_records:
-                    # compute similarity between embeddings and determine if LLM call is needed
-                    embedding_sim = compute_similarity(embedding, right_embedding)
-                    llm_call_needed = self.min_matching_sim <= embedding_sim <= self.max_non_matching_sim
+                # collect results as they complete
+                for future in as_completed(futures):
+                    self.join_idx += 1
+                    join_output_record, join_output_record_op_stats, embedding_sim = future.result()
+                    output_records.append(join_output_record)
+                    output_record_op_stats.append(join_output_record_op_stats)
+                    print(f"{self.join_idx} JOINED")
 
-                    if self.samples_drawn < self.num_samples or llm_call_needed:
-                        futures.append(executor.submit(self._process_join_candidate_pair, candidate, right_candidate, gen_kwargs, embedding_sim))
-                        self.samples_drawn += 1
-
-                    elif embedding_sim < self.min_matching_sim:
-                        self.join_idx += 1
-                        output_record, record_op_stats = self._process_join_candidate_with_sim(candidate, right_candidate, passed_operator=False)
-                        output_records.append(output_record)
-                        output_record_op_stats.append(record_op_stats)
-                        print(f"{self.join_idx} SKIPPED (low sim: {embedding_sim:.4f} < {self.min_matching_sim:.4f})")
-
-                    elif embedding_sim > self.max_non_matching_sim:
-                        self.join_idx += 1
-                        output_record, record_op_stats = self._process_join_candidate_with_sim(candidate, right_candidate, passed_operator=True)
-                        output_records.append(output_record)
-                        output_record_op_stats.append(record_op_stats)
-                        print(f"{self.join_idx} JOINED (high sim: {embedding_sim:.4f} > {self.max_non_matching_sim:.4f})")
-
-                    num_inputs_processed += 1
-
-            # join new right candidates with stored left input records
-            for candidate, embedding in self._left_input_records:
-                for right_candidate, right_embedding in zip(right_candidates, right_embeddings):
-                    # compute similarity between embeddings and determine if LLM call is needed
-                    embedding_sim = compute_similarity(embedding, right_embedding)
-                    llm_call_needed = self.min_matching_sim <= embedding_sim <= self.max_non_matching_sim
-
-                    if self.samples_drawn < self.num_samples or llm_call_needed:
-                        futures.append(executor.submit(self._process_join_candidate_pair, candidate, right_candidate, gen_kwargs, embedding_sim))
-                        self.samples_drawn += 1
-
-                    elif embedding_sim < self.min_matching_sim:
-                        self.join_idx += 1
-                        output_record, record_op_stats = self._process_join_candidate_with_sim(candidate, right_candidate, passed_operator=False)
-                        output_records.append(output_record)
-                        output_record_op_stats.append(record_op_stats)
-                        print(f"{self.join_idx} SKIPPED (low sim: {embedding_sim:.4f} < {self.min_matching_sim:.4f})")
-
-                    elif embedding_sim > self.max_non_matching_sim:
-                        self.join_idx += 1
-                        output_record, record_op_stats = self._process_join_candidate_with_sim(candidate, right_candidate, passed_operator=True)
-                        output_records.append(output_record)
-                        output_record_op_stats.append(record_op_stats)
-                        print(f"{self.join_idx} JOINED (high sim: {embedding_sim:.4f} > {self.max_non_matching_sim:.4f})")
-
-                    num_inputs_processed += 1
-
-            # collect results as they complete
-            for future in as_completed(futures):
-                self.join_idx += 1
-                join_output_record, join_output_record_op_stats, embedding_sim = future.result()
-                output_records.append(join_output_record)
-                output_record_op_stats.append(join_output_record_op_stats)
-                print(f"{self.join_idx} JOINED")
-
-                # update similarity thresholds
-                records_joined = join_output_record._passed_operator
-                if not records_joined and embedding_sim > self.max_non_matching_sim:
-                    self.max_non_matching_sim = embedding_sim
-                if records_joined and embedding_sim < self.min_matching_sim:
-                    self.min_matching_sim = embedding_sim
+                    # update similarity thresholds
+                    records_joined = join_output_record._passed_operator
+                    if not records_joined and embedding_sim > self.max_non_matching_sim:
+                        self.max_non_matching_sim = embedding_sim
+                    if records_joined and embedding_sim < self.min_matching_sim:
+                        self.min_matching_sim = embedding_sim
 
         # amortize embedding costs over all output records and add to each record's op stats
         amortized_embedding_cost = total_embedding_cost / len(output_record_op_stats) if len(output_record_op_stats) > 0 else 0.0
