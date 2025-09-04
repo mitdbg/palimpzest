@@ -27,7 +27,7 @@ class RAGConvert(LLMConvert):
         self.num_chunks_per_field = num_chunks_per_field
         self.chunk_size = chunk_size
 
-        # crude adjustment factor for naive estimation in no-sentinel setting
+        # crude adjustment factor for naive estimation in unoptimized setting
         self.naive_quality_adjustment = 0.6
 
     def __str__(self):

@@ -25,8 +25,6 @@ class Model(str, Enum):
     GPT_5_MINI = "openai/gpt-5-mini-2025-08-07"
     GPT_5_NANO = "openai/gpt-5-nano-2025-08-07"
     o4_MINI = "openai/o4-mini-2025-04-16"  # noqa: N815
-    TEXT_EMBEDDING_3_SMALL = "text-embedding-3-small"
-    CLIP_VIT_B_32 = "clip-ViT-B-32"
     CLAUDE_3_5_SONNET = "anthropic/claude-3-5-sonnet-20241022"
     CLAUDE_3_7_SONNET = "anthropic/claude-3-7-sonnet-20250219"
     CLAUDE_3_5_HAIKU = "anthropic/claude-3-5-haiku-20241022"
@@ -41,6 +39,8 @@ class Model(str, Enum):
     GPT_4o_MINI_AUDIO_PREVIEW = "openai/gpt-4o-mini-audio-preview"
     VLLM_QWEN_1_5_0_5B_CHAT = "hosted_vllm/qwen/Qwen1.5-0.5B-Chat"
     # o1 = "o1-2024-12-17"
+    TEXT_EMBEDDING_3_SMALL = "text-embedding-3-small"
+    CLIP_VIT_B_32 = "clip-ViT-B-32"
 
     def __repr__(self):
         return f"{self.name}"

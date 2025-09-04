@@ -937,6 +937,7 @@ class PromptFactory:
         # handle prompts w/no images or audio
         else:
             base_prompt = base_prompt.replace("<<image-audio-placeholder>>", "")
+            base_prompt = base_prompt.replace("<<right-image-audio-placeholder>>", "")
             user_messages.append({"role": "user", "type": "text", "content": base_prompt.format(**kwargs)})
 
         return user_messages

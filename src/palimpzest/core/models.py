@@ -223,6 +223,9 @@ class RecordOpStats(BaseModel):
     # the total cost of processing the output tokens; None if this operation did not use an LLM
     total_output_cost: float = 0.0
 
+    # the (possibly amortized) cost of generating embeddings for this record; None if this operation did not use an embedding LLM
+    total_embedding_cost: float = 0.0
+
     # (if applicable) the filter text (or a string representation of the filter function) applied to this record
     filter_str: str | None = None
 

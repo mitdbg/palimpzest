@@ -10,7 +10,7 @@ from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.lib.schemas import AudioFilepath, ImageFilepath, union_schemas
 from palimpzest.core.models import GenerationStats
 from palimpzest.query.generators.generators import Generator
-from palimpzest.query.operators.join import BlockingNestedLoopsJoin, NestedLoopsJoin
+from palimpzest.query.operators.join import EmbeddingJoin, NestedLoopsJoin
 
 if not os.environ.get("OPENAI_API_KEY"):
     from palimpzest.utils.env_helpers import load_env
@@ -57,7 +57,6 @@ def mock_generator_call(candidate, fields, right_candidate=None, json_output=Tru
     return field_answers, reasoning, generation_stats, messages
 
 
-# TODO: test all joins without CI and with assert False
 @pytest.mark.parametrize(
     "left_input_schema",
     [TextInputSchema, ImageInputSchema, AudioInputSchema, TextImageInputSchema, TextAudioInputSchema, ImageAudioInputSchema, TextImageAudioInputSchema],
@@ -70,11 +69,17 @@ def mock_generator_call(candidate, fields, right_candidate=None, json_output=Tru
 )
 @pytest.mark.parametrize(
     "physical_op_class",
-    [NestedLoopsJoin, BlockingNestedLoopsJoin],
-    ids=["nested-loops-join", "blocking-nested-loops-join"],
+    [NestedLoopsJoin, EmbeddingJoin],
+    ids=["nested-loops-join", "embedding-join"],
 )
 def test_join(mocker, left_input_schema, right_input_schema, physical_op_class):
     """Test join operators on simple input"""
+    # RAGConvert and SplitConvert only support text input currently
+    left_has_audio = any(field in left_input_schema.model_fields for field in AudioInputSchema.model_fields)
+    right_has_audio = any(field in right_input_schema.model_fields for field in AudioInputSchema.model_fields)
+    if physical_op_class in [EmbeddingJoin] and (left_has_audio or right_has_audio):
+        pytest.skip(f"{physical_op_class} does not support audio input currently")
+
     # construct the kwargs for the physical operator
     input_schema = union_schemas([left_input_schema, right_input_schema])
     physical_op_kwargs = {
@@ -84,6 +89,8 @@ def test_join(mocker, left_input_schema, right_input_schema, physical_op_class):
         "logical_op_id": "test-join",
         "model": Model.GEMINI_2_5_FLASH,
     }
+    if physical_op_class == EmbeddingJoin:
+        physical_op_kwargs["num_samples"] = 10
 
     # create join operator
     join_op = physical_op_class(**physical_op_kwargs)
@@ -106,3 +113,57 @@ def test_join(mocker, left_input_schema, right_input_schema, physical_op_class):
 
     assert sorted(output_record._schema.model_fields) == sorted(input_schema.model_fields)
     assert output_record._passed_operator
+
+# TODO: uncomment once TODO in EmbeddingJoin is addressed
+# def test_embedding_join(mocker):
+#     """Test EmbeddingJoin operator on simple text input"""
+#     left_candidates = []
+#     for left_idx, animal in enumerate(["elephant", "tiger", "lion", "bear"]):
+#         left_input_record = DataRecord(schema=TextInputSchema, source_indices=[left_idx])
+#         left_input_record['text'] = f"This text describes a {animal}."
+#         left_input_record['age'] = left_idx + 1
+#         left_candidates.append(left_input_record)
+
+#     right_candidates = []
+#     for right_idx, animal in enumerate(["elephant", "giraffe", "lion", "zebra"]):
+#         right_input_record = DataRecord(schema=TextInputSchema, source_indices=[right_idx])
+#         right_input_record['text'] = f"This text describes a {animal}."
+#         right_input_record['age'] = right_idx + 2
+#         right_candidates.append(right_input_record)
+
+#     # construct the kwargs for the physical operator
+#     input_schema = union_schemas([TextInputSchema, TextInputSchema])
+#     physical_op_kwargs = {
+#         "input_schema": input_schema,
+#         "output_schema": input_schema,
+#         "condition": "Do the two inputs describe the same type of animal?",
+#         "logical_op_id": "test-join",
+#         "model": Model.GEMINI_2_5_FLASH,
+#         "num_samples": 8,
+#     }
+
+#     # create join operator
+#     join_op = EmbeddingJoin(**physical_op_kwargs)
+
+#     # only execute LLM calls when running on CI for merge to main
+#     if not os.getenv("CI"):
+#         mock_call = mocker.patch.object(Generator, "__call__", side_effect=mock_generator_call)
+
+#     # apply join operator to the inputs
+#     data_record_set, num_inputs_processed = join_op(left_candidates, right_candidates)
+
+#     # check that the mock was called 8 times (num_samples)
+#     if not os.getenv("CI"):
+#         assert mock_call.call_count == 8
+
+#     # sanity checks on output records and stats
+#     records = data_record_set.data_records
+#     record_op_stats_lst = data_record_set.record_op_stats
+#     assert len(record_op_stats_lst) == 16
+#     assert num_inputs_processed == 16
+#     for output_record in records:
+#         assert sorted(output_record._schema.model_fields) == sorted(input_schema.model_fields)
+
+#     # check that all output record stats have embedding stats
+#     assert all(stats.total_embedding_cost > 0.0 for stats in record_op_stats_lst)
+#     assert sum(record._passed_operator for record in records) == 2

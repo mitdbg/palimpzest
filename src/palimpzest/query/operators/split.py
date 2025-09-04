@@ -27,7 +27,7 @@ class SplitConvert(LLMConvert):
         self.split_generator = Generator(self.model, PromptStrategy.MAP_SPLIT_PROPOSER, self.reasoning_effort, self.api_base, self.cardinality, self.desc, self.verbose)
         self.split_merge_generator = Generator(self.model, PromptStrategy.MAP_SPLIT_MERGER, self.reasoning_effort, self.api_base, self.cardinality, self.desc, self.verbose)
 
-        # crude adjustment factor for naive estimation in no-sentinel setting
+        # crude adjustment factor for naive estimation in unoptimized setting
         self.naive_quality_adjustment = 0.6
 
     def __str__(self):
