@@ -168,6 +168,7 @@ class RetrieveOp(PhysicalOperator):
             op_name=self.op_name(),
             time_per_record=total_time,
             cost_per_record=generation_stats.cost_per_record,
+            total_embedding_cost=generation_stats.cost_per_record,
             answer=answer,
             input_fields=list(self.input_schema.model_fields),
             generated_fields=generated_fields,
