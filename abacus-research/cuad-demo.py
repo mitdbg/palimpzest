@@ -5,9 +5,9 @@ import string
 
 import numpy as np
 import pandas as pd
-from cuad_data_loader import load_cuad_data
 
 import palimpzest as pz
+from cuad_data_loader import load_cuad_data
 from palimpzest.constants import Model
 
 CUAD_CATEGORIES = [

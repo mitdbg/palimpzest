@@ -79,8 +79,7 @@ class Validator:
         Compute the quality of the generated output for the given fields and input_record.
         """
         # create prompt factory
-        prompt_strategy = PromptStrategy.MAP_IMAGE if op.is_image_op() else PromptStrategy.MAP
-        factory = PromptFactory(prompt_strategy, Model.o4_MINI, Cardinality.ONE_TO_ONE) # TODO: switch to o4_MINI after merging in dev
+        factory = PromptFactory(PromptStrategy.MAP, Model.o4_MINI, Cardinality.ONE_TO_ONE)
 
         # get the input messages; strip out the system message(s)
         msg_kwargs = {"output_schema": op.output_schema, "project_cols": op.get_input_fields()}
@@ -116,8 +115,7 @@ class Validator:
         Compute the quality for each record_op_stats object in the given record_set.
         """
         # create prompt factory
-        prompt_strategy = PromptStrategy.MAP_IMAGE if op.is_image_op() else PromptStrategy.MAP
-        factory = PromptFactory(prompt_strategy, Model.o4_MINI, Cardinality.ONE_TO_MANY) # TODO: switch to o4_MINI after merging in dev
+        factory = PromptFactory(PromptStrategy.MAP, Model.o4_MINI, Cardinality.ONE_TO_MANY)
 
         # get the input messages; strip out the system message(s)
         msg_kwargs = {"output_schema": op.output_schema, "project_cols": op.get_input_fields()}
@@ -227,7 +225,7 @@ class Validator:
         # TODO: retrieve k=25; score each item based on relevance; compute F1
         # TODO: support retrieval over images
         # create prompt factory
-        factory = PromptFactory(PromptStrategy.MAP, Model.o4_MINI, Cardinality.ONE_TO_ONE) # TODO: switch to o4_MINI after merging in dev
+        factory = PromptFactory(PromptStrategy.MAP, Model.o4_MINI, Cardinality.ONE_TO_ONE)
 
         # get the input messages; strip out the system message(s)
         msg_kwargs = {"output_schema": op.output_schema, "project_cols": op.get_input_fields()}
