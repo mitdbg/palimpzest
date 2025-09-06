@@ -139,7 +139,6 @@ class ConvertOp(PhysicalOperator, ABC):
                 total_llm_calls=per_record_stats.total_llm_calls,
                 total_embedding_llm_calls=per_record_stats.total_embedding_llm_calls,
                 failed_convert=(not successful_convert),
-                image_operation=self.is_image_conversion(),
                 op_details={k: str(v) for k, v in self.get_id_params().items()},
             )
             for dr in records
@@ -147,11 +146,6 @@ class ConvertOp(PhysicalOperator, ABC):
 
         # create and return the DataRecordSet
         return DataRecordSet(records, record_op_stats_lst)
-
-    @abstractmethod
-    def is_image_conversion(self) -> bool:
-        """Return True if the convert operation processes an image, False otherwise."""
-        pass
 
     @abstractmethod
     def convert(self, candidate: DataRecord, fields: dict[str, FieldInfo]) -> tuple[dict[str, list], GenerationStats]:
@@ -215,11 +209,6 @@ class NonLLMConvert(ConvertOp):
         op = super().__str__()
         op += f"    UDF: {self.udf.__name__}\n"
         return op
-
-    def is_image_conversion(self) -> bool:
-        # NOTE: even if the UDF is processing an image, we do not consider this an image conversion
-        # (the output of this function will be used by the CostModel in a way which does not apply to UDFs)
-        return False
 
     def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         """
@@ -287,7 +276,7 @@ class LLMConvert(ConvertOp):
     def __init__(
         self,
         model: Model,
-        prompt_strategy: PromptStrategy = PromptStrategy.COT_QA,
+        prompt_strategy: PromptStrategy = PromptStrategy.MAP,
         reasoning_effort: str | None = None,
         *args,
         **kwargs,
@@ -330,9 +319,6 @@ class LLMConvert(ConvertOp):
     def get_model_name(self):
         return None if self.model is None else self.model.value
 
-    def is_image_conversion(self) -> bool:
-        return self.prompt_strategy.is_image_prompt()
-
     def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         """
         Compute naive cost estimates for the LLMConvert operation. Implicitly, these estimates
@@ -350,7 +336,7 @@ class LLMConvert(ConvertOp):
 
         # get est. of conversion cost (in USD) per record from model card
         usd_per_input_token = MODEL_CARDS[model_name].get("usd_per_input_token")
-        if getattr(self, "prompt_strategy", None) is not None and self.prompt_strategy.is_audio_prompt():
+        if getattr(self, "prompt_strategy", None) is not None and self.is_audio_op():
             usd_per_input_token = MODEL_CARDS[model_name]["usd_per_audio_input_token"]
 
         model_conversion_usd_per_record = (

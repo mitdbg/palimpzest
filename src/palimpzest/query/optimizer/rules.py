@@ -5,12 +5,17 @@ from itertools import combinations
 
 from palimpzest.constants import AggFunc, Model, PromptStrategy
 from palimpzest.core.data.context_manager import ContextManager
-from palimpzest.core.lib.schemas import AudioBase64, AudioFilepath, ImageBase64, ImageFilepath, ImageURL
+from palimpzest.core.lib.schemas import (
+    AUDIO_FIELD_TYPES,
+    AUDIO_LIST_FIELD_TYPES,
+    IMAGE_FIELD_TYPES,
+    IMAGE_LIST_FIELD_TYPES,
+)
 from palimpzest.prompts import CONTEXT_SEARCH_PROMPT
 from palimpzest.query.operators.aggregate import ApplyGroupByOp, AverageAggregateOp, CountAggregateOp
 from palimpzest.query.operators.compute import SmolAgentsCompute
 from palimpzest.query.operators.convert import LLMConvertBonded, NonLLMConvert
-from palimpzest.query.operators.critique_and_refine_convert import CriticAndRefineConvert
+from palimpzest.query.operators.critique_and_refine import CritiqueAndRefineConvert, CritiqueAndRefineFilter
 from palimpzest.query.operators.distinct import DistinctOp
 from palimpzest.query.operators.filter import LLMFilter, NonLLMFilter
 from palimpzest.query.operators.join import NestedLoopsJoin
@@ -30,43 +35,20 @@ from palimpzest.query.operators.logical import (
     RetrieveScan,
     SearchOperator,
 )
-from palimpzest.query.operators.mixture_of_agents_convert import MixtureOfAgentsConvert
+from palimpzest.query.operators.mixture_of_agents import MixtureOfAgentsConvert, MixtureOfAgentsFilter
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.project import ProjectOp
-from palimpzest.query.operators.rag_convert import RAGConvert
+from palimpzest.query.operators.rag import RAGConvert, RAGFilter
 from palimpzest.query.operators.retrieve import RetrieveOp
 from palimpzest.query.operators.scan import ContextScanOp, MarshalAndScanDataOp
 from palimpzest.query.operators.search import (
     SmolAgentsSearch,  # SmolAgentsCustomManagedSearch,  # SmolAgentsManagedSearch
 )
-from palimpzest.query.operators.split_convert import SplitConvert
+from palimpzest.query.operators.split import SplitConvert, SplitFilter
 from palimpzest.query.optimizer.primitives import Expression, Group, LogicalExpression, PhysicalExpression
 
 logger = logging.getLogger(__name__)
 
-# DEFINITIONS
-IMAGE_LIST_FIELD_TYPES = [
-    list[ImageBase64],
-    list[ImageFilepath],
-    list[ImageURL],
-    list[ImageBase64] | None,
-    list[ImageFilepath] | None,
-    list[ImageURL] | None,
-]
-IMAGE_FIELD_TYPES = IMAGE_LIST_FIELD_TYPES + [
-    ImageBase64, ImageFilepath, ImageURL,
-    ImageBase64 | None, ImageFilepath | None, ImageURL | None,
-]
-AUDIO_LIST_FIELD_TYPES = [
-    list[AudioBase64],
-    list[AudioFilepath],
-    list[AudioBase64] | None,
-    list[AudioFilepath] | None,
-]
-AUDIO_FIELD_TYPES = AUDIO_LIST_FIELD_TYPES + [
-    AudioBase64, AudioFilepath,
-    AudioBase64 | None, AudioFilepath | None,
-]
 
 class Rule:
     """
@@ -496,22 +478,11 @@ class LLMConvertBondedRule(ImplementationRule):
 
         # create variable physical operator kwargs for each model which can implement this logical_expression
         models = [model for model in runtime_kwargs["available_models"] if cls._model_matches_input(model, logical_expression)]
-        # NOTE: right now we exclusively allow image or audio operations, but not both simultaneously
-        prompt_strategy, no_reasoning_prompt_strategy = None, None
         no_reasoning = runtime_kwargs["reasoning_effort"] in [None, "minimal", "low"]
-        if cls._is_text_only_operation(logical_expression):
-            prompt_strategy = PromptStrategy.COT_QA
-            no_reasoning_prompt_strategy = PromptStrategy.COT_QA_NO_REASONING
-        elif cls._is_image_operation(logical_expression):
-            prompt_strategy = PromptStrategy.COT_QA_IMAGE
-            no_reasoning_prompt_strategy = PromptStrategy.COT_QA_IMAGE_NO_REASONING
-        elif cls._is_audio_operation(logical_expression):
-            prompt_strategy = PromptStrategy.COT_QA_AUDIO
-            no_reasoning_prompt_strategy = PromptStrategy.COT_QA_AUDIO_NO_REASONING
         variable_op_kwargs = [
             {
                 "model": model,
-                "prompt_strategy": no_reasoning_prompt_strategy if model.is_reasoning_model() and no_reasoning else prompt_strategy,
+                "prompt_strategy": PromptStrategy.MAP_NO_REASONING if model.is_reasoning_model() and no_reasoning else PromptStrategy.MAP,
                 "reasoning_effort": runtime_kwargs["reasoning_effort"],
             }
             for model in models
@@ -520,9 +491,9 @@ class LLMConvertBondedRule(ImplementationRule):
         return cls._perform_substitution(logical_expression, LLMConvertBonded, runtime_kwargs, variable_op_kwargs)
 
 
-class RAGConvertRule(ImplementationRule):
+class RAGRule(ImplementationRule):
     """
-    Substitute a logical expression for a ConvertScan with a RAGConvert physical implementation.
+    Implementation rule for the RAG operators.
     """
 
     num_chunks_per_fields = [1, 2, 4]
@@ -531,20 +502,23 @@ class RAGConvertRule(ImplementationRule):
     @classmethod
     def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
         logical_op = logical_expression.operator
-        is_match = isinstance(logical_op, ConvertScan) and cls._is_text_only_operation(logical_expression) and logical_op.udf is None
-        logger.debug(f"RAGConvertRule matches_pattern: {is_match} for {logical_expression}")
-        return is_match
+        is_map_match = isinstance(logical_op, ConvertScan) and cls._is_text_only_operation(logical_expression) and logical_op.udf is None
+        is_filter_match = isinstance(logical_op, FilteredScan) and cls._is_text_only_operation(logical_expression) and logical_op.filter.filter_fn is None
+        logger.debug(f"RAGRule matches_pattern: {is_map_match or is_filter_match} for {logical_expression}")
+        return is_map_match or is_filter_match
 
     @classmethod
     def substitute(cls, logical_expression: LogicalExpression, **runtime_kwargs) -> set[PhysicalExpression]:
-        logger.debug(f"Substituting RAGConvertRule for {logical_expression}")
+        logger.debug(f"Substituting RAGRule for {logical_expression}")
+        # select physical operator class based on whether this is a map or filter operation
+        phys_op_cls = RAGConvert if isinstance(logical_expression.operator, ConvertScan) else RAGFilter
 
         # create variable physical operator kwargs for each model which can implement this logical_expression
         models = [model for model in runtime_kwargs["available_models"] if cls._model_matches_input(model, logical_expression)]
         variable_op_kwargs = [
             {
                 "model": model,
-                "prompt_strategy": PromptStrategy.COT_QA,
+                "prompt_strategy": PromptStrategy.MAP if phys_op_cls is RAGConvert else PromptStrategy.FILTER,
                 "num_chunks_per_field": num_chunks_per_field,
                 "chunk_size": chunk_size,
                 "reasoning_effort": runtime_kwargs["reasoning_effort"],
@@ -554,12 +528,12 @@ class RAGConvertRule(ImplementationRule):
             for chunk_size in cls.chunk_sizes
         ]
 
-        return cls._perform_substitution(logical_expression, RAGConvert, runtime_kwargs, variable_op_kwargs)
+        return cls._perform_substitution(logical_expression, phys_op_cls, runtime_kwargs, variable_op_kwargs)
 
 
-class MixtureOfAgentsConvertRule(ImplementationRule):
+class MixtureOfAgentsRule(ImplementationRule):
     """
-    Implementation rule for the MixtureOfAgentsConvert operator.
+    Implementation rule for the MixtureOfAgents operators.
     """
 
     num_proposer_models = [1, 2, 3]
@@ -568,26 +542,25 @@ class MixtureOfAgentsConvertRule(ImplementationRule):
     @classmethod
     def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
         logical_op = logical_expression.operator
-        # TODO: remove audio limitation once I add prompts
-        is_match = isinstance(logical_op, ConvertScan) and logical_op.udf is None and not cls._is_audio_operation(logical_expression)
-        logger.debug(f"MixtureOfAgentsConvertRule matches_pattern: {is_match} for {logical_expression}")
-        return is_match
+        is_map_match = isinstance(logical_op, ConvertScan) and logical_op.udf is None
+        is_filter_match = isinstance(logical_op, FilteredScan) and logical_op.filter.filter_fn is None
+        logger.debug(f"MixtureOfAgentsRule matches_pattern: {is_map_match or is_filter_match} for {logical_expression}")
+        return is_map_match or is_filter_match
 
     @classmethod
     def substitute(cls, logical_expression: LogicalExpression, **runtime_kwargs) -> set[PhysicalExpression]:
-        logger.debug(f"Substituting MixtureOfAgentsConvertRule for {logical_expression}")
+        logger.debug(f"Substituting MixtureOfAgentsRule for {logical_expression}")
+        # select physical operator class based on whether this is a map or filter operation
+        phys_op_cls = MixtureOfAgentsConvert if isinstance(logical_expression.operator, ConvertScan) else MixtureOfAgentsFilter
 
         # create variable physical operator kwargs for each model which can implement this logical_expression
         proposer_model_set = {model for model in runtime_kwargs["available_models"] if cls._model_matches_input(model, logical_expression)}
         aggregator_model_set = {model for model in runtime_kwargs["available_models"] if model.is_text_model()}
-        proposer_prompt_strategy = PromptStrategy.COT_MOA_PROPOSER_IMAGE if cls._is_image_operation(logical_expression) else PromptStrategy.COT_MOA_PROPOSER
         variable_op_kwargs = [
             {
                 "proposer_models": list(proposer_models),
                 "temperatures": [temp] * len(proposer_models),
                 "aggregator_model": aggregator_model,
-                "proposer_prompt_strategy": proposer_prompt_strategy,
-                "aggregator_prompt_strategy": PromptStrategy.COT_MOA_AGG,
                 "reasoning_effort": runtime_kwargs["reasoning_effort"],
             }
             for k in cls.num_proposer_models
@@ -596,35 +569,36 @@ class MixtureOfAgentsConvertRule(ImplementationRule):
             for aggregator_model in aggregator_model_set
         ]
 
-        return cls._perform_substitution(logical_expression, MixtureOfAgentsConvert, runtime_kwargs, variable_op_kwargs)
+        return cls._perform_substitution(logical_expression, phys_op_cls, runtime_kwargs, variable_op_kwargs)
 
 
-class CriticAndRefineConvertRule(ImplementationRule):
+class CritiqueAndRefineRule(ImplementationRule):
     """
-    Implementation rule for the CriticAndRefineConvert operator.
+    Implementation rule for the CritiqueAndRefine operators.
     """
 
     @classmethod
     def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
         logical_op = logical_expression.operator
-        # TODO: remove audio limitation once I add prompts
-        is_match = isinstance(logical_op, ConvertScan) and logical_op.udf is None and not cls._is_audio_operation(logical_expression)
-        logger.debug(f"CriticAndRefineConvertRule matches_pattern: {is_match} for {logical_expression}")
-        return is_match
+        is_map_match = isinstance(logical_op, ConvertScan) and logical_op.udf is None
+        is_filter_match = isinstance(logical_op, FilteredScan) and logical_op.filter.filter_fn is None
+        logger.debug(f"CritiqueAndRefineRule matches_pattern: {is_map_match or is_filter_match} for {logical_expression}")
+        return is_map_match or is_filter_match
 
     @classmethod
     def substitute(cls, logical_expression: LogicalExpression, **runtime_kwargs) -> set[PhysicalExpression]:
-        logger.debug(f"Substituting CriticAndRefineConvertRule for {logical_expression}")
+        logger.debug(f"Substituting CritiqueAndRefineRule for {logical_expression}")
+        # select physical operator class based on whether this is a map or filter operation
+        phys_op_cls = CritiqueAndRefineConvert if isinstance(logical_expression.operator, ConvertScan) else CritiqueAndRefineFilter
 
         # create variable physical operator kwargs for each model which can implement this logical_expression
         models = [model for model in runtime_kwargs["available_models"] if cls._model_matches_input(model, logical_expression)]
-        prompt_strategy = PromptStrategy.COT_QA_IMAGE if cls._is_image_operation(logical_expression) else PromptStrategy.COT_QA
         variable_op_kwargs = [
             {
                 "model": model,
                 "critic_model": critic_model,
                 "refine_model": refine_model,
-                "prompt_strategy": prompt_strategy,
+                "prompt_strategy": PromptStrategy.MAP if phys_op_cls is CritiqueAndRefineConvert else PromptStrategy.FILTER,
                 "reasoning_effort": runtime_kwargs["reasoning_effort"],
             }
             for model in models
@@ -632,12 +606,12 @@ class CriticAndRefineConvertRule(ImplementationRule):
             for refine_model in models
         ]
 
-        return cls._perform_substitution(logical_expression, CriticAndRefineConvert, runtime_kwargs, variable_op_kwargs)
+        return cls._perform_substitution(logical_expression, phys_op_cls, runtime_kwargs, variable_op_kwargs)
 
 
-class SplitConvertRule(ImplementationRule):
+class SplitRule(ImplementationRule):
     """
-    Substitute a logical expression for a ConvertScan with a SplitConvert physical implementation.
+    Implementation rule for the Split operators.
     """
     num_chunks = [2, 4, 6]
     min_size_to_chunk = [1000, 4000]
@@ -645,13 +619,16 @@ class SplitConvertRule(ImplementationRule):
     @classmethod
     def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
         logical_op = logical_expression.operator
-        is_match = isinstance(logical_op, ConvertScan) and cls._is_text_only_operation() and logical_op.udf is None
-        logger.debug(f"SplitConvertRule matches_pattern: {is_match} for {logical_expression}")
-        return is_match
+        is_map_match = isinstance(logical_op, ConvertScan) and cls._is_text_only_operation() and logical_op.udf is None
+        is_filter_match = isinstance(logical_op, FilteredScan) and cls._is_text_only_operation() and logical_op.filter.filter_fn is None
+        logger.debug(f"SplitRule matches_pattern: {is_map_match or is_filter_match} for {logical_expression}")
+        return is_map_match or is_filter_match
 
     @classmethod
     def substitute(cls, logical_expression: LogicalExpression, **runtime_kwargs) -> set[PhysicalExpression]:
-        logger.debug(f"Substituting SplitConvertRule for {logical_expression}")
+        logger.debug(f"Substituting SplitRule for {logical_expression}")
+        # select physical operator class based on whether this is a map or filter operation
+        phys_op_cls = SplitConvert if isinstance(logical_expression.operator, ConvertScan) else SplitFilter
 
         # create variable physical operator kwargs for each model which can implement this logical_expression
         models = [model for model in runtime_kwargs["available_models"] if cls._model_matches_input(model, logical_expression)]
@@ -667,7 +644,7 @@ class SplitConvertRule(ImplementationRule):
             for num_chunks in cls.num_chunks
         ]
 
-        return cls._perform_substitution(logical_expression, SplitConvert, runtime_kwargs, variable_op_kwargs)
+        return cls._perform_substitution(logical_expression, phys_op_cls, runtime_kwargs, variable_op_kwargs)
 
 
 class RetrieveRule(ImplementationRule):
@@ -699,10 +676,8 @@ class NonLLMFilterRule(ImplementationRule):
 
     @classmethod
     def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
-        is_match = (
-            isinstance(logical_expression.operator, FilteredScan)
-            and logical_expression.operator.filter.filter_fn is not None
-        )
+        logical_op = logical_expression.operator
+        is_match = isinstance(logical_op, FilteredScan) and logical_op.filter.filter_fn is not None
         logger.debug(f"NonLLMFilterRule matches_pattern: {is_match} for {logical_expression}")
         return is_match
 
@@ -719,10 +694,8 @@ class LLMFilterRule(ImplementationRule):
 
     @classmethod
     def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
-        is_match = (
-            isinstance(logical_expression.operator, FilteredScan)
-            and logical_expression.operator.filter.filter_condition is not None
-        )
+        logical_op = logical_expression.operator
+        is_match = isinstance(logical_op, FilteredScan) and logical_op.filter.filter_fn is None
         logger.debug(f"LLMFilterRule matches_pattern: {is_match} for {logical_expression}")
         return is_match
 
@@ -732,22 +705,11 @@ class LLMFilterRule(ImplementationRule):
 
         # create variable physical operator kwargs for each model which can implement this logical_expression
         models = [model for model in runtime_kwargs["available_models"] if cls._model_matches_input(model, logical_expression)]
-        # NOTE: right now we exclusively allow image or audio operations, but not both simultaneously
-        prompt_strategy, no_reasoning_prompt_strategy = None, None
         no_reasoning = runtime_kwargs["reasoning_effort"] in [None, "minimal", "low"]
-        if cls._is_text_only_operation(logical_expression):
-            prompt_strategy = PromptStrategy.COT_BOOL
-            no_reasoning_prompt_strategy = PromptStrategy.COT_BOOL_NO_REASONING
-        elif cls._is_image_operation(logical_expression):
-            prompt_strategy = PromptStrategy.COT_BOOL_IMAGE
-            no_reasoning_prompt_strategy = PromptStrategy.COT_BOOL_IMAGE_NO_REASONING
-        elif cls._is_audio_operation(logical_expression):
-            prompt_strategy = PromptStrategy.COT_BOOL_AUDIO
-            no_reasoning_prompt_strategy = PromptStrategy.COT_BOOL_AUDIO_NO_REASONING
         variable_op_kwargs = [
             {
                 "model": model,
-                "prompt_strategy": no_reasoning_prompt_strategy if model.is_reasoning_model() and no_reasoning else prompt_strategy,
+                "prompt_strategy": PromptStrategy.FILTER_NO_REASONING if model.is_reasoning_model() and no_reasoning else PromptStrategy.FILTER,
                 "reasoning_effort": runtime_kwargs["reasoning_effort"]
             }
             for model in models
@@ -773,22 +735,11 @@ class LLMJoinRule(ImplementationRule):
 
         # create variable physical operator kwargs for each model which can implement this logical_expression
         models = [model for model in runtime_kwargs["available_models"] if cls._model_matches_input(model, logical_expression)]
-        # NOTE: right now we exclusively allow image or audio operations, but not both simultaneously
-        prompt_strategy, no_reasoning_prompt_strategy = None, None
         no_reasoning = runtime_kwargs["reasoning_effort"] in [None, "minimal", "low"]
-        if cls._is_text_only_operation(logical_expression):
-            prompt_strategy = PromptStrategy.COT_JOIN
-            no_reasoning_prompt_strategy = PromptStrategy.COT_JOIN_NO_REASONING
-        elif cls._is_image_operation(logical_expression):
-            prompt_strategy = PromptStrategy.COT_JOIN_IMAGE
-            no_reasoning_prompt_strategy = PromptStrategy.COT_JOIN_IMAGE_NO_REASONING
-        elif cls._is_audio_operation(logical_expression):
-            prompt_strategy = PromptStrategy.COT_JOIN_AUDIO
-            no_reasoning_prompt_strategy = PromptStrategy.COT_JOIN_AUDIO_NO_REASONING
         variable_op_kwargs = [
             {
                 "model": model,
-                "prompt_strategy": no_reasoning_prompt_strategy if model.is_reasoning_model() and no_reasoning else prompt_strategy,
+                "prompt_strategy": PromptStrategy.JOIN_NO_REASONING if model.is_reasoning_model() and no_reasoning else PromptStrategy.JOIN,
                 "join_parallelism": runtime_kwargs["join_parallelism"],
                 "reasoning_effort": runtime_kwargs["reasoning_effort"],
             }

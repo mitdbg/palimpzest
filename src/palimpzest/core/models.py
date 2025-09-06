@@ -223,6 +223,9 @@ class RecordOpStats(BaseModel):
     # the total cost of processing the output tokens; None if this operation did not use an LLM
     total_output_cost: float = 0.0
 
+    # the (possibly amortized) cost of generating embeddings for this record; None if this operation did not use an embedding LLM
+    total_embedding_cost: float = 0.0
+
     # (if applicable) the filter text (or a string representation of the filter function) applied to this record
     filter_str: str | None = None
 
@@ -247,9 +250,6 @@ class RecordOpStats(BaseModel):
 
     # (if applicable) a boolean indicating whether this is the statistics captured from a failed convert operation
     failed_convert: bool | None = None
-
-    # (if applicable) a boolean indicating whether this is an image convert/filter operation
-    image_operation: bool | None = None
 
     # an OPTIONAL dictionary with more detailed information about this operation;
     op_details: dict[str, Any] = Field(default_factory=dict)

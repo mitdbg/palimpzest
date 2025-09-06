@@ -1,14 +1,10 @@
-"""This script contains tests for the refactoring of the physical operators"""
+"""This script contains tests for the PhysicalOperator class."""
 
 import os
-import sys
 
 from pydantic import BaseModel, Field
 
 from palimpzest.query.operators.physical import PhysicalOperator
-
-sys.path.append("./tests/")
-sys.path.append("./tests/refactor-tests/")
 
 if not os.environ.get("OPENAI_API_KEY"):
     from palimpzest.utils.env_helpers import load_env

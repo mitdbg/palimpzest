@@ -6,6 +6,8 @@ from palimpzest.query.operators.convert import ConvertOp as _ConvertOp
 from palimpzest.query.operators.convert import LLMConvert as _LLMConvert
 from palimpzest.query.operators.convert import LLMConvertBonded as _LLMConvertBonded
 from palimpzest.query.operators.convert import NonLLMConvert as _NonLLMConvert
+from palimpzest.query.operators.critique_and_refine import CritiqueAndRefineConvert as _CritiqueAndRefineConvert
+from palimpzest.query.operators.critique_and_refine import CritiqueAndRefineFilter as _CritiqueAndRefineFilter
 from palimpzest.query.operators.distinct import DistinctOp as _DistinctOp
 from palimpzest.query.operators.filter import FilterOp as _FilterOp
 from palimpzest.query.operators.filter import LLMFilter as _LLMFilter
@@ -46,12 +48,17 @@ from palimpzest.query.operators.logical import (
 from palimpzest.query.operators.logical import (
     RetrieveScan as _RetrieveScan,
 )
-from palimpzest.query.operators.mixture_of_agents_convert import MixtureOfAgentsConvert as _MixtureOfAgentsConvert
+from palimpzest.query.operators.mixture_of_agents import MixtureOfAgentsConvert as _MixtureOfAgentsConvert
+from palimpzest.query.operators.mixture_of_agents import MixtureOfAgentsFilter as _MixtureOfAgentsFilter
 from palimpzest.query.operators.physical import PhysicalOperator as _PhysicalOperator
 from palimpzest.query.operators.project import ProjectOp as _ProjectOp
+from palimpzest.query.operators.rag import RAGConvert as _RAGConvert
+from palimpzest.query.operators.rag import RAGFilter as _RAGFilter
 from palimpzest.query.operators.retrieve import RetrieveOp as _RetrieveOp
 from palimpzest.query.operators.scan import MarshalAndScanDataOp as _MarshalAndScanDataOp
 from palimpzest.query.operators.scan import ScanPhysicalOp as _ScanPhysicalOp
+from palimpzest.query.operators.split import SplitConvert as _SplitConvert
+from palimpzest.query.operators.split import SplitFilter as _SplitFilter
 
 LOGICAL_OPERATORS = [
     _LogicalOperator,
@@ -72,6 +79,8 @@ PHYSICAL_OPERATORS = (
     [_AggregateOp, _ApplyGroupByOp, _AverageAggregateOp, _CountAggregateOp]
     # convert
     + [_ConvertOp, _NonLLMConvert, _LLMConvert, _LLMConvertBonded]
+    # critique and refine
+    + [_CritiqueAndRefineConvert, _CritiqueAndRefineFilter]
     # distinct
     + [_DistinctOp]
     # scan
@@ -83,13 +92,17 @@ PHYSICAL_OPERATORS = (
     # limit
     + [_LimitScanOp]
     # mixture-of-agents
-    + [_MixtureOfAgentsConvert]
+    + [_MixtureOfAgentsConvert, _MixtureOfAgentsFilter]
     # physical
     + [_PhysicalOperator]
     # project
     + [_ProjectOp]
+    # rag
+    + [_RAGConvert, _RAGFilter]
     # retrieve
     + [_RetrieveOp]
+    # split
+    + [_SplitConvert, _SplitFilter]
 )
 
 __all__ = [

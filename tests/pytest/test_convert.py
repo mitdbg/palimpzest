@@ -31,7 +31,7 @@ def test_convert(mocker, convert_op, side_effect, email_schema, enron_eval_tiny)
         input_schema=File,
         output_schema=email_schema,
         model=Model.GPT_4o,
-        prompt_strategy=PromptStrategy.COT_QA,
+        prompt_strategy=PromptStrategy.MAP,
         logical_op_id="test_convert",
     )
 
