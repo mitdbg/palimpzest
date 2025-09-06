@@ -56,6 +56,12 @@ def mock_generator_call(candidate, fields, right_candidate=None, json_output=Tru
     messages = []
     return field_answers, reasoning, generation_stats, messages
 
+def embedding_join_mock_generator_call(candidate, fields, right_candidate=None, json_output=True, **kwargs):
+    field_answers = {"passed_operator": candidate['text'] == right_candidate['text']}
+    reasoning = "The input matches that of an elephant."
+    generation_stats = GenerationStats(cost_per_record=1.0, time_per_record=1.0, num_input_tokens=10, num_output_tokens=10)
+    messages = []
+    return field_answers, reasoning, generation_stats, messages
 
 @pytest.mark.parametrize(
     "left_input_schema",
@@ -80,6 +86,10 @@ def test_join(mocker, left_input_schema, right_input_schema, physical_op_class):
     if physical_op_class in [EmbeddingJoin] and (left_has_audio or right_has_audio):
         pytest.skip(f"{physical_op_class} does not support audio input currently")
 
+    audio_input_schemas = [AudioInputSchema, TextAudioInputSchema, ImageAudioInputSchema, TextImageAudioInputSchema]
+    if os.getenv("CI") and (left_input_schema in audio_input_schemas or right_input_schema in audio_input_schemas):
+        pytest.skip("Skipping multi-modal audio tests on CI which does not have access to gemini models")
+
     # construct the kwargs for the physical operator
     input_schema = union_schemas([left_input_schema, right_input_schema])
     physical_op_kwargs = {
@@ -87,7 +97,7 @@ def test_join(mocker, left_input_schema, right_input_schema, physical_op_class):
         "output_schema": input_schema,
         "condition": "Do the two inputs describe the same type of animal?",
         "logical_op_id": "test-join",
-        "model": Model.GEMINI_2_5_FLASH,
+        "model": Model.GPT_5_MINI if os.getenv("CI") else Model.GEMINI_2_5_FLASH,
     }
     if physical_op_class == EmbeddingJoin:
         physical_op_kwargs["num_samples"] = 10
@@ -137,7 +147,7 @@ def test_embedding_join(mocker):
         "output_schema": input_schema,
         "condition": "Do the two inputs describe the same type of animal?",
         "logical_op_id": "test-join",
-        "model": Model.GEMINI_2_5_FLASH,
+        "model": Model.GPT_5_MINI,
         "num_samples": 8,
     }
 
@@ -146,7 +156,7 @@ def test_embedding_join(mocker):
 
     # only execute LLM calls when running on CI for merge to main
     if not os.getenv("CI"):
-        mock_call = mocker.patch.object(Generator, "__call__", side_effect=mock_generator_call)
+        mock_call = mocker.patch.object(Generator, "__call__", side_effect=embedding_join_mock_generator_call)
 
     # apply join operator to the inputs
     data_record_set, num_inputs_processed = join_op(left_candidates, right_candidates)

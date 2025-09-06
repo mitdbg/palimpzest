@@ -66,26 +66,34 @@ def test_map(mocker, input_schema, physical_op_class):
     if physical_op_class in [RAGConvert, SplitConvert] and input_schema != TextInputSchema:
         pytest.skip(f"{physical_op_class} only supports text input currently")
 
+    if os.getenv("CI") and input_schema in [AudioInputSchema, TextAudioInputSchema, ImageAudioInputSchema, TextImageAudioInputSchema]:
+        pytest.skip("Skipping audio tests on CI which does not have access to gemini models")
+
+    model = Model.GPT_5_MINI if os.getenv("CI") else Model.GEMINI_2_5_FLASH
+    proposer_models = [Model.GPT_5, Model.GPT_5_NANO] if os.getenv("CI") else [Model.GEMINI_2_5_PRO, Model.GEMINI_2_0_FLASH]
+    critic_model = Model.GPT_5_NANO if os.getenv("CI") else Model.GEMINI_2_0_FLASH
+    refine_model = Model.GPT_5 if os.getenv("CI") else Model.GEMINI_2_5_PRO
+
     # construct the kwargs for the physical operator
     physical_op_kwargs = {"input_schema": input_schema, "output_schema": OutputSchema, "logical_op_id": "test-map"}
     if physical_op_class is LLMConvertBonded:
-        physical_op_kwargs["model"] = Model.GEMINI_2_5_FLASH
+        physical_op_kwargs["model"] = model
     elif physical_op_class is RAGConvert:
-        physical_op_kwargs["model"] = Model.GEMINI_2_5_FLASH
+        physical_op_kwargs["model"] = model
         physical_op_kwargs["num_chunks_per_field"] = 1
         physical_op_kwargs["chunk_size"] = 1000
     elif physical_op_class is SplitConvert:
-        physical_op_kwargs["model"] = Model.GEMINI_2_5_FLASH
+        physical_op_kwargs["model"] = model
         physical_op_kwargs["num_chunks"] = 2
         physical_op_kwargs["min_size_to_chunk"] = 1000
     elif physical_op_class is MixtureOfAgentsConvert:
-        physical_op_kwargs["proposer_models"] = [Model.GEMINI_2_5_PRO, Model.GEMINI_2_0_FLASH]
+        physical_op_kwargs["proposer_models"] = proposer_models
         physical_op_kwargs["temperatures"] = [0.8, 0.8]
-        physical_op_kwargs["aggregator_model"] = Model.GEMINI_2_5_FLASH
+        physical_op_kwargs["aggregator_model"] = model
     elif physical_op_class is CritiqueAndRefineConvert:
-        physical_op_kwargs["model"] = Model.GEMINI_2_5_FLASH
-        physical_op_kwargs["critic_model"] = Model.GEMINI_2_0_FLASH
-        physical_op_kwargs["refine_model"] = Model.GEMINI_2_5_PRO
+        physical_op_kwargs["model"] = model
+        physical_op_kwargs["critic_model"] = critic_model
+        physical_op_kwargs["refine_model"] = refine_model
 
     # create map operator
     map_op = physical_op_class(**physical_op_kwargs)
