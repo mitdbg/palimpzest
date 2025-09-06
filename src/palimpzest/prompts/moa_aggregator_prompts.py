@@ -1,7 +1,7 @@
 """This file contains prompts for Mixture-of-Agents aggregator operations."""
 
 ### SYSTEM PROMPTS ###
-COT_MOA_AGG_BASE_SYSTEM_PROMPT = """You are a helpful assistant whose job is to generate a JSON object.
+MAP_MOA_AGG_BASE_SYSTEM_PROMPT = """You are a helpful assistant whose job is to generate a JSON object.
 You will be presented with one or more outputs produced by a set of models. Your task is to synthesize these responses into a single, high-quality JSON object which fills in the output fields with the correct values.
 It is crucial to critically evaluate the information provided in these responses, recognizing that some of it may be biased or incorrect.
 
@@ -35,8 +35,38 @@ ANSWER:
 ---
 """
 
+FILTER_MOA_AGG_BASE_SYSTEM_PROMPT = """You are a helpful assistant whose job is to answer a TRUE/FALSE question.
+You will be presented with one or more outputs produced by a set of models. Your task is to synthesize these responses into a single TRUE/FALSE answer.
+It is crucial to critically evaluate the information provided in these responses, recognizing that some of it may be biased or incorrect.
+
+You will also be provided with a description of each input field and the filter condition.
+
+Remember, your answer must be TRUE or FALSE. Finish your response with a newline character followed by ---
+
+An example is shown below:
+---
+MODEL RESPONSE 1: The context describes Augusta Ada King, Countess of Lovelace, also known as Ada Lovelace, who is widely recognized as a foundational figure in computer science. Therefore, the answer is TRUE.
+
+MODEL RESPONSE 2: Based on the context provided, Ada Lovelace is indeed a foundational computer scientist, therefore the answer is TRUE.
+
+INPUT FIELDS:
+- text: a text passage describing a scientist
+- birthday: the scientist's birthday
+- image: an image of the scientist
+- recording: an audio recording of a newscast about the scientist's contributions to their field
+
+FILTER CONDITION: The subject of the input is a foundational computer scientist.
+
+Let's think step-by-step in order to answer the question.
+
+REASONING: Both model responses agree that the context describes Ada Lovelace, who is widely recognized as a foundational figure in computer science. The evidence from the text passage supports this conclusion.
+
+ANSWER: TRUE
+---
+"""
+
 ### USER / INSTANCE-SPECIFIC PROMPTS ###
-COT_MOA_AGG_BASE_USER_PROMPT = """You are a helpful assistant whose job is to generate a JSON object.
+MAP_MOA_AGG_BASE_USER_PROMPT = """You are a helpful assistant whose job is to generate a JSON object.
 You will be presented with one or more outputs produced by a set of models. Your task is to synthesize these responses into a single, high-quality JSON object which fills in the output fields with the correct values.
 It is crucial to critically evaluate the information provided in these responses, recognizing that some of it may be biased or incorrect.
 
@@ -51,6 +81,25 @@ INPUT FIELDS:
 
 OUTPUT FIELDS:
 {output_fields_desc}
+
+Let's think step-by-step in order to answer the question.
+
+REASONING: """
+
+FILTER_MOA_AGG_BASE_USER_PROMPT = """You are a helpful assistant whose job is to answer a TRUE/FALSE question.
+You will be presented with one or more outputs produced by a set of models. Your task is to synthesize these responses into a single TRUE/FALSE answer.
+It is crucial to critically evaluate the information provided in these responses, recognizing that some of it may be biased or incorrect.
+
+You will also be provided with a description of each input field and the filter condition.
+
+Remember, your answer must be TRUE or FALSE. Finish your response with a newline character followed by ---
+---
+{model_responses}
+
+INPUT FIELDS:
+{input_fields_desc}
+
+FILTER CONDITION: {filter_condition}
 
 Let's think step-by-step in order to answer the question.
 

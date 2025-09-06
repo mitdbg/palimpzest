@@ -7,6 +7,7 @@ docs/build/*
 docs/source/generated/*
 dist/*
 .vscode/*
+.idea/*
 .chroma
 .chroma-biodex
 .chroma-mmqa
@@ -31,6 +32,7 @@ testdata/*.tar.gz
 
 # virtual environment(s)
 venv/
+uv.lock
 
 # tmp
 testdata/maildir/

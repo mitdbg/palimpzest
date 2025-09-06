@@ -79,8 +79,7 @@ class Validator:
         Compute the quality of the generated output for the given fields and input_record.
         """
         # create prompt factory
-        prompt_strategy = PromptStrategy.COT_QA_IMAGE if op.is_image_conversion() else PromptStrategy.COT_QA
-        factory = PromptFactory(prompt_strategy, Model.o4_MINI, Cardinality.ONE_TO_ONE) # TODO: switch to o4_MINI after merging in dev
+        factory = PromptFactory(PromptStrategy.MAP, Model.o4_MINI, Cardinality.ONE_TO_ONE)
 
         # get the input messages; strip out the system message(s)
         msg_kwargs = {"output_schema": op.output_schema, "project_cols": op.get_input_fields()}
@@ -94,7 +93,7 @@ class Validator:
         score, gen_stats = None, GenerationStats()
         try:
             start_time = time.time()
-            validator_prompt = MAP_IMAGE_VALIDATOR_PROMPT if op.is_image_conversion() else MAP_VALIDATOR_PROMPT
+            validator_prompt = MAP_IMAGE_VALIDATOR_PROMPT if op.is_image_op() else MAP_VALIDATOR_PROMPT
             val_messages = [{"role": "system", "content": validator_prompt}] + input_messages + [{"role": "user", "content": output_message}]
             completion = litellm.completion(model="openai/o4-mini", messages=val_messages)
             completion_text = completion.choices[0].message.content
@@ -116,8 +115,7 @@ class Validator:
         Compute the quality for each record_op_stats object in the given record_set.
         """
         # create prompt factory
-        prompt_strategy = PromptStrategy.COT_QA_IMAGE if op.is_image_conversion() else PromptStrategy.COT_QA
-        factory = PromptFactory(prompt_strategy, Model.o4_MINI, Cardinality.ONE_TO_MANY) # TODO: switch to o4_MINI after merging in dev
+        factory = PromptFactory(PromptStrategy.MAP, Model.o4_MINI, Cardinality.ONE_TO_MANY)
 
         # get the input messages; strip out the system message(s)
         msg_kwargs = {"output_schema": op.output_schema, "project_cols": op.get_input_fields()}
@@ -131,7 +129,7 @@ class Validator:
         score, gen_stats = None, GenerationStats()
         try:
             start_time = time.time()
-            validator_prompt = FLAT_MAP_IMAGE_VALIDATOR_PROMPT if op.is_image_conversion() else FLAT_MAP_VALIDATOR_PROMPT
+            validator_prompt = FLAT_MAP_IMAGE_VALIDATOR_PROMPT if op.is_image_op() else FLAT_MAP_VALIDATOR_PROMPT
             val_messages = [{"role": "system", "content": validator_prompt}] + input_messages + [{"role": "user", "content": output_message}]
             completion = litellm.completion(model="openai/o4-mini", messages=val_messages)
             completion_text = completion.choices[0].message.content
@@ -163,7 +161,7 @@ class Validator:
             validator_op.model = Model.o4_MINI
             try:
                 target_record_set = validator_op(input_record)
-                label = target_record_set[0].passed_operator
+                label = target_record_set[0]._passed_operator
                 self.filter_cache[filter_input_hash] = label
                 score = label == output
                 record_op_stats = target_record_set.record_op_stats[0]
@@ -196,7 +194,7 @@ class Validator:
             validator_op.model = Model.o4_MINI
             try:
                 target_record_set = validator_op([left_input_record], [right_input_record])
-                label = target_record_set[0].passed_operator
+                label = target_record_set[0]._passed_operator
                 self.join_cache[join_input_hash] = label
                 score = label == output
                 record_op_stats = target_record_set.record_op_stats[0]
@@ -227,7 +225,7 @@ class Validator:
         # TODO: retrieve k=25; score each item based on relevance; compute F1
         # TODO: support retrieval over images
         # create prompt factory
-        factory = PromptFactory(PromptStrategy.COT_QA, Model.o4_MINI, Cardinality.ONE_TO_ONE) # TODO: switch to o4_MINI after merging in dev
+        factory = PromptFactory(PromptStrategy.MAP, Model.o4_MINI, Cardinality.ONE_TO_ONE)
 
         # get the input messages; strip out the system message(s)
         msg_kwargs = {"output_schema": op.output_schema, "project_cols": op.get_input_fields()}

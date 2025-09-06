@@ -3,7 +3,7 @@ import pytest
 from palimpzest.policy import MaxQuality
 from palimpzest.query.operators.convert import LLMConvertBonded
 from palimpzest.query.operators.filter import LLMFilter
-from palimpzest.query.operators.rag_convert import RAGConvert
+from palimpzest.query.operators.rag import RAGConvert
 from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.query.processor.query_processor_factory import QueryProcessorFactory
 

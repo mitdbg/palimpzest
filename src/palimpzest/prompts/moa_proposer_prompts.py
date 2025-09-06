@@ -1,7 +1,7 @@
-"""This file contains prompts for SplitAndMerge operations."""
+"""This file contains prompts for MixtureOfAgentsConvert operations."""
 
 ### SYSTEM PROMPTS ###
-MAP_SPLIT_PROPOSER_BASE_SYSTEM_PROMPT = """You are a helpful assistant whose job is to {job_instruction}.
+MAP_MOA_PROPOSER_BASE_SYSTEM_PROMPT = """You are a helpful assistant whose job is to {job_instruction}.
 You will be presented with a context and a set of output fields to generate. Your task is to generate a detailed and succinct analysis describing what you believe is the correct value for each output field.
 Be sure to cite information from the context as evidence of why your answers are correct. Do not hallucinate evidence.
 
@@ -24,7 +24,7 @@ ANSWER: {example_answer}
 ---
 """
 
-FILTER_SPLIT_PROPOSER_BASE_SYSTEM_PROMPT = """You are a helpful assistant whose job is to {job_instruction}.
+FILTER_MOA_PROPOSER_BASE_SYSTEM_PROMPT = """You are a helpful assistant whose job is to {job_instruction}.
 You will be presented with a context and a filter condition. Your task is to generate a detailed and succinct analysis describing whether you believe the input satisfies the filter condition.
 Be sure to cite information from the context as evidence of why your determination is correct. Do not hallucinate evidence.
 
@@ -47,8 +47,8 @@ ANSWER: {example_answer}
 """
 
 ### USER / INSTANCE-SPECIFIC PROMPTS ###
-MAP_SPLIT_PROPOSER_BASE_USER_PROMPT = """You are a helpful assistant whose job is to {job_instruction}.
-You will be presented with a context and a set of output fields to generate. Your task is to generate a paragraph or two which describes what you believe is the correct value for each output field.
+MAP_MOA_PROPOSER_BASE_USER_PROMPT = """You are a helpful assistant whose job is to {job_instruction}.
+You will be presented with a context and a set of output fields to generate. Your task is to generate a detailed and succinct analysis describing what you believe is the correct value for each output field.
 Be sure to cite information from the context as evidence of why your answers are correct. Do not hallucinate evidence.
 {desc_section}
 You will be provided with a description of each input field and each output field.
@@ -66,7 +66,7 @@ Let's think step-by-step in order to answer the question.
 
 ANSWER: """
 
-FILTER_SPLIT_PROPOSER_BASE_USER_PROMPT = """You are a helpful assistant whose job is to {job_instruction}.
+FILTER_MOA_PROPOSER_BASE_USER_PROMPT = """You are a helpful assistant whose job is to {job_instruction}.
 You will be presented with a context and a filter condition. Your task is to generate a detailed and succinct analysis describing whether you believe the input satisfies the filter condition.
 Be sure to cite information from the context as evidence of why your determination is correct. Do not hallucinate evidence.
 {desc_section}

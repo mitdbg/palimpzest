@@ -83,7 +83,7 @@ def scan_convert_filter_expected_outputs(foobar_schema):
             dr.contents = None
             dr.foo = f"foo{source_idx}"
             dr.bar = f"bar{source_idx}"
-            dr.passed_operator = True # bool(source_idx % 2)
+            dr._passed_operator = True # bool(source_idx % 2)
             expected_outputs[source_idx] = DataRecordSet([dr], None)
 
     return expected_outputs
@@ -105,7 +105,7 @@ def scan_convert_filter_varied_expected_outputs(foobar_schema):
             dr.contents = None
             dr.foo = f"foo{source_idx}"
             dr.bar = f"bar{source_idx}-{str(Model.GPT_4o_MINI)}" if source_idx < 6 else f"bar{source_idx}-{str(Model.LLAMA3_1_8B)}"
-            dr.passed_operator = True
+            dr._passed_operator = True
             expected_outputs[source_idx] = DataRecordSet([dr], None)
 
     return expected_outputs
@@ -133,7 +133,7 @@ def scan_multi_convert_multi_filter_expected_outputs(foobar_schema, baz_schema):
             dr.foo = f"foo{source_idx}-one-to-many-{one_to_many_idx}"
             dr.bar = f"bar{source_idx}-{str(Model.GPT_4o_MINI)}"
             dr.baz = f"baz{str(Model.GPT_4o_MINI)}"
-            dr.passed_operator = True
+            dr._passed_operator = True
             drs.append(dr)
 
         expected_outputs[source_idx] = DataRecordSet(drs, None)

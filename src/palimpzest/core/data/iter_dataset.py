@@ -227,7 +227,7 @@ class HTMLFileDataset(BaseFileDataset):
             path (str): The path to the directory
         """
         super().__init__(path=path, id=id, schema=WebPage)
-        assert all([filename.endswith(tuple(constants.HTML_EXTENSIONS)) for filename in self.filepaths])
+        self.filepaths = [fp for fp in self.filepaths if fp.endswith(tuple(constants.HTML_EXTENSIONS))]
 
     def _html_to_text_with_links(self, html: str) -> str:
         # Parse the HTML content
@@ -295,7 +295,7 @@ class ImageFileDataset(BaseFileDataset):
             path (str): The path to the directory
         """
         super().__init__(path=path, id=id, schema=ImageFile)
-        assert all([filename.endswith(tuple(constants.IMAGE_EXTENSIONS)) for filename in self.filepaths])
+        self.filepaths = [fp for fp in self.filepaths if fp.endswith(tuple(constants.IMAGE_EXTENSIONS))]
 
     def __getitem__(self, idx: int) -> dict:
         """
@@ -347,7 +347,7 @@ class PDFFileDataset(BaseFileDataset):
             file_cache_dir (str): The directory to store the temporary files generated during PDF processing
         """
         super().__init__(path=path, id=id, schema=PDFFile)
-        assert all([filename.endswith(tuple(constants.PDF_EXTENSIONS)) for filename in self.filepaths])
+        self.filepaths = [fp for fp in self.filepaths if fp.endswith(tuple(constants.PDF_EXTENSIONS))]
         self.pdfprocessor = pdfprocessor
         self.file_cache_dir = file_cache_dir
 
@@ -432,7 +432,7 @@ class XLSFileDataset(BaseFileDataset):
         Constructor for the `XLSFileDataset` class. The `schema` is set to the `XLSFile` schema.
         """
         super().__init__(path=path, id=id, schema=XLSFile)
-        assert all([filename.endswith(tuple(constants.XLS_EXTENSIONS)) for filename in self.filepaths])
+        self.filepaths = [fp for fp in self.filepaths if fp.endswith(tuple(constants.XLS_EXTENSIONS))]
 
     def __getitem__(self, idx: int) -> dict:
         """
@@ -483,7 +483,7 @@ class AudioFileDataset(BaseFileDirectoryDataset):
             path (str): The path to the directory
         """
         super().__init__(path=path, id=id, schema=AudioFile)
-        assert all([filename.endswith(tuple(constants.AUDIO_EXTENSIONS)) for filename in self.filepaths])
+        self.filepaths = [fp for fp in self.filepaths if fp.endswith(tuple(constants.AUDIO_EXTENSIONS))]
 
     def __getitem__(self, idx: int) -> dict:
         """

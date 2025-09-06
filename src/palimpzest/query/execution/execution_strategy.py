@@ -182,7 +182,7 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
                     elif isinstance(op, LLMFilter):
                         filter_str = op.filter_obj.filter_condition
                         input_record: DataRecord = record_set.input
-                        output = record_set.data_records[0].passed_operator
+                        output = record_set.data_records[0]._passed_operator
                         full_hash = f"{filter_str}{hash(input_record)}"
                         if full_hash not in full_hashes:
                             full_hash_to_bool_output[full_hash] = output
@@ -195,7 +195,7 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
                         for left_idx, left_input_record in enumerate(record_set.input[0]):
                             for right_idx, right_input_record in enumerate(record_set.input[1]):
                                 record_idx = left_idx * len(record_set.input[1]) + right_idx
-                                output = record_set.data_records[record_idx].passed_operator
+                                output = record_set.data_records[record_idx]._passed_operator
                                 full_hash = f"{condition}{hash(left_input_record)}{hash(right_input_record)}"
                                 if full_hash not in full_hashes:
                                     full_hash_to_bool_output[full_hash] = output
@@ -246,7 +246,7 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
                 elif isinstance(op, LLMFilter):
                     filter_str = op.filter_obj.filter_condition
                     input_record: DataRecord = record_set.input
-                    output = record_set.data_records[0].passed_operator
+                    output = record_set.data_records[0]._passed_operator
                     full_hash = f"{filter_str}{hash(input_record)}"
                     if output == full_hash_to_bool_output[full_hash]:
                         record_set.record_op_stats[0].quality = full_hash_to_score[full_hash]
@@ -258,7 +258,7 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
                     for left_idx, left_input_record in enumerate(record_set.input[0]):
                         for right_idx, right_input_record in enumerate(record_set.input[1]):
                             record_idx = left_idx * len(record_set.input[1]) + right_idx
-                            output = record_set.data_records[record_idx].passed_operator
+                            output = record_set.data_records[record_idx]._passed_operator
                             full_hash = f"{condition}{hash(left_input_record)}{hash(right_input_record)}"
                             if output == full_hash_to_bool_output[full_hash]:
                                 record_set.record_op_stats[record_idx].quality = full_hash_to_score[full_hash]

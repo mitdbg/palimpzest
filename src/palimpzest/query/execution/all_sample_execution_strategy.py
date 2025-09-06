@@ -146,7 +146,7 @@ class OpSet:
             input = []
             max_quality_record_set = self.pick_highest_quality_output(record_sets)
             for record in max_quality_record_set:
-                input.append(record if record.passed_operator else None)
+                input.append(record if record._passed_operator else None)
 
             self.source_indices_to_inputs[source_idx] = input
 
