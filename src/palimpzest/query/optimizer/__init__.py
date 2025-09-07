@@ -36,6 +36,9 @@ from palimpzest.query.optimizer.rules import (
     RAGRule as _RAGRule,
 )
 from palimpzest.query.optimizer.rules import (
+    ReorderConverts as _ReorderConverts,
+)
+from palimpzest.query.optimizer.rules import (
     RetrieveRule as _RetrieveRule,
 )
 from palimpzest.query.optimizer.rules import (
@@ -62,6 +65,7 @@ ALL_RULES = [
     _NonLLMFilterRule,
     _PushDownFilter,
     _RAGRule,
+    _ReorderConverts,
     _RetrieveRule,
     _Rule,
     _SplitRule,
