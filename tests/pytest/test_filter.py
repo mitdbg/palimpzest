@@ -64,13 +64,13 @@ def test_filter(mocker, input_schema, physical_op_class):
     if physical_op_class in [RAGFilter, SplitFilter] and input_schema != TextInputSchema:
         pytest.skip(f"{physical_op_class} only supports text input currently")
 
-    if os.getenv("CI") and input_schema in [AudioInputSchema, TextAudioInputSchema, ImageAudioInputSchema, TextImageAudioInputSchema]:
+    if os.getenv("NO_GEMINI") and input_schema in [AudioInputSchema, TextAudioInputSchema, ImageAudioInputSchema, TextImageAudioInputSchema]:
         pytest.skip("Skipping multi-modal audio tests on CI which does not have access to gemini models")
 
-    model = Model.GPT_5_MINI if os.getenv("CI") else Model.GEMINI_2_5_FLASH
-    proposer_models = [Model.GPT_5, Model.GPT_5_NANO] if os.getenv("CI") else [Model.GEMINI_2_5_PRO, Model.GEMINI_2_0_FLASH]
-    critic_model = Model.GPT_5_NANO if os.getenv("CI") else Model.GEMINI_2_0_FLASH
-    refine_model = Model.GPT_5 if os.getenv("CI") else Model.GEMINI_2_5_PRO
+    model = Model.GPT_5_MINI if os.getenv("NO_GEMINI") else Model.GEMINI_2_5_FLASH
+    proposer_models = [Model.GPT_5, Model.GPT_5_NANO] if os.getenv("NO_GEMINI") else [Model.GEMINI_2_5_PRO, Model.GEMINI_2_0_FLASH]
+    critic_model = Model.GPT_5_NANO if os.getenv("NO_GEMINI") else Model.GEMINI_2_0_FLASH
+    refine_model = Model.GPT_5 if os.getenv("NO_GEMINI") else Model.GEMINI_2_5_PRO
 
     # construct the kwargs for the physical operator
     filter = Filter(filter_condition="The animal is an elephant.")

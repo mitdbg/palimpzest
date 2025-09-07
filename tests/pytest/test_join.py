@@ -87,7 +87,7 @@ def test_join(mocker, left_input_schema, right_input_schema, physical_op_class):
         pytest.skip(f"{physical_op_class} does not support audio input currently")
 
     audio_input_schemas = [AudioInputSchema, TextAudioInputSchema, ImageAudioInputSchema, TextImageAudioInputSchema]
-    if os.getenv("CI") and (left_input_schema in audio_input_schemas or right_input_schema in audio_input_schemas):
+    if os.getenv("NO_GEMINI") and (left_input_schema in audio_input_schemas or right_input_schema in audio_input_schemas):
         pytest.skip("Skipping multi-modal audio tests on CI which does not have access to gemini models")
 
     # construct the kwargs for the physical operator
@@ -97,7 +97,7 @@ def test_join(mocker, left_input_schema, right_input_schema, physical_op_class):
         "output_schema": input_schema,
         "condition": "Do the two inputs describe the same type of animal?",
         "logical_op_id": "test-join",
-        "model": Model.GPT_5_MINI if os.getenv("CI") else Model.GEMINI_2_5_FLASH,
+        "model": Model.GPT_5_MINI if os.getenv("NO_GEMINI") else Model.GEMINI_2_5_FLASH,
     }
     if physical_op_class == EmbeddingJoin:
         physical_op_kwargs["num_samples"] = 10
