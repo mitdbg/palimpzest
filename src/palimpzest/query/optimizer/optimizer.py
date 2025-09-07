@@ -37,7 +37,7 @@ from palimpzest.query.optimizer.rules import (
 )
 from palimpzest.query.optimizer.tasks import (
     ApplyRule,
-    ExpandGroup,
+    ExploreGroup,
     OptimizeGroup,
     OptimizeLogicalExpression,
     OptimizePhysicalExpression,
@@ -398,7 +398,7 @@ class Optimizer:
             task = self.tasks_stack.pop(-1)
 
             new_tasks = []
-            if isinstance(task, (OptimizeGroup, ExpandGroup)):
+            if isinstance(task, (OptimizeGroup, ExploreGroup)):
                 new_tasks = task.perform(self.groups)
             elif isinstance(task, OptimizeLogicalExpression):
                 new_tasks = task.perform(self.transformation_rules, self.implementation_rules)

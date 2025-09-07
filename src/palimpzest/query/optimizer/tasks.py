@@ -66,17 +66,19 @@ class OptimizeGroup(Task):
             task = OptimizePhysicalExpression(physical_expr)
             new_tasks.append(task)
 
+        # and first explore the group if it hasn't been explored yet
+        if not group.explored:
+            task = ExploreGroup(self.group_id)
+            new_tasks.append(task)
+
         logger.debug(f"Done optimizing group {self.group_id}")
         logger.debug(f"New tasks: {len(new_tasks)}")
         return new_tasks
 
 
-class ExpandGroup(Task):
+class ExploreGroup(Task):
     """
-    The task to expand a group.
-
-    NOTE: we currently do not use this task, but I'm keeping it around in case we need it
-    once we add join operations.
+    The task to explore a group and add additional logical expressions.
     """
 
     def __init__(self, group_id: int):
@@ -99,6 +101,12 @@ class ExpandGroup(Task):
         for logical_expr in group.logical_expressions:
             task = OptimizeLogicalExpression(logical_expr, exploring=True)
             new_tasks.append(task)
+
+        # but first (tasks are LIFO), we recursively explore input groups of logical expressions in this group
+        for logical_expr in group.logical_expressions:
+            for input_group_id in logical_expr.input_group_ids:
+                task = ExploreGroup(input_group_id)
+                new_tasks.append(task)
 
         # mark the group as explored and return tasks
         group.set_explored()
@@ -131,7 +139,11 @@ class OptimizeLogicalExpression(Task):
             context = {}
 
         # if we're exploring, only apply transformation rules
-        rules = transformation_rules if self.exploring else transformation_rules + implementation_rules
+        rules = (
+            [rule for rule in transformation_rules if rule.is_exploration_rule()]
+            if self.exploring
+            else transformation_rules + implementation_rules
+        )
 
         # filter out rules that have already been applied to logical expression
         rules = list(filter(lambda rule: rule.get_rule_id() not in self.logical_expression.rules_applied, rules))
