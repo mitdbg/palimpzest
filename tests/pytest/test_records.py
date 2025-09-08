@@ -17,9 +17,7 @@ class TestDataRecord:
     @pytest.fixture
     def sample_record(self):
         """Fixture to create a sample DataRecord for testing"""
-        record = DataRecord(schema=TestSchema, source_indices=[0])
-        record.name = "test"
-        record.value = 42
+        record = DataRecord(data_item=TestSchema(name="test", value=42), source_indices=[0])
         return record
 
     @pytest.fixture
@@ -38,9 +36,7 @@ class TestDataRecord:
 
     def test_record_equality(self, sample_record):
         """Test record equality comparison"""
-        record2 = DataRecord(schema=TestSchema, source_indices=[0])
-        record2.name = "test"
-        record2.value = 42
+        record2 = DataRecord(data_item=TestSchema(name="test", value=42), source_indices=[0])
         assert sample_record == record2
 
     def test_from_df(self, sample_df):
@@ -66,8 +62,8 @@ class TestDataRecord:
         """Test auto-schema generation from DataFrame"""
         records = DataRecord.from_df(sample_df)  # No schema provided
         assert len(records) == 2
-        assert 'name' in records[0]._schema.model_fields
-        assert 'value' in records[0]._schema.model_fields
+        assert 'name' in records[0]._data_item.model_fields
+        assert 'value' in records[0]._data_item.model_fields
 
     def test_invalid_attribute(self, sample_record):
         """Test accessing non-existent attribute"""

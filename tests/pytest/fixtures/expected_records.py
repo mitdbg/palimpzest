@@ -12,7 +12,7 @@ from palimpzest.core.lib.schemas import File
 def enron_all_expected_records(enron_eval_tiny_data_path):
     data_records = []
     for source_idx, file in enumerate(sorted(os.listdir(enron_eval_tiny_data_path))):
-        dr = DataRecord(schema=File, source_indices=[source_idx])
+        dr = DataRecord(data_item=File, source_indices=[source_idx])
         dr.filename = file
         with open(os.path.join(enron_eval_tiny_data_path, file), "rb") as f:
             dr.contents = f.read()
@@ -41,7 +41,7 @@ def real_estate_all_expected_records(real_estate_eval_tiny_data_path, image_real
     for source_idx, listing in enumerate(expected_listings):
         if listing == ".DS_Store":
             continue
-        dr = DataRecord(schema=image_real_estate_listing_schema, source_indices=[source_idx])
+        dr = DataRecord(data_item=image_real_estate_listing_schema, source_indices=[source_idx])
         dr.listing = listing
         dr.is_modern_and_attractive = listing_to_modern_and_attractive[listing]
         dr.has_natural_sunlight = listing_to_has_natural_sunlight[listing]
@@ -64,7 +64,7 @@ def real_estate_one_to_many_expected_records(real_estate_eval_tiny_data_path, ro
         if listing == ".DS_Store":
             continue
         for room in listing_to_rooms[listing]:
-            dr = DataRecord(schema=room_real_estate_listing_schema, source_indices=[source_idx])
+            dr = DataRecord(data_item=room_real_estate_listing_schema, source_indices=[source_idx])
             dr.listing = listing
             dr.room = room
             data_records.append(dr)
