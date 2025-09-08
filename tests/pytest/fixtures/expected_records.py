@@ -12,10 +12,9 @@ from palimpzest.core.lib.schemas import File
 def enron_all_expected_records(enron_eval_tiny_data_path):
     data_records = []
     for source_idx, file in enumerate(sorted(os.listdir(enron_eval_tiny_data_path))):
-        dr = DataRecord(data_item=File, source_indices=[source_idx])
-        dr.filename = file
         with open(os.path.join(enron_eval_tiny_data_path, file), "rb") as f:
-            dr.contents = f.read()
+            contents = f.read()
+        dr = DataRecord(data_item=File(filename=file, contents=contents), source_indices=[source_idx])
         data_records.append(dr)
 
     return data_records

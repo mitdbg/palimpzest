@@ -29,6 +29,7 @@ class DataRecord:
     def __init__(
         self,
         data_item: BaseModel,
+        # TODO(Tianyu): multiple places in the tests seem to type this parameter as list[int]
         source_indices: str | list[str],
         parent_ids: str | list[str] | None = None,
         cardinality_idx: int | None = None,
@@ -88,22 +89,22 @@ class DataRecord:
         if name in ["_data_item", "_source_indices", "_parent_ids", "_cardinality_idx", "_passed_operator", "_id"]:
             super().__setattr__(name, value)
         else:
-            self._data_item.__setattr__(name, value)
+            self._data_item.model_fields[name] = value
 
 
     def __getattr__(self, name: str) -> Any:
-        if name in self._data_item.model_fields:
-            return self._data_item[name]
-        else:
-            raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
+        field = self._data_item.model_fields.get(name)
+        if field is not None:
+            return field
+        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
 
 
     def __getitem__(self, field: str) -> Any:
-        return self._data_item[field]
+        return self._data_item.model_fields[field]
 
 
     def __setitem__(self, field: str, value: Any) -> None:
-        self._data_item[field] = value
+        self._data_item.model_fields[field] = value
 
 
     def __str__(self, truncate: int | None = 15) -> str:
@@ -394,7 +395,7 @@ class DataRecordSet:
         self.data_records = data_records
         self.parent_ids = data_records[0]._parent_ids if len(data_records) > 0 else None
         self.source_indices = data_records[0]._source_indices if len(data_records) > 0 else None
-        self.schema = data_records[0]._data_item if len(data_records) > 0 else None
+        self.schema = data_records[0].schema if len(data_records) > 0 else None
 
         # the input to the operator which produced the data_records; type is tuple[DataRecord] | tuple[int]
         # - for scan operators, input is a singleton tuple[int] which wraps the source_idx, e.g.: (source_idx,)
