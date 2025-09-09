@@ -62,8 +62,8 @@ class TestDataRecord:
         """Test auto-schema generation from DataFrame"""
         records = DataRecord.from_df(sample_df)  # No schema provided
         assert len(records) == 2
-        assert 'name' in records[0]._data_item.model_fields
-        assert 'value' in records[0]._data_item.model_fields
+        assert 'name' in records[0].get_field_names()
+        assert 'value' in records[0].get_field_names()
 
     def test_invalid_attribute(self, sample_record):
         """Test accessing non-existent attribute"""
