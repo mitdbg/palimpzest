@@ -49,6 +49,22 @@ def enron_workload(enron_eval_tiny, email_schema):
 
 
 @pytest.fixture
+def small_real_estate_workload(
+    real_estate_eval_tiny,
+    text_real_estate_listing_schema,
+    image_real_estate_listing_schema,
+):
+    listings = real_estate_eval_tiny
+    listings = listings.sem_add_columns(text_real_estate_listing_schema, depends_on="text_content")
+    listings = listings.sem_add_columns(image_real_estate_listing_schema, depends_on="image_filepaths")
+    listings = listings.sem_filter(
+        "The interior is modern and attractive, and has lots of natural sunlight",
+        depends_on=["is_modern_and_attractive", "has_natural_sunlight"],
+    )
+    return listings
+
+
+@pytest.fixture
 def real_estate_workload(
     real_estate_eval_tiny,
     text_real_estate_listing_schema,

@@ -29,15 +29,15 @@ from palimpzest.query.optimizer.optimizer_strategy_type import OptimizationStrat
 from palimpzest.query.optimizer.plan import PhysicalPlan
 from palimpzest.query.optimizer.primitives import Group, LogicalExpression
 from palimpzest.query.optimizer.rules import (
-    CriticAndRefineConvertRule,
+    CritiqueAndRefineRule,
     LLMConvertBondedRule,
-    MixtureOfAgentsConvertRule,
-    RAGConvertRule,
-    SplitConvertRule,
+    MixtureOfAgentsRule,
+    RAGRule,
+    SplitRule,
 )
 from palimpzest.query.optimizer.tasks import (
     ApplyRule,
-    ExpandGroup,
+    ExploreGroup,
     OptimizeGroup,
     OptimizeLogicalExpression,
     OptimizePhysicalExpression,
@@ -150,22 +150,22 @@ class Optimizer:
 
         if not self.allow_rag_reduction:
             self.implementation_rules = [
-                rule for rule in self.implementation_rules if not issubclass(rule, RAGConvertRule)
+                rule for rule in self.implementation_rules if not issubclass(rule, RAGRule)
             ]
 
         if not self.allow_mixtures:
             self.implementation_rules = [
-                rule for rule in self.implementation_rules if not issubclass(rule, MixtureOfAgentsConvertRule)
+                rule for rule in self.implementation_rules if not issubclass(rule, MixtureOfAgentsRule)
             ]
 
         if not self.allow_critic:
             self.implementation_rules = [
-                rule for rule in self.implementation_rules if not issubclass(rule, CriticAndRefineConvertRule)
+                rule for rule in self.implementation_rules if not issubclass(rule, CritiqueAndRefineRule)
             ]
 
         if not self.allow_split_merge:
             self.implementation_rules = [
-                rule for rule in self.implementation_rules if not issubclass(rule, SplitConvertRule)
+                rule for rule in self.implementation_rules if not issubclass(rule, SplitRule)
             ]
 
         logger.info(f"Initialized Optimizer with verbose={self.verbose}")
@@ -396,8 +396,9 @@ class Optimizer:
         # TODO: conditionally stop when X number of tasks have been executed to limit exhaustive search
         while len(self.tasks_stack) > 0:
             task = self.tasks_stack.pop(-1)
+
             new_tasks = []
-            if isinstance(task, (OptimizeGroup, ExpandGroup)):
+            if isinstance(task, (OptimizeGroup, ExploreGroup)):
                 new_tasks = task.perform(self.groups)
             elif isinstance(task, OptimizeLogicalExpression):
                 new_tasks = task.perform(self.transformation_rules, self.implementation_rules)
@@ -409,6 +410,7 @@ class Optimizer:
             elif isinstance(task, OptimizePhysicalExpression):
                 context = {"optimizer_strategy": self.optimizer_strategy, "execution_strategy": self.execution_strategy}
                 new_tasks = task.perform(self.cost_model, self.groups, self.policy, context=context)
+
             self.tasks_stack.extend(new_tasks)
 
         logger.debug(f"Done searching optimization space for group_id: {group_id}")

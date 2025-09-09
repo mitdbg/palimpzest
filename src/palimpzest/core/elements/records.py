@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Generator
+from copy import deepcopy
 from typing import Any
 
 import pandas as pd
@@ -96,7 +97,6 @@ class DataRecord:
         if field is not None:
             return field
         raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
-
 
     def __getitem__(self, field: str) -> Any:
         return getattr(self._data_item, field)
@@ -354,7 +354,7 @@ class DataRecord:
                 if field_type.annotation in [AudioBase64, AudioFilepath, ImageBase64, ImageFilepath, ImageURL]:
                     dct[k] = "<bytes>"
 
-        return dct
+        return deepcopy(dct)
 
 
 class DataRecordSet:

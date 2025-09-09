@@ -6,7 +6,7 @@ from palimpzest.core.elements.filters import Filter
 from palimpzest.core.lib.schemas import File, TextFile
 from palimpzest.query.operators.convert import LLMConvertBonded
 from palimpzest.query.operators.filter import LLMFilter, NonLLMFilter
-from palimpzest.query.operators.rag_convert import RAGConvert
+from palimpzest.query.operators.rag import RAGConvert
 from palimpzest.query.operators.scan import MarshalAndScanDataOp
 from palimpzest.query.optimizer.plan import PhysicalPlan, SentinelPlan
 

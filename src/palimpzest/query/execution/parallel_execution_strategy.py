@@ -61,8 +61,8 @@ class ParallelExecutionStrategy(ExecutionStrategy):
             output = future.result()
             record_set, num_inputs_processed = output if self.is_join_op[unique_full_op_id] else (output, 1)
 
-            # record set can be None if one side of join has no input records yet
-            if record_set is None:
+            # record set can be empty if one side of join has no input records yet
+            if len(record_set) == 0:
                 continue
 
             # otherwise, process records and their stats
