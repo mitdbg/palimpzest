@@ -74,25 +74,14 @@ class ConvertOp(PhysicalOperator, ABC):
 
         drs = []
         for idx in range(max(n_records, 1)):
-            # initialize record with the correct output schema, parent record, and cardinality idx
-            dr = DataRecord.from_parent(self.output_schema, parent_record=candidate, cardinality_idx=idx)
-
-            # copy all fields from the input record
-            # NOTE: this means that records processed by PZ converts will inherit all pre-computed fields
-            #       in an incremental fashion; this is a design choice which may be revisited in the future
-            for field in candidate.get_field_names():
-                setattr(dr, field, getattr(candidate, field))
-
-            # get input field names and output field names
-            input_fields = list(self.input_schema.model_fields)
-            output_fields = list(self.output_schema.model_fields)
-
             # parse newly generated fields from the field_answers dictionary for this field; if the list
             # of generated values is shorter than the number of records, we fill in with None
-            for field in output_fields:
-                if field not in input_fields:
-                    value = field_answers[field][idx] if idx < len(field_answers[field]) else None
-                    setattr(dr, field, value)
+            data_item = {}
+            for field in self.generated_fields:
+                data_item[field] = field_answers[field][idx] if idx < len(field_answers[field]) else None
+
+            # initialize record with the correct output schema, data_item, parent record, and cardinality idx
+            dr = DataRecord.from_parent(self.output_schema, data_item, parent_record=candidate, cardinality_idx=idx)
 
             # append data record to list of output data records
             drs.append(dr)

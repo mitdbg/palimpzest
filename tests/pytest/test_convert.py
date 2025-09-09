@@ -47,5 +47,5 @@ def test_convert(mocker, convert_op, side_effect, email_schema, enron_eval_tiny)
         outputs.extend(record_set.data_records)
 
     assert len(outputs) == 1
-    assert outputs[0]._schema == union_schemas([email_schema, TextFile])
+    assert outputs[0].schema == union_schemas([email_schema, TextFile])
     assert sorted(outputs[0].get_field_names()) == ["contents", "filename", "sender", "subject"]

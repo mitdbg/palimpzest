@@ -35,7 +35,7 @@ class DistinctOp(PhysicalOperator):
 
     def __call__(self, candidate: DataRecord) -> DataRecordSet:
         # create new DataRecord
-        dr = DataRecord.from_parent(schema=candidate._schema, parent_record=candidate)
+        dr = DataRecord.from_parent(schema=candidate.schema, data_item={}, parent_record=candidate)
 
         # output record only if it has not been seen before
         record_str = dr.to_json_str(project_cols=self.distinct_cols, bytes_to_str=True, sorted=True)
