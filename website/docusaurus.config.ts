@@ -102,8 +102,12 @@ const config: Config = {
           title: 'Docs',
           items: [
             {
-              label: 'Tutorial',
+              label: 'Getting Started',
               to: '/docs/intro',
+            },
+            {
+              label: 'Documentation',
+              to: '/docs/api/overview',
             },
           ],
         },
