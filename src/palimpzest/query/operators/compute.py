@@ -94,10 +94,8 @@ class SmolAgentsCompute(PhysicalOperator):
         construct the resulting RecordSet.
         """
         # create new DataRecord
-        dr = DataRecord.from_parent(self.output_schema, parent_record=candidate)
-        for field in self.output_schema.model_fields:
-            if field in answer:
-                dr[field] = answer[field]
+        data_item = {field: answer[field] for field in self.output_schema.model_fields if field in answer}
+        dr = DataRecord.from_parent(self.output_schema, data_item, parent_record=candidate)
 
         # create RecordOpStats object
         record_op_stats = RecordOpStats(

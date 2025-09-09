@@ -27,14 +27,13 @@ def scan_convert_filter_execution_data(scan_convert_filter_sentinel_plan, foobar
 
     # create convert data records
     for idx in range(30):
-        convert_dr = DataRecord.from_parent(foobar_schema, scan_drs[idx % 10])
-        convert_dr.foo = f"foo{idx % 10}"
-        convert_dr.bar = f"bar{idx % 10}"
+        data_item = {"foo": f"foo{idx % 10}", "bar": f"bar{idx % 10}"}
+        convert_dr = DataRecord.from_parent(foobar_schema, data_item, scan_drs[idx % 10])
         convert_drs.append(convert_dr)
 
     # create filter data records
     for idx in range(30):
-        filter_dr = DataRecord.from_parent(foobar_schema, convert_drs[idx])
+        filter_dr = DataRecord.from_parent(foobar_schema, {}, convert_drs[idx])
         filter_drs.append(filter_dr)
 
     # create execution data entries for scan operator
@@ -132,14 +131,13 @@ def scan_convert_filter_varied_execution_data(scan_convert_filter_sentinel_plan,
     models = [Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B]
     for model in models:
         for idx in range(10):
-            convert_dr = DataRecord.from_parent(foobar_schema, scan_drs[idx])
-            convert_dr.foo = f"foo{idx}"
-            convert_dr.bar = f"bar{idx}-{str(model)}"
+            data_item = {"foo": f"foo{idx}", "bar": f"bar{idx}-{str(model)}"}
+            convert_dr = DataRecord.from_parent(foobar_schema, data_item, scan_drs[idx])
             convert_drs.append(convert_dr)
 
     # create filter data records
     for idx in range(30):
-        filter_dr = DataRecord.from_parent(foobar_schema, convert_drs[idx])
+        filter_dr = DataRecord.from_parent(foobar_schema, {}, convert_drs[idx])
         filter_drs.append(filter_dr)
 
     # create execution data entries for scan operator
@@ -247,30 +245,29 @@ def scan_multi_convert_multi_filter_execution_data(scan_multi_convert_multi_filt
     for model in models:
         for source_idx in range(10):
             for one_to_many_idx in range(2):
-                convert_dr = DataRecord.from_parent(foobar_schema, scan_drs[source_idx])
-                convert_dr.foo = f"foo{source_idx}-one-to-many-{one_to_many_idx}"
-                convert_dr.bar = f"bar{source_idx}-{str(model)}"
+                data_item = {"foo": f"foo{source_idx}-one-to-many-{one_to_many_idx}", "bar": f"bar{source_idx}-{str(model)}"}
+                convert_dr = DataRecord.from_parent(foobar_schema, data_item, scan_drs[source_idx])
                 convert1_drs.append(convert_dr)
 
     # create first filter data records
     for _ in models:
         for gpt4_convert_dr in convert1_drs[:20]:
-            filter_dr = DataRecord.from_parent(foobar_schema, gpt4_convert_dr)
+            filter_dr = DataRecord.from_parent(foobar_schema, {}, gpt4_convert_dr)
             filter1_drs.append(filter_dr)
 
     # NOTE: assume GPT-4 in filter1 filtered out last 6 out of 20 records
     # create second filter data records
     for _ in models:
         for gpt4_filter_dr in filter1_drs[:14]:
-            filter_dr = DataRecord.from_parent(foobar_schema, gpt4_filter_dr)
+            filter_dr = DataRecord.from_parent(foobar_schema, {}, gpt4_filter_dr)
             filter2_drs.append(filter_dr)
 
     # NOTE: assume GPT-4 in filter2 filtered out last 4 out of 14 records
     # create second convert data records (second half of records will be filtered out)
     for model in models:
         for gpt4_filter_dr in filter2_drs[:10]:
-            convert_dr = DataRecord.from_parent(baz_schema, gpt4_filter_dr)
-            convert_dr.baz = f"baz{str(model)}"
+            data_item = {"baz": f"baz{str(model)}"}
+            convert_dr = DataRecord.from_parent(baz_schema, data_item, gpt4_filter_dr)
             convert2_drs.append(convert_dr)
 
     # create execution data entries for scan operator

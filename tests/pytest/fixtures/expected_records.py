@@ -14,7 +14,8 @@ def enron_all_expected_records(enron_eval_tiny_data_path):
     for source_idx, file in enumerate(sorted(os.listdir(enron_eval_tiny_data_path))):
         with open(os.path.join(enron_eval_tiny_data_path, file), "rb") as f:
             contents = f.read()
-        dr = DataRecord(data_item=File(filename=file, contents=contents), source_indices=[source_idx])
+        data_item = File(filename=file, contents=contents)
+        dr = DataRecord(data_item=data_item, source_indices=[source_idx])
         data_records.append(dr)
 
     return data_records
@@ -40,10 +41,14 @@ def real_estate_all_expected_records(real_estate_eval_tiny_data_path, image_real
     for source_idx, listing in enumerate(expected_listings):
         if listing == ".DS_Store":
             continue
-        dr = DataRecord(data_item=image_real_estate_listing_schema, source_indices=[source_idx])
-        dr.listing = listing
-        dr.is_modern_and_attractive = listing_to_modern_and_attractive[listing]
-        dr.has_natural_sunlight = listing_to_has_natural_sunlight[listing]
+        data_item = image_real_estate_listing_schema(
+            listing=listing,
+            text_content="",
+            image_filepaths=[],
+            is_modern_and_attractive=listing_to_modern_and_attractive[listing],
+            has_natural_sunlight=listing_to_has_natural_sunlight[listing],
+        )
+        dr = DataRecord(data_item=data_item, source_indices=[source_idx])
         data_records.append(dr)
 
     return data_records
@@ -63,9 +68,13 @@ def real_estate_one_to_many_expected_records(real_estate_eval_tiny_data_path, ro
         if listing == ".DS_Store":
             continue
         for room in listing_to_rooms[listing]:
-            dr = DataRecord(data_item=room_real_estate_listing_schema, source_indices=[source_idx])
-            dr.listing = listing
-            dr.room = room
+            data_item = room_real_estate_listing_schema(
+                listing=listing,
+                text_content="",
+                image_filepaths=[],
+                room=room,
+            )
+            dr = DataRecord(data_item=data_item, source_indices=[source_idx])
             data_records.append(dr)
 
     return data_records
@@ -77,11 +86,13 @@ def scan_convert_filter_expected_outputs(foobar_schema):
     expected_outputs = {}
     for source_idx in range(10):
         if source_idx % 2:
-            dr = DataRecord(foobar_schema, [source_idx])
-            dr.filename = f"file{source_idx}"
-            dr.contents = None
-            dr.foo = f"foo{source_idx}"
-            dr.bar = f"bar{source_idx}"
+            data_item = foobar_schema(
+                filename=f"file{source_idx}",
+                contents=None,
+                foo=f"foo{source_idx}",
+                bar=f"bar{source_idx}",
+            )
+            dr = DataRecord(data_item, [source_idx])
             dr._passed_operator = True # bool(source_idx % 2)
             expected_outputs[source_idx] = DataRecordSet([dr], None)
 
@@ -99,11 +110,13 @@ def scan_convert_filter_varied_expected_outputs(foobar_schema):
     expected_outputs = {}
     for source_idx in range(10):
         if source_idx % 3 > 0:
-            dr = DataRecord(foobar_schema, [source_idx])
-            dr.filename = f"file{source_idx}"
-            dr.contents = None
-            dr.foo = f"foo{source_idx}"
-            dr.bar = f"bar{source_idx}-{str(Model.GPT_4o_MINI)}" if source_idx < 6 else f"bar{source_idx}-{str(Model.LLAMA3_1_8B)}"
+            data_item = foobar_schema(
+                filename=f"file{source_idx}",
+                contents=None,
+                foo=f"foo{source_idx}",
+                bar=f"bar{source_idx}-{str(Model.GPT_4o_MINI)}" if source_idx < 6 else f"bar{source_idx}-{str(Model.LLAMA3_1_8B)}",
+            )
+            dr = DataRecord(data_item, [source_idx])
             dr._passed_operator = True
             expected_outputs[source_idx] = DataRecordSet([dr], None)
 
@@ -126,12 +139,14 @@ def scan_multi_convert_multi_filter_expected_outputs(foobar_schema, baz_schema):
             if source_idx == 0 and one_to_many_idx == 1:
                 continue
 
-            dr = DataRecord(foobar_schema, [source_idx])
-            dr.filename = f"file{source_idx}"
-            dr.contents = None
-            dr.foo = f"foo{source_idx}-one-to-many-{one_to_many_idx}"
-            dr.bar = f"bar{source_idx}-{str(Model.GPT_4o_MINI)}"
-            dr.baz = f"baz{str(Model.GPT_4o_MINI)}"
+            data_item = foobar_schema(
+                filename=f"file{source_idx}",
+                contents=None,
+                foo=f"foo{source_idx}-one-to-many-{one_to_many_idx}",
+                bar=f"bar{source_idx}-{str(Model.GPT_4o_MINI)}",
+                baz=f"baz{str(Model.GPT_4o_MINI)}",
+            )
+            dr = DataRecord(data_item, [source_idx])
             dr._passed_operator = True
             drs.append(dr)
 

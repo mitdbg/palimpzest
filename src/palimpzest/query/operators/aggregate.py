@@ -113,18 +113,20 @@ class ApplyGroupByOp(AggregateOp):
         group_by_fields = self.group_by_sig.group_by_fields
         agg_fields = self.group_by_sig.get_agg_field_names()
         for g in agg_state:
-            dr = DataRecord.from_agg_parents(
-                schema=self.group_by_sig.output_schema(),
-                parent_records=candidates,
-            )
+            # build up data item
+            data_item = {}
             for i in range(0, len(g)):
                 k = g[i]
-                setattr(dr, group_by_fields[i], k)
+                data_item[group_by_fields[i]] = k
             vals = agg_state[g]
             for i in range(0, len(vals)):
                 v = ApplyGroupByOp.agg_final(self.group_by_sig.agg_funcs[i], vals[i])
-                setattr(dr, agg_fields[i], v)
+                data_item[agg_fields[i]] = v
 
+            # create new DataRecord
+            schema = self.group_by_sig.output_schema()
+            data_item = schema(**data_item)
+            dr = DataRecord.from_agg_parents(data_item, parent_records=candidates)
             drs.append(dr)
 
         # create RecordOpStats objects
@@ -197,7 +199,6 @@ class AverageAggregateOp(AggregateOp):
         # NOTE: right now we perform a check in the constructor which enforces that the input_schema
         #       has a single field which is numeric in nature; in the future we may want to have a
         #       cleaner way of computing the value (rather than `float(list(candidate...))` below)
-        dr = DataRecord.from_agg_parents(schema=Average, parent_records=candidates)
         summation, total = 0, 0
         for candidate in candidates:
             try:
@@ -205,7 +206,8 @@ class AverageAggregateOp(AggregateOp):
                 total += 1
             except Exception:
                 pass
-        dr.average = summation / total
+        data_item = Average(average=summation / total)
+        dr = DataRecord.from_agg_parents(data_item, parent_records=candidates)
 
         # create RecordOpStats object
         record_op_stats = RecordOpStats(
@@ -260,8 +262,8 @@ class CountAggregateOp(AggregateOp):
         start_time = time.time()
 
         # create new DataRecord
-        dr = DataRecord.from_agg_parents(schema=Count, parent_records=candidates)
-        dr.count = len(candidates)
+        data_item = Count(count=len(candidates))
+        dr = DataRecord.from_agg_parents(data_item, parent_records=candidates)
 
         # create RecordOpStats object
         record_op_stats = RecordOpStats(

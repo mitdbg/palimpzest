@@ -34,7 +34,7 @@ class ProjectOp(PhysicalOperator):
 
     def __call__(self, candidate: DataRecord) -> DataRecordSet:
         # create new DataRecord with projection applied
-        dr = DataRecord.from_parent(schema=candidate.schema, parent_record=candidate, project_cols=self.project_cols)
+        dr = DataRecord.from_parent(schema=candidate.schema, data_item={}, parent_record=candidate, project_cols=self.project_cols)
 
         # create RecordOpStats object
         record_op_stats = RecordOpStats(

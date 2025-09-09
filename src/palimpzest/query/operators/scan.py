@@ -71,9 +71,8 @@ class ScanPhysicalOp(PhysicalOperator, ABC):
         assert all([field in item for field in output_field_names]), f"Some fields in Dataset schema not present in item!\n - Dataset fields: {output_field_names}\n - Item fields: {list(item.keys())}"
 
         # construct a DataRecord from the item
-        dr = DataRecord(self.output_schema(), source_indices=[f"{self.datasource.id}-{idx}"])
-        for field in output_field_names:
-            setattr(dr, field, item[field])
+        data_item = self.output_schema(**{field: item[field] for field in output_field_names})
+        dr = DataRecord(data_item, source_indices=[f"{self.datasource.id}-{idx}"])
 
         # create RecordOpStats objects
         record_op_stats = RecordOpStats(

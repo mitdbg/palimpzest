@@ -76,7 +76,7 @@ class FilterOp(PhysicalOperator, ABC):
         construct the resulting RecordSet.
         """
         # create new DataRecord and set passed_operator attribute
-        dr = DataRecord.from_parent(schema=candidate.schema, parent_record=candidate)
+        dr = DataRecord.from_parent(schema=candidate.schema, data_item={}, parent_record=candidate)
         dr._passed_operator = passed_operator
 
         # create RecordOpStats object

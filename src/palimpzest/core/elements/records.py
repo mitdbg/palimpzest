@@ -45,7 +45,7 @@ class DataRecord:
         if isinstance(parent_ids, str):
             parent_ids = [parent_ids]
 
-        # schema for the data record
+        # data for the data record
         self._data_item = data_item
 
         # the index in the root Dataset from which this DataRecord is derived;
@@ -78,7 +78,6 @@ class DataRecord:
             if cardinality_idx is None
             else str(data_item) + str(cardinality_idx) + str(parent_ids) if parent_ids is not None else str(self._source_indices)
         )
-        # TODO: hide special fields in BaseModel when we deprecate DataRecord
         self._id = hash_for_id(id_str)
 
 
@@ -89,22 +88,22 @@ class DataRecord:
         if name in ["_data_item", "_source_indices", "_parent_ids", "_cardinality_idx", "_passed_operator", "_id"]:
             super().__setattr__(name, value)
         else:
-            self._data_item.model_fields[name] = value
+            setattr(self._data_item, name, value)
 
 
     def __getattr__(self, name: str) -> Any:
-        field = self._data_item.model_fields.get(name)
+        field = getattr(self._data_item, name)
         if field is not None:
             return field
         raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
 
 
     def __getitem__(self, field: str) -> Any:
-        return self._data_item.model_fields[field]
+        return getattr(self._data_item, field)
 
 
     def __setitem__(self, field: str, value: Any) -> None:
-        self._data_item.model_fields[field] = value
+        setattr(self._data_item, field, value)
 
 
     def __str__(self, truncate: int | None = 15) -> str:
@@ -132,11 +131,11 @@ class DataRecord:
 
 
     def get_field_names(self):
-        return list(self._data_item.model_fields.keys())
+        return list(type(self._data_item).model_fields.keys())
 
 
     def get_field_type(self, field_name: str) -> FieldInfo:
-        return self._data_item.model_fields[field_name]
+        return type(self._data_item).model_fields[field_name]
 
     @property
     def schema(self) -> type[BaseModel]:
@@ -177,6 +176,7 @@ class DataRecord:
     @staticmethod
     def from_parent(
         schema: type[BaseModel],
+        data_item: dict,
         parent_record: DataRecord,
         project_cols: list[str] | None = None,
         cardinality_idx: int | None = None,
@@ -186,35 +186,34 @@ class DataRecord:
         # otherwise, it's a ProjectSchema
         new_schema = None
         if project_cols is None:
-            new_schema = union_schemas([schema, parent_record._data_item])
+            new_schema = union_schemas([schema, parent_record.schema])
         elif project_cols == []:
             new_schema = schema
         else:
-            new_schema = union_schemas([schema, parent_record._data_item])
+            new_schema = union_schemas([schema, parent_record.schema])
             new_schema = project(new_schema, project_cols)
+
+        # get the set of fields and field descriptions to copy from the parent record
+        copy_field_names = parent_record.get_field_names() if project_cols is None else project_cols
+        copy_field_names = [field.split(".")[-1] for field in copy_field_names]
+
+        # copy fields from the parent
+        data_item.update({field_name: parent_record[field_name] for field_name in copy_field_names})
 
         # make new record which has parent_record as its parent (and the same source_indices)
         new_dr = DataRecord(
-            new_schema(),
+            new_schema(**data_item),
             source_indices=parent_record._source_indices,
             parent_ids=[parent_record._id],
             cardinality_idx=cardinality_idx,
         )
-
-        # get the set of fields and field descriptions to copy from the parent record
-        copy_field_names = project_cols if project_cols is not None else parent_record.get_field_names()
-        copy_field_names = [field.split(".")[-1] for field in copy_field_names]
-
-        # copy fields from the parent
-        for field_name in copy_field_names:
-            new_dr[field_name] = parent_record[field_name]
 
         return new_dr
 
 
     @staticmethod
     def from_agg_parents(
-        schema: type[BaseModel],
+        data_item: BaseModel,
         parent_records: DataRecordSet,
         cardinality_idx: int | None = None,
     ) -> DataRecord:
@@ -227,7 +226,7 @@ class DataRecord:
 
         # make new record which has all parent records as its parents
         return DataRecord(
-            schema(),
+            data_item,
             source_indices=source_indices,
             parent_ids=[parent_record._id for parent_record in parent_records],
             cardinality_idx=cardinality_idx,
@@ -241,14 +240,6 @@ class DataRecord:
         project_cols: list[str] | None = None,
         cardinality_idx: int = None,
     ) -> DataRecord:
-        # make new record which has left and right parent record as its parents
-        new_dr = DataRecord(
-            schema(),
-            source_indices=list(left_parent_record._source_indices) + list(right_parent_record._source_indices),
-            parent_ids=[left_parent_record._id, right_parent_record._id],
-            cardinality_idx=cardinality_idx,
-        )
-
         # get the set of fields and field descriptions to copy from the parent record(s)
         left_copy_field_names = (
             left_parent_record.get_field_names()
@@ -264,14 +255,20 @@ class DataRecord:
         right_copy_field_names = [field.split(".")[-1] for field in right_copy_field_names]
 
         # copy fields from the parents
-        for field_name in left_copy_field_names:
-            new_dr[field_name] = left_parent_record[field_name]
-
+        data_item = {field_name: left_parent_record[field_name] for field_name in left_copy_field_names}
         for field_name in right_copy_field_names:
             new_field_name = field_name
             if field_name in left_copy_field_names:
                 new_field_name = f"{field_name}_right"
-            new_dr[new_field_name] = right_parent_record[field_name]
+            data_item[new_field_name] = right_parent_record[field_name]
+
+        # make new record which has left and right parent record as its parents
+        new_dr = DataRecord(
+            schema(**data_item),
+            source_indices=list(left_parent_record._source_indices) + list(right_parent_record._source_indices),
+            parent_ids=[left_parent_record._id, right_parent_record._id],
+            cardinality_idx=cardinality_idx,
+        )
 
         return new_dr
 
@@ -305,7 +302,7 @@ class DataRecord:
         records = []
         for idx, row in df.iterrows():
             row_dict = row.to_dict()
-            record = DataRecord(schema.model_validate(row_dict), source_indices=[f"{dataset_id}-{idx}"])
+            record = DataRecord(schema(**row_dict), source_indices=[f"{dataset_id}-{idx}"])
             records.append(record)
 
         return records
@@ -340,8 +337,7 @@ class DataRecord:
         # TODO(chjun): In case of numpy types, the json.dumps will fail. Convert to native types.
         # Better ways to handle this.
         field_values = {
-            k: v.description
-            if isinstance(v, context.Context) else v
+            k: v.description if isinstance(v, context.Context) else v
             for k, v in self._data_item.model_dump().items()
         }
         dct = pd.Series(field_values).to_dict()
@@ -352,7 +348,7 @@ class DataRecord:
 
         if not include_bytes:
             for k in dct:
-                field_type = self._data_item.model_fields[k]
+                field_type = self.get_field_type(k)
                 if field_type.annotation in [bytes, AudioBase64, ImageBase64, list[bytes], list[ImageBase64]]:
                     dct[k] = "<bytes>"
 
@@ -368,7 +364,7 @@ class DataRecord:
 
         if mask_filepaths:
             for k in dct:
-                field_type = self._data_item.model_fields[k]
+                field_type = self.get_field_type(k)
                 if field_type.annotation in [AudioBase64, AudioFilepath, ImageBase64, ImageFilepath, ImageURL]:
                     dct[k] = "<bytes>"
 
@@ -442,7 +438,6 @@ class DataRecordCollection:
         DataRecordSet is used for the output of executing an operator.
         DataRecordCollection is used for the output of executing a query, we definitely could extend it to support more advanced features for output of execute().
     """
-    # TODO(Jun): consider to have stats_manager class to centralize stats management.
     def __init__(self, data_records: list[DataRecord], execution_stats: ExecutionStats | None = None, plan_stats: PlanStats | None = None):
         self.data_records = data_records
         self.execution_stats = execution_stats
