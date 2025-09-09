@@ -29,8 +29,7 @@ class DataRecord:
     def __init__(
         self,
         data_item: BaseModel,
-        # TODO(Tianyu): multiple places in the tests seem to type this parameter as list[int]
-        source_indices: str | list[str],
+        source_indices: str | int | list[str | int],
         parent_ids: str | list[str] | None = None,
         cardinality_idx: int | None = None,
     ):
@@ -73,10 +72,11 @@ class DataRecord:
         # We may revisit this hashing scheme in the future.
 
         # unique identifier for the record
+        schema_fields = sorted(list(type(data_item).model_fields))
         id_str = (
-            str(data_item) + str(parent_ids) if parent_ids is not None else str(self._source_indices)
+            str(schema_fields) + str(parent_ids) if parent_ids is not None else str(self._source_indices)
             if cardinality_idx is None
-            else str(data_item) + str(cardinality_idx) + str(parent_ids) if parent_ids is not None else str(self._source_indices)
+            else str(schema_fields) + str(cardinality_idx) + str(parent_ids) if parent_ids is not None else str(self._source_indices)
         )
         self._id = hash_for_id(id_str)
 
