@@ -141,12 +141,16 @@ class DataRecord:
     def schema(self) -> type[BaseModel]:
         return type(self._data_item)
 
-    # TODO(Tianyu): the two optional args seems never used?
-    def copy(self, include_bytes: bool = True, project_cols: list[str] | None = None):
+    def copy(self):
+        # get the set of fields to copy from the parent record
+        copy_field_names = [field.split(".")[-1] for field in self.get_field_names()]
+
+        # copy field types and values from the parent
+        data_item = {field_name: self[field_name] for field_name in copy_field_names}
+
         # make copy of the current record
         new_dr = DataRecord(
-            self.schema(),
-            # TODO(Tianyu): Are these always immutable after creation? If so, that's not enforced. If not, this shallow copy seems dangerous.
+            self.schema(**data_item),
             source_indices=self._source_indices,
             parent_ids=self._parent_ids,
             cardinality_idx=self._cardinality_idx,
@@ -155,23 +159,7 @@ class DataRecord:
         # copy the passed_operator attribute
         new_dr._passed_operator = self._passed_operator
 
-        # get the set of fields to copy from the parent record
-        copy_field_names = project_cols if project_cols is not None else self.get_field_names()
-        copy_field_names = [field.split(".")[-1] for field in copy_field_names]
-
-        # copy field types and values from the parent
-        for field_name in copy_field_names:
-            field_value = self[field_name]
-            if (
-                not include_bytes
-                and isinstance(field_value, bytes)
-                or (isinstance(field_value, list) and len(field_value) > 0 and isinstance(field_value[0], bytes))
-            ):
-                continue
-            new_dr[field_name] = field_value
-
         return new_dr
-
 
     @staticmethod
     def from_parent(
@@ -209,7 +197,6 @@ class DataRecord:
         )
 
         return new_dr
-
 
     @staticmethod
     def from_agg_parents(
@@ -271,7 +258,6 @@ class DataRecord:
         )
 
         return new_dr
-
 
     # TODO: unused outside of unit tests
     @staticmethod
