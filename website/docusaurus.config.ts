@@ -24,6 +24,10 @@ const config: Config = {
   // If you aren't using GitHub pages, you don't need these.
   organizationName: 'mitdbg', // Usually your GitHub org/user name.
   projectName: 'palimpzest', // Usually your repo name.
+  deploymentBranch: 'gh-pages',
+
+  // github pages remove trailing slash: https://github.com/slorber/trailing-slash-guide
+  trailingSlash: false,
 
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',
