@@ -8,7 +8,7 @@ import numpy as np
 from openai import OpenAI
 
 from palimpzest.constants import MODEL_CARDS, Cardinality, Model
-from palimpzest.utils.generation_helpers import get_json_from_answer
+from palimpzest.query.generators.generators import get_json_from_answer
 
 
 def f1(preds: list | None, targets: list):
