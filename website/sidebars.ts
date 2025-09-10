@@ -37,7 +37,9 @@ const sidebars: SidebarsConfig = {
         'user-guide/operators',
         'user-guide/optimization',
       ],
-    },
+    }
+  ],
+  documentationSidebar: [
     {
       type: 'category',
       label: 'Documentation',

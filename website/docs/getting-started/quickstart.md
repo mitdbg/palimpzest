@@ -17,7 +17,7 @@ The ideal way to do this is with the old mantra "show don't tell." A great examp
 
 
 ### Creating a Dataset
-Let's revisit our example from the [Getting Started](../index.md) page in more depth, starting with the first two lines:
+Let's revisit our example from the [Getting Started](../intro.md) page in more depth, starting with the first two lines:
 ```python
 import palimpzest as pz
 

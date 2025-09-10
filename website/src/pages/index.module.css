@@ -8,6 +8,35 @@
   text-align: center;
   position: relative;
   overflow: hidden;
+  background-image: url('/img/background.svg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.heroBanner .hero__title {
+  color: #2d3748 !important;
+  text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8) !important;
+}
+
+.heroBanner .hero__subtitle {
+  color: #4a5568 !important;
+  text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8) !important;
+}
+
+.heroBanner h1 {
+  color: #2d3748 !important;
+  text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8) !important;
+}
+
+.heroBanner p {
+  color: #4a5568 !important;
+  text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8) !important;
+}
+
+.heroBanner .container {
+  position: relative;
+  z-index: 1;
 }
 
 @media screen and (max-width: 996px) {
@@ -20,4 +49,6 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
+  z-index: 2;
 }

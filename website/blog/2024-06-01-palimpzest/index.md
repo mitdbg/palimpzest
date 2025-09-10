@@ -25,6 +25,8 @@ import Bibtex from './bibtex.js';
 - [Colab Demo](https://colab.research.google.com/drive/1Fm8I4yL1az395MsFkQbEIZSmUZs0oGvZ?usp=sharing)
 - [Discord](https://discord.gg/dN85JJ6jaH)
 
+{/* truncate */}
+
 ## Scaling Modern AI Systems to Large Corpora is Challenging
 Advances in AI models have driven progress in applications such as question answering, chatbots, autonomous agents, and code synthesis. In many cases these systems have evolved far beyond posing a simple question to a chat model: they are complex [AI systems](https://bair.berkeley.edu/blog/2024/02/18/compound-ai-systems/) that combine elements of data processing, such as Retrieval Augmented Generation (RAG); ensembles of different models; and multi-step chain-of-thought reasoning.
 

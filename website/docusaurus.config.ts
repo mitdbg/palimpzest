@@ -6,8 +6,8 @@ import type * as Preset from '@docusaurus/preset-classic';
 
 const config: Config = {
   title: 'Palimpzest',
-  tagline: 'Powerful Semantic Computation',
-  favicon: 'img/favicon.ico',
+  tagline: 'Optimized Execution for Semantic Operators',
+  favicon: 'img/pz-small-logo.ico',
 
   // Future flags, see https://docusaurus.io/docs/api/docusaurus-config#future
   future: {
@@ -71,7 +71,7 @@ const config: Config = {
 
   themeConfig: {
     // Replace with your project's social card
-    image: 'img/docusaurus-social-card.jpg',
+    image: 'img/pz-social-card.png',
     navbar: {
       title: 'Palimpzest',
       logo: {
@@ -85,7 +85,12 @@ const config: Config = {
           position: 'left',
           label: 'Getting Started',
         },
-        {to: '/docs/api', label: 'Documentation', position: 'left'},
+        {
+          type: 'docSidebar',
+          sidebarId: 'documentationSidebar',
+          label: 'Documentation',
+          position: 'left',
+        },
         {to: '/blog', label: 'Blog', position: 'left'},
         {to: '/research', label: 'Research', position: 'left'},
         {

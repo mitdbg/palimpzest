@@ -38,6 +38,6 @@ For developers who are looking to contribute to PZ, we would also encourage you 
 
 Finally, feel free to check out other resources on PZ:
 
-- [Join our Community](../community.md) (if you haven't already)
-- [PalimpChat](../chat-demo.md) (research prototype of a chat interface for PZ)
-- [Research](../research.md) (a timeline of our research papers)
+- [Join our Community](https://discord.gg/dN85JJ6jaH) (if you haven't already)
+- [PalimpChat](http://3.213.4.62:8888/) (research prototype of a chat interface for PZ)
+- [Research](/research) (a timeline of our research papers)

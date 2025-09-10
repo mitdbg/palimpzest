@@ -12,31 +12,32 @@ type FeatureItem = {
 const FeatureList: FeatureItem[] = [
   {
     title: 'Easy to Use',
-    Svg: require('@site/static/img/undraw_docusaurus_mountain.svg').default,
+    Svg: require('@site/static/img/pz-orange-transparent.svg').default,
     description: (
       <>
-        Docusaurus was designed from the ground up to be easily installed and
-        used to get your website up and running quickly.
+        Install Palimpzest with pip and get started in minutes.
+        Follow our quickstart and join the Discord community to
+        get help with your use case.
       </>
     ),
   },
   {
-    title: 'Focus on What Matters',
-    Svg: require('@site/static/img/undraw_docusaurus_tree.svg').default,
+    title: 'Multi-Modal Joins, Maps, and Filters',
+    Svg: require('@site/static/img/multimodal.svg').default,
     description: (
       <>
-        Docusaurus lets you focus on your docs, and we&apos;ll do the chores. Go
-        ahead and move your docs into the <code>docs</code> directory.
+        Join any combination of text, images, audio, and tables.
+        Palimpzest also supports maps and filters over any combination of modalities.
       </>
     ),
   },
   {
-    title: 'Powered by React',
-    Svg: require('@site/static/img/undraw_docusaurus_react.svg').default,
+    title: 'Highly Optimizable',
+    Svg: require('@site/static/img/orange-abacus.svg').default,
     description: (
       <>
-        Extend or customize your website layout by reusing React. Docusaurus can
-        be extended while reusing the same header and footer.
+        Palimpzest's optimizer can leverage labels and/or an LLM judge to
+        produce the best implementation of your data processing pipeline.
       </>
     ),
   },
