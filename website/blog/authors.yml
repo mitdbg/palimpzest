@@ -1,0 +1,23 @@
+mdrusso:
+  name: Matthew Russo
+  title: PhD Student @ MIT
+  url: https://mdr223.github.io/
+  image_url: /img/mdrusso.png
+  page: true
+  socials:
+    x: RussoMatthew
+    linkedin: matthew-russo-7a1931105
+    github: mdr223
+
+mjc:
+  name: Michael Cafarella
+  title: Principal Research Scientist @ MIT
+  url: https://www.csail.mit.edu/person/michael-cafarella
+  image_url: /img/cafarella.jpg
+  # page:
+  #   # customize the url of the author page at /blog/authors/<permalink>
+  #   permalink: '/all-sebastien-lorber-articles'
+  page: true
+  socials:
+    x: MikeCafarella
+    github: mikecafarella
