@@ -110,8 +110,8 @@ def test_filter(mocker, input_schema, physical_op_class):
         data_item['year'] = 2020
     input_record = DataRecord(input_schema(**data_item), source_indices=[0])
 
-    # only execute LLM calls when running on CI for merge to main
-    if not os.getenv("CI"):
+    # only execute LLM calls if specified
+    if not os.getenv("RUN_LLM_TESTS"):
         mocker.patch.object(Generator, "__call__", side_effect=mock_generator_call)
 
     # apply filter operator to the input

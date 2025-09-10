@@ -110,8 +110,8 @@ def test_join(mocker, left_input_schema, right_input_schema, physical_op_class):
     left_input_record = create_input_record(left_input_schema)
     right_input_record = create_input_record(right_input_schema)
 
-    # only execute LLM calls when running on CI for merge to main
-    if not os.getenv("CI"):
+    # only execute LLM calls if specified
+    if not os.getenv("RUN_LLM_TESTS"):
         mocker.patch.object(Generator, "__call__", side_effect=mock_generator_call)
 
     # apply join operator to the inputs
@@ -153,15 +153,15 @@ def test_embedding_join(mocker):
     # create join operator
     join_op = EmbeddingJoin(**physical_op_kwargs)
 
-    # only execute LLM calls when running on CI for merge to main
-    if not os.getenv("CI"):
+    # only execute LLM calls if specified
+    if not os.getenv("RUN_LLM_TESTS"):
         mock_call = mocker.patch.object(Generator, "__call__", side_effect=embedding_join_mock_generator_call)
 
     # apply join operator to the inputs
     data_record_set, num_inputs_processed = join_op(left_candidates, right_candidates)
 
     # check that the mock was called 8 times (num_samples)
-    if not os.getenv("CI"):
+    if not os.getenv("RUN_LLM_TESTS"):
         assert mock_call.call_count == 8
 
     # sanity checks on output records and stats
