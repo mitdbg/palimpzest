@@ -26,4 +26,4 @@ jobs:
       - name: Test build website
         run: |
           cd website
-          npm build
+          npm run build

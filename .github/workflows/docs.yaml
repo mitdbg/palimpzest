@@ -29,7 +29,7 @@ jobs:
       - name: Build website
         run: |
           cd website
-          npm build
+          npm run build
           echo "palimpzest.org" > site/CNAME
       - name: Upload Build Artifact
         uses: actions/upload-pages-artifact@v3
