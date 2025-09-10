@@ -99,16 +99,17 @@ def test_map(mocker, input_schema, physical_op_class):
     map_op = physical_op_class(**physical_op_kwargs)
 
     # create input record
-    input_record = DataRecord(schema=input_schema, source_indices=[0])
+    data_item = {}
     if all(field in input_schema.model_fields for field in TextInputSchema.model_fields):
-        input_record['text'] = "An elephant is a large gray animal with a trunk and big ears."
-        input_record['age'] = 3
+        data_item['text'] = "An elephant is a large gray animal with a trunk and big ears."
+        data_item['age'] = 3
     if all(field in input_schema.model_fields for field in ImageInputSchema.model_fields):
-        input_record.image_file = "tests/pytest/data/elephant.png"
-        input_record.height = 304.5
+        data_item['image_file'] = "tests/pytest/data/elephant.png"
+        data_item['height'] = 304.5
     if all(field in input_schema.model_fields for field in AudioInputSchema.model_fields):
-        input_record.audio_file = "tests/pytest/data/elephant.wav"
-        input_record.year = 2020
+        data_item['audio_file'] = "tests/pytest/data/elephant.wav"
+        data_item['year'] = 2020
+    input_record = DataRecord(input_schema(**data_item), source_indices=[0])
 
     # only execute LLM calls when running on CI for merge to main
     if not os.getenv("CI"):
@@ -121,6 +122,6 @@ def test_map(mocker, input_schema, physical_op_class):
     assert len(data_record_set) == 1
     output_record = data_record_set[0]
 
-    assert sorted(output_record._schema.model_fields) == sorted(union_schemas([input_schema, OutputSchema]).model_fields)
+    assert sorted(output_record.schema.model_fields) == sorted(union_schemas([input_schema, OutputSchema]).model_fields)
     assert hasattr(output_record, "animal")
     assert output_record.animal == "elephant"

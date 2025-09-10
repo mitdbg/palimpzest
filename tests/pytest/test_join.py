@@ -36,16 +36,17 @@ ImageAudioInputSchema = union_schemas([ImageInputSchema, AudioInputSchema])
 TextImageAudioInputSchema = union_schemas([TextInputSchema, ImageInputSchema, AudioInputSchema])
 
 def create_input_record(schema: type[BaseModel]) -> DataRecord:
-    input_record = DataRecord(schema=schema, source_indices=[0])
+    data_item = {}
     if all(field in schema.model_fields for field in TextInputSchema.model_fields):
-        input_record['text'] = "An elephant is a large gray animal with a trunk and big ears."
-        input_record['age'] = 3
+        data_item['text'] = "An elephant is a large gray animal with a trunk and big ears."
+        data_item['age'] = 3
     if all(field in schema.model_fields for field in ImageInputSchema.model_fields):
-        input_record.image_file = "tests/pytest/data/elephant.png"
-        input_record.height = 304.5
+        data_item['image_file'] = "tests/pytest/data/elephant.png"
+        data_item['height'] = 304.5
     if all(field in schema.model_fields for field in AudioInputSchema.model_fields):
-        input_record.audio_file = "tests/pytest/data/elephant.wav"
-        input_record.year = 2020
+        data_item['audio_file'] = "tests/pytest/data/elephant.wav"
+        data_item['year'] = 2020
+    input_record = DataRecord(schema(**data_item), source_indices=[0])
 
     return input_record
 
@@ -121,23 +122,21 @@ def test_join(mocker, left_input_schema, right_input_schema, physical_op_class):
     assert num_inputs_processed == 1
     output_record = data_record_set[0]
 
-    assert sorted(output_record._schema.model_fields) == sorted(input_schema.model_fields)
+    assert sorted(output_record.schema.model_fields) == sorted(input_schema.model_fields)
     assert output_record._passed_operator
 
 def test_embedding_join(mocker):
     """Test EmbeddingJoin operator on simple text input"""
     left_candidates = []
     for left_idx, animal in enumerate(["elephant", "lion", "lion", "bear"]):
-        left_input_record = DataRecord(schema=TextInputSchema, source_indices=[left_idx])
-        left_input_record['text'] = f"This text describes a {animal}."
-        left_input_record['age'] = left_idx + 1
+        data_item = {"text": f"This text describes a {animal}.", "age": left_idx + 1}
+        left_input_record = DataRecord(TextInputSchema(**data_item), source_indices=[left_idx])
         left_candidates.append(left_input_record)
 
     right_candidates = []
     for right_idx, animal in enumerate(["elephant", "giraffe", "lion", "zebra"]):
-        right_input_record = DataRecord(schema=TextInputSchema, source_indices=[right_idx])
-        right_input_record['text'] = f"This text describes a {animal}."
-        right_input_record['age'] = right_idx + 2
+        data_item = {"text": f"This text describes a {animal}.", "age": right_idx + 2}
+        right_input_record = DataRecord(TextInputSchema(**data_item), source_indices=[right_idx])
         right_candidates.append(right_input_record)
 
     # construct the kwargs for the physical operator
@@ -171,7 +170,7 @@ def test_embedding_join(mocker):
     assert len(record_op_stats_lst) == 16
     assert num_inputs_processed == 16
     for output_record in records:
-        assert sorted(output_record._schema.model_fields) == sorted(input_schema.model_fields)
+        assert sorted(output_record.schema.model_fields) == sorted(input_schema.model_fields)
 
     # check that all output record stats have embedding stats
     assert all(stats.total_embedding_cost > 0.0 for stats in record_op_stats_lst)

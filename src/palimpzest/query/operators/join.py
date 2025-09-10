@@ -347,7 +347,7 @@ class EmbeddingJoin(JoinOp):
             for field in input_fields:
                 field_inputs = []
                 for candidate in candidates:
-                    if field not in candidate._field_values:
+                    if field not in candidate.get_field_names():
                         continue
                     num_input_fields_present += 1
                     field_type = candidate.get_field_type(field)
