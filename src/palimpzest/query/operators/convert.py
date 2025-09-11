@@ -116,7 +116,7 @@ class ConvertOp(PhysicalOperator, ABC):
                 time_per_record=time_per_record,
                 cost_per_record=per_record_stats.cost_per_record,
                 model_name=self.get_model_name(),
-                answer={field_name: getattr(dr, field_name) for field_name in field_names},
+                answer={field_name: getattr(dr, field_name, None) for field_name in field_names},
                 input_fields=list(self.input_schema.model_fields),
                 generated_fields=field_names,
                 total_input_tokens=per_record_stats.total_input_tokens,

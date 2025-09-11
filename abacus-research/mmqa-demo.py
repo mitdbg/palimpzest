@@ -4,6 +4,7 @@ import json
 import os
 import string
 import time
+from typing import Any
 
 import chromadb
 import numpy as np
@@ -40,7 +41,7 @@ mmqa_image_cols = [
 ]
 
 mmqa_answer_cols = [
-    {"name": "answers", "type": list[str], "desc": "The answer(s) to the question. Answer the question using the relevant information from gathered image(s), text(s), and table(s). Return your answer as a JSON list of strings. Do not include any additional context or an explanation in your answer, simply list the entities asked for by the question"},
+    {"name": "answers", "type": list[str] | Any, "desc": "The answer(s) to the question. Answer the question using the relevant information from gathered image(s), text(s), and table(s). Return your answer as a JSON list of strings. Do not include any additional context or an explanation in your answer, simply list the entities asked for by the question"},
 ]
 
 def get_json_from_answer(answer: str):

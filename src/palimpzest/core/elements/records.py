@@ -93,7 +93,7 @@ class DataRecord:
 
 
     def __getattr__(self, name: str) -> Any:
-        field = getattr(self._data_item, name)
+        field = getattr(self._data_item, name, None)
         if field is not None:
             return field
         raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
@@ -187,6 +187,13 @@ class DataRecord:
 
         # copy fields from the parent
         data_item.update({field_name: parent_record[field_name] for field_name in copy_field_names})
+
+        # corner-case: wrap values in lists if the new schema expects a list but the data item has a single value
+        for field_name, field_info in new_schema.model_fields.items():
+            field_should_be_list = hasattr(field_info.annotation, '__origin__') and field_info.annotation.__origin__ is list
+            field_is_not_list = field_name in data_item and not isinstance(data_item[field_name], list)
+            if field_should_be_list and field_is_not_list:
+                data_item[field_name] = [data_item[field_name]]
 
         # make new record which has parent_record as its parent (and the same source_indices)
         new_dr = DataRecord(
