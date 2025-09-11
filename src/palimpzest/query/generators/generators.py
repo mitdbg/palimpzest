@@ -345,7 +345,6 @@ class Generator(Generic[ContextType, InputType]):
         # if there's an error generating the completion, we have to return an empty answer
         # and can only account for the time spent performing the failed generation
         except Exception as e:
-            print(f"Error generating completion: {e}")
             logger.error(f"Error generating completion: {e}")
             field_answers = (
                 {"passed_operator": False}
@@ -417,8 +416,6 @@ class Generator(Generic[ContextType, InputType]):
                     prompt += "<audio>\n"
         logger.debug(f"PROMPT:\n{prompt}")
         logger.debug(Fore.GREEN + f"{completion_text}\n" + Style.RESET_ALL)
-        print(f"PROMPT:\n{prompt}")
-        print(Fore.GREEN + f"{completion_text}\n" + Style.RESET_ALL)
 
         # parse reasoning
         reasoning = None
