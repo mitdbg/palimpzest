@@ -664,6 +664,7 @@ def parse_arguments():
 
 def build_cuad_query(dataset, mode):
     assert mode in ["one-convert", "separate-converts"]
+    from typing import Any
 
     if mode == "one-convert":
         cols = []
@@ -671,7 +672,7 @@ def build_cuad_query(dataset, mode):
             desc = (
                 f"Extract the text spans (if they exist) from the contract corresponding to: {category['Description']}. If no spans exist, return an empty list. Quote text spans verbatim (do not summarize or paraphrase)."
             )
-            cols.append({"name": category["Category"], "type": list[str], "desc": desc})
+            cols.append({"name": category["Category"], "type": list[str] | Any, "desc": desc})
 
         desc = "Extract the text spans (if they exist) from the contract."
         dataset = dataset.sem_map(cols, depends_on=["contract"])
@@ -681,7 +682,7 @@ def build_cuad_query(dataset, mode):
                 f"Extract the text spans (if they exist) from the contract corresponding to: {category['Description']}. If no spans exist, return an empty list. Quote text spans verbatim (do not summarize or paraphrase)."
             )
             dataset = dataset.sem_map(
-                [{"name": category["Category"], "type": list[str], "desc": desc}],
+                [{"name": category["Category"], "type": list[str] | Any, "desc": desc}],
                 depends_on=["contract"],
             )
 

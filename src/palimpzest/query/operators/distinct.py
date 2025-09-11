@@ -35,27 +35,27 @@ class DistinctOp(PhysicalOperator):
 
     def __call__(self, candidate: DataRecord) -> DataRecordSet:
         # create new DataRecord
-        dr = DataRecord.from_parent(schema=candidate.schema, parent_record=candidate)
+        dr = DataRecord.from_parent(schema=candidate.schema, data_item={}, parent_record=candidate)
 
         # output record only if it has not been seen before
         record_str = dr.to_json_str(project_cols=self.distinct_cols, bytes_to_str=True, sorted=True)
         record_hash = f"{hash(record_str)}"
-        dr.passed_operator = record_hash not in self._distinct_seen
-        if dr.passed_operator:
+        dr._passed_operator = record_hash not in self._distinct_seen
+        if dr._passed_operator:
             self._distinct_seen.add(record_hash)
 
         # create RecordOpStats object
         record_op_stats = RecordOpStats(
-            record_id=dr.id,
-            record_parent_ids=dr.parent_ids,
-            record_source_indices=dr.source_indices,
+            record_id=dr._id,
+            record_parent_ids=dr._parent_ids,
+            record_source_indices=dr._source_indices,
             record_state=dr.to_dict(include_bytes=False),
             full_op_id=self.get_full_op_id(),
             logical_op_id=self.logical_op_id,
             op_name=self.op_name(),
             time_per_record=0.0,
             cost_per_record=0.0,
-            passed_operator=dr.passed_operator,
+            passed_operator=dr._passed_operator,
             op_details={k: str(v) for k, v in self.get_id_params().items()},
         )
 

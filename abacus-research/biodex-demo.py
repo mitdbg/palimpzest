@@ -2,6 +2,7 @@ import argparse
 import json
 import os
 import time
+from typing import Any
 
 import chromadb
 import datasets
@@ -18,15 +19,15 @@ biodex_entry_cols = [
 ]
 
 biodex_reactions_cols = [
-    {"name": "reactions", "type": list[str], "desc": "The list of all medical conditions experienced by the patient as discussed in the report. Try to provide as many relevant medical conditions as possible."},
+    {"name": "reactions", "type": list[str] | Any, "desc": "The list of all medical conditions experienced by the patient as discussed in the report. Try to provide as many relevant medical conditions as possible."},
 ]
 
 biodex_reaction_labels_cols = [
-    {"name": "reaction_labels", "type": list[str], "desc": "Official terms for medical conditions listed in `reactions`"},
+    {"name": "reaction_labels", "type": list[str] | Any, "desc": "Official terms for medical conditions listed in `reactions`"},
 ]
 
 biodex_ranked_reactions_labels_cols = [
-    {"name": "ranked_reaction_labels", "type": list[str], "desc": "The ranked list of medical conditions experienced by the patient. The most relevant label occurs first in the list. Be sure to rank ALL of the inputs."},
+    {"name": "ranked_reaction_labels", "type": list[str] | Any, "desc": "The ranked list of medical conditions experienced by the patient. The most relevant label occurs first in the list. Be sure to rank ALL of the inputs."},
 ]
 
 class BiodexValidator(pz.Validator):

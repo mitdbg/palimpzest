@@ -145,11 +145,11 @@ class RetrieveOp(PhysicalOperator):
         Given an input DataRecord and the top_k_results, construct the resulting RecordSet.
         """
         # create output DataRecord an set the output attribute
-        output_dr, answer = DataRecord.from_parent(self.output_schema, parent_record=candidate), {}
-        for output_field_name in self.output_field_names:
-            top_k_attr_results = None if top_k_results is None else top_k_results[output_field_name]
-            setattr(output_dr, output_field_name, top_k_attr_results)
-            answer[output_field_name] = top_k_attr_results
+        data_item = {
+            output_field_name: None if top_k_results is None else top_k_results[output_field_name]
+            for output_field_name in self.output_field_names
+        }
+        output_dr = DataRecord.from_parent(self.output_schema, data_item, parent_record=candidate)
 
         # get the record_state and generated fields
         record_state = output_dr.to_dict(include_bytes=False)
@@ -159,16 +159,17 @@ class RetrieveOp(PhysicalOperator):
 
         # construct the RecordOpStats object
         record_op_stats = RecordOpStats(
-            record_id=output_dr.id,
-            record_parent_ids=output_dr.parent_ids,
-            record_source_indices=output_dr.source_indices,
+            record_id=output_dr._id,
+            record_parent_ids=output_dr._parent_ids,
+            record_source_indices=output_dr._source_indices,
             record_state=record_state,
             full_op_id=self.get_full_op_id(),
             logical_op_id=self.logical_op_id,
             op_name=self.op_name(),
             time_per_record=total_time,
             cost_per_record=generation_stats.cost_per_record,
-            answer=answer,
+            total_embedding_cost=generation_stats.cost_per_record,
+            answer=data_item,
             input_fields=list(self.input_schema.model_fields),
             generated_fields=generated_fields,
             fn_call_duration_secs=total_time - generation_stats.llm_call_duration_secs,

@@ -26,6 +26,29 @@ ImageURL = TypeAliasType('ImageURL', str)
 AudioFilepath = TypeAliasType('AudioFilepath', str)
 AudioBase64 = TypeAliasType('AudioBase64', str)
 
+IMAGE_LIST_FIELD_TYPES = [
+    list[ImageBase64],
+    list[ImageFilepath],
+    list[ImageURL],
+    list[ImageBase64] | None,
+    list[ImageFilepath] | None,
+    list[ImageURL] | None,
+]
+IMAGE_FIELD_TYPES = IMAGE_LIST_FIELD_TYPES + [
+    ImageBase64, ImageFilepath, ImageURL,
+    ImageBase64 | None, ImageFilepath | None, ImageURL | None,
+]
+AUDIO_LIST_FIELD_TYPES = [
+    list[AudioBase64],
+    list[AudioFilepath],
+    list[AudioBase64] | None,
+    list[AudioFilepath] | None,
+]
+AUDIO_FIELD_TYPES = AUDIO_LIST_FIELD_TYPES + [
+    AudioBase64, AudioFilepath,
+    AudioBase64 | None, AudioFilepath | None,
+]
+
 
 def get_schema_field_names(schema: type[BaseModel], id: str | None = None) -> list[str]:
     """Return the field names of a Pydantic model."""

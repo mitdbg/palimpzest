@@ -1,9 +1,9 @@
 [project]
 name = "palimpzest"
-version = "0.8.2"
+version = "0.8.3"
 description = "Palimpzest is a system which enables anyone to process AI-powered analytical queries simply by defining them in a declarative language"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 keywords = ["relational", "optimization", "llm", "AI programming", "extraction", "tools", "document", "search", "integration"]
 authors = [
     {name="MIT DSG Semantic Management Lab", email="michjc@csail.mit.edu"},
@@ -16,7 +16,7 @@ dependencies = [
     "datasets>=4.0.0",
     "fastapi~=0.115.0",
     "gradio>=5.26.0",
-    "litellm>=1.73.1",
+    "litellm>=1.76.1",
     "numpy==2.0.2",
     "openai>=1.0",
     "pandas>=2.1.1",
@@ -49,12 +49,6 @@ classifiers=[
 ]
 
 [project.optional-dependencies]
-docs = [
-    "mkdocs>=1.6.1",
-    "mkdocs-material>=9.6.3",
-    "mkdocstrings-python>=1.15.0",
-    "mkdocs-material[imaging]",
-]
 vllm = [
     "vllm>=0.10.1.1",
 ]

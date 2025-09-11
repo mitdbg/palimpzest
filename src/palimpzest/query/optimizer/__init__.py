@@ -6,7 +6,7 @@ from palimpzest.query.optimizer.rules import (
     BasicSubstitutionRule as _BasicSubstitutionRule,
 )
 from palimpzest.query.optimizer.rules import (
-    CriticAndRefineConvertRule as _CriticAndRefineConvertRule,
+    CritiqueAndRefineRule as _CritiqueAndRefineRule,
 )
 from palimpzest.query.optimizer.rules import (
     ImplementationRule as _ImplementationRule,
@@ -21,7 +21,7 @@ from palimpzest.query.optimizer.rules import (
     LLMJoinRule as _LLMJoinRule,
 )
 from palimpzest.query.optimizer.rules import (
-    MixtureOfAgentsConvertRule as _MixtureOfAgentsConvertRule,
+    MixtureOfAgentsRule as _MixtureOfAgentsRule,
 )
 from palimpzest.query.optimizer.rules import (
     NonLLMConvertRule as _NonLLMConvertRule,
@@ -33,7 +33,10 @@ from palimpzest.query.optimizer.rules import (
     PushDownFilter as _PushDownFilter,
 )
 from palimpzest.query.optimizer.rules import (
-    RAGConvertRule as _RAGConvertRule,
+    RAGRule as _RAGRule,
+)
+from palimpzest.query.optimizer.rules import (
+    ReorderConverts as _ReorderConverts,
 )
 from palimpzest.query.optimizer.rules import (
     RetrieveRule as _RetrieveRule,
@@ -42,7 +45,7 @@ from palimpzest.query.optimizer.rules import (
     Rule as _Rule,
 )
 from palimpzest.query.optimizer.rules import (
-    SplitConvertRule as _SplitConvertRule,
+    SplitRule as _SplitRule,
 )
 from palimpzest.query.optimizer.rules import (
     TransformationRule as _TransformationRule,
@@ -52,19 +55,20 @@ ALL_RULES = [
     _AddContextsBeforeComputeRule,
     _AggregateRule,
     _BasicSubstitutionRule,
-    _CriticAndRefineConvertRule,
+    _CritiqueAndRefineRule,
     _ImplementationRule,
     _LLMConvertBondedRule,
     _LLMFilterRule,
     _LLMJoinRule,
-    _MixtureOfAgentsConvertRule,
+    _MixtureOfAgentsRule,
     _NonLLMConvertRule,
     _NonLLMFilterRule,
     _PushDownFilter,
-    _RAGConvertRule,
+    _RAGRule,
+    _ReorderConverts,
     _RetrieveRule,
     _Rule,
-    _SplitConvertRule,
+    _SplitRule,
     _TransformationRule,
 ]
 

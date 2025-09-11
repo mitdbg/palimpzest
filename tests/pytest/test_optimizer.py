@@ -182,6 +182,25 @@ class TestOptimizer:
         assert isinstance(physical_plan[0], MarshalAndScanDataOp)
         assert isinstance(physical_plan[1], LLMConvertBonded)
 
+    def test_simple_vllm_convert(self, enron_eval_tiny, email_schema, opt_strategy):
+        plan = enron_eval_tiny
+        plan = plan.sem_add_columns(email_schema)
+        policy = MinTime()
+        cost_model = SampleBasedCostModel()
+        optimizer = Optimizer(
+            policy=policy,
+            cost_model=cost_model,
+            verbose=True,
+            available_models=[Model.VLLM_QWEN_1_5_0_5B_CHAT],
+            optimizer_strategy=opt_strategy,
+        )
+        physical_plans = optimizer.optimize(plan)
+        physical_plan = physical_plans[0]
+
+        assert len(physical_plan) == 2
+        assert isinstance(physical_plan[0], MarshalAndScanDataOp)
+        assert isinstance(physical_plan[1], LLMConvertBonded)
+
     def test_push_down_filter(self, enron_eval_tiny, email_schema, opt_strategy):
         plan = enron_eval_tiny
         plan = plan.sem_add_columns(email_schema)
@@ -225,6 +244,29 @@ class TestOptimizer:
         assert isinstance(physical_plan[1], LLMFilter)
         assert isinstance(physical_plan[2], LLMFilter)
         assert isinstance(physical_plan[3], LLMConvertBonded)
+
+    def test_small_real_estate_logical_reorder(self, small_real_estate_workload, opt_strategy):
+        policy = MinCost()
+        cost_model = SampleBasedCostModel()
+        optimizer = Optimizer(
+            policy=policy,
+            cost_model=cost_model,
+            verbose=True,
+            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B],
+            allow_rag_reduction=False,
+            allow_mixtures=False,
+            allow_critic=False,
+            allow_split_merge=False,
+            optimizer_strategy=opt_strategy,
+        )
+        physical_plans = optimizer.optimize(small_real_estate_workload)
+        physical_plan = physical_plans[0]
+
+        assert len(physical_plan) == 4
+        assert isinstance(physical_plan[0], MarshalAndScanDataOp)  # RealEstateListingFiles
+        assert isinstance(physical_plan[1], LLMConvert)  # ImageRealEstateListing
+        assert isinstance(physical_plan[2], LLMFilter)  # ImageRealEstateListing(attractive)
+        assert isinstance(physical_plan[3], LLMConvert)  # TextRealEstateListing
 
     def test_real_estate_logical_reorder(self, real_estate_workload, opt_strategy):
         policy = MinCost()
@@ -270,6 +312,10 @@ class TestOptimizer:
             cost_model=cost_model,
             verbose=True,
             available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B],
+            allow_rag_reduction=False,
+            allow_mixtures=False,
+            allow_critic=False,
+            allow_split_merge=False,
             optimizer_strategy=opt_strategy,
         )
         physical_plans = optimizer.optimize(plan)

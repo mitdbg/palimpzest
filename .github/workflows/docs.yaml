@@ -1,10 +1,7 @@
-name: docs
+name: Deploy Docs to GitHub Pages
 
 on:
   push:
-    branches:
-      - main
-  pull_request:
     branches:
       - main
 
@@ -12,28 +9,49 @@ permissions:
   contents: write
 
 jobs:
-  docs:
+  build:
+    name: Build Docusaurus
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+
       - name: Install dependencies
         run: |
-          pip install --upgrade pip
-          pip install palimpzest[docs]
-      - name: MkDocs build
+          cd website
+          npm ci
+      - name: Build website
         run: |
-          cd docs
-          mkdocs build
+          cd website
+          npm run build
           echo "palimpzest.org" > site/CNAME
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+      - name: Upload Build Artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          publish_branch: gh-pages
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: docs/site/
-          force_orphan: true
+          path: website/build
 
-# TODO: pip install mike
-#       mike deploy --push --update-aliases 0.1 latest
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+
+    # Grant GITHUB_TOKEN the permissions required to make a Pages deployment
+    permissions:
+      pages: write # to deploy to Pages
+      id-token: write # to verify the deployment originates from an appropriate source
+
+    # Deploy to the github-pages environment
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -36,13 +36,13 @@ class LimitScanOp(PhysicalOperator):
         # NOTE: execution layer ensures that no more than self.limit
         #       records are returned to the user by this operator.
         # create new DataRecord
-        dr = DataRecord.from_parent(schema=candidate.schema, parent_record=candidate)
+        dr = DataRecord.from_parent(schema=candidate.schema, data_item={}, parent_record=candidate)
 
         # create RecordOpStats object
         record_op_stats = RecordOpStats(
-            record_id=dr.id,
-            record_parent_ids=dr.parent_ids,
-            record_source_indices=dr.source_indices,
+            record_id=dr._id,
+            record_parent_ids=dr._parent_ids,
+            record_source_indices=dr._source_indices,
             record_state=dr.to_dict(include_bytes=False),
             full_op_id=self.get_full_op_id(),
             logical_op_id=self.logical_op_id,

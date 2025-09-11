@@ -12,8 +12,7 @@ from palimpzest.query.generators.generators import Generator
 def question():
     class Question(BaseModel):
         question: str = Field(description="A simple question")
-    dr = DataRecord(schema=Question, source_indices=[0])
-    dr.question = "What color is grass? (one-word answer)"
+    dr = DataRecord(data_item=Question(question="What color is grass? (one-word answer)"), source_indices=[0])
     return dr
 
 @pytest.fixture
@@ -32,7 +31,7 @@ def output_schema():
     ]
 )
 def test_generator(model, question, output_schema):
-    generator = Generator(model, PromptStrategy.COT_QA)
+    generator = Generator(model, PromptStrategy.MAP)
     output, _, gen_stats, _ = generator(question, output_schema.model_fields, **{"output_schema": output_schema})
     assert gen_stats.total_input_tokens > 0
     assert gen_stats.total_output_tokens > 0

@@ -42,11 +42,6 @@ class FilterOp(PhysicalOperator, ABC):
         return {"filter": self.filter_obj, "desc": self.desc, **op_params}
 
     @abstractmethod
-    def is_image_filter(self) -> bool:
-        """Return True if the filter operation processes an image, False otherwise."""
-        pass
-
-    @abstractmethod
     def filter(self, candidate: DataRecord) -> tuple[dict[str, bool], GenerationStats]:
         """
         This abstract method will be implemented by subclasses of FilterOp to process the input DataRecord
@@ -76,14 +71,14 @@ class FilterOp(PhysicalOperator, ABC):
         construct the resulting RecordSet.
         """
         # create new DataRecord and set passed_operator attribute
-        dr = DataRecord.from_parent(candidate.schema, parent_record=candidate)
-        dr.passed_operator = passed_operator
+        dr = DataRecord.from_parent(schema=candidate.schema, data_item={}, parent_record=candidate)
+        dr._passed_operator = passed_operator
 
         # create RecordOpStats object
         record_op_stats = RecordOpStats(
-            record_id=dr.id,
-            record_parent_ids=dr.parent_ids,
-            record_source_indices=dr.source_indices,
+            record_id=dr._id,
+            record_parent_ids=dr._parent_ids,
+            record_source_indices=dr._source_indices,
             record_state=dr.to_dict(include_bytes=False),
             full_op_id=self.get_full_op_id(),
             logical_op_id=self.logical_op_id,
@@ -102,7 +97,6 @@ class FilterOp(PhysicalOperator, ABC):
             total_embedding_llm_calls=generation_stats.total_embedding_llm_calls,
             answer=answer,
             passed_operator=passed_operator,
-            image_operation=self.is_image_filter(),
             op_details={k: str(v) for k, v in self.get_id_params().items()},
         )
 
@@ -127,10 +121,6 @@ class FilterOp(PhysicalOperator, ABC):
 
 
 class NonLLMFilter(FilterOp):
-    def is_image_filter(self) -> bool:
-        # NOTE: even if the UDF is processing an image, we do not consider this an image filter
-        # (the output of this function will be used by the CostModel in a way which does not apply to UDFs)
-        return False
 
     def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates):
         # estimate output cardinality using a constant assumption of the filter selectivity
@@ -174,7 +164,7 @@ class LLMFilter(FilterOp):
     def __init__(
         self,
         model: Model,
-        prompt_strategy: PromptStrategy = PromptStrategy.COT_BOOL,
+        prompt_strategy: PromptStrategy = PromptStrategy.FILTER,
         reasoning_effort: str | None = None,
         *args,
         **kwargs,
@@ -183,13 +173,14 @@ class LLMFilter(FilterOp):
         self.model = model
         self.prompt_strategy = prompt_strategy
         self.reasoning_effort = reasoning_effort
-        self.generator = Generator(model, prompt_strategy, reasoning_effort, self.api_base, Cardinality.ONE_TO_ONE, self.desc, self.verbose)
+        if model is not None:
+            self.generator = Generator(model, prompt_strategy, reasoning_effort, self.api_base, Cardinality.ONE_TO_ONE, self.desc, self.verbose)
 
     def get_id_params(self):
         id_params = super().get_id_params()
         id_params = {
-            "model": self.model.value,
-            "prompt_strategy": self.prompt_strategy.value,
+            "model": None if self.model is None else self.model.value,
+            "prompt_strategy": None if self.prompt_strategy is None else self.prompt_strategy.value,
             "reasoning_effort": self.reasoning_effort,
             **id_params,
         }
@@ -208,15 +199,12 @@ class LLMFilter(FilterOp):
         return op_params
 
     def get_model_name(self):
-        return self.model.value
-
-    def is_image_filter(self) -> bool:
-        return self.prompt_strategy is PromptStrategy.COT_BOOL_IMAGE
+        return None if self.model is None else self.model.value
 
     def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates):
         # estimate number of input tokens from source
         est_num_input_tokens = NAIVE_EST_NUM_INPUT_TOKENS
-        if self.is_image_filter():
+        if self.is_image_op():
             est_num_input_tokens = 765 / 10  # 1024x1024 image is 765 tokens
 
         # NOTE: the output often generates an entire reasoning sentence, thus the true value may be higher
@@ -232,7 +220,7 @@ class LLMFilter(FilterOp):
         # get est. of conversion cost (in USD) per record from model card
         usd_per_input_token = (
             MODEL_CARDS[self.model.value]["usd_per_audio_input_token"]
-            if self.prompt_strategy.is_audio_prompt()
+            if self.is_audio_op()
             else MODEL_CARDS[self.model.value]["usd_per_input_token"]
         )
         model_conversion_usd_per_record = (

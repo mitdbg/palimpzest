@@ -10,9 +10,7 @@ from palimpzest.prompts.agent_prompts import (
 )
 from palimpzest.prompts.context_search import CONTEXT_SEARCH_PROMPT
 from palimpzest.prompts.prompt_factory import PromptFactory
-from palimpzest.prompts.util_phrases import (
-    COT_ANSWER_INSTRUCTION,
-    COT_REASONING_INSTRUCTION,
+from palimpzest.prompts.utils import (
     ONE_TO_MANY_OUTPUT_FORMAT_INSTRUCTION,
     ONE_TO_ONE_OUTPUT_FORMAT_INSTRUCTION,
 )
@@ -38,9 +36,7 @@ __all__ = [
     "CONTEXT_SEARCH_PROMPT",
     # prompt factory
     "PromptFactory",
-    # util phrases
-    "COT_ANSWER_INSTRUCTION",
-    "COT_REASONING_INSTRUCTION",
+    # utils
     "ONE_TO_MANY_OUTPUT_FORMAT_INSTRUCTION",
     "ONE_TO_ONE_OUTPUT_FORMAT_INSTRUCTION",
     # validator

@@ -74,25 +74,14 @@ class ConvertOp(PhysicalOperator, ABC):
 
         drs = []
         for idx in range(max(n_records, 1)):
-            # initialize record with the correct output schema, parent record, and cardinality idx
-            dr = DataRecord.from_parent(self.output_schema, parent_record=candidate, cardinality_idx=idx)
-
-            # copy all fields from the input record
-            # NOTE: this means that records processed by PZ converts will inherit all pre-computed fields
-            #       in an incremental fashion; this is a design choice which may be revisited in the future
-            for field in candidate.get_field_names():
-                setattr(dr, field, getattr(candidate, field))
-
-            # get input field names and output field names
-            input_fields = list(self.input_schema.model_fields)
-            output_fields = list(self.output_schema.model_fields)
-
             # parse newly generated fields from the field_answers dictionary for this field; if the list
             # of generated values is shorter than the number of records, we fill in with None
-            for field in output_fields:
-                if field not in input_fields:
-                    value = field_answers[field][idx] if idx < len(field_answers[field]) else None
-                    setattr(dr, field, value)
+            data_item = {}
+            for field in self.generated_fields:
+                data_item[field] = field_answers[field][idx] if idx < len(field_answers[field]) else None
+
+            # initialize record with the correct output schema, data_item, parent record, and cardinality idx
+            dr = DataRecord.from_parent(self.output_schema, data_item, parent_record=candidate, cardinality_idx=idx)
 
             # append data record to list of output data records
             drs.append(dr)
@@ -117,9 +106,9 @@ class ConvertOp(PhysicalOperator, ABC):
         # create the RecordOpStats objects for each output record
         record_op_stats_lst = [
             RecordOpStats(
-                record_id=dr.id,
-                record_parent_ids=dr.parent_ids,
-                record_source_indices=dr.source_indices,
+                record_id=dr._id,
+                record_parent_ids=dr._parent_ids,
+                record_source_indices=dr._source_indices,
                 record_state=dr.to_dict(include_bytes=False),
                 full_op_id=self.get_full_op_id(),
                 logical_op_id=self.logical_op_id,
@@ -127,7 +116,7 @@ class ConvertOp(PhysicalOperator, ABC):
                 time_per_record=time_per_record,
                 cost_per_record=per_record_stats.cost_per_record,
                 model_name=self.get_model_name(),
-                answer={field_name: getattr(dr, field_name) for field_name in field_names},
+                answer={field_name: getattr(dr, field_name, None) for field_name in field_names},
                 input_fields=list(self.input_schema.model_fields),
                 generated_fields=field_names,
                 total_input_tokens=per_record_stats.total_input_tokens,
@@ -139,7 +128,6 @@ class ConvertOp(PhysicalOperator, ABC):
                 total_llm_calls=per_record_stats.total_llm_calls,
                 total_embedding_llm_calls=per_record_stats.total_embedding_llm_calls,
                 failed_convert=(not successful_convert),
-                image_operation=self.is_image_conversion(),
                 op_details={k: str(v) for k, v in self.get_id_params().items()},
             )
             for dr in records
@@ -147,11 +135,6 @@ class ConvertOp(PhysicalOperator, ABC):
 
         # create and return the DataRecordSet
         return DataRecordSet(records, record_op_stats_lst)
-
-    @abstractmethod
-    def is_image_conversion(self) -> bool:
-        """Return True if the convert operation processes an image, False otherwise."""
-        pass
 
     @abstractmethod
     def convert(self, candidate: DataRecord, fields: dict[str, FieldInfo]) -> tuple[dict[str, list], GenerationStats]:
@@ -215,11 +198,6 @@ class NonLLMConvert(ConvertOp):
         op = super().__str__()
         op += f"    UDF: {self.udf.__name__}\n"
         return op
-
-    def is_image_conversion(self) -> bool:
-        # NOTE: even if the UDF is processing an image, we do not consider this an image conversion
-        # (the output of this function will be used by the CostModel in a way which does not apply to UDFs)
-        return False
 
     def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         """
@@ -287,7 +265,7 @@ class LLMConvert(ConvertOp):
     def __init__(
         self,
         model: Model,
-        prompt_strategy: PromptStrategy = PromptStrategy.COT_QA,
+        prompt_strategy: PromptStrategy = PromptStrategy.MAP,
         reasoning_effort: str | None = None,
         *args,
         **kwargs,
@@ -330,9 +308,6 @@ class LLMConvert(ConvertOp):
     def get_model_name(self):
         return None if self.model is None else self.model.value
 
-    def is_image_conversion(self) -> bool:
-        return self.prompt_strategy.is_image_prompt()
-
     def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         """
         Compute naive cost estimates for the LLMConvert operation. Implicitly, these estimates
@@ -350,7 +325,7 @@ class LLMConvert(ConvertOp):
 
         # get est. of conversion cost (in USD) per record from model card
         usd_per_input_token = MODEL_CARDS[model_name].get("usd_per_input_token")
-        if getattr(self, "prompt_strategy", None) is not None and self.prompt_strategy.is_audio_prompt():
+        if getattr(self, "prompt_strategy", None) is not None and self.is_audio_op():
             usd_per_input_token = MODEL_CARDS[model_name]["usd_per_audio_input_token"]
 
         model_conversion_usd_per_record = (
