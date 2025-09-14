@@ -41,6 +41,7 @@ class JoinOp(PhysicalOperator, ABC):
         prompt_strategy: PromptStrategy = PromptStrategy.JOIN,
         join_parallelism: int = 64,
         reasoning_effort: str | None = None,
+        retain_inputs: bool = True,
         desc: str | None = None,
         *args,
         **kwargs,
@@ -52,6 +53,7 @@ class JoinOp(PhysicalOperator, ABC):
         self.prompt_strategy = prompt_strategy
         self.join_parallelism = join_parallelism
         self.reasoning_effort = reasoning_effort
+        self.retain_inputs = retain_inputs
         self.desc = desc
         self.generator = Generator(model, prompt_strategy, reasoning_effort, self.api_base, Cardinality.ONE_TO_ONE, self.desc, self.verbose)
         self.join_idx = 0
@@ -82,10 +84,11 @@ class JoinOp(PhysicalOperator, ABC):
         op_params = super().get_op_params()
         op_params = {
             "condition": self.condition,
-            "model": self.model.value,
-            "prompt_strategy": self.prompt_strategy.value,
+            "model": self.model,
+            "prompt_strategy": self.prompt_strategy,
             "join_parallelism": self.join_parallelism,
             "reasoning_effort": self.reasoning_effort,
+            "retain_inputs": self.retain_inputs,
             "desc": self.desc,
             **op_params,
         }
@@ -227,8 +230,9 @@ class NestedLoopsJoin(JoinOp):
         num_inputs_processed = len(join_candidates)
 
         # store input records to join with new records added later
-        self._left_input_records.extend(left_candidates)
-        self._right_input_records.extend(right_candidates)
+        if self.retain_inputs:
+            self._left_input_records.extend(left_candidates)
+            self._right_input_records.extend(right_candidates)
 
         # return empty DataRecordSet if no output records were produced
         if len(output_records) == 0:
@@ -242,7 +246,7 @@ class EmbeddingJoin(JoinOp):
     # specialized use cases (e.g., speech-to-text) with strict requirements on things like e.g. sample rate
     def __init__(
         self,
-        num_samples: int = 100,
+        num_samples: int = 10,
         *args,
         **kwargs,
     ):
@@ -307,10 +311,7 @@ class EmbeddingJoin(JoinOp):
         )
 
         # get est. of conversion cost (in USD) per record from model card
-        model_conversion_usd_per_record = (
-            MODEL_CARDS[self.embedding_model.value]["usd_per_input_token"] * est_num_input_tokens
-            + MODEL_CARDS[self.embedding_model.value]["usd_per_output_token"] * est_num_output_tokens
-        )
+        model_conversion_usd_per_record = MODEL_CARDS[self.embedding_model.value]["usd_per_input_token"] * est_num_input_tokens
 
         # estimate output cardinality using a constant assumption of the filter selectivity
         selectivity = NAIVE_EST_JOIN_SELECTIVITY
@@ -521,8 +522,9 @@ class EmbeddingJoin(JoinOp):
             record_op_stats.total_embedding_cost = amortized_embedding_cost
 
         # store input records to join with new records added later
-        self._left_input_records.extend(zip(left_candidates, left_embeddings))
-        self._right_input_records.extend(zip(right_candidates, right_embeddings))
+        if self.retain_inputs:
+            self._left_input_records.extend(zip(left_candidates, left_embeddings))
+            self._right_input_records.extend(zip(right_candidates, right_embeddings))
 
         # return empty DataRecordSet if no output records were produced
         if len(output_records) == 0:

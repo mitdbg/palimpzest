@@ -93,10 +93,8 @@ class DataRecord:
 
 
     def __getattr__(self, name: str) -> Any:
-        field = getattr(self._data_item, name, None)
-        if field is not None:
-            return field
-        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
+        return getattr(self._data_item, name)
+
 
     def __getitem__(self, field: str) -> Any:
         return getattr(self._data_item, field)

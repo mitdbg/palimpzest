@@ -9,6 +9,9 @@ from palimpzest.query.optimizer.rules import (
     CritiqueAndRefineRule as _CritiqueAndRefineRule,
 )
 from palimpzest.query.optimizer.rules import (
+    EmbeddingJoinRule as _EmbeddingJoinRule,
+)
+from palimpzest.query.optimizer.rules import (
     ImplementationRule as _ImplementationRule,
 )
 from palimpzest.query.optimizer.rules import (
@@ -18,7 +21,7 @@ from palimpzest.query.optimizer.rules import (
     LLMFilterRule as _LLMFilterRule,
 )
 from palimpzest.query.optimizer.rules import (
-    LLMJoinRule as _LLMJoinRule,
+    NestedLoopsJoinRule as _NestedLoopsJoinRule,
 )
 from palimpzest.query.optimizer.rules import (
     MixtureOfAgentsRule as _MixtureOfAgentsRule,
@@ -56,10 +59,11 @@ ALL_RULES = [
     _AggregateRule,
     _BasicSubstitutionRule,
     _CritiqueAndRefineRule,
+    _EmbeddingJoinRule,
     _ImplementationRule,
     _LLMConvertBondedRule,
     _LLMFilterRule,
-    _LLMJoinRule,
+    _NestedLoopsJoinRule,
     _MixtureOfAgentsRule,
     _NonLLMConvertRule,
     _NonLLMFilterRule,
