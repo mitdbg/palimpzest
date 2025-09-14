@@ -97,6 +97,7 @@ const config: Config = {
         },
         {to: '/blog', label: 'Blog', position: 'left'},
         {to: '/research', label: 'Research', position: 'left'},
+        {to: '/Palimpchat', label: 'PalimpChat', position: 'left'},
         {
           href: 'https://github.com/mitdbg/palimpzest',
           label: 'GitHub',
