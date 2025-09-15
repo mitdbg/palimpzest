@@ -152,6 +152,9 @@ class QueryProcessorFactory:
         # update the dataset's types if we're not enforcing types
         if not config.enforce_types:
             dataset.relax_types()
+            if train_dataset is not None:
+                for _, ds in train_dataset.items():
+                    ds.relax_types()
 
         # create the optimizer, execution strateg(ies), and processor
         optimizer = cls._create_optimizer(config)
