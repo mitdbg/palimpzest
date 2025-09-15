@@ -80,6 +80,15 @@ def _create_pickleable_model(fields: dict[str, tuple[type, FieldInfo]]) -> type[
     return new_model
 
 
+def relax_schema(model: type[BaseModel]) -> type[BaseModel]:
+    """Updates the type annotation for every field in the BaseModel to include typing.Any"""
+    fields = {}
+    for field_name, field in model.model_fields.items():
+        fields[field_name] = (field.annotation | Any, field)
+
+    return _create_pickleable_model(fields)
+
+
 def project(model: type[BaseModel], project_fields: list[str]) -> type[BaseModel]:
     """Project a Pydantic model to only the specified columns."""
     # make sure projection column names are shortened
@@ -119,7 +128,7 @@ def create_schema_from_df(df: pd.DataFrame) -> type[BaseModel]:
     for column, dtype in zip(df.columns, df.dtypes):
         column = f"column_{column}" if isinstance(column, int) else column
         field_desc = f"The {column} column from an input DataFrame"
-        annotation = PANDAS_DTYPE_TO_PYDANTIC.get(str(dtype), Any) | Any  # TODO: make strict type-checking configurable
+        annotation = PANDAS_DTYPE_TO_PYDANTIC.get(str(dtype), Any) # | Any  # TODO: make strict type-checking configurable
         fields[column] = (annotation, Field(description=field_desc))
 
     # create and return the new schema

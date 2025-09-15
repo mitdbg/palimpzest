@@ -21,10 +21,10 @@ from palimpzest.query.optimizer.rules import (
     LLMFilterRule as _LLMFilterRule,
 )
 from palimpzest.query.optimizer.rules import (
-    NestedLoopsJoinRule as _NestedLoopsJoinRule,
+    MixtureOfAgentsRule as _MixtureOfAgentsRule,
 )
 from palimpzest.query.optimizer.rules import (
-    MixtureOfAgentsRule as _MixtureOfAgentsRule,
+    NestedLoopsJoinRule as _NestedLoopsJoinRule,
 )
 from palimpzest.query.optimizer.rules import (
     NonLLMConvertRule as _NonLLMConvertRule,

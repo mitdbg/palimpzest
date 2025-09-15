@@ -149,6 +149,10 @@ class QueryProcessorFactory:
         # apply any additional keyword arguments to the config and validate its contents
         config, validator = cls._config_validation_and_normalization(config, train_dataset, validator)
 
+        # update the dataset's types if we're not enforcing types
+        if not config.enforce_types:
+            dataset.relax_types()
+
         # create the optimizer, execution strateg(ies), and processor
         optimizer = cls._create_optimizer(config)
         config.execution_strategy = cls._create_execution_strategy(dataset, config)

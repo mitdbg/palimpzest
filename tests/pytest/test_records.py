@@ -39,31 +39,23 @@ class TestDataRecord:
         record2 = DataRecord(data_item=TestSchema(name="test", value=42), source_indices=[0])
         assert sample_record == record2
 
-    def test_from_df(self, sample_df):
-        """Test creating records from DataFrame"""
-        records = DataRecord.from_df(sample_df, schema=TestSchema)
-        assert len(records) == 2
-        assert records[0].name == "Alice"
-        assert records[1].value == 2
-
     def test_to_df(self, sample_df):
         """Test converting records back to DataFrame"""
-        records = DataRecord.from_df(sample_df, schema=TestSchema)
+        records = [
+            DataRecord(data_item=TestSchema(name="Alice", value=1), source_indices=[0]),
+            DataRecord(data_item=TestSchema(name="Bob", value=2), source_indices=[1]),
+        ]
         df_result = DataRecord.to_df(records)
         assert df_result.equals(sample_df)
 
     def test_to_df_with_project_cols(self, sample_df):
         """Test converting records to DataFrame with project_cols"""
-        records = DataRecord.from_df(sample_df, schema=TestSchema)
+        records = [
+            DataRecord(data_item=TestSchema(name="Alice", value=1), source_indices=[0]),
+            DataRecord(data_item=TestSchema(name="Bob", value=2), source_indices=[1]),
+        ]
         df_result = DataRecord.to_df(records, project_cols=["name"])
         assert df_result.equals(sample_df[["name"]])
-
-    def test_derived_schema(self, sample_df):
-        """Test auto-schema generation from DataFrame"""
-        records = DataRecord.from_df(sample_df)  # No schema provided
-        assert len(records) == 2
-        assert 'name' in records[0].get_field_names()
-        assert 'value' in records[0].get_field_names()
 
     def test_invalid_attribute(self, sample_record):
         """Test accessing non-existent attribute"""

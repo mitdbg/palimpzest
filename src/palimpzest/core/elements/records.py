@@ -16,12 +16,11 @@ from palimpzest.core.lib.schemas import (
     ImageBase64,
     ImageFilepath,
     ImageURL,
-    create_schema_from_df,
     project,
     union_schemas,
 )
 from palimpzest.core.models import ExecutionStats, PlanStats, RecordOpStats
-from palimpzest.utils.hash_helpers import hash_for_id, hash_for_serialized_dict
+from palimpzest.utils.hash_helpers import hash_for_id
 
 
 class DataRecord:
@@ -263,40 +262,6 @@ class DataRecord:
         )
 
         return new_dr
-
-    # TODO: unused outside of unit tests
-    @staticmethod
-    def from_df(df: pd.DataFrame, schema: type[BaseModel] | None = None) -> list[DataRecord]:
-        """Create a list of DataRecords from a pandas DataFrame
-        
-        Args:
-            df (pd.DataFrame): Input DataFrame
-            schema (BaseModel, optional): Schema for the DataRecords. If None, will be derived from DataFrame  
-        
-        Returns:
-            list[DataRecord]: List of DataRecord instances
-        """
-        if df is None:
-            raise ValueError("DataFrame is None!")
-
-        # create schema if one isn't provided
-        if schema is None:
-            schema = create_schema_from_df(df)
-
-        # create an id for the dataset from the schema
-        dataset_id = hash_for_serialized_dict({
-            k: {"annotation": str(v.annotation), "default": str(v.default), "description": v.description}
-            for k, v in schema.model_fields.items()
-        })
-
-        # create records
-        records = []
-        for idx, row in df.iterrows():
-            row_dict = row.to_dict()
-            record = DataRecord(schema(**row_dict), source_indices=[f"{dataset_id}-{idx}"])
-            records.append(record)
-
-        return records
 
     @staticmethod
     def to_df(records: list[DataRecord], project_cols: list[str] | None = None) -> pd.DataFrame:
