@@ -79,7 +79,7 @@ class Validator:
         Compute the quality of the generated output for the given fields and input_record.
         """
         # create prompt factory
-        factory = PromptFactory(PromptStrategy.MAP, Model.o4_MINI, Cardinality.ONE_TO_ONE)
+        factory = PromptFactory(PromptStrategy.MAP, self.model, Cardinality.ONE_TO_ONE)
 
         # get the input messages; strip out the system message(s)
         msg_kwargs = {"output_schema": op.output_schema, "project_cols": op.get_input_fields()}
@@ -95,14 +95,14 @@ class Validator:
             start_time = time.time()
             validator_prompt = MAP_IMAGE_VALIDATOR_PROMPT if op.is_image_op() else MAP_VALIDATOR_PROMPT
             val_messages = [{"role": "system", "content": validator_prompt}] + input_messages + [{"role": "user", "content": output_message}]
-            completion = litellm.completion(model="openai/o4-mini", messages=val_messages)
+            completion = litellm.completion(model=self.model.value, messages=val_messages)
             completion_text = completion.choices[0].message.content
             gen_stats = self._get_gen_stats_from_completion(completion, start_time)
             print(f"INPUT:\n{input_str}")
             print(Fore.GREEN + f"{completion_text}\n" + Style.RESET_ALL)
 
             # parse the evaluation
-            eval_dict: dict = get_json_from_answer(completion_text, Model.o4_MINI, Cardinality.ONE_TO_ONE)
+            eval_dict: dict = get_json_from_answer(completion_text, self.model, Cardinality.ONE_TO_ONE)
             score = sum(eval_dict.values()) / len(eval_dict)
 
         except Exception:
@@ -115,7 +115,7 @@ class Validator:
         Compute the quality for each record_op_stats object in the given record_set.
         """
         # create prompt factory
-        factory = PromptFactory(PromptStrategy.MAP, Model.o4_MINI, Cardinality.ONE_TO_MANY)
+        factory = PromptFactory(PromptStrategy.MAP, self.model, Cardinality.ONE_TO_MANY)
 
         # get the input messages; strip out the system message(s)
         msg_kwargs = {"output_schema": op.output_schema, "project_cols": op.get_input_fields()}
@@ -138,7 +138,7 @@ class Validator:
             # print(Fore.GREEN + f"{completion_text}\n" + Style.RESET_ALL)
 
             # parse the evaluation
-            eval_dicts: list[dict] = get_json_from_answer(completion_text, Model.o4_MINI, Cardinality.ONE_TO_MANY)
+            eval_dicts: list[dict] = get_json_from_answer(completion_text, self.model, Cardinality.ONE_TO_MANY)
             all_qualities = []
             for record_eval_dict in eval_dicts:
                 all_qualities.extend(record_eval_dict.values())
@@ -158,12 +158,12 @@ class Validator:
         label = self.filter_cache.get(filter_input_hash, None)
         if label is None:
             validator_op: LLMFilter = op.copy()
-            validator_op.model = Model.o4_MINI
+            validator_op.model = self.model
             try:
                 target_record_set = validator_op(input_record)
                 label = target_record_set[0]._passed_operator
                 self.filter_cache[filter_input_hash] = label
-                score = label == output
+                score = float(label == output)
                 record_op_stats = target_record_set.record_op_stats[0]
                 gen_stats = GenerationStats(
                     model_name=self.model.value,
@@ -181,7 +181,7 @@ class Validator:
                 pass
 
         else:
-            score = label == output
+            score = float(label == output)
 
         return score, gen_stats
 
@@ -191,12 +191,12 @@ class Validator:
         label = self.join_cache.get(join_input_hash, None)
         if label is None:
             validator_op: JoinOp = op.copy()
-            validator_op.model = Model.o4_MINI
+            validator_op.model = self.model
             try:
-                target_record_set = validator_op([left_input_record], [right_input_record])
+                target_record_set, _ = validator_op([left_input_record], [right_input_record])
                 label = target_record_set[0]._passed_operator
                 self.join_cache[join_input_hash] = label
-                score = label == output
+                score = float(label == output)
                 record_op_stats = target_record_set.record_op_stats[0]
                 gen_stats = GenerationStats(
                     model_name=self.model.value,
@@ -214,7 +214,7 @@ class Validator:
                 pass
 
         else:
-            score = label == output
+            score = float(label == output)
 
         return score, gen_stats
 
@@ -225,7 +225,7 @@ class Validator:
         # TODO: retrieve k=25; score each item based on relevance; compute F1
         # TODO: support retrieval over images
         # create prompt factory
-        factory = PromptFactory(PromptStrategy.MAP, Model.o4_MINI, Cardinality.ONE_TO_ONE)
+        factory = PromptFactory(PromptStrategy.MAP, self.model, Cardinality.ONE_TO_ONE)
 
         # get the input messages; strip out the system message(s)
         msg_kwargs = {"output_schema": op.output_schema, "project_cols": op.get_input_fields()}
@@ -249,7 +249,7 @@ class Validator:
             print(Fore.GREEN + f"{completion_text}\n" + Style.RESET_ALL)
 
             # parse the evaluation
-            eval_dict: dict = get_json_from_answer(completion_text, Model.o4_MINI, Cardinality.ONE_TO_ONE)
+            eval_dict: dict = get_json_from_answer(completion_text, self.model, Cardinality.ONE_TO_ONE)
             score = sum(eval_dict.values()) / len(eval_dict)
 
         except Exception:

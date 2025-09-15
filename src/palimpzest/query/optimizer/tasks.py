@@ -247,8 +247,16 @@ class ApplyRule(Task):
             # apply implementation rule
             new_expressions = self.rule.substitute(self.logical_expression, **physical_op_params)
             new_expressions = [expr for expr in new_expressions if expr.expr_id not in expressions]
+
+            # get the costed_full_op_ids from the context (if provided) and compute whether this
+            # logical expression has physical operators which have been costed
             costed_full_op_ids = context['costed_full_op_ids']
-            if costed_full_op_ids is not None:
+            logical_op_has_been_costed = costed_full_op_ids is not None and any([
+                op_id.split("-")[0] == self.logical_expression.operator.get_logical_op_id()
+                for op_id in costed_full_op_ids
+            ])
+
+            if logical_op_has_been_costed:
                 new_expressions = [expr for expr in new_expressions if expr.operator.get_full_op_id() in costed_full_op_ids]
             expressions.update({expr.expr_id: expr for expr in new_expressions})
             group.physical_expressions.update(new_expressions)

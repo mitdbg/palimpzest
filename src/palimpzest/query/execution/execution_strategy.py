@@ -314,6 +314,11 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
             for future in as_completed(futures):
                 # update output record sets
                 record_set, operator, source_indices, input = future.result()
+
+                # if the operator is a join, get record_set from tuple output
+                if isinstance(operator, JoinOp):
+                    record_set = record_set[0]
+
                 output_record_sets.append((record_set, operator, source_indices, input))
 
                 # update cache

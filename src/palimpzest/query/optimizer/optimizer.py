@@ -181,6 +181,7 @@ class Optimizer:
             "join_parallelism": self.join_parallelism,
             "reasoning_effort": self.reasoning_effort,
             "api_base": self.api_base,
+            "is_validation": self.optimizer_strategy == OptimizationStrategyType.SENTINEL,
         }
 
     def deepcopy_clean(self):
@@ -204,9 +205,16 @@ class Optimizer:
         return optimizer
 
     def update_strategy(self, optimizer_strategy: OptimizationStrategyType):
+        # set the optimizer_strategy
         self.optimizer_strategy = optimizer_strategy
+
+        # get the strategy class associated with the optimizer strategy
         optimizer_strategy_cls = optimizer_strategy.value
         self.strategy = optimizer_strategy_cls()
+
+        # remove transformation rules for optimization strategies which do not require them
+        if optimizer_strategy.no_transformation():
+            self.transformation_rules = []
 
     def construct_group_tree(self, dataset: Dataset) -> tuple[int, dict[str, FieldInfo], dict[str, set[str]]]:
         logger.debug(f"Constructing group tree for dataset: {dataset}")

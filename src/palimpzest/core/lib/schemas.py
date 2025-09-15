@@ -80,6 +80,15 @@ def _create_pickleable_model(fields: dict[str, tuple[type, FieldInfo]]) -> type[
     return new_model
 
 
+def relax_schema(model: type[BaseModel]) -> type[BaseModel]:
+    """Updates the type annotation for every field in the BaseModel to include typing.Any"""
+    fields = {}
+    for field_name, field in model.model_fields.items():
+        fields[field_name] = (field.annotation | Any, field)
+
+    return _create_pickleable_model(fields)
+
+
 def project(model: type[BaseModel], project_fields: list[str]) -> type[BaseModel]:
     """Project a Pydantic model to only the specified columns."""
     # make sure projection column names are shortened

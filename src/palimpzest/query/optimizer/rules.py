@@ -18,7 +18,7 @@ from palimpzest.query.operators.convert import LLMConvertBonded, NonLLMConvert
 from palimpzest.query.operators.critique_and_refine import CritiqueAndRefineConvert, CritiqueAndRefineFilter
 from palimpzest.query.operators.distinct import DistinctOp
 from palimpzest.query.operators.filter import LLMFilter, NonLLMFilter
-from palimpzest.query.operators.join import NestedLoopsJoin
+from palimpzest.query.operators.join import EmbeddingJoin, NestedLoopsJoin
 from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.operators.logical import (
     Aggregate,
@@ -761,8 +761,8 @@ class SplitRule(ImplementationRule):
     @classmethod
     def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
         logical_op = logical_expression.operator
-        is_map_match = isinstance(logical_op, ConvertScan) and cls._is_text_only_operation() and logical_op.udf is None
-        is_filter_match = isinstance(logical_op, FilteredScan) and cls._is_text_only_operation() and logical_op.filter.filter_fn is None
+        is_map_match = isinstance(logical_op, ConvertScan) and cls._is_text_only_operation(logical_expression) and logical_op.udf is None
+        is_filter_match = isinstance(logical_op, FilteredScan) and cls._is_text_only_operation(logical_expression) and logical_op.filter.filter_fn is None
         logger.debug(f"SplitRule matches_pattern: {is_map_match or is_filter_match} for {logical_expression}")
         return is_map_match or is_filter_match
 
@@ -860,7 +860,7 @@ class LLMFilterRule(ImplementationRule):
         return cls._perform_substitution(logical_expression, LLMFilter, runtime_kwargs, variable_op_kwargs)
 
 
-class LLMJoinRule(ImplementationRule):
+class NestedLoopsJoinRule(ImplementationRule):
     """
     Substitute a logical expression for a JoinOp with an (LLM) NestedLoopsJoin physical implementation.
     """
@@ -868,12 +868,12 @@ class LLMJoinRule(ImplementationRule):
     @classmethod
     def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
         is_match = isinstance(logical_expression.operator, JoinOp)
-        logger.debug(f"LLMJoinRule matches_pattern: {is_match} for {logical_expression}")
+        logger.debug(f"NestedLoopsJoinRule matches_pattern: {is_match} for {logical_expression}")
         return is_match
 
     @classmethod
     def substitute(cls, logical_expression: LogicalExpression, **runtime_kwargs) -> set[PhysicalExpression]:
-        logger.debug(f"Substituting LLMJoinRule for {logical_expression}")
+        logger.debug(f"Substituting NestedLoopsJoinRule for {logical_expression}")
 
         # create variable physical operator kwargs for each model which can implement this logical_expression
         models = [model for model in runtime_kwargs["available_models"] if cls._model_matches_input(model, logical_expression)]
@@ -884,11 +884,45 @@ class LLMJoinRule(ImplementationRule):
                 "prompt_strategy": PromptStrategy.JOIN_NO_REASONING if model.is_reasoning_model() and no_reasoning else PromptStrategy.JOIN,
                 "join_parallelism": runtime_kwargs["join_parallelism"],
                 "reasoning_effort": runtime_kwargs["reasoning_effort"],
+                "retain_inputs": not runtime_kwargs["is_validation"],
             }
             for model in models
         ]
 
         return cls._perform_substitution(logical_expression, NestedLoopsJoin, runtime_kwargs, variable_op_kwargs)
+
+
+class EmbeddingJoinRule(ImplementationRule):
+    """
+    Substitute a logical expression for a JoinOp with an EmbeddingJoin physical implementation.
+    """
+
+    @classmethod
+    def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
+        is_match = isinstance(logical_expression.operator, JoinOp) and not cls._is_audio_operation(logical_expression)
+        logger.debug(f"EmbeddingJoinRule matches_pattern: {is_match} for {logical_expression}")
+        return is_match
+
+    @classmethod
+    def substitute(cls, logical_expression: LogicalExpression, **runtime_kwargs) -> set[PhysicalExpression]:
+        logger.debug(f"Substituting EmbeddingJoinRule for {logical_expression}")
+
+        # create variable physical operator kwargs for each model which can implement this logical_expression
+        models = [model for model in runtime_kwargs["available_models"] if cls._model_matches_input(model, logical_expression)]
+        no_reasoning = runtime_kwargs["reasoning_effort"] in [None, "minimal", "low"]
+        variable_op_kwargs = [
+            {
+                "model": model,
+                "prompt_strategy": PromptStrategy.JOIN_NO_REASONING if model.is_reasoning_model() and no_reasoning else PromptStrategy.JOIN,
+                "join_parallelism": runtime_kwargs["join_parallelism"],
+                "reasoning_effort": runtime_kwargs["reasoning_effort"],
+                "retain_inputs": not runtime_kwargs["is_validation"],
+                "num_samples": 10, # TODO: iterate over different choices of num_samples
+            }
+            for model in models
+        ]
+
+        return cls._perform_substitution(logical_expression, EmbeddingJoin, runtime_kwargs, variable_op_kwargs)
 
 
 class AggregateRule(ImplementationRule):

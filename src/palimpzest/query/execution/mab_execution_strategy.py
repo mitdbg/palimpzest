@@ -11,7 +11,7 @@ from palimpzest.policy import Policy
 from palimpzest.query.execution.execution_strategy import SentinelExecutionStrategy
 from palimpzest.query.operators.aggregate import AggregateOp
 from palimpzest.query.operators.convert import LLMConvert
-from palimpzest.query.operators.filter import FilterOp, LLMFilter
+from palimpzest.query.operators.filter import FilterOp, LLMFilter, NonLLMFilter
 from palimpzest.query.operators.join import JoinOp
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.retrieve import RetrieveOp
@@ -351,7 +351,7 @@ class OpFrontier:
 
         return op_inputs
 
-    def update_frontier(self, unique_logical_op_id: str, plan_stats: SentinelPlanStats) -> None:
+    def update_frontier(self, unique_logical_op_id: str, plan_stats: SentinelPlanStats, full_op_id_to_source_indices_processed: dict[str, set[list]]) -> None:
         """
         Update the set of frontier operators, pulling in new ones from the reservoir as needed.
         This function will:
@@ -383,22 +383,14 @@ class OpFrontier:
             # compute final list of record op stats
             full_op_id_to_record_op_stats[full_op_id] = list(record_id_to_max_quality_record_op_stats.values())
 
-        # compute mapping of physical op to num samples and total samples drawn;
-        # also update the set of source indices which have been processed by each physical operator
-        full_op_id_to_num_samples, total_num_samples = {}, 0
-        for full_op_id, record_op_stats_lst in full_op_id_to_record_op_stats.items():
+        # update the set of source indices processed by each physical operator
+        for full_op_id, source_indices_processed in full_op_id_to_source_indices_processed.items():
             # update the set of source indices processed
-            source_indices_processed = set()
-            for record_op_stats in record_op_stats_lst:
-                source_indices = record_op_stats.record_source_indices
-
-                if len(source_indices) == 1:
-                    source_indices = source_indices[0]
-                elif self.is_llm_join or self.is_aggregate_op:
-                    source_indices = tuple(source_indices)
-
+            for source_indices in source_indices_processed:
+                source_indices = source_indices[0] if len(source_indices) == 1 else tuple(source_indices)
                 self.full_op_id_to_sources_processed[full_op_id].add(source_indices)
-                source_indices_processed.add(source_indices)
+                if source_indices in self.full_op_id_to_sources_not_processed[full_op_id]:
+                    self.full_op_id_to_sources_not_processed[full_op_id].remove(source_indices)
 
             # update the set of source indices not processed
             self.full_op_id_to_sources_not_processed[full_op_id] = [
@@ -406,8 +398,11 @@ class OpFrontier:
                 if indices not in source_indices_processed
             ]
 
-            # compute the number of samples as the number of source indices processed
-            num_samples = len(self.full_op_id_to_sources_processed[full_op_id])
+        # compute mapping of physical op to num samples and total samples drawn
+        full_op_id_to_num_samples, total_num_samples = {}, 0
+        for full_op_id, record_op_stats_lst in full_op_id_to_record_op_stats.items():
+            # compute the number of samples as the length of the record_op_stats_lst
+            num_samples = len(record_op_stats_lst)
             full_op_id_to_num_samples[full_op_id] = num_samples
             total_num_samples += num_samples
 
@@ -620,6 +615,28 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
     calls does not perfectly match the sample_budget. This may cause some minor discrepancies with
     the progress manager as a result.
     """
+    def _remove_filtered_records_from_downstream_ops(self, topo_idx: int, plan: SentinelPlan, op_frontiers: dict[str, OpFrontier], source_indices_to_all_record_sets: dict[int, list[DataRecordSet]]) -> None:
+        """Remove records which were filtered out by a NonLLMFilter from all downstream operators."""
+        filtered_source_indices = set()
+
+        # NonLLMFilter will have one record_set per source_indices with a single record
+        for source_indices, record_sets in source_indices_to_all_record_sets.items():
+            record: DataRecord = record_sets[0][0]
+            if not record._passed_operator:
+                filtered_source_indices.add(source_indices)
+
+        # remove filtered source indices from all downstream operators
+        if len(filtered_source_indices) > 0:
+            for downstream_topo_idx in range(topo_idx + 1, len(plan)):
+                downstream_logical_op_id = plan[downstream_topo_idx][0]
+                downstream_unique_logical_op_id = f"{downstream_topo_idx}-{downstream_logical_op_id}"
+                downstream_op_frontier = op_frontiers[downstream_unique_logical_op_id]
+                for full_op_id in downstream_op_frontier.full_op_id_to_sources_not_processed:
+                    downstream_op_frontier.full_op_id_to_sources_not_processed[full_op_id] = [
+                        indices for indices in downstream_op_frontier.full_op_id_to_sources_not_processed[full_op_id]
+                        if indices not in filtered_source_indices
+                    ]
+
     def _get_max_quality_op(self, unique_logical_op_id: str, op_frontiers: dict[str, OpFrontier], plan_stats: SentinelPlanStats) -> PhysicalOperator:
         """
         Returns the operator in the frontier with the highest (estimated) quality.
@@ -639,7 +656,11 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
         for op in frontier_ops:
             op_quality_stats = []
             if op.get_full_op_id() in full_op_id_to_record_op_stats:
-                op_quality_stats = [record_op_stats.quality for record_op_stats in full_op_id_to_record_op_stats[op.get_full_op_id()]]
+                op_quality_stats = [
+                    record_op_stats.quality
+                    for record_op_stats in full_op_id_to_record_op_stats[op.get_full_op_id()]
+                    if record_op_stats.quality is not None
+                ]
             avg_op_quality = sum(op_quality_stats) / len(op_quality_stats) if len(op_quality_stats) > 0 else 0.0
             if max_avg_quality is None or avg_op_quality > max_avg_quality:
                 max_quality_op = op
@@ -664,7 +685,7 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
                 source_indices_to_sample.update(source_indices)
 
             # execute operator sets in sequence
-            for topo_idx, (logical_op_id, _) in enumerate(plan):
+            for topo_idx, (logical_op_id, op_set) in enumerate(plan):
                 # compute unique logical op id within plan
                 unique_logical_op_id = f"{topo_idx}-{logical_op_id}"
 
@@ -672,8 +693,10 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
                 max_quality_op = self._get_max_quality_op(unique_logical_op_id, op_frontiers, plan_stats)
 
                 # get frontier ops and their next input
+                def is_filtered_out(tup: tuple) -> bool:
+                    return tup[-1] is None or isinstance(tup[-1], list) and all([record is None for record in tup[-1]])
                 frontier_op_inputs = op_frontiers[unique_logical_op_id].get_frontier_op_inputs(source_indices_to_sample, max_quality_op)
-                frontier_op_inputs = list(filter(lambda tup: tup[-1] is not None, frontier_op_inputs))
+                frontier_op_inputs = list(filter(lambda tup: not is_filtered_out(tup), frontier_op_inputs))
 
                 # break out of the loop if frontier_op_inputs is empty, as this means all records have been filtered out
                 if len(frontier_op_inputs) == 0:
@@ -711,7 +734,18 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
                     op_frontiers[next_unique_logical_op_id].update_inputs(unique_logical_op_id, source_indices_to_all_record_sets)
 
                 # update the (pareto) frontier for each set of operators
-                op_frontiers[unique_logical_op_id].update_frontier(unique_logical_op_id, plan_stats)
+                full_op_id_to_source_indices_processed = {}
+                for source_indices, record_set_tuples in source_indices_to_record_set_tuples.items():
+                    for _, op, _ in record_set_tuples:
+                        if op.get_full_op_id() not in full_op_id_to_source_indices_processed:
+                            full_op_id_to_source_indices_processed[op.get_full_op_id()] = set()
+                        full_op_id_to_source_indices_processed[op.get_full_op_id()].add(source_indices)
+                op_frontiers[unique_logical_op_id].update_frontier(unique_logical_op_id, plan_stats, full_op_id_to_source_indices_processed)
+
+                # if the operator is a non-llm filter which has filtered out records, remove those records from
+                # all downstream operators' full_op_id_to_sources_not_processed
+                if isinstance(op_set[0], NonLLMFilter):
+                    self._remove_filtered_records_from_downstream_ops(topo_idx, plan, op_frontiers, source_indices_to_all_record_sets)
 
         # finalize plan stats
         plan_stats.finish()
