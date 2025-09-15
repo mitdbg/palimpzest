@@ -12,6 +12,7 @@ from palimpzest.query.operators.distinct import DistinctOp as _DistinctOp
 from palimpzest.query.operators.filter import FilterOp as _FilterOp
 from palimpzest.query.operators.filter import LLMFilter as _LLMFilter
 from palimpzest.query.operators.filter import NonLLMFilter as _NonLLMFilter
+from palimpzest.query.operators.join import EmbeddingJoin as _EmbeddingJoin
 from palimpzest.query.operators.join import JoinOp as _JoinOp
 from palimpzest.query.operators.join import NestedLoopsJoin as _NestedLoopsJoin
 from palimpzest.query.operators.limit import LimitScanOp as _LimitScanOp
@@ -88,7 +89,7 @@ PHYSICAL_OPERATORS = (
     # filter
     + [_FilterOp, _NonLLMFilter, _LLMFilter]
     # join
-    + [_JoinOp, _NestedLoopsJoin]
+    + [_EmbeddingJoin, _JoinOp, _NestedLoopsJoin]
     # limit
     + [_LimitScanOp]
     # mixture-of-agents

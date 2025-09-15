@@ -16,6 +16,7 @@ class QueryProcessorConfig(BaseModel):
 
     # general execution flags
     policy: Policy = Field(default_factory=MaxQuality)
+    enforce_types: bool = Field(default=False)
     scan_start_idx: int = Field(default=0)
     num_samples: int = Field(default=None)
     verbose: bool = Field(default=False)

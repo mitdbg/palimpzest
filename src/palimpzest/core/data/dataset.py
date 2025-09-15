@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from palimpzest.constants import AggFunc, Cardinality
 from palimpzest.core.elements.filters import Filter
 from palimpzest.core.elements.groupbysig import GroupBySig
-from palimpzest.core.lib.schemas import create_schema_from_fields, project, union_schemas
+from palimpzest.core.lib.schemas import create_schema_from_fields, project, relax_schema, union_schemas
 from palimpzest.policy import construct_policy_from_kwargs
 from palimpzest.query.operators.logical import (
     Aggregate,
@@ -192,6 +192,21 @@ class Dataset:
             root_datasets = {**root_datasets, **child_root_datasets}
 
         return root_datasets
+
+    def relax_types(self) -> None:
+        """
+        Relax the types in this Dataset's schema and all upstream Datasets' schemas to be more permissive.
+        """
+        # relax the types in this dataset's schema
+        self._schema = relax_schema(self._schema)
+
+        # relax the types in dataset's operator's input and output schemas
+        self._operator.input_schema = None if self._operator.input_schema is None else relax_schema(self._operator.input_schema)
+        self._operator.output_schema = relax_schema(self._operator.output_schema)
+
+        # recursively relax the types in all upstream datasets
+        for source in self._sources:
+            source.relax_types()
 
     def get_upstream_datasets(self) -> list[Dataset]:
         """
