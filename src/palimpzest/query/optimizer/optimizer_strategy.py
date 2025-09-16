@@ -58,7 +58,6 @@ class GreedyStrategy(OptimizationStrategy):
     def get_optimal_plans(self, groups: dict, final_group_id: int, policy: Policy, use_final_op_quality: bool) -> list[PhysicalPlan]:
         logger.info(f"Getting greedy optimal plans for final group id: {final_group_id}")
         plans = [self._get_greedy_physical_plan(groups, final_group_id)]
-        logger.info(f"Greedy optimal plans: {plans}")
         logger.info(f"Done getting greedy optimal plans for final group id: {final_group_id}")
 
         return plans
@@ -137,7 +136,6 @@ class ParetoStrategy(OptimizationStrategy):
             optimal_plan = optimal_plan if policy.choose(optimal_plan.plan_cost, plan.plan_cost) else plan
 
         plans = [optimal_plan]
-        logger.info(f"Pareto optimal plans: {plans}")
         logger.info(f"Done getting pareto optimal plans for final group id: {final_group_id}")
         return plans
     
@@ -174,7 +172,6 @@ class SentinelStrategy(OptimizationStrategy):
     def get_optimal_plans(self, groups: dict, final_group_id: int, policy: Policy, use_final_op_quality: bool) -> list[SentinelPlan]:
         logger.info(f"Getting sentinel optimal plans for final group id: {final_group_id}")
         plans = [self._get_sentinel_plan(groups, final_group_id)]
-        logger.info(f"Sentinel optimal plans: {plans}")
         logger.info(f"Done getting sentinel optimal plans for final group id: {final_group_id}")
         return plans
 

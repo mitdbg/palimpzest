@@ -5,9 +5,28 @@ import palimpzest as pz
 from palimpzest.core.lib.schemas import TextFile
 
 
+class EnronValidator(pz.Validator):
+    def __init__(self, labels_file: str):
+        super().__init__()
+
+        self.filename_to_labels = {}
+        if labels_file:
+            with open(labels_file) as f:
+                self.filename_to_labels = json.load(f)
+
+    def map_score_fn(self, fields: list[str], input_record: dict, output: dict) -> float | None:
+        filename = input_record["filename"]
+        labels = self.filename_to_labels[filename]
+        if len(labels) == 0:
+            return None
+
+        labels = labels[0]
+        return (float(labels["sender"] == output["sender"]) + float(labels["subject"] == output["subject"])) / 2.0
+
+
 class EnronDataset(pz.IterDataset):
     def __init__(self, dir: str, labels_file: str | None = None, split: str = "test"):
-        super().__init__(id=f"enron-{split}", schema=TextFile)
+        super().__init__(id="enron", schema=TextFile)
         self.filepaths = [os.path.join(dir, filename) for filename in os.listdir(dir)]
         self.filepaths = self.filepaths[:50] if split == "train" else self.filepaths[50:150]
         self.filename_to_labels = {}
@@ -24,22 +43,21 @@ class EnronDataset(pz.IterDataset):
         filename = os.path.basename(filepath)
         with open(filepath) as f:
             contents = f.read()
-        
+
         # create item with fields
-        item = {"fields": {}, "labels": {}}
-        item["fields"]["filename"] = filename
-        item["fields"]["contents"] = contents
-        item["labels"] = self.filename_to_labels.get(filename, {})
+        item = {"filename": filename, "contents": contents}
 
         return item
 
+
 if __name__ == "__main__":
-    # create validation data source
-    train_dataset = EnronDataset(dir="testdata/enron-eval-medium", labels_file="testdata/enron-eval-medium-labels.json", split="train")
+    # create validator and train_dataset
+    validator = EnronValidator(labels_file="testdata/enron-eval-medium-labels.json")
+    train_dataset = EnronDataset(dir="testdata/enron-eval-medium", split="train")
 
     # construct plan
     plan = EnronDataset(dir="testdata/enron-eval-medium", split="test")
-    plan = plan.sem_add_columns([
+    plan = plan.sem_map([
         {"name": "subject", "type": str, "desc": "The subject of the email"},
         {"name": "sender", "type": str, "desc": "The email address of the email's sender"},
     ])
@@ -56,8 +74,7 @@ if __name__ == "__main__":
         max_workers=20,
         progress=True,
     )
-    # output = plan.optimize_and_run(train_dataset=train_dataset, validator=pz.Validator(), config=config)
-    output = plan.optimize_and_run(train_dataset=train_dataset, validator=pz.Validator(), config=config)
+    output = plan.optimize_and_run(train_dataset=train_dataset, validator=validator, config=config)
 
     # print output dataframe
     print(output.to_df())
