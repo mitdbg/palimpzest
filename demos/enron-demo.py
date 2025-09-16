@@ -61,8 +61,14 @@ if __name__ == "__main__":
         {"name": "subject", "type": str, "desc": "The subject of the email"},
         {"name": "sender", "type": str, "desc": "The email address of the email's sender"},
     ])
-    plan = plan.sem_filter('The email refers to a fraudulent scheme (i.e., "Raptor", "Deathstar", "Chewco", and/or "Fat Boy")')
-    plan = plan.sem_filter("The email is not quoting from a news article or an article written by someone outside of Enron")
+    plan = plan.sem_filter(
+        'The email refers to a fraudulent scheme (i.e., "Raptor", "Deathstar", "Chewco", and/or "Fat Boy")',
+        depends_on=["contents"],
+    )
+    plan = plan.sem_filter(
+        "The email is not quoting from a news article or an article written by someone outside of Enron",
+        depends_on=["contents"],
+    )
 
     # execute pz plan
     config = pz.QueryProcessorConfig(
