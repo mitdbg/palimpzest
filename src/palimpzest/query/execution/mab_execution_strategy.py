@@ -755,7 +755,6 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
 
     def execute_sentinel_plan(self, plan: SentinelPlan, train_dataset: dict[str, Dataset], validator: Validator) -> SentinelPlanStats:
         logger.info(f"Executing plan {plan.plan_id} with {self.max_workers} workers")
-        logger.info(f"Plan Details: {plan}")
 
         # initialize plan stats
         plan_stats = SentinelPlanStats.from_plan(plan)

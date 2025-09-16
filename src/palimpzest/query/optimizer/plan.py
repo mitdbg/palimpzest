@@ -330,12 +330,11 @@ class SentinelPlan(Plan):
 
     def _get_str(self, idx: int = 0, indent: int = 0) -> str:
         indent_str = " " * (indent * 2)
-        plan_str = ""
-        for inner_idx, operator in enumerate(self.operator_set):
-            inner_idx_str = "" if len(self.operator_set) == 1 else f"{inner_idx + 1}."
-            plan_str += f"{indent_str}{idx}.{inner_idx_str} {str(operator)}\n"
-            for subplan in self.subplans:
-                plan_str += subplan._get_str(idx=idx + 1, indent=indent + 1)
+        operator = self.operator_set[0]
+        inner_idx_str = "" if len(self.operator_set) == 1 else f"1 - {len(self.operator_set)}."
+        plan_str = f"{indent_str}{idx}.{inner_idx_str} {str(operator)}\n"
+        for subplan in self.subplans:
+            plan_str += subplan._get_str(idx=idx + 1, indent=indent + 1)
 
         return plan_str
 
