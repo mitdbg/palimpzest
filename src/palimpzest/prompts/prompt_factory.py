@@ -2,6 +2,7 @@
 
 import base64
 import json
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -747,14 +748,14 @@ class PromptFactory:
             field_type = candidate.get_field_type(field_name)
 
             # audio filepath (or list of audio filepaths)
-            if field_type.annotation in [AudioFilepath, AudioFilepath | None]:
+            if field_type.annotation in [AudioFilepath, AudioFilepath | None, AudioFilepath | Any]:
                 with open(field_value, "rb") as f:
                     base64_audio_str = base64.b64encode(f.read()).decode("utf-8")
                 audio_content.append(
                     {"type": "input_audio", "input_audio": {"data": base64_audio_str, "format": "wav"}}
                 )
 
-            elif field_type.annotation in [list[AudioFilepath], list[AudioFilepath] | None]:
+            elif field_type.annotation in [list[AudioFilepath], list[AudioFilepath] | None, list[AudioFilepath] | Any]:
                 for audio_filepath in field_value:
                     with open(audio_filepath, "rb") as f:
                         base64_audio_str = base64.b64encode(f.read()).decode("utf-8")
@@ -763,12 +764,12 @@ class PromptFactory:
                     )
 
             # pre-encoded images (or list of pre-encoded images)
-            elif field_type.annotation in [AudioBase64, AudioBase64 | None]:
+            elif field_type.annotation in [AudioBase64, AudioBase64 | None, AudioBase64 | Any]:
                 audio_content.append(
                     {"type": "input_audio", "input_audio": {"data": field_value, "format": "wav"}}
                 )
 
-            elif field_type.annotation in [list[AudioBase64], list[AudioBase64] | None]:
+            elif field_type.annotation in [list[AudioBase64], list[AudioBase64] | None, list[AudioBase64] | Any]:
                 for base64_audio in field_value:
                     audio_content.append(
                         {"type": "input_audio", "input_audio": {"data": base64_audio, "format": "wav"}}
@@ -794,14 +795,14 @@ class PromptFactory:
             field_type = candidate.get_field_type(field_name)
 
             # image filepath (or list of image filepaths)
-            if field_type.annotation in [ImageFilepath, ImageFilepath | None]:
+            if field_type.annotation in [ImageFilepath, ImageFilepath | None, ImageFilepath | Any]:
                 with open(field_value, "rb") as f:
                     base64_image_str = base64.b64encode(f.read()).decode("utf-8")
                 image_content.append(
                     {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image_str}"}}
                 )
 
-            elif field_type.annotation in [list[ImageFilepath], list[ImageFilepath] | None]:
+            elif field_type.annotation in [list[ImageFilepath], list[ImageFilepath] | None, list[ImageFilepath] | Any]:
                 for image_filepath in field_value:
                     with open(image_filepath, "rb") as f:
                         base64_image_str = base64.b64encode(f.read()).decode("utf-8")
@@ -810,20 +811,20 @@ class PromptFactory:
                     )
 
             # image url (or list of image urls)
-            elif field_type.annotation in [ImageURL, ImageURL | None]:
+            elif field_type.annotation in [ImageURL, ImageURL | None, ImageURL | Any]:
                 image_content.append({"type": "image_url", "image_url": {"url": field_value}})
 
-            elif field_type.annotation in [list[ImageURL], list[ImageURL] | None]:
+            elif field_type.annotation in [list[ImageURL], list[ImageURL] | None, list[ImageURL] | Any]:
                 for image_url in field_value:
                     image_content.append({"type": "image_url", "image_url": {"url": image_url}})
 
             # pre-encoded images (or list of pre-encoded images)
-            elif field_type.annotation in [ImageBase64, ImageBase64 | None]:
+            elif field_type.annotation in [ImageBase64, ImageBase64 | None, ImageBase64 | Any]:
                 image_content.append(
                     {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{field_value}"}}
                 )
 
-            elif field_type.annotation in [list[ImageBase64], list[ImageBase64] | None]:
+            elif field_type.annotation in [list[ImageBase64], list[ImageBase64] | None, list[ImageBase64] | Any]:
                 for base64_image in field_value:
                     image_content.append(
                         {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
