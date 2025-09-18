@@ -33,20 +33,27 @@ IMAGE_LIST_FIELD_TYPES = [
     list[ImageBase64] | None,
     list[ImageFilepath] | None,
     list[ImageURL] | None,
+    list[ImageBase64] | Any,
+    list[ImageFilepath] | Any,
+    list[ImageURL] | Any,
 ]
 IMAGE_FIELD_TYPES = IMAGE_LIST_FIELD_TYPES + [
     ImageBase64, ImageFilepath, ImageURL,
     ImageBase64 | None, ImageFilepath | None, ImageURL | None,
+    ImageBase64 | Any, ImageFilepath | Any, ImageURL | Any,
 ]
 AUDIO_LIST_FIELD_TYPES = [
     list[AudioBase64],
     list[AudioFilepath],
     list[AudioBase64] | None,
     list[AudioFilepath] | None,
+    list[AudioBase64] | Any,
+    list[AudioFilepath] | Any,
 ]
 AUDIO_FIELD_TYPES = AUDIO_LIST_FIELD_TYPES + [
     AudioBase64, AudioFilepath,
     AudioBase64 | None, AudioFilepath | None,
+    AudioBase64 | Any, AudioFilepath | Any,
 ]
 
 

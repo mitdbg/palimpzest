@@ -11,6 +11,8 @@ from pydantic.fields import FieldInfo
 
 from palimpzest.core.data import context
 from palimpzest.core.lib.schemas import (
+    AUDIO_FIELD_TYPES,
+    IMAGE_FIELD_TYPES,
     AudioBase64,
     AudioFilepath,
     ImageBase64,
@@ -303,9 +305,11 @@ class DataRecord:
             dct = {k: v for k, v in dct.items() if k in project_field_names}
 
         if not include_bytes:
+            bytes_field_types = [bytes, list[bytes], bytes | None, list[bytes] | None, bytes | Any, list[bytes] | Any]
+            bytes_field_types += AUDIO_FIELD_TYPES + IMAGE_FIELD_TYPES
             for k in dct:
                 field_type = self.get_field_type(k)
-                if field_type.annotation in [bytes, AudioBase64, ImageBase64, list[bytes], list[ImageBase64]]:
+                if field_type.annotation in bytes_field_types:
                     dct[k] = "<bytes>"
 
         if bytes_to_str:

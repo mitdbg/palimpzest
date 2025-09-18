@@ -20,9 +20,9 @@ dog_image_cols = [
 ]
 
 def build_image_plan(dataset):
-    images = pz.Dataset(dataset)
+    images = pz.ImageFileDataset(id="images", path=dataset)
     filtered_images = images.sem_filter("The image contains one or more dogs")
-    dog_images = filtered_images.sem_add_columns(dog_image_cols)
+    dog_images = filtered_images.sem_map(dog_image_cols)
     return dog_images
 
 
@@ -35,10 +35,7 @@ if __name__ == "__main__":
     print("Starting image task")
     policy = pz.MaxQuality()
     plan = build_image_plan("testdata/images-tiny")
-    config = pz.QueryProcessorConfig(
-        policy=policy,
-        verbose=True,
-    )
+    config = pz.QueryProcessorConfig(policy=policy)
     data_record_collection = plan.run(config)
 
     imgs, breeds = [], []
