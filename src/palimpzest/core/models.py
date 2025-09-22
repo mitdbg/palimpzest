@@ -56,6 +56,14 @@ class GenerationStats(BaseModel):
     # (if applicable) the total number of embedding LLM calls made by this operator
     total_embedding_llm_calls: int = 0
 
+
+
+    #NEWLY ADDED TOKEN FIELDS
+    total_embedding_input_tokens: float = 0.0
+
+    total_embedding_cost: float = 0.0
+
+
     def __iadd__(self, other: GenerationStats) -> GenerationStats:
         # self.raw_answers.extend(other.raw_answers)
         for model_field in [
@@ -68,6 +76,9 @@ class GenerationStats(BaseModel):
             "fn_call_duration_secs",
             "total_llm_calls",
             "total_embedding_llm_calls",
+            "total_embedding_input_tokens",
+            "total_embedding_cost"
+            
         ]:
             setattr(self, model_field, getattr(self, model_field) + getattr(other, model_field))
         return self
@@ -85,6 +96,8 @@ class GenerationStats(BaseModel):
                 "cost_per_record",
                 "total_llm_calls",
                 "total_embedding_llm_calls",
+                 "total_embedding_input_tokens",
+                "total_embedding_cost"
             ]
         }
         # dct['raw_answers'] = self.raw_answers + other.raw_answers
@@ -107,6 +120,8 @@ class GenerationStats(BaseModel):
             "fn_call_duration_secs",
             "total_llm_calls",
             "total_embedding_llm_calls",
+             "total_embedding_input_tokens",
+            "total_embedding_cost"
         ]:
             setattr(self, model_field, getattr(self, model_field) / quotient)
         return self
@@ -128,6 +143,8 @@ class GenerationStats(BaseModel):
                 "total_llm_calls",
                 "total_embedding_llm_calls",
                 "cost_per_record",
+                 "total_embedding_input_tokens",
+                "total_embedding_cost"
             ]
         }
         dct["model_name"] = self.model_name
