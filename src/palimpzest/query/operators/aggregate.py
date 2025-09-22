@@ -58,6 +58,10 @@ class ApplyGroupByOp(AggregateOp):
             return 0
         elif func.lower() == "average":
             return (0, 0)
+        elif func.lower() == "list":
+            return []
+        elif func.lower() == "set":
+            return set()
         else:
             raise Exception("Unknown agg function " + func)
 
@@ -70,12 +74,18 @@ class ApplyGroupByOp(AggregateOp):
             if val is None:
                 return (sum, cnt)
             return (sum + val, cnt + 1)
+        elif func.lower() == "list":
+            state.append(val)
+            return state
+        elif func.lower() == "set":
+            state.add(val)
+            return state
         else:
             raise Exception("Unknown agg function " + func)
 
     @staticmethod
     def agg_final(func, state):
-        if func.lower() == "count":
+        if func.lower() in ["count", "list", "set"]:
             return state
         elif func.lower() == "average":
             sum, cnt = state

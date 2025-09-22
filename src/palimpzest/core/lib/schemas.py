@@ -142,16 +142,30 @@ def create_schema_from_df(df: pd.DataFrame) -> type[BaseModel]:
     return _create_pickleable_model(fields)
 
 
-def union_schemas(models: list[type[BaseModel]], join: bool = False) -> type[BaseModel]:
+def union_schemas(models: list[type[BaseModel]], join: bool = False, on: list[str] | None = None) -> type[BaseModel]:
     """Union multiple Pydantic models into a single model."""
+    # convert on to empty list if None
+    if on is None:
+        on = []
+
+    # build up the fields for the new schema
     fields = {}
     for model in models:
         for field_name, field in model.model_fields.items():
-            if field_name in fields and not join:
+            # for non-join unions, make sure duplicate fields have the same type
+            if not join and field_name in fields:
                 assert fields[field_name][0] == field.annotation, f"Field {field_name} has different types in different models"
-            elif field_name in fields and join:
+
+            # for joins with "on" specified, no need to rename fields in "on"
+            elif join and field_name in on and field_name in fields:
+                continue
+
+            # otherwise, rename duplicate fields by appending _right
+            elif join and field_name in fields:
                 while field_name in fields:
                     field_name = f"{field_name}_right"
+
+            # add the field to the new schema
             fields[field_name] = (field.annotation, field)
 
     # create and return the new schema

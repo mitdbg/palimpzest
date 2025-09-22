@@ -398,17 +398,25 @@ class GroupByAggregate(LogicalOperator):
 
 
 class JoinOp(LogicalOperator):
-    def __init__(self, condition: str, desc: str | None = None, *args, **kwargs):
+    def __init__(self, condition: str, on: list[str] | None = None, how: str = "inner", desc: str | None = None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.condition = condition
+        self.on = on
+        self.how = how
         self.desc = desc
 
     def __str__(self):
-        return f"Join(condition={self.condition})"
+        return f"Join(condition={self.condition})" if self.on is None else f"Join(on={self.on}, how={self.how})"
 
     def get_logical_id_params(self) -> dict:
         logical_id_params = super().get_logical_id_params()
-        logical_id_params = {"condition": self.condition, "desc": self.desc, **logical_id_params}
+        logical_id_params = {
+            "condition": self.condition,
+            "on": self.on,
+            "how": self.how,
+            "desc": self.desc,
+            **logical_id_params,
+        }
 
         return logical_id_params
 
@@ -416,6 +424,8 @@ class JoinOp(LogicalOperator):
         logical_op_params = super().get_logical_op_params()
         logical_op_params = {
             "condition": self.condition,
+            "on": self.on,
+            "how": self.how,
             "desc": self.desc,
             **logical_op_params,
         }

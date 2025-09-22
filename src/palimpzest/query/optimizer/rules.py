@@ -18,7 +18,7 @@ from palimpzest.query.operators.convert import LLMConvertBonded, NonLLMConvert
 from palimpzest.query.operators.critique_and_refine import CritiqueAndRefineConvert, CritiqueAndRefineFilter
 from palimpzest.query.operators.distinct import DistinctOp
 from palimpzest.query.operators.filter import LLMFilter, NonLLMFilter
-from palimpzest.query.operators.join import EmbeddingJoin, NestedLoopsJoin
+from palimpzest.query.operators.join import EmbeddingJoin, NestedLoopsJoin, RelationalJoin
 from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.operators.logical import (
     Aggregate,
@@ -860,6 +860,23 @@ class LLMFilterRule(ImplementationRule):
         return cls._perform_substitution(logical_expression, LLMFilter, runtime_kwargs, variable_op_kwargs)
 
 
+class RelationalJoinRule(ImplementationRule):
+    """
+    Substitute a logical expression for a JoinOp with a RelationalJoin physical implementation.
+    """
+
+    @classmethod
+    def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
+        is_match = isinstance(logical_expression.operator, JoinOp) and logical_expression.operator.condition is None
+        logger.debug(f"RelationalJoinRule matches_pattern: {is_match} for {logical_expression}")
+        return is_match
+
+    @classmethod
+    def substitute(cls, logical_expression: LogicalExpression, **runtime_kwargs) -> set[PhysicalExpression]:
+        logger.debug(f"Substituting RelationalJoinRule for {logical_expression}")
+        return cls._perform_substitution(logical_expression, RelationalJoin, runtime_kwargs)
+
+
 class NestedLoopsJoinRule(ImplementationRule):
     """
     Substitute a logical expression for a JoinOp with an (LLM) NestedLoopsJoin physical implementation.
@@ -867,7 +884,7 @@ class NestedLoopsJoinRule(ImplementationRule):
 
     @classmethod
     def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
-        is_match = isinstance(logical_expression.operator, JoinOp)
+        is_match = isinstance(logical_expression.operator, JoinOp) and logical_expression.operator.condition is not None
         logger.debug(f"NestedLoopsJoinRule matches_pattern: {is_match} for {logical_expression}")
         return is_match
 
@@ -899,7 +916,7 @@ class EmbeddingJoinRule(ImplementationRule):
 
     @classmethod
     def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
-        is_match = isinstance(logical_expression.operator, JoinOp) and not cls._is_audio_operation(logical_expression)
+        is_match = isinstance(logical_expression.operator, JoinOp) and logical_expression.operator.condition is not None and not cls._is_audio_operation(logical_expression)
         logger.debug(f"EmbeddingJoinRule matches_pattern: {is_match} for {logical_expression}")
         return is_match
 

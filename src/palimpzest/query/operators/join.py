@@ -37,10 +37,9 @@ class JoinOp(PhysicalOperator, ABC):
     def __init__(
         self,
         condition: str,
-        model: Model,
-        prompt_strategy: PromptStrategy = PromptStrategy.JOIN,
+        how: str,
+        on: list[str] | None,
         join_parallelism: int = 64,
-        reasoning_effort: str | None = None,
         retain_inputs: bool = True,
         desc: str | None = None,
         *args,
@@ -49,13 +48,11 @@ class JoinOp(PhysicalOperator, ABC):
         super().__init__(*args, **kwargs)
         assert self.input_schema == self.output_schema, "Input and output schemas must match for JoinOp"
         self.condition = condition
-        self.model = model
-        self.prompt_strategy = prompt_strategy
+        self.how = how
+        self.on = on
         self.join_parallelism = join_parallelism
-        self.reasoning_effort = reasoning_effort
         self.retain_inputs = retain_inputs
         self.desc = desc
-        self.generator = Generator(model, prompt_strategy, reasoning_effort, self.api_base, Cardinality.ONE_TO_ONE, self.desc, self.verbose)
         self.join_idx = 0
 
         # maintain list(s) of input records for the join
@@ -65,16 +62,15 @@ class JoinOp(PhysicalOperator, ABC):
     def __str__(self):
         op = super().__str__()
         op += f"    Condition: {self.condition}\n"
+        op += f"    How: {self.how}\n"
+        op += f"    On: {self.on}\n"
         return op
 
     def get_id_params(self):
         id_params = super().get_id_params()
         id_params = {
             "condition": self.condition,
-            "model": self.model.value,
-            "prompt_strategy": self.prompt_strategy.value,
             "join_parallelism": self.join_parallelism,
-            "reasoning_effort": self.reasoning_effort,
             "desc": self.desc,
             **id_params,
         }
@@ -84,22 +80,168 @@ class JoinOp(PhysicalOperator, ABC):
         op_params = super().get_op_params()
         op_params = {
             "condition": self.condition,
-            "model": self.model,
-            "prompt_strategy": self.prompt_strategy,
             "join_parallelism": self.join_parallelism,
-            "reasoning_effort": self.reasoning_effort,
             "retain_inputs": self.retain_inputs,
             "desc": self.desc,
             **op_params,
         }
         return op_params
 
-    def get_model_name(self):
-        return self.model.value
-
     @abstractmethod
     def naive_cost_estimates(self, left_source_op_cost_estimates: OperatorCostEstimates, right_source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         pass
+
+
+class RelationalJoin(JoinOp):
+
+    def get_model_name(self):
+        return None
+    
+    def _process_join_candidate_pair(self, left_candidate, right_candidate) -> tuple[DataRecord, RecordOpStats]:
+        start_time = time.time()
+
+        # determine whether or not the join was satisfied
+        passed_operator = all(
+            left_candidate[field] == right_candidate[field]
+            for field in self.on
+        )
+
+        # TODO: handle different join types
+        if self.how == "left" and not passed_operator:
+            pass
+        elif self.how == "right" and not passed_operator:
+            pass
+        elif self.how == "outer" and not passed_operator:
+            pass
+
+        # compute output record and add to output_records
+        join_dr = DataRecord.from_join_parents(self.output_schema, left_candidate, right_candidate)
+        join_dr._passed_operator = passed_operator
+
+        # compute record stats and add to output_record_op_stats
+        time_per_record = time.time() - start_time
+        record_op_stats = RecordOpStats(
+            record_id=join_dr._id,
+            record_parent_ids=join_dr._parent_ids,
+            record_source_indices=join_dr._source_indices,
+            record_state=join_dr.to_dict(include_bytes=False),
+            full_op_id=self.get_full_op_id(),
+            logical_op_id=self.logical_op_id,
+            op_name=self.op_name(),
+            time_per_record=time_per_record,
+            cost_per_record=0.0,
+            model_name=self.get_model_name(),
+            join_condition=str(self.on),
+            fn_call_duration_secs=time_per_record,
+            answer={"passed_operator": passed_operator},
+            passed_operator=passed_operator,
+            op_details={k: str(v) for k, v in self.get_id_params().items()},
+        )
+
+        return join_dr, record_op_stats
+
+    def naive_cost_estimates(self, left_source_op_cost_estimates: OperatorCostEstimates, right_source_op_cost_estimates: OperatorCostEstimates):
+        # estimate output cardinality using a constant assumption of the filter selectivity
+        selectivity = NAIVE_EST_JOIN_SELECTIVITY
+        cardinality = selectivity * (left_source_op_cost_estimates.cardinality * right_source_op_cost_estimates.cardinality)
+
+        # estimate 1 ms execution time per input record pair
+        time_per_record = 0.001 * (left_source_op_cost_estimates.cardinality + right_source_op_cost_estimates.cardinality)
+
+        return OperatorCostEstimates(
+            cardinality=cardinality,
+            time_per_record=time_per_record,
+            cost_per_record=0.0,
+            quality=1.0,
+        )
+
+    def __call__(self, left_candidates: list[DataRecord], right_candidates: list[DataRecord]) -> tuple[DataRecordSet, int]:
+        # create the set of candidates to join
+        join_candidates = []
+        for candidate in left_candidates:
+            for right_candidate in right_candidates:
+                join_candidates.append((candidate, right_candidate))
+            for right_candidate in self._right_input_records:
+                join_candidates.append((candidate, right_candidate))
+        for candidate in self._left_input_records:
+            for right_candidate in right_candidates:
+                join_candidates.append((candidate, right_candidate))
+
+        # apply the join logic to each pair of candidates
+        output_records, output_record_op_stats = [], []
+        with ThreadPoolExecutor(max_workers=self.join_parallelism) as executor:
+            futures = [
+                executor.submit(self._process_join_candidate_pair, candidate, right_candidate)
+                for candidate, right_candidate in join_candidates
+            ]
+  
+            # collect results as they complete
+            for future in as_completed(futures):
+                self.join_idx += 1
+                join_output_record, join_output_record_op_stats = future.result()
+                output_records.append(join_output_record)
+                output_record_op_stats.append(join_output_record_op_stats)
+
+        # compute the number of inputs processed
+        num_inputs_processed = len(join_candidates)
+
+        # store input records to join with new records added later
+        if self.retain_inputs:
+            self._left_input_records.extend(left_candidates)
+            self._right_input_records.extend(right_candidates)
+
+        # return empty DataRecordSet if no output records were produced
+        if len(output_records) == 0:
+            return DataRecordSet([], []), num_inputs_processed
+
+        return DataRecordSet(output_records, output_record_op_stats), num_inputs_processed
+
+
+
+class LLMJoin(JoinOp):
+    def __init__(
+        self,
+        model: Model,
+        prompt_strategy: PromptStrategy = PromptStrategy.JOIN,
+        reasoning_effort: str | None = None,
+        *args,
+        **kwargs,
+    ):
+        super().__init__(*args, **kwargs)
+        self.model = model
+        self.prompt_strategy = prompt_strategy
+        self.reasoning_effort = reasoning_effort
+        self.generator = Generator(model, prompt_strategy, reasoning_effort, self.api_base, Cardinality.ONE_TO_ONE, self.desc, self.verbose)
+
+    def __str__(self):
+        op = super().__str__()
+        op += f"    Model: {self.model.value}\n"
+        op += f"    Reasoning Effort: {self.reasoning_effort}\n"
+        op += f"    Prompt Strategy: {self.prompt_strategy.value}\n"
+        return op
+
+    def get_id_params(self):
+        id_params = super().get_id_params()
+        id_params = {
+            "model": self.model.value,
+            "prompt_strategy": self.prompt_strategy.value,
+            "reasoning_effort": self.reasoning_effort,
+            **id_params,
+        }
+        return id_params
+
+    def get_op_params(self):
+        op_params = super().get_op_params()
+        op_params = {
+            "model": self.model,
+            "prompt_strategy": self.prompt_strategy,
+            "reasoning_effort": self.reasoning_effort,
+            **op_params,
+        }
+        return op_params
+
+    def get_model_name(self):
+        return self.model.value
 
     def _process_join_candidate_pair(
         self,
@@ -115,6 +257,14 @@ class JoinOp(PhysicalOperator, ABC):
 
         # determine whether or not the join was satisfied
         passed_operator = field_answers["passed_operator"]
+
+        # TODO: handle different join types
+        if self.how == "left" and not passed_operator:
+            pass
+        elif self.how == "right" and not passed_operator:
+            pass
+        elif self.how == "outer" and not passed_operator:
+            pass
 
         # compute output record and add to output_records
         join_dr = DataRecord.from_join_parents(self.output_schema, left_candidate, right_candidate)
@@ -149,7 +299,7 @@ class JoinOp(PhysicalOperator, ABC):
         return join_dr, record_op_stats
 
 
-class NestedLoopsJoin(JoinOp):
+class NestedLoopsJoin(LLMJoin):
 
     def naive_cost_estimates(self, left_source_op_cost_estimates: OperatorCostEstimates, right_source_op_cost_estimates: OperatorCostEstimates):
         # estimate number of input tokens from source
@@ -241,7 +391,7 @@ class NestedLoopsJoin(JoinOp):
         return DataRecordSet(output_records, output_record_op_stats), num_inputs_processed
 
 
-class EmbeddingJoin(JoinOp):
+class EmbeddingJoin(LLMJoin):
     # NOTE: we currently do not support audio joins as embedding models for audio seem to have
     # specialized use cases (e.g., speech-to-text) with strict requirements on things like e.g. sample rate
     def __init__(
@@ -275,6 +425,11 @@ class EmbeddingJoin(JoinOp):
         # maintain lowest and highest embedding similarities for matching and non-matching pairs
         self.min_matching_sim = float("inf")
         self.max_non_matching_sim = float("-inf")
+
+    def __str__(self):
+        op = super().__str__()
+        op += f"    Num Samples: {self.num_samples}\n"
+        return op
 
     def get_id_params(self):
         id_params = super().get_id_params()
