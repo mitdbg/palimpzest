@@ -70,6 +70,13 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
                 record_set, num_inputs_processed = operator(left_input_records, right_input_records)
                 records = record_set.data_records
                 record_op_stats = record_set.record_op_stats
+
+                # process the join one last time with final=True to handle any left/right/outer join logic
+                if operator.how in ("left", "right", "outer"):
+                    record_set, num_inputs_processed = operator([], [], final=True)
+                    records.extend(record_set.data_records)
+                    record_op_stats.extend(record_set.record_op_stats)
+      
                 num_outputs = sum(record._passed_operator for record in records)
 
                 # update the progress manager
@@ -170,7 +177,6 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
 
     def _upstream_ops_finished(self, plan: PhysicalPlan, topo_idx: int, operator: PhysicalOperator, input_queues: dict[str, dict[str, list]]) -> bool:
         """Helper function to check if agg / join operator is ready to process its inputs."""
-        # for agg / join operator, we can only process it when all upstream operators have finished processing their inputs
         upstream_unique_full_op_ids = plan.get_upstream_unique_full_op_ids(topo_idx, operator)
         upstream_input_queues = {upstream_unique_full_op_id: input_queues[upstream_unique_full_op_id] for upstream_unique_full_op_id in upstream_unique_full_op_ids}
         return not self._any_queue_not_empty(upstream_input_queues)
@@ -241,6 +247,17 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
 
                     # update the progress manager
                     self.progress_manager.incr(unique_full_op_id, num_inputs=1, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
+
+                # if this is a join operator with no more inputs to process, then finish it
+                if isinstance(operator, JoinOp) and operator.how in ("left", "right", "outer"):
+                    join_op_upstream_finished = self._upstream_ops_finished(plan, topo_idx, operator, input_queues)
+                    join_input_queues_empty = all(len(inputs) == 0 for inputs in input_queues[unique_full_op_id].values())
+                    if join_op_upstream_finished and join_input_queues_empty:
+                        # process the join one last time with final=True to handle any left/right/outer join logic
+                        record_set, num_inputs_processed = operator([], [], final=True)
+                        records.extend(record_set.data_records)
+                        record_op_stats.extend(record_set.record_op_stats)
+                        num_outputs += sum(record._passed_operator for record in record_set.data_records)
 
                 # update plan stats
                 plan_stats.add_record_op_stats(unique_full_op_id, record_op_stats)

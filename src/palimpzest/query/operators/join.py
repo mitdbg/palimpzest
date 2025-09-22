@@ -59,6 +59,10 @@ class JoinOp(PhysicalOperator, ABC):
         self._left_input_records: list[DataRecord] = []
         self._right_input_records: list[DataRecord] = []
 
+        # maintain set of left/right record ids that have been joined (for left/right/outer joins)
+        self._left_joined_record_ids: set[str] = set()
+        self._right_joined_record_ids: set[str] = set()
+
     def __str__(self):
         op = super().__str__()
         op += f"    Condition: {self.condition}\n"
@@ -87,6 +91,58 @@ class JoinOp(PhysicalOperator, ABC):
         }
         return op_params
 
+    def _compute_unmatched_records(self) -> DataRecordSet:
+        """Helper function to compute unmatched records for left/right/outer joins."""
+        def join_unmatched_records(input_records: list[DataRecord], joined_record_ids: set[str], left: bool = True):
+            records, record_op_stats_lst = [], []
+            for record in input_records:
+                start_time = time.time()
+                if record._id not in joined_record_ids:
+                    unmatched_dr = (
+                        DataRecord.from_join_parents(self.output_schema, record, None)
+                        if left
+                        else DataRecord.from_join_parents(self.output_schema, None, record)
+                    )
+                    unmatched_dr._passed_operator = True
+
+                    # compute record stats and add to output_record_op_stats
+                    time_per_record = time.time() - start_time
+                    record_op_stats = RecordOpStats(
+                        record_id=unmatched_dr._id,
+                        record_parent_ids=unmatched_dr._parent_ids,
+                        record_source_indices=unmatched_dr._source_indices,
+                        record_state=unmatched_dr.to_dict(include_bytes=False),
+                        full_op_id=self.get_full_op_id(),
+                        logical_op_id=self.logical_op_id,
+                        op_name=self.op_name(),
+                        time_per_record=time_per_record,
+                        cost_per_record=0.0,
+                        model_name=self.get_model_name(),
+                        join_condition=str(self.on),
+                        fn_call_duration_secs=time_per_record,
+                        answer={"passed_operator": True},
+                        passed_operator=True,
+                        op_details={k: str(v) for k, v in self.get_id_params().items()},
+                    )
+                    records.append(unmatched_dr)
+                    record_op_stats_lst.append(record_op_stats)
+            return records, record_op_stats_lst
+
+        records, record_op_stats = [], []
+        if self.how == "left":
+            records, record_op_stats = join_unmatched_records(self._left_input_records, self._left_joined_record_ids, left=True)
+
+        elif self.how == "right":
+            records, record_op_stats = join_unmatched_records(self._right_input_records, self._right_joined_record_ids, left=False)
+
+        elif self.how == "outer":
+            records, record_op_stats = join_unmatched_records(self._left_input_records, self._left_joined_record_ids, left=True)
+            right_records, right_record_op_stats = join_unmatched_records(self._right_input_records, self._right_joined_record_ids, left=False)
+            records.extend(right_records)
+            record_op_stats.extend(right_record_op_stats)
+
+        return DataRecordSet(records, record_op_stats)
+
     @abstractmethod
     def naive_cost_estimates(self, left_source_op_cost_estimates: OperatorCostEstimates, right_source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         pass
@@ -106,13 +162,14 @@ class RelationalJoin(JoinOp):
             for field in self.on
         )
 
-        # TODO: handle different join types
-        if self.how == "left" and not passed_operator:
-            pass
-        elif self.how == "right" and not passed_operator:
-            pass
-        elif self.how == "outer" and not passed_operator:
-            pass
+        # handle different join types
+        if self.how == "left" and passed_operator:
+            self._left_joined_record_ids.add(left_candidate._id)
+        elif self.how == "right" and passed_operator:
+            self._right_joined_record_ids.add(right_candidate._id)
+        elif self.how == "outer" and passed_operator:
+            self._left_joined_record_ids.add(left_candidate._id)
+            self._right_joined_record_ids.add(right_candidate._id)
 
         # compute output record and add to output_records
         join_dr = DataRecord.from_join_parents(self.output_schema, left_candidate, right_candidate)
@@ -155,7 +212,7 @@ class RelationalJoin(JoinOp):
             quality=1.0,
         )
 
-    def __call__(self, left_candidates: list[DataRecord], right_candidates: list[DataRecord]) -> tuple[DataRecordSet, int]:
+    def __call__(self, left_candidates: list[DataRecord], right_candidates: list[DataRecord], final: bool = False) -> tuple[DataRecordSet, int]:
         # create the set of candidates to join
         join_candidates = []
         for candidate in left_candidates:
@@ -189,6 +246,10 @@ class RelationalJoin(JoinOp):
         if self.retain_inputs:
             self._left_input_records.extend(left_candidates)
             self._right_input_records.extend(right_candidates)
+        
+        # if this is the final call, then add in any left/right/outer join records that did not match
+        if final:
+            return self._compute_unmatched_records(), 0
 
         # return empty DataRecordSet if no output records were produced
         if len(output_records) == 0:
@@ -258,13 +319,14 @@ class LLMJoin(JoinOp):
         # determine whether or not the join was satisfied
         passed_operator = field_answers["passed_operator"]
 
-        # TODO: handle different join types
-        if self.how == "left" and not passed_operator:
-            pass
-        elif self.how == "right" and not passed_operator:
-            pass
-        elif self.how == "outer" and not passed_operator:
-            pass
+        # handle different join types
+        if self.how == "left" and passed_operator:
+            self._left_joined_record_ids.add(left_candidate._id)
+        elif self.how == "right" and passed_operator:
+            self._right_joined_record_ids.add(right_candidate._id)
+        elif self.how == "outer" and passed_operator:
+            self._left_joined_record_ids.add(left_candidate._id)
+            self._right_joined_record_ids.add(right_candidate._id)
 
         # compute output record and add to output_records
         join_dr = DataRecord.from_join_parents(self.output_schema, left_candidate, right_candidate)
@@ -342,7 +404,7 @@ class NestedLoopsJoin(LLMJoin):
             quality=quality,
         )
 
-    def __call__(self, left_candidates: list[DataRecord], right_candidates: list[DataRecord]) -> tuple[DataRecordSet, int]:
+    def __call__(self, left_candidates: list[DataRecord], right_candidates: list[DataRecord], final: bool = False) -> tuple[DataRecordSet, int]:
         # get the set of input fields from both records in the join
         input_fields = self.get_input_fields()
 
@@ -383,6 +445,10 @@ class NestedLoopsJoin(LLMJoin):
         if self.retain_inputs:
             self._left_input_records.extend(left_candidates)
             self._right_input_records.extend(right_candidates)
+
+        # if this is the final call, then add in any left/right/outer join records that did not match
+        if final:
+            return self._compute_unmatched_records(), 0
 
         # return empty DataRecordSet if no output records were produced
         if len(output_records) == 0:
@@ -544,6 +610,15 @@ class EmbeddingJoin(LLMJoin):
         join_dr = DataRecord.from_join_parents(self.output_schema, left_candidate, right_candidate)
         join_dr._passed_operator = passed_operator
 
+        # handle different join types
+        if self.how == "left" and passed_operator:
+            self._left_joined_record_ids.add(left_candidate._id)
+        elif self.how == "right" and passed_operator:
+            self._right_joined_record_ids.add(right_candidate._id)
+        elif self.how == "outer" and passed_operator:
+            self._left_joined_record_ids.add(left_candidate._id)
+            self._right_joined_record_ids.add(right_candidate._id)
+
         # NOTE: embedding costs are amortized over all records and added at the end of __call__
         # compute record stats and add to output_record_op_stats
         record_op_stats = RecordOpStats(
@@ -565,7 +640,7 @@ class EmbeddingJoin(LLMJoin):
 
         return join_dr, record_op_stats
 
-    def __call__(self, left_candidates: list[DataRecord], right_candidates: list[DataRecord]) -> tuple[DataRecordSet, int]:
+    def __call__(self, left_candidates: list[DataRecord], right_candidates: list[DataRecord], final: bool = False) -> tuple[DataRecordSet, int]:
         # get the set of input fields from both records in the join
         input_fields = self.get_input_fields()
 
@@ -680,6 +755,10 @@ class EmbeddingJoin(LLMJoin):
         if self.retain_inputs:
             self._left_input_records.extend(zip(left_candidates, left_embeddings))
             self._right_input_records.extend(zip(right_candidates, right_embeddings))
+
+        # if this is the final call, then add in any left/right/outer join records that did not match
+        if final:
+            return self._compute_unmatched_records(), 0
 
         # return empty DataRecordSet if no output records were produced
         if len(output_records) == 0:

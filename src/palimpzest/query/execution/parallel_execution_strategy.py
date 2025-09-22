@@ -37,7 +37,6 @@ class ParallelExecutionStrategy(ExecutionStrategy):
 
     def _upstream_ops_finished(self, plan: PhysicalPlan, topo_idx: int, operator: PhysicalOperator, input_queues: dict[str, dict[str, list]], future_queues: dict[str, list]) -> bool:
         """Helper function to check if agg / join operator is ready to process its inputs."""
-        # for agg / join operator, we can only process it when all upstream operators have finished processing their inputs
         upstream_unique_full_op_ids = plan.get_upstream_unique_full_op_ids(topo_idx, operator)
         upstream_input_queues = {upstream_unique_full_op_id: input_queues[upstream_unique_full_op_id] for upstream_unique_full_op_id in upstream_unique_full_op_ids}
         upstream_future_queues = {upstream_unique_full_op_id: future_queues[upstream_unique_full_op_id] for upstream_unique_full_op_id in upstream_unique_full_op_ids}
@@ -201,6 +200,18 @@ class ParallelExecutionStrategy(ExecutionStrategy):
                                 future = executor.submit(operator, input_record)
                                 future_queues[unique_full_op_id].append(future)
                             input_queues[unique_full_op_id][source_unique_full_op_id] = input_records[batch_size:]
+
+                    # if this is a join operator with no more inputs to process, then finish it
+                    if isinstance(operator, JoinOp) and operator.how in ("left", "right", "outer"):
+                        join_op_upstream_finished = self._upstream_ops_finished(plan, topo_idx, operator, input_queues, future_queues)
+                        join_input_queues_empty = all(len(inputs) == 0 for inputs in input_queues[unique_full_op_id].values())
+                        join_future_queue_empty = len(future_queues[unique_full_op_id]) == 0
+                        if join_op_upstream_finished and join_input_queues_empty and join_future_queue_empty:
+                            # process the join one last time with final=True to handle any left/right/outer join logic
+                            def finalize_op(operator):
+                                return operator([], [], final=True)
+                            future = executor.submit(finalize_op, operator)
+                            future_queues[unique_full_op_id].append(future)
 
                 # TODO: change logic to stop upstream operators once a limit is reached
                 # break out of loop if the final operator is a LimitScanOp and we've reached its limit
