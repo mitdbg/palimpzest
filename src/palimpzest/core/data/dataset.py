@@ -258,6 +258,7 @@ class Dataset:
         operator = JoinOp(
             input_schema=combined_schema,
             output_schema=combined_schema,
+            condition="",
             on=on,
             how=how,
             depends_on=on,

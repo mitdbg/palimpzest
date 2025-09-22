@@ -5,15 +5,8 @@ import os
 import string
 import time
 
-import chromadb
 import numpy as np
 import regex as re
-from chromadb.utils.embedding_functions import (
-    SentenceTransformerEmbeddingFunction,
-)
-from chromadb.utils.embedding_functions.openai_embedding_function import (
-    OpenAIEmbeddingFunction,
-)
 
 import palimpzest as pz
 from palimpzest.constants import Model
@@ -231,7 +224,7 @@ class MMQAQuestionDataset(pz.IterDataset):
 
 class MMQATextDataset(pz.IterDataset):
     def __init__(self, dataset: list[dict]):
-        super().__init__(id="mmqa-texts", schema=mmqa_entry_cols)
+        super().__init__(id="mmqa-texts", schema=mmqa_text_cols)
 
         # construct mapping from text id to text
         text_id_to_text = {}
@@ -258,7 +251,7 @@ class MMQATextDataset(pz.IterDataset):
 
 class MMQATableDataset(pz.IterDataset):
     def __init__(self, dataset: list[dict]):
-        super().__init__(id="mmqa-tables", schema=mmqa_entry_cols)
+        super().__init__(id="mmqa-tables", schema=mmqa_table_cols)
 
         # construct mapping from table id to table string
         table_id_to_table = {}
@@ -309,7 +302,7 @@ class MMQATableDataset(pz.IterDataset):
 
 class MMQAImageDataset(pz.IterDataset):
     def __init__(self, dataset: list[dict]):
-        super().__init__(id="mmqa-images", schema=mmqa_entry_cols)
+        super().__init__(id="mmqa-images", schema=mmqa_image_cols)
 
         # construct mapping from image id to image base64 object
         image_id_to_image = {}
