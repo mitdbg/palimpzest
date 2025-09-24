@@ -2,6 +2,8 @@ from palimpzest.query.operators.aggregate import AggregateOp as _AggregateOp
 from palimpzest.query.operators.aggregate import ApplyGroupByOp as _ApplyGroupByOp
 from palimpzest.query.operators.aggregate import AverageAggregateOp as _AverageAggregateOp
 from palimpzest.query.operators.aggregate import CountAggregateOp as _CountAggregateOp
+from palimpzest.query.operators.aggregate import MaxAggregateOp as _MaxAggregateOp
+from palimpzest.query.operators.aggregate import MinAggregateOp as _MinAggregateOp
 from palimpzest.query.operators.convert import ConvertOp as _ConvertOp
 from palimpzest.query.operators.convert import LLMConvert as _LLMConvert
 from palimpzest.query.operators.convert import LLMConvertBonded as _LLMConvertBonded
@@ -69,7 +71,7 @@ LOGICAL_OPERATORS = [
 
 PHYSICAL_OPERATORS = (
     # aggregate
-    [_AggregateOp, _ApplyGroupByOp, _AverageAggregateOp, _CountAggregateOp]
+    [_AggregateOp, _ApplyGroupByOp, _AverageAggregateOp, _CountAggregateOp, _MaxAggregateOp, _MinAggregateOp]
     # convert
     + [_ConvertOp, _NonLLMConvert, _LLMConvert, _LLMConvertBonded]
     # distinct

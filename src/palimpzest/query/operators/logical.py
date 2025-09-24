@@ -9,7 +9,7 @@ from palimpzest.constants import AggFunc, Cardinality
 from palimpzest.core.data import context, dataset
 from palimpzest.core.elements.filters import Filter
 from palimpzest.core.elements.groupbysig import GroupBySig
-from palimpzest.core.lib.schemas import Average, Count
+from palimpzest.core.lib.schemas import Average, Count, Max, Min
 from palimpzest.utils.hash_helpers import hash_for_id
 
 
@@ -158,6 +158,10 @@ class Aggregate(LogicalOperator):
                 kwargs["output_schema"] = Count
             elif agg_func == AggFunc.AVERAGE:
                 kwargs["output_schema"] = Average
+            elif agg_func == AggFunc.MIN:
+                kwargs["output_schema"] = Min
+            elif agg_func == AggFunc.MAX:
+                kwargs["output_schema"] = Max
             else:
                 raise ValueError(f"Unsupported aggregation function: {agg_func}")
 
