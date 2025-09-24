@@ -533,6 +533,16 @@ class Dataset:
         """Apply an average aggregation to this set"""
         operator = Aggregate(input_schema=self.schema, agg_func=AggFunc.AVERAGE)
         return Dataset(sources=[self], operator=operator, schema=operator.output_schema)
+    
+    def min(self) -> Dataset:
+        """Apply an min operator to this set"""
+        operator = Aggregate(input_schema=self.schema, agg_func=AggFunc.MIN)
+        return Dataset(sources=[self], operator=operator, schema=operator.output_schema)
+
+    def max(self) -> Dataset:
+        """Apply an max operator to this set"""
+        operator = Aggregate(input_schema=self.schema, agg_func=AggFunc.MAX)
+        return Dataset(sources=[self], operator=operator, schema=operator.output_schema)
 
     def groupby(self, groupby: GroupBySig) -> Dataset:
         output_schema = groupby.output_schema()

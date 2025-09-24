@@ -12,7 +12,13 @@ from palimpzest.core.lib.schemas import (
     IMAGE_LIST_FIELD_TYPES,
 )
 from palimpzest.prompts import CONTEXT_SEARCH_PROMPT
-from palimpzest.query.operators.aggregate import ApplyGroupByOp, AverageAggregateOp, CountAggregateOp
+from palimpzest.query.operators.aggregate import (
+    ApplyGroupByOp,
+    AverageAggregateOp,
+    CountAggregateOp,
+    MaxAggregateOp,
+    MinAggregateOp,
+)
 from palimpzest.query.operators.compute import SmolAgentsCompute
 from palimpzest.query.operators.convert import LLMConvertBonded, NonLLMConvert
 from palimpzest.query.operators.critique_and_refine import CritiqueAndRefineConvert, CritiqueAndRefineFilter
@@ -946,6 +952,10 @@ class AggregateRule(ImplementationRule):
             physical_op_class = CountAggregateOp
         elif logical_expression.operator.agg_func == AggFunc.AVERAGE:
             physical_op_class = AverageAggregateOp
+        elif logical_expression.operator.agg_func == AggFunc.MIN:
+            physical_op_class = MinAggregateOp
+        elif logical_expression.operator.agg_func == AggFunc.MAX:
+            physical_op_class = MaxAggregateOp
         else:
             raise Exception(f"Cannot support aggregate function: {logical_expression.operator.agg_func}")
 

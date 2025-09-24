@@ -200,7 +200,8 @@ class Modality(str, Enum):
 class AggFunc(str, Enum):
     COUNT = "count"
     AVERAGE = "average"
-
+    MIN = "min"
+    MAX = "max"
 
 class Cardinality(str, Enum):
     ONE_TO_ONE = "one-to-one"

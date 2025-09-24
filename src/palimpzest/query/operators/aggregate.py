@@ -5,7 +5,7 @@ import time
 from palimpzest.constants import NAIVE_EST_NUM_GROUPS, AggFunc
 from palimpzest.core.elements.groupbysig import GroupBySig
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
-from palimpzest.core.lib.schemas import Average, Count
+from palimpzest.core.lib.schemas import Average, Count, Max, Min
 from palimpzest.core.models import OperatorCostEstimates, RecordOpStats
 from palimpzest.query.operators.physical import PhysicalOperator
 
@@ -270,6 +270,132 @@ class CountAggregateOp(AggregateOp):
             record_id=dr._id,
             record_parent_ids=dr._parent_ids,
             record_source_indices=dr._source_indices,
+            record_state=dr.to_dict(include_bytes=False),
+            full_op_id=self.get_full_op_id(),
+            logical_op_id=self.logical_op_id,
+            op_name=self.op_name(),
+            time_per_record=time.time() - start_time,
+            cost_per_record=0.0,
+            op_details={k: str(v) for k, v in self.get_id_params().items()},
+        )
+
+        return DataRecordSet([dr], [record_op_stats])
+
+
+class MinAggregateOp(AggregateOp):
+    # NOTE: we don't actually need / use agg_func here (yet)
+
+    def __init__(self, agg_func: AggFunc, *args, **kwargs):
+        # enforce that output schema is correct
+        assert kwargs["output_schema"] == Min, "MinAggregateOp requires output_schema to be Min"
+
+        # call parent constructor
+        super().__init__(*args, **kwargs)
+        self.agg_func = agg_func
+
+    def __str__(self):
+        op = super().__str__()
+        op += f"    Function: {str(self.agg_func)}\n"
+        return op
+
+    def get_id_params(self):
+        id_params = super().get_id_params()
+        return {"agg_func": str(self.agg_func), **id_params}
+
+    def get_op_params(self):
+        op_params = super().get_op_params()
+        return {"agg_func": self.agg_func, **op_params}
+
+    def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
+        # for now, assume applying the aggregation takes negligible additional time (and no cost in USD)
+        return OperatorCostEstimates(
+            cardinality=1,
+            time_per_record=0,
+            cost_per_record=0,
+            quality=1.0,
+        )
+
+    def __call__(self, candidates: list[DataRecord]) -> DataRecordSet:
+        start_time = time.time()
+
+        # create new DataRecord
+        dr = DataRecord.from_agg_parents(schema=Min, parent_records=candidates)
+        min = float("inf")
+        for candidate in candidates:
+            try:  # noqa: SIM105
+                min = min(float(list(candidate.to_dict().values())[0]), min)
+            except Exception:
+                pass
+        dr.min = min if min != float("inf") else None
+
+        # create RecordOpStats object
+        record_op_stats = RecordOpStats(
+            record_id=dr.id,
+            record_parent_ids=dr.parent_ids,
+            record_source_indices=dr.source_indices,
+            record_state=dr.to_dict(include_bytes=False),
+            full_op_id=self.get_full_op_id(),
+            logical_op_id=self.logical_op_id,
+            op_name=self.op_name(),
+            time_per_record=time.time() - start_time,
+            cost_per_record=0.0,
+            op_details={k: str(v) for k, v in self.get_id_params().items()},
+        )
+
+        return DataRecordSet([dr], [record_op_stats])
+
+
+class MaxAggregateOp(AggregateOp):
+    # NOTE: we don't actually need / use agg_func here (yet)
+
+    def __init__(self, agg_func: AggFunc, *args, **kwargs):
+        # enforce that output schema is correct
+        assert kwargs["output_schema"] == Max, "MaxAggregateOp requires output_schema to be Max"
+
+        # call parent constructor
+        super().__init__(*args, **kwargs)
+        self.agg_func = agg_func
+
+    def __str__(self):
+        op = super().__str__()
+        op += f"    Function: {str(self.agg_func)}\n"
+        return op
+
+    def get_id_params(self):
+        id_params = super().get_id_params()
+        return {"agg_func": str(self.agg_func), **id_params}
+
+    def get_op_params(self):
+        op_params = super().get_op_params()
+        return {"agg_func": self.agg_func, **op_params}
+
+    def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
+        # for now, assume applying the aggregation takes negligible additional time (and no cost in USD)
+        return OperatorCostEstimates(
+            cardinality=1,
+            time_per_record=0,
+            cost_per_record=0,
+            quality=1.0,
+        )
+
+    def __call__(self, candidates: list[DataRecord]) -> DataRecordSet:
+        start_time = time.time()
+
+        # create new DataRecord
+        dr = DataRecord.from_agg_parents(schema=Max, parent_records=candidates)
+        max = float("-inf")
+        for candidate in candidates:
+            try:  # noqa: SIM105
+                max = max(float(list(candidate.to_dict().values())[0]), max)
+            except Exception:
+                pass
+        dr.max = max if max != float("-inf") else None
+
+        # create RecordOpStats object
+        record_op_stats = RecordOpStats(
+            record_id=dr.id,
+            record_parent_ids=dr.parent_ids,
+            record_source_indices=dr.source_indices,
             record_state=dr.to_dict(include_bytes=False),
             full_op_id=self.get_full_op_id(),
             logical_op_id=self.logical_op_id,
