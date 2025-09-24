@@ -867,7 +867,7 @@ class RelationalJoinRule(ImplementationRule):
 
     @classmethod
     def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
-        is_match = isinstance(logical_expression.operator, JoinOp) and logical_expression.operator.condition is None
+        is_match = isinstance(logical_expression.operator, JoinOp) and logical_expression.operator.condition == ""
         logger.debug(f"RelationalJoinRule matches_pattern: {is_match} for {logical_expression}")
         return is_match
 
@@ -884,7 +884,7 @@ class NestedLoopsJoinRule(ImplementationRule):
 
     @classmethod
     def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
-        is_match = isinstance(logical_expression.operator, JoinOp) and logical_expression.operator.condition is not None
+        is_match = isinstance(logical_expression.operator, JoinOp) and logical_expression.operator.condition != ""
         logger.debug(f"NestedLoopsJoinRule matches_pattern: {is_match} for {logical_expression}")
         return is_match
 
@@ -916,7 +916,7 @@ class EmbeddingJoinRule(ImplementationRule):
 
     @classmethod
     def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
-        is_match = isinstance(logical_expression.operator, JoinOp) and logical_expression.operator.condition is not None and not cls._is_audio_operation(logical_expression)
+        is_match = isinstance(logical_expression.operator, JoinOp) and logical_expression.operator.condition != "" and not cls._is_audio_operation(logical_expression)
         logger.debug(f"EmbeddingJoinRule matches_pattern: {is_match} for {logical_expression}")
         return is_match
 

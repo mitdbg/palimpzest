@@ -7,7 +7,11 @@ from pydantic import BaseModel
 from palimpzest.core.lib.schemas import create_schema_from_fields
 
 
-# TODO: need to rethink how group bys work
+# TODO:
+# - move the arguments for group_by_fields, agg_funcs, and agg_fields into the Dataset.groupby() operator
+# - construct the correct output schema using the input schema and the group by and aggregation fields
+# - remove/update all other references to GroupBySig in the codebase
+
 # signature for a group by aggregate that applies
 # group and aggregation to an input tuple
 class GroupBySig:
@@ -50,6 +54,7 @@ class GroupBySig:
             ops.append(self.agg_funcs[i] + "(" + self.agg_fields[i] + ")")
         return ops
 
+    # TODO: output schema needs to account for input schema types and create new output schema types
     def output_schema(self) -> type[BaseModel]:
         # the output class varies depending on the group by, so here
         # we dynamically construct this output

@@ -501,8 +501,8 @@ class OptimizePhysicalExpression(Task):
 
                         # compute the total cost for this physical expression by summing its operator's PlanCost
                         # with the input groups' total PlanCost; also set the op_estimates for this expression's operator
-                        execution_strategy = "parallel" if execution_strategy.is_fully_parallel() else "sequential"
-                        full_plan_cost = op_plan_cost.join_add(left_input_plan_cost, right_input_plan_cost, execution_strategy)
+                        execution_strategy_str = "parallel" if execution_strategy.is_fully_parallel() else "sequential"
+                        full_plan_cost = op_plan_cost.join_add(left_input_plan_cost, right_input_plan_cost, execution_strategy_str)
                         full_plan_cost.op_estimates = op_plan_cost.op_estimates
                         all_possible_plan_costs.append((full_plan_cost, (left_input_plan_cost, right_input_plan_cost)))
 
@@ -570,8 +570,8 @@ class OptimizePhysicalExpression(Task):
 
                 # compute the total cost for this physical expression by summing its operator's PlanCost
                 # with the input groups' total PlanCost; also set the op_estimates for this expression's operator
-                execution_strategy = "parallel" if execution_strategy.is_fully_parallel() else "sequential"
-                full_plan_cost = op_plan_cost.join_add(left_best_input_plan_cost, right_best_input_plan_cost, execution_strategy)
+                execution_strategy_str = "parallel" if execution_strategy.is_fully_parallel() else "sequential"
+                full_plan_cost = op_plan_cost.join_add(left_best_input_plan_cost, right_best_input_plan_cost, execution_strategy_str)
                 full_plan_cost.op_estimates = op_plan_cost.op_estimates
 
             else:

@@ -527,7 +527,7 @@ if __name__ == "__main__":
         sentinel_execution_strategy=sentinel_execution_strategy,
         execution_strategy=execution_strategy,
         use_final_op_quality=True,
-        max_workers=1,
+        max_workers=64,
         verbose=verbose,
         available_models=[
             Model.GPT_4o_MINI,

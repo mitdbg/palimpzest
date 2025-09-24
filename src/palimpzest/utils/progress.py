@@ -225,20 +225,22 @@ class PZProgressManager(ProgressManager):
             current_unique_full_op_id = unique_full_op_id
             next_op, next_unique_full_op_id = self.unique_full_op_id_to_next_op_and_id[unique_full_op_id]
             while next_op is not None:
-                if not isinstance(next_op, (AggregateOp, LimitScanOp)):
-                    next_task = self.unique_full_op_id_to_task[next_unique_full_op_id]
-                    multiplier = 1
-                    if isinstance(next_op, JoinOp):
-                        # for joins, scale the delta by the number of inputs from the other side of the join
-                        left_input_unique_full_op_id, right_input_unique_input_op_id = self.unique_full_op_id_to_input_unique_full_op_ids[next_unique_full_op_id]
-                        if current_unique_full_op_id == left_input_unique_full_op_id:
-                            multiplier = self.get_task_total(right_input_unique_input_op_id)
-                        elif current_unique_full_op_id == right_input_unique_input_op_id:
-                            multiplier = self.get_task_total(left_input_unique_full_op_id)
-                        else:
-                            raise ValueError(f"Current op ID {current_unique_full_op_id} not found in join inputs {left_input_unique_full_op_id}, {right_input_unique_input_op_id}")
-                    delta_adjusted = delta * multiplier
-                    self.progress.update(next_task, total=self.get_task_total(next_unique_full_op_id) + delta_adjusted)
+                if isinstance(next_op, (AggregateOp, LimitScanOp)):
+                    break
+
+                next_task = self.unique_full_op_id_to_task[next_unique_full_op_id]
+                multiplier = 1
+                if isinstance(next_op, JoinOp):
+                    # for joins, scale the delta by the number of inputs from the other side of the join
+                    left_input_unique_full_op_id, right_input_unique_input_op_id = self.unique_full_op_id_to_input_unique_full_op_ids[next_unique_full_op_id]
+                    if current_unique_full_op_id == left_input_unique_full_op_id:
+                        multiplier = self.get_task_total(right_input_unique_input_op_id)
+                    elif current_unique_full_op_id == right_input_unique_input_op_id:
+                        multiplier = self.get_task_total(left_input_unique_full_op_id)
+                    else:
+                        raise ValueError(f"Current op ID {current_unique_full_op_id} not found in join inputs {left_input_unique_full_op_id}, {right_input_unique_input_op_id}")
+                delta_adjusted = delta * multiplier
+                self.progress.update(next_task, total=self.get_task_total(next_unique_full_op_id) + delta_adjusted)
 
                 # move to the next operator in the plan
                 current_unique_full_op_id = next_unique_full_op_id

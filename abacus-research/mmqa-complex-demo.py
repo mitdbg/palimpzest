@@ -528,9 +528,13 @@ if __name__ == "__main__":
 
     # construct plan
     test_question_dataset = MMQAQuestionDataset(test_dataset)
+    print(f"Test Question Dataset: {len(test_question_dataset)}")
     test_text_dataset = MMQATextDataset(test_dataset)
+    print(f"Text Dataset: {len(test_text_dataset)}")
     test_table_dataset = MMQATableDataset(test_dataset)
+    print(f"Table Dataset: {len(test_table_dataset)}")
     test_image_dataset = MMQAImageDataset(test_dataset)
+    print(f"Image Dataset: {len(test_image_dataset)}")
     text_plan = test_question_dataset.sem_map(mmqa_text_search_cols, depends_on=["question"])
     text_plan = text_plan.sem_join(
         test_text_dataset,
@@ -540,7 +544,7 @@ if __name__ == "__main__":
     )
     text_plan = text_plan.groupby(pz.GroupBySig(["qid", "question", "text_search_string"], agg_funcs=["list", "list"], agg_fields=["text_id", "text"]))
     text_plan = text_plan.map(
-        udf=lambda record: "...".join(record["list(text)"]) if record["list(text)"] != [None] else "None",
+        udf=lambda record: {"text": "...".join(record["list(text)"]) if record["list(text)"] != [None] else "None", **record},
         cols=[{"name": "text", "type": str, "desc": "All relevant text snippets concatenated together."}],
     )
     text_plan = text_plan.project(["qid", "question", "text"])
@@ -554,8 +558,8 @@ if __name__ == "__main__":
     )
     table_plan = table_plan.groupby(pz.GroupBySig(["qid", "question", "table_search_string"], agg_funcs=["list", "list"], agg_fields=["table_id", "table"]))
     table_plan = table_plan.map(
-        udf=lambda record: "...".join(record["list(table)"]) if record["list(table)"] != [None] else "None",
-        cols=[{"name": "table", "type": str, "desc": "All relevant table snippets concatenated together."}],
+        udf=lambda record: {"table": "\n\n".join(record["list(table)"]) if record["list(table)"] != [None] else "None", **record},
+        cols=[{"name": "table", "type": str, "desc": "All relevant tables concatenated together."}],
     )
     table_plan = table_plan.project(["qid", "question", "table"])
 
@@ -564,14 +568,14 @@ if __name__ == "__main__":
         test_image_dataset,
         condition="The image is relevant to the question based on the image search string.",
         depends_on=["image_search_string", "image"],
+        how="left",
     )
     image_plan = image_plan.groupby(pz.GroupBySig(["qid", "question", "image_search_string"], agg_funcs=["list", "list"], agg_fields=["image_id", "image"]))
     image_plan = image_plan.map(
-        udf=lambda record: "...".join(record["list(image)"]) if record["list(image)"] != [None] else "None",
-        cols=[{"name": "image", "type": str, "desc": "All relevant image snippets concatenated together."}],
+        udf=lambda record: {"image": record["list(image)"] if record["list(image)"] != [None] else "None", **record},
+        cols=[{"name": "image", "type": list[ImageBase64], "desc": "All relevant images."}],
     )
     image_plan = image_plan.project(["qid", "question", "image"])
-
     plan = text_plan.join(table_plan, on=["qid", "question"]).join(image_plan, on=["qid", "question"])
     plan = plan.sem_map(mmqa_answer_cols, depends_on=["question", "text", "table", "image"])
 
@@ -587,7 +591,7 @@ if __name__ == "__main__":
         sentinel_execution_strategy=sentinel_execution_strategy,
         execution_strategy=execution_strategy,
         use_final_op_quality=True,
-        max_workers=1,
+        max_workers=64,
         verbose=verbose,
         available_models=[
             Model.GPT_4o_MINI,

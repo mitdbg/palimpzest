@@ -96,6 +96,12 @@ class OpFrontier:
         """
         return self.frontier_ops
 
+    def get_off_frontier_ops(self) -> list[PhysicalOperator]:
+        """
+        Returns the set of off-frontier operators for this OpFrontier.
+        """
+        return self.off_frontier_ops
+
     def _compute_op_id_to_pareto_distance(self, priors: dict[str, dict[str, float]]) -> dict[str, float]:
         """
         Return l2-distance for each operator from the pareto frontier.
@@ -298,7 +304,7 @@ class OpFrontier:
         def remove_unavailable_root_datasets(source_indices: str | tuple) -> str | tuple | None:
             # base case: source_indices is a string
             if isinstance(source_indices, str):
-                return source_indices if source_indices.split("-")[0] in self.root_dataset_ids else None
+                return source_indices if source_indices.split("---")[0] in self.root_dataset_ids else None
 
             # recursive case: source_indices is a tuple
             left_indices = source_indices[0]
@@ -641,8 +647,8 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
         """
         Returns the operator in the frontier with the highest (estimated) quality.
         """
-        # get the operators in the frontier set for this logical_op_id
-        frontier_ops = op_frontiers[unique_logical_op_id].get_frontier_ops()
+        # get the (off) frontier operators for this logical_op_id
+        frontier_ops = op_frontiers[unique_logical_op_id].get_frontier_ops() + op_frontiers[unique_logical_op_id].get_off_frontier_ops()
 
         # get a mapping from full_op_id --> list[RecordOpStats]
         full_op_id_to_op_stats: dict[str, OperatorStats] = plan_stats.operator_stats.get(unique_logical_op_id, {})
@@ -693,14 +699,21 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
                 max_quality_op = self._get_max_quality_op(unique_logical_op_id, op_frontiers, plan_stats)
 
                 # get frontier ops and their next input
-                def is_filtered_out(tup: tuple) -> bool:
-                    return tup[-1] is None or isinstance(tup[-1], list) and all([record is None for record in tup[-1]])
+                def filter_and_clean_inputs(frontier_op_inputs: list[tuple]) -> bool:
+                    cleaned_inputs = []
+                    for tup in frontier_op_inputs:
+                        input = tup[-1]
+                        if isinstance(input, list):
+                            input = [record for record in input if record is not None]
+                        if input is not None and input != []:
+                            cleaned_inputs.append((tup[0], tup[1], input))
+                    return cleaned_inputs
                 frontier_op_inputs = op_frontiers[unique_logical_op_id].get_frontier_op_inputs(source_indices_to_sample, max_quality_op)
-                frontier_op_inputs = list(filter(lambda tup: not is_filtered_out(tup), frontier_op_inputs))
+                frontier_op_inputs = filter_and_clean_inputs(frontier_op_inputs)
 
                 # break out of the loop if frontier_op_inputs is empty, as this means all records have been filtered out
                 if len(frontier_op_inputs) == 0:
-                    break
+                    continue
 
                 # run sampled operators on sampled inputs and update the number of samples drawn
                 source_indices_to_record_set_tuples, num_llm_ops = self._execute_op_set(unique_logical_op_id, frontier_op_inputs)
@@ -734,13 +747,14 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
                     op_frontiers[next_unique_logical_op_id].update_inputs(unique_logical_op_id, source_indices_to_all_record_sets)
 
                 # update the (pareto) frontier for each set of operators
-                full_op_id_to_source_indices_processed = {}
-                for source_indices, record_set_tuples in source_indices_to_record_set_tuples.items():
-                    for _, op, _ in record_set_tuples:
-                        if op.get_full_op_id() not in full_op_id_to_source_indices_processed:
-                            full_op_id_to_source_indices_processed[op.get_full_op_id()] = set()
-                        full_op_id_to_source_indices_processed[op.get_full_op_id()].add(source_indices)
-                op_frontiers[unique_logical_op_id].update_frontier(unique_logical_op_id, plan_stats, full_op_id_to_source_indices_processed)
+                if len(new_record_op_stats) > 0:
+                    full_op_id_to_source_indices_processed = {}
+                    for source_indices, record_set_tuples in source_indices_to_record_set_tuples.items():
+                        for _, op, _ in record_set_tuples:
+                            if op.get_full_op_id() not in full_op_id_to_source_indices_processed:
+                                full_op_id_to_source_indices_processed[op.get_full_op_id()] = set()
+                            full_op_id_to_source_indices_processed[op.get_full_op_id()].add(source_indices)
+                    op_frontiers[unique_logical_op_id].update_frontier(unique_logical_op_id, plan_stats, full_op_id_to_source_indices_processed)
 
                 # if the operator is a non-llm filter which has filtered out records, remove those records from
                 # all downstream operators' full_op_id_to_sources_not_processed
@@ -764,7 +778,7 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
         dataset_id_to_shuffled_source_indices = {}
         for dataset_id, dataset in train_dataset.items():
             total_num_samples = len(dataset)
-            shuffled_source_indices = [f"{dataset_id}-{int(idx)}" for idx in np.arange(total_num_samples)]
+            shuffled_source_indices = [f"{dataset_id}---{int(idx)}" for idx in np.arange(total_num_samples)]
             self.rng.shuffle(shuffled_source_indices)
             dataset_id_to_shuffled_source_indices[dataset_id] = shuffled_source_indices
 

@@ -6,7 +6,6 @@ from palimpzest.query.execution.execution_strategy import ExecutionStrategy
 from palimpzest.query.operators.aggregate import AggregateOp
 from palimpzest.query.operators.join import JoinOp
 from palimpzest.query.operators.limit import LimitScanOp
-from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.scan import ContextScanOp, ScanPhysicalOp
 from palimpzest.query.optimizer.plan import PhysicalPlan
 from palimpzest.utils.progress import create_progress_manager
@@ -175,9 +174,9 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
                 return True
         return False
 
-    def _upstream_ops_finished(self, plan: PhysicalPlan, topo_idx: int, operator: PhysicalOperator, input_queues: dict[str, dict[str, list]]) -> bool:
+    def _upstream_ops_finished(self, plan: PhysicalPlan, unique_full_op_id: str, input_queues: dict[str, dict[str, list]]) -> bool:
         """Helper function to check if agg / join operator is ready to process its inputs."""
-        upstream_unique_full_op_ids = plan.get_upstream_unique_full_op_ids(topo_idx, operator)
+        upstream_unique_full_op_ids = plan.get_upstream_unique_full_op_ids(unique_full_op_id)
         upstream_input_queues = {upstream_unique_full_op_id: input_queues[upstream_unique_full_op_id] for upstream_unique_full_op_id in upstream_unique_full_op_ids}
         return not self._any_queue_not_empty(upstream_input_queues)
 
@@ -198,8 +197,8 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
                 unique_full_op_id = f"{topo_idx}-{operator.get_full_op_id()}"
 
                 num_inputs = sum(len(input_queues[unique_full_op_id][source_unique_full_op_id]) for source_unique_full_op_id in source_unique_full_op_ids)
-                agg_op_not_ready = isinstance(operator, AggregateOp) and not self._upstream_ops_finished(plan, topo_idx, operator, input_queues)
-                join_op_not_ready = isinstance(operator, JoinOp) and not self._upstream_ops_finished(plan, topo_idx, operator, input_queues)
+                agg_op_not_ready = isinstance(operator, AggregateOp) and not self._upstream_ops_finished(plan, unique_full_op_id, input_queues)
+                join_op_not_ready = isinstance(operator, JoinOp) and not self._upstream_ops_finished(plan, unique_full_op_id, input_queues)
                 if num_inputs == 0 or agg_op_not_ready or join_op_not_ready:
                     continue
 
@@ -250,14 +249,15 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
 
                 # if this is a join operator with no more inputs to process, then finish it
                 if isinstance(operator, JoinOp) and operator.how in ("left", "right", "outer"):
-                    join_op_upstream_finished = self._upstream_ops_finished(plan, topo_idx, operator, input_queues)
+                    join_op_upstream_finished = self._upstream_ops_finished(plan, unique_full_op_id, input_queues)
                     join_input_queues_empty = all(len(inputs) == 0 for inputs in input_queues[unique_full_op_id].values())
-                    if join_op_upstream_finished and join_input_queues_empty:
+                    if join_op_upstream_finished and join_input_queues_empty and not operator.finished:
                         # process the join one last time with final=True to handle any left/right/outer join logic
                         record_set, num_inputs_processed = operator([], [], final=True)
                         records.extend(record_set.data_records)
                         record_op_stats.extend(record_set.record_op_stats)
                         num_outputs += sum(record._passed_operator for record in record_set.data_records)
+                        operator.set_finished()
 
                 # update plan stats
                 plan_stats.add_record_op_stats(unique_full_op_id, record_op_stats)

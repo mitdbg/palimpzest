@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 import time
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -54,6 +55,7 @@ class JoinOp(PhysicalOperator, ABC):
         self.retain_inputs = retain_inputs
         self.desc = desc
         self.join_idx = 0
+        self.finished = False
 
         # maintain list(s) of input records for the join
         self._left_input_records: list[DataRecord] = []
@@ -93,10 +95,11 @@ class JoinOp(PhysicalOperator, ABC):
 
     def _compute_unmatched_records(self) -> DataRecordSet:
         """Helper function to compute unmatched records for left/right/outer joins."""
-        def join_unmatched_records(input_records: list[DataRecord], joined_record_ids: set[str], left: bool = True):
+        def join_unmatched_records(input_records: list[DataRecord] | list[tuple[DataRecord, list[float]]], joined_record_ids: set[str], left: bool = True):
             records, record_op_stats_lst = [], []
             for record in input_records:
                 start_time = time.time()
+                record = record[0] if isinstance(record, tuple) else record
                 if record._id not in joined_record_ids:
                     unmatched_dr = (
                         DataRecord.from_join_parents(self.output_schema, record, None)
@@ -147,6 +150,9 @@ class JoinOp(PhysicalOperator, ABC):
     def naive_cost_estimates(self, left_source_op_cost_estimates: OperatorCostEstimates, right_source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         pass
 
+    def set_finished(self):
+        """Mark the operator as finished after computing left/right/outer join logic."""
+        self.finished = True
 
 class RelationalJoin(JoinOp):
 
@@ -477,6 +483,8 @@ class EmbeddingJoin(LLMJoin):
             if field_name.split(".")[-1] in self.get_input_fields()
         ])
         self.embedding_model = Model.TEXT_EMBEDDING_3_SMALL if self.text_only else Model.CLIP_VIT_B_32
+        self.clip_model = None
+        self._lock = threading.Lock()
 
         # keep track of embedding costs that could not be amortized if no output records were produced
         self.residual_embedding_cost = 0.0
@@ -548,6 +556,12 @@ class EmbeddingJoin(LLMJoin):
             quality=quality,
         )
 
+    def _get_clip_model(self):
+        with self._lock:
+            if self.clip_model is None:
+                self.clip_model = SentenceTransformer(self.embedding_model.value)
+            return self.clip_model
+
     def _compute_embeddings(self, candidates: list[DataRecord], input_fields: list[str]) -> tuple[np.ndarray, GenerationStats]:
         # return empty array and empty stats if no candidates  
         if len(candidates) == 0:
@@ -563,7 +577,7 @@ class EmbeddingJoin(LLMJoin):
             total_input_tokens = response.usage.total_tokens
             embeddings = np.array([item.embedding for item in response.data])
         else:
-            model = SentenceTransformer(self.embedding_model.value)
+            model = self._get_clip_model()
             embeddings = np.zeros((len(candidates), 512))  # CLIP embeddings are 512-dimensional
             num_input_fields_present = 0
             for field in input_fields:
@@ -698,18 +712,22 @@ class EmbeddingJoin(LLMJoin):
                         self.max_non_matching_sim = embedding_sim
                     if records_joined and embedding_sim < self.min_matching_sim:
                         self.min_matching_sim = embedding_sim
-            
+
             # update samples drawn and num_inputs_processed
             self.samples_drawn += samples_to_draw
             num_inputs_processed += samples_to_draw
 
         # process remaining candidates based on embedding similarity
         if len(join_candidates) > 0:
-             assert self.samples_drawn == self.num_samples, "All samples should have been drawn before processing remaining candidates"
+             assert self.samples_drawn >= self.num_samples, "All samples should have been drawn before processing remaining candidates"
              with ThreadPoolExecutor(max_workers=self.join_parallelism) as executor:
                 futures = []
                 for left_candidate, right_candidate, embedding_sim in join_candidates:
-                    llm_call_needed = self.min_matching_sim <= embedding_sim <= self.max_non_matching_sim
+                    llm_call_needed = (
+                        self.min_matching_sim == float("inf")
+                        or self.max_non_matching_sim == float("-inf")
+                        or self.min_matching_sim <= embedding_sim <= self.max_non_matching_sim
+                    )
 
                     if llm_call_needed:
                         futures.append(executor.submit(self._process_join_candidate_pair, left_candidate, right_candidate, gen_kwargs, embedding_sim))
