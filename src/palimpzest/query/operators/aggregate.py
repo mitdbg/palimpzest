@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from typing import Any
 
 from palimpzest.constants import NAIVE_EST_NUM_GROUPS, AggFunc
 from palimpzest.core.elements.groupbysig import GroupBySig
@@ -156,12 +157,17 @@ class AverageAggregateOp(AggregateOp):
 
     def __init__(self, agg_func: AggFunc, *args, **kwargs):
         # enforce that output schema is correct
-        assert kwargs["output_schema"] == Average, "AverageAggregateOp requires output_schema to be Average"
+        assert kwargs["output_schema"].model_fields.keys() == Average.model_fields.keys(), "AverageAggregateOp requires output_schema to be Average"
 
         # enforce that input schema is a single numeric field
         input_field_types = list(kwargs["input_schema"].model_fields.values())
         assert len(input_field_types) == 1, "AverageAggregateOp requires input_schema to have exactly one field"
-        numeric_field_types = [bool, int, float, bool | None, int | None, float | None, int | float, int | float | None]
+        numeric_field_types = [
+            bool, int, float, int | float,
+            bool | None, int | None, float | None, int | float | None,
+            bool | Any, int | Any, float | Any, int | float | Any,
+            bool | None | Any, int | None | Any, float | None | Any, int | float | None | Any,
+        ]
         is_numeric = input_field_types[0].annotation in numeric_field_types
         assert is_numeric, f"AverageAggregateOp requires input_schema to have a numeric field type, i.e. one of: {numeric_field_types}\nGot: {input_field_types[0]}"
 
@@ -230,7 +236,7 @@ class CountAggregateOp(AggregateOp):
 
     def __init__(self, agg_func: AggFunc, *args, **kwargs):
         # enforce that output schema is correct
-        assert kwargs["output_schema"] == Count, "CountAggregateOp requires output_schema to be Count"
+        assert kwargs["output_schema"].model_fields.keys() == Count.model_fields.keys(), "CountAggregateOp requires output_schema to be Count"
 
         # call parent constructor
         super().__init__(*args, **kwargs)
@@ -287,7 +293,7 @@ class MinAggregateOp(AggregateOp):
 
     def __init__(self, agg_func: AggFunc, *args, **kwargs):
         # enforce that output schema is correct
-        assert kwargs["output_schema"] == Min, "MinAggregateOp requires output_schema to be Min"
+        assert kwargs["output_schema"].model_fields.keys() == Min.model_fields.keys(), "MinAggregateOp requires output_schema to be Min"
 
         # call parent constructor
         super().__init__(*args, **kwargs)
@@ -350,7 +356,7 @@ class MaxAggregateOp(AggregateOp):
 
     def __init__(self, agg_func: AggFunc, *args, **kwargs):
         # enforce that output schema is correct
-        assert kwargs["output_schema"] == Max, "MaxAggregateOp requires output_schema to be Max"
+        assert kwargs["output_schema"].model_fields.keys() == Max.model_fields.keys(), "MaxAggregateOp requires output_schema to be Max"
 
         # call parent constructor
         super().__init__(*args, **kwargs)
