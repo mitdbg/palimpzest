@@ -78,6 +78,8 @@ class JoinOp(PhysicalOperator, ABC):
             "condition": self.condition,
             "join_parallelism": self.join_parallelism,
             "desc": self.desc,
+            "how": self.how,
+            "on": self.on,
             **id_params,
         }
         return id_params
@@ -89,6 +91,8 @@ class JoinOp(PhysicalOperator, ABC):
             "join_parallelism": self.join_parallelism,
             "retain_inputs": self.retain_inputs,
             "desc": self.desc,
+            "how": self.how,
+            "on": self.on,
             **op_params,
         }
         return op_params

@@ -389,6 +389,12 @@ class OpFrontier:
             # compute final list of record op stats
             full_op_id_to_record_op_stats[full_op_id] = list(record_id_to_max_quality_record_op_stats.values())
 
+        # NOTE: it is possible for the full_op_id_to_record_op_stats to be empty if there is a duplicate operator
+        # (e.g. a scan of the same dataset) which has all of its results cached and no new_record_op_stats;
+        # in this case, we do not update the frontier
+        if full_op_id_to_record_op_stats == {}:
+            return
+
         # update the set of source indices processed by each physical operator
         for full_op_id, source_indices_processed in full_op_id_to_source_indices_processed.items():
             # update the set of source indices processed
@@ -747,14 +753,13 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
                     op_frontiers[next_unique_logical_op_id].update_inputs(unique_logical_op_id, source_indices_to_all_record_sets)
 
                 # update the (pareto) frontier for each set of operators
-                if len(new_record_op_stats) > 0:
-                    full_op_id_to_source_indices_processed = {}
-                    for source_indices, record_set_tuples in source_indices_to_record_set_tuples.items():
-                        for _, op, _ in record_set_tuples:
-                            if op.get_full_op_id() not in full_op_id_to_source_indices_processed:
-                                full_op_id_to_source_indices_processed[op.get_full_op_id()] = set()
-                            full_op_id_to_source_indices_processed[op.get_full_op_id()].add(source_indices)
-                    op_frontiers[unique_logical_op_id].update_frontier(unique_logical_op_id, plan_stats, full_op_id_to_source_indices_processed)
+                full_op_id_to_source_indices_processed = {}
+                for source_indices, record_set_tuples in source_indices_to_record_set_tuples.items():
+                    for _, op, _ in record_set_tuples:
+                        if op.get_full_op_id() not in full_op_id_to_source_indices_processed:
+                            full_op_id_to_source_indices_processed[op.get_full_op_id()] = set()
+                        full_op_id_to_source_indices_processed[op.get_full_op_id()].add(source_indices)
+                op_frontiers[unique_logical_op_id].update_frontier(unique_logical_op_id, plan_stats, full_op_id_to_source_indices_processed)
 
                 # if the operator is a non-llm filter which has filtered out records, remove those records from
                 # all downstream operators' full_op_id_to_sources_not_processed
