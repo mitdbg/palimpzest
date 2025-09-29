@@ -86,17 +86,17 @@ COT_BOOL_IMAGE_EXAMPLE_INPUT_FIELDS = """- image: an image of a scene
 COT_BOOL_AUDIO_EXAMPLE_INPUT_FIELDS = """- recording: an audio recording of a newscast
 - speaker: the name of the speaker in the recording"""
 
-COT_BOOL_EXAMPLE_CONTEXT = """{{
+COT_BOOL_EXAMPLE_CONTEXT = """{
   "text": "The quick brown fox jumps over the lazy dog."
-}}"""
-COT_BOOL_IMAGE_EXAMPLE_CONTEXT = """{{
+}"""
+COT_BOOL_IMAGE_EXAMPLE_CONTEXT = """{
   "image": <bytes>,
   "photographer": "CameraEnthusiast1"
-}}"""
-COT_BOOL_AUDIO_EXAMPLE_CONTEXT = """{{
+}"""
+COT_BOOL_AUDIO_EXAMPLE_CONTEXT = """{
   "recording": <bytes>,
   "speaker": "Walter Cronkite"
-}}"""
+}"""
 
 COT_BOOL_EXAMPLE_FILTER_CONDITION = "the text mentions an animal"
 COT_BOOL_IMAGE_EXAMPLE_FILTER_CONDITION = "there's an animal in this image"

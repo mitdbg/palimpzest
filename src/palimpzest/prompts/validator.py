@@ -22,17 +22,17 @@ OUTPUT FIELDS:
 - birth_year: the year the scientist was born
 
 CONTEXT:
-{{
+{
   "text": "Augusta Ada King, Countess of Lovelace, also known as Ada Lovelace, was an English mathematician and writer chiefly known for her work on Charles Babbage's proposed mechanical general-purpose computer, the Analytical Engine. She was the first to recognise that the machine had applications beyond pure calculation.",
   "birthday": "December 10, 1815"
-}}
+}
 
 OUTPUT:
 --------
-{{
+{
   "name": "Charles Babbage",
   "birth_year": 1815
-}}
+}
 
 EVALUATION: {"name": 0.0, "birth_year": 1.0}
 
@@ -66,18 +66,18 @@ OUTPUT FIELDS:
 - person_in_image: true if a person is in the image and false otherwise
 
 CONTEXT:
-{{
+{
   "image": <bytes>,
   "photographer": "CameraEnthusiast1"
-}}
+}
 <image content provided here; assume in this example the image shows a dog and a cat playing>
 
 OUTPUT:
 --------
-{{
+{
   "dog_in_image": true,
   "person_in_image": true
-}}
+}
 
 EVALUATION: {"dog_in_image": 1.0, "person_in_image": 0.0}
 
@@ -113,22 +113,22 @@ OUTPUT FIELDS:
 - birth_year: the year the scientist was born
 
 CONTEXT:
-{{
+{
   "text": "Augusta Ada King, Countess of Lovelace, also known as Ada Lovelace, was an English mathematician and writer chiefly known for her work on Charles Babbage's proposed mechanical general-purpose computer, the Analytical Engine. She was the first to recognise that the machine had applications beyond pure calculation.",
   "birthdays": "...Lovelace was born on December 10, 1815, almost exactly 24 years after Babbage's birth on 26 December 1791..."
-}}
+}
 
 OUTPUTS:
 --------
 [
-  {{
+  {
     "name": "Ada Lovelace",
     "birth_year": 1815
-  }},
-  {{
+  },
+  {
     "name": "Charles Babbage",
     "birth_year": 1790
-  }}
+  }
 ]
 
 EVALUATION: [{"name": 1.0, "birth_year": 1.0}, {"name": 1.0, "birth_year": 0.0}]
@@ -163,23 +163,23 @@ OUTPUT FIELDS:
 - animal_is_canine: true if the animal is a canine and false otherwise
 
 CONTEXT:
-{{
+{
   "image": <bytes>,
   "photographer": "CameraEnthusiast1"
-}}
+}
 <image content provided here; assume in this example the image shows a dog and a cat playing>
 
 OUTPUT:
 --------
 [
-  {{
+  {
     "animal": "dog",
     "animal_is_canine": true
-  }},
-  {{
+  },
+  {
     "animal": "cat",
     "animal_is_canine": true
-  }}
+  }
 ]
 
 EVALUATION: [{"animal": 1.0, "animal_is_canine": 1.0}, {"animal": 1.0, "animal_is_canine": 0.0}]
@@ -214,20 +214,20 @@ OUTPUT FIELDS:
 - related_scientists: list of scientists who perform similar work as the scientist described in the text
 
 CONTEXT:
-{{
+{
   "text": "Augusta Ada King, Countess of Lovelace, also known as Ada Lovelace, was an English mathematician and writer chiefly known for her work on Charles Babbage's proposed mechanical general-purpose computer, the Analytical Engine. She was the first to recognise that the machine had applications beyond pure calculation.",
-}}
+}
 
 OUTPUT:
 --------
-{{
+{
   "related_scientists": [
     "Charles Babbage",
     "Alan Turing",
     "Charles Darwin",
     "John von Neumann",
   ]
-}}
+}
 
 EVALUATION: {"related_scientists": 0.75}
 

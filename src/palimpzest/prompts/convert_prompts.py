@@ -105,18 +105,18 @@ COT_QA_IMAGE_EXAMPLE_OUTPUT_FIELDS = """- dog_in_image: true if a dog is in the 
 COT_QA_AUDIO_EXAMPLE_OUTPUT_FIELDS = """- main_topic: the main topic discussed in the newscast
 - language: the language spoken in the newscast"""
 
-COT_QA_EXAMPLE_CONTEXT = """{{
+COT_QA_EXAMPLE_CONTEXT = """{
   "text": "Augusta Ada King, Countess of Lovelace, also known as Ada Lovelace, was an English mathematician and writer chiefly known for her work on Charles Babbage's proposed mechanical general-purpose computer, the Analytical Engine. She was the first to recognise that the machine had applications beyond pure calculation.",
   "birthday": "December 10, 1815"
-}}"""
-COT_QA_IMAGE_EXAMPLE_CONTEXT = """{{
+}"""
+COT_QA_IMAGE_EXAMPLE_CONTEXT = """{
   "image": <bytes>,
   "photographer": "CameraEnthusiast1"
-}}"""
-COT_QA_AUDIO_EXAMPLE_CONTEXT = """{{
+}"""
+COT_QA_AUDIO_EXAMPLE_CONTEXT = """{
   "recording": <bytes>,
   "speaker": "Walter Cronkite"
-}}"""
+}"""
 
 COT_QA_IMAGE_DISCLAIMER = """
 \n<image content provided here; assume in this example the image shows a dog and a cat playing>
@@ -129,15 +129,15 @@ COT_QA_EXAMPLE_REASONING = """the text passage mentions the scientist's name as 
 COT_QA_IMAGE_EXAMPLE_REASONING = """The image shows a dog playing with a cat, so there is a dog in the image. There is no person in the image."""
 COT_QA_AUDIO_EXAMPLE_REASONING = """The recording discusses the Cuban Missile Crisis, which is the main topic. The language spoken in the recording is English."""
 
-COT_QA_EXAMPLE_ANSWER = """{{
+COT_QA_EXAMPLE_ANSWER = """{
   "name": "Augusta Ada King",
   "birth_year": 1815
-}}"""
-COT_QA_IMAGE_EXAMPLE_ANSWER = """{{
+}"""
+COT_QA_IMAGE_EXAMPLE_ANSWER = """{
   "dog_in_image": true,
   "person_in_image": false
-}}"""
-COT_QA_AUDIO_EXAMPLE_ANSWER = """{{
+}"""
+COT_QA_AUDIO_EXAMPLE_ANSWER = """{
   "main_topic": "Cuban Missile Crisis",
   "language": "English"
-}}"""
+}"""

@@ -58,14 +58,14 @@ COT_MOA_PROPOSER_EXAMPLE_OUTPUT_FIELDS = """- name: the name of the scientist
 COT_MOA_PROPOSER_IMAGE_EXAMPLE_OUTPUT_FIELDS = """- dog_in_image: true if a dog is in the image and false otherwise
 - person_in_image: true if a person is in the image and false otherwise"""
 
-COT_MOA_PROPOSER_EXAMPLE_CONTEXT = """{{
+COT_MOA_PROPOSER_EXAMPLE_CONTEXT = """{
   "text": "Augusta Ada King, Countess of Lovelace, also known as Ada Lovelace, was an English mathematician and writer chiefly known for her work on Charles Babbage's proposed mechanical general-purpose computer, the Analytical Engine. She was the first to recognise that the machine had applications beyond pure calculation.",
   "birthday": "December 10, 1815"
-}}"""
-COT_MOA_PROPOSER_IMAGE_EXAMPLE_CONTEXT = """{{
+}"""
+COT_MOA_PROPOSER_IMAGE_EXAMPLE_CONTEXT = """{
   "image": <bytes>,
   "photographer": "CameraEnthusiast1"
-}}"""
+}"""
 
 COT_MOA_PROPOSER_IMAGE_DISCLAIMER = """
 \n<image content provided here; assume in this example the image shows a dog and a cat playing>

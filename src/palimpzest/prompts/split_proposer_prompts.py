@@ -49,7 +49,7 @@ SPLIT_PROPOSER_JOB_INSTRUCTION = "produce an answer to a question"
 SPLIT_PROPOSER_EXAMPLE_INPUT_FIELDS = """- text: a text passage describing scientists"""
 SPLIT_PROPOSER_EXAMPLE_OUTPUT_FIELDS = """- name: the list of names for each scientist mentioned in the text
 - field_of_study: a list with the field of study for each scientist"""
-SPLIT_PROPOSER_EXAMPLE_CONTEXT = """{{
+SPLIT_PROPOSER_EXAMPLE_CONTEXT = """{
   "text": "Augusta Ada King, Countess of Lovelace, also known as Ada Lovelace, born December 10, 1815 was an English mathematician and writer chiefly known for her work on Charles Babbage's proposed mechanical general-purpose computer, the Analytical Engine. She was the first to recognise that the machine had applications beyond pure calculation."
-}}"""
+}"""
 SPLIT_PROPOSER_EXAMPLE_ANSWER = """the text passage mentions the scientists "Augusta Ada King, Countess of Lovelace, also known as Ada Lovelace" and "Charles Babbage", both of whom were mathematicians. Therefore, the name output should be ["Augusta Ada King", "Charles Babbage"] and the field_of_study output should be ["Mathematician", "Mathematician"]."""

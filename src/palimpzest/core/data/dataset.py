@@ -518,7 +518,7 @@ class Dataset:
         """Apply an average aggregation to this set"""
         operator = Aggregate(input_schema=self.schema, agg_func=AggFunc.AVERAGE)
         return Dataset(sources=[self], operator=operator, schema=operator.output_schema)
-    
+
     def min(self) -> Dataset:
         """Apply an min operator to this set"""
         operator = Aggregate(input_schema=self.schema, agg_func=AggFunc.MIN)

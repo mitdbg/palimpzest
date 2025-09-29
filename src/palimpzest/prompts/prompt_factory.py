@@ -305,7 +305,7 @@ class PromptFactory:
             str: The output fields description.
         """
         output_fields_desc = ""
-        output_schema: BaseModel = kwargs.get("output_schema")
+        output_schema: type[BaseModel] = kwargs.get("output_schema")
         if self.prompt_strategy.is_convert_prompt():
             assert output_schema is not None, "Output schema must be provided for convert prompts."
 
@@ -434,14 +434,23 @@ class PromptFactory:
         """
         prompt_strategy_to_job_instruction = {
             PromptStrategy.COT_BOOL: COT_BOOL_JOB_INSTRUCTION,
+            PromptStrategy.COT_BOOL_NO_REASONING: COT_BOOL_JOB_INSTRUCTION,
             PromptStrategy.COT_BOOL_AUDIO: COT_BOOL_AUDIO_JOB_INSTRUCTION,
+            PromptStrategy.COT_BOOL_AUDIO_NO_REASONING: COT_BOOL_AUDIO_JOB_INSTRUCTION,
             PromptStrategy.COT_BOOL_IMAGE: COT_BOOL_IMAGE_JOB_INSTRUCTION,
+            PromptStrategy.COT_BOOL_IMAGE_NO_REASONING: COT_BOOL_IMAGE_JOB_INSTRUCTION,
             PromptStrategy.COT_JOIN: COT_JOIN_JOB_INSTRUCTION,
+            PromptStrategy.COT_JOIN_NO_REASONING: COT_JOIN_JOB_INSTRUCTION,
             PromptStrategy.COT_JOIN_AUDIO: COT_JOIN_AUDIO_JOB_INSTRUCTION,
+            PromptStrategy.COT_JOIN_AUDIO_NO_REASONING: COT_JOIN_AUDIO_JOB_INSTRUCTION,
             PromptStrategy.COT_JOIN_IMAGE: COT_JOIN_IMAGE_JOB_INSTRUCTION,
+            PromptStrategy.COT_JOIN_IMAGE_NO_REASONING: COT_JOIN_IMAGE_JOB_INSTRUCTION,
             PromptStrategy.COT_QA: COT_QA_JOB_INSTRUCTION,
+            PromptStrategy.COT_QA_NO_REASONING: COT_QA_JOB_INSTRUCTION,
             PromptStrategy.COT_QA_AUDIO: COT_QA_AUDIO_JOB_INSTRUCTION,
+            PromptStrategy.COT_QA_AUDIO_NO_REASONING: COT_QA_AUDIO_JOB_INSTRUCTION,
             PromptStrategy.COT_QA_IMAGE: COT_QA_IMAGE_JOB_INSTRUCTION,
+            PromptStrategy.COT_QA_IMAGE_NO_REASONING: COT_QA_IMAGE_JOB_INSTRUCTION,
             PromptStrategy.COT_MOA_PROPOSER: COT_MOA_PROPOSER_JOB_INSTRUCTION,
             PromptStrategy.COT_MOA_PROPOSER_IMAGE: COT_MOA_PROPOSER_IMAGE_JOB_INSTRUCTION,
             PromptStrategy.SPLIT_PROPOSER: SPLIT_PROPOSER_JOB_INSTRUCTION,
@@ -517,14 +526,23 @@ class PromptFactory:
         """
         prompt_strategy_to_example_input_fields = {
             PromptStrategy.COT_BOOL: COT_BOOL_EXAMPLE_INPUT_FIELDS,
+            PromptStrategy.COT_BOOL_NO_REASONING: COT_BOOL_EXAMPLE_INPUT_FIELDS,
             PromptStrategy.COT_BOOL_AUDIO: COT_BOOL_AUDIO_EXAMPLE_INPUT_FIELDS,
+            PromptStrategy.COT_BOOL_AUDIO_NO_REASONING: COT_BOOL_AUDIO_EXAMPLE_INPUT_FIELDS,
             PromptStrategy.COT_BOOL_IMAGE: COT_BOOL_IMAGE_EXAMPLE_INPUT_FIELDS,
+            PromptStrategy.COT_BOOL_IMAGE_NO_REASONING: COT_BOOL_IMAGE_EXAMPLE_INPUT_FIELDS,
             PromptStrategy.COT_JOIN: COT_JOIN_EXAMPLE_INPUT_FIELDS,
+            PromptStrategy.COT_JOIN_NO_REASONING: COT_JOIN_EXAMPLE_INPUT_FIELDS,
             PromptStrategy.COT_JOIN_AUDIO: COT_JOIN_AUDIO_EXAMPLE_INPUT_FIELDS,
+            PromptStrategy.COT_JOIN_AUDIO_NO_REASONING: COT_JOIN_AUDIO_EXAMPLE_INPUT_FIELDS,
             PromptStrategy.COT_JOIN_IMAGE: COT_JOIN_IMAGE_EXAMPLE_INPUT_FIELDS,
+            PromptStrategy.COT_JOIN_IMAGE_NO_REASONING: COT_JOIN_IMAGE_EXAMPLE_INPUT_FIELDS,
             PromptStrategy.COT_QA: COT_QA_EXAMPLE_INPUT_FIELDS,
+            PromptStrategy.COT_QA_NO_REASONING: COT_QA_EXAMPLE_INPUT_FIELDS,
             PromptStrategy.COT_QA_AUDIO: COT_QA_AUDIO_EXAMPLE_INPUT_FIELDS,
+            PromptStrategy.COT_QA_AUDIO_NO_REASONING: COT_QA_AUDIO_EXAMPLE_INPUT_FIELDS,
             PromptStrategy.COT_QA_IMAGE: COT_QA_IMAGE_EXAMPLE_INPUT_FIELDS,
+            PromptStrategy.COT_QA_IMAGE_NO_REASONING: COT_QA_IMAGE_EXAMPLE_INPUT_FIELDS,
             PromptStrategy.COT_MOA_PROPOSER: COT_MOA_PROPOSER_EXAMPLE_INPUT_FIELDS,
             PromptStrategy.COT_MOA_PROPOSER_IMAGE: COT_MOA_PROPOSER_IMAGE_EXAMPLE_INPUT_FIELDS,
             PromptStrategy.SPLIT_PROPOSER: SPLIT_PROPOSER_EXAMPLE_INPUT_FIELDS,
@@ -541,8 +559,11 @@ class PromptFactory:
         """
         prompt_strategy_to_right_example_input_fields = {
             PromptStrategy.COT_JOIN: COT_JOIN_RIGHT_EXAMPLE_INPUT_FIELDS,
+            PromptStrategy.COT_JOIN_NO_REASONING: COT_JOIN_RIGHT_EXAMPLE_INPUT_FIELDS,
             PromptStrategy.COT_JOIN_AUDIO: COT_JOIN_AUDIO_RIGHT_EXAMPLE_INPUT_FIELDS,
+            PromptStrategy.COT_JOIN_AUDIO_NO_REASONING: COT_JOIN_AUDIO_RIGHT_EXAMPLE_INPUT_FIELDS,
             PromptStrategy.COT_JOIN_IMAGE: COT_JOIN_IMAGE_RIGHT_EXAMPLE_INPUT_FIELDS,
+            PromptStrategy.COT_JOIN_IMAGE_NO_REASONING: COT_JOIN_IMAGE_RIGHT_EXAMPLE_INPUT_FIELDS,
         }
 
         return prompt_strategy_to_right_example_input_fields.get(self.prompt_strategy)
@@ -556,8 +577,11 @@ class PromptFactory:
         """
         prompt_strategy_to_example_output_fields = {
             PromptStrategy.COT_QA: COT_QA_EXAMPLE_OUTPUT_FIELDS,
+            PromptStrategy.COT_QA_NO_REASONING: COT_QA_EXAMPLE_OUTPUT_FIELDS,
             PromptStrategy.COT_QA_AUDIO: COT_QA_AUDIO_EXAMPLE_OUTPUT_FIELDS,
+            PromptStrategy.COT_QA_AUDIO_NO_REASONING: COT_QA_AUDIO_EXAMPLE_OUTPUT_FIELDS,
             PromptStrategy.COT_QA_IMAGE: COT_QA_IMAGE_EXAMPLE_OUTPUT_FIELDS,
+            PromptStrategy.COT_QA_IMAGE_NO_REASONING: COT_QA_IMAGE_EXAMPLE_OUTPUT_FIELDS,
             PromptStrategy.COT_MOA_PROPOSER: COT_MOA_PROPOSER_EXAMPLE_OUTPUT_FIELDS,
             PromptStrategy.COT_MOA_PROPOSER_IMAGE: COT_MOA_PROPOSER_IMAGE_EXAMPLE_OUTPUT_FIELDS,
             PromptStrategy.SPLIT_PROPOSER: SPLIT_PROPOSER_EXAMPLE_OUTPUT_FIELDS,
@@ -574,14 +598,23 @@ class PromptFactory:
         """
         prompt_strategy_to_example_context = {
             PromptStrategy.COT_BOOL: COT_BOOL_EXAMPLE_CONTEXT,
+            PromptStrategy.COT_BOOL_NO_REASONING: COT_BOOL_EXAMPLE_CONTEXT,
             PromptStrategy.COT_BOOL_AUDIO: COT_BOOL_AUDIO_EXAMPLE_CONTEXT,
+            PromptStrategy.COT_BOOL_AUDIO_NO_REASONING: COT_BOOL_AUDIO_EXAMPLE_CONTEXT,
             PromptStrategy.COT_BOOL_IMAGE: COT_BOOL_IMAGE_EXAMPLE_CONTEXT,
+            PromptStrategy.COT_BOOL_IMAGE_NO_REASONING: COT_BOOL_IMAGE_EXAMPLE_CONTEXT,
             PromptStrategy.COT_JOIN: COT_JOIN_EXAMPLE_CONTEXT,
+            PromptStrategy.COT_JOIN_NO_REASONING: COT_JOIN_EXAMPLE_CONTEXT,
             PromptStrategy.COT_JOIN_AUDIO: COT_JOIN_AUDIO_EXAMPLE_CONTEXT,
+            PromptStrategy.COT_JOIN_AUDIO_NO_REASONING: COT_JOIN_AUDIO_EXAMPLE_CONTEXT,
             PromptStrategy.COT_JOIN_IMAGE: COT_JOIN_IMAGE_EXAMPLE_CONTEXT,
+            PromptStrategy.COT_JOIN_IMAGE_NO_REASONING: COT_JOIN_IMAGE_EXAMPLE_CONTEXT,
             PromptStrategy.COT_QA: COT_QA_EXAMPLE_CONTEXT,
+            PromptStrategy.COT_QA_NO_REASONING: COT_QA_EXAMPLE_CONTEXT,
             PromptStrategy.COT_QA_AUDIO: COT_QA_AUDIO_EXAMPLE_CONTEXT,
+            PromptStrategy.COT_QA_AUDIO_NO_REASONING: COT_QA_AUDIO_EXAMPLE_CONTEXT,
             PromptStrategy.COT_QA_IMAGE: COT_QA_IMAGE_EXAMPLE_CONTEXT,
+            PromptStrategy.COT_QA_IMAGE_NO_REASONING: COT_QA_IMAGE_EXAMPLE_CONTEXT,
             PromptStrategy.COT_MOA_PROPOSER: COT_MOA_PROPOSER_EXAMPLE_CONTEXT,
             PromptStrategy.COT_MOA_PROPOSER_IMAGE: COT_MOA_PROPOSER_IMAGE_EXAMPLE_CONTEXT,
             PromptStrategy.SPLIT_PROPOSER: SPLIT_PROPOSER_EXAMPLE_CONTEXT,
@@ -598,8 +631,11 @@ class PromptFactory:
         """
         prompt_strategy_to_right_example_context = {
             PromptStrategy.COT_JOIN: COT_JOIN_RIGHT_EXAMPLE_CONTEXT,
+            PromptStrategy.COT_JOIN_NO_REASONING: COT_JOIN_RIGHT_EXAMPLE_CONTEXT,
             PromptStrategy.COT_JOIN_AUDIO: COT_JOIN_AUDIO_RIGHT_EXAMPLE_CONTEXT,
+            PromptStrategy.COT_JOIN_AUDIO_NO_REASONING: COT_JOIN_AUDIO_RIGHT_EXAMPLE_CONTEXT,
             PromptStrategy.COT_JOIN_IMAGE: COT_JOIN_IMAGE_RIGHT_EXAMPLE_CONTEXT,
+            PromptStrategy.COT_JOIN_IMAGE_NO_REASONING: COT_JOIN_IMAGE_RIGHT_EXAMPLE_CONTEXT,
         }
 
         return prompt_strategy_to_right_example_context.get(self.prompt_strategy)
@@ -614,8 +650,11 @@ class PromptFactory:
         """
         prompt_strategy_to_image_disclaimer = {
             PromptStrategy.COT_BOOL_IMAGE: COT_BOOL_IMAGE_DISCLAIMER,
+            PromptStrategy.COT_BOOL_IMAGE_NO_REASONING: COT_BOOL_IMAGE_DISCLAIMER,
             PromptStrategy.COT_JOIN_IMAGE: COT_JOIN_IMAGE_DISCLAIMER,
+            PromptStrategy.COT_JOIN_IMAGE_NO_REASONING: COT_JOIN_IMAGE_DISCLAIMER,
             PromptStrategy.COT_QA_IMAGE: COT_QA_IMAGE_DISCLAIMER,
+            PromptStrategy.COT_QA_IMAGE_NO_REASONING: COT_QA_IMAGE_DISCLAIMER,
             PromptStrategy.COT_MOA_PROPOSER_IMAGE: COT_MOA_PROPOSER_IMAGE_DISCLAIMER,
         }
 
@@ -631,8 +670,11 @@ class PromptFactory:
         """
         prompt_strategy_to_audio_disclaimer = {
             PromptStrategy.COT_BOOL_AUDIO: COT_BOOL_AUDIO_DISCLAIMER,
+            PromptStrategy.COT_BOOL_AUDIO_NO_REASONING: COT_BOOL_AUDIO_DISCLAIMER,
             PromptStrategy.COT_JOIN_AUDIO: COT_JOIN_AUDIO_DISCLAIMER,
+            PromptStrategy.COT_JOIN_AUDIO_NO_REASONING: COT_JOIN_AUDIO_DISCLAIMER,
             PromptStrategy.COT_QA_AUDIO: COT_QA_AUDIO_DISCLAIMER,
+            PromptStrategy.COT_QA_AUDIO_NO_REASONING: COT_QA_AUDIO_DISCLAIMER,
         }
 
         return prompt_strategy_to_audio_disclaimer.get(self.prompt_strategy, "")
@@ -647,6 +689,7 @@ class PromptFactory:
         """
         prompt_strategy_to_image_disclaimer = {
             PromptStrategy.COT_JOIN_IMAGE: COT_JOIN_RIGHT_IMAGE_DISCLAIMER,
+            PromptStrategy.COT_JOIN_IMAGE_NO_REASONING: COT_JOIN_RIGHT_IMAGE_DISCLAIMER,
         }
 
         return prompt_strategy_to_image_disclaimer.get(self.prompt_strategy, "")
@@ -661,6 +704,7 @@ class PromptFactory:
         """
         prompt_strategy_to_audio_disclaimer = {
             PromptStrategy.COT_JOIN_AUDIO: COT_JOIN_RIGHT_AUDIO_DISCLAIMER,
+            PromptStrategy.COT_JOIN_AUDIO_NO_REASONING: COT_JOIN_RIGHT_AUDIO_DISCLAIMER,
         }
 
         return prompt_strategy_to_audio_disclaimer.get(self.prompt_strategy, "")
@@ -674,8 +718,11 @@ class PromptFactory:
         """
         prompt_strategy_to_example_filter_condition = {
             PromptStrategy.COT_BOOL: COT_BOOL_EXAMPLE_FILTER_CONDITION,
+            PromptStrategy.COT_BOOL_NO_REASONING: COT_BOOL_EXAMPLE_FILTER_CONDITION,
             PromptStrategy.COT_BOOL_AUDIO: COT_BOOL_AUDIO_EXAMPLE_FILTER_CONDITION,
+            PromptStrategy.COT_BOOL_AUDIO_NO_REASONING: COT_BOOL_AUDIO_EXAMPLE_FILTER_CONDITION,
             PromptStrategy.COT_BOOL_IMAGE: COT_BOOL_IMAGE_EXAMPLE_FILTER_CONDITION,
+            PromptStrategy.COT_BOOL_IMAGE_NO_REASONING: COT_BOOL_IMAGE_EXAMPLE_FILTER_CONDITION,
         }
 
         return prompt_strategy_to_example_filter_condition.get(self.prompt_strategy)
@@ -689,8 +736,11 @@ class PromptFactory:
         """
         prompt_strategy_to_example_join_condition = {
             PromptStrategy.COT_JOIN: COT_JOIN_EXAMPLE_JOIN_CONDITION,
+            PromptStrategy.COT_JOIN_NO_REASONING: COT_JOIN_EXAMPLE_JOIN_CONDITION,
             PromptStrategy.COT_JOIN_AUDIO: COT_JOIN_AUDIO_EXAMPLE_JOIN_CONDITION,
+            PromptStrategy.COT_JOIN_AUDIO_NO_REASONING: COT_JOIN_AUDIO_EXAMPLE_JOIN_CONDITION,
             PromptStrategy.COT_JOIN_IMAGE: COT_JOIN_IMAGE_EXAMPLE_JOIN_CONDITION,
+            PromptStrategy.COT_JOIN_IMAGE_NO_REASONING: COT_JOIN_IMAGE_EXAMPLE_JOIN_CONDITION,
         }
 
         return prompt_strategy_to_example_join_condition.get(self.prompt_strategy)
@@ -725,8 +775,11 @@ class PromptFactory:
         """
         prompt_strategy_to_example_answer = {
             PromptStrategy.COT_QA: COT_QA_EXAMPLE_ANSWER,
+            PromptStrategy.COT_QA_NO_REASONING: COT_QA_EXAMPLE_ANSWER,
             PromptStrategy.COT_QA_AUDIO: COT_QA_AUDIO_EXAMPLE_ANSWER,
+            PromptStrategy.COT_QA_AUDIO_NO_REASONING: COT_QA_AUDIO_EXAMPLE_ANSWER,
             PromptStrategy.COT_QA_IMAGE: COT_QA_IMAGE_EXAMPLE_ANSWER,
+            PromptStrategy.COT_QA_IMAGE_NO_REASONING: COT_QA_IMAGE_EXAMPLE_ANSWER,
             PromptStrategy.COT_MOA_PROPOSER: COT_MOA_PROPOSER_EXAMPLE_ANSWER,
             PromptStrategy.COT_MOA_PROPOSER_IMAGE: COT_MOA_PROPOSER_IMAGE_EXAMPLE_ANSWER,
             PromptStrategy.SPLIT_PROPOSER: SPLIT_PROPOSER_EXAMPLE_ANSWER,

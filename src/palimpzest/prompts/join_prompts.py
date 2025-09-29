@@ -117,29 +117,29 @@ COT_JOIN_IMAGE_RIGHT_EXAMPLE_INPUT_FIELDS = """- image: an image of a scene
 COT_JOIN_AUDIO_RIGHT_EXAMPLE_INPUT_FIELDS = """- recording: an audio recording of a newscast
 - speaker: the name of the speaker in the recording"""
 
-COT_JOIN_EXAMPLE_CONTEXT = """{{
+COT_JOIN_EXAMPLE_CONTEXT = """{
   "text": "The quick brown fox jumps over the lazy dog."
-}}"""
-COT_JOIN_IMAGE_EXAMPLE_CONTEXT = """{{
+}"""
+COT_JOIN_IMAGE_EXAMPLE_CONTEXT = """{
   "image": <bytes>,
   "photographer": "CameraEnthusiast1"
-}}"""
-COT_JOIN_AUDIO_EXAMPLE_CONTEXT = """{{
+}"""
+COT_JOIN_AUDIO_EXAMPLE_CONTEXT = """{
   "recording": <bytes>,
   "speaker": "Walter Cronkite"
-}}"""
+}"""
 
-COT_JOIN_RIGHT_EXAMPLE_CONTEXT = """{{
+COT_JOIN_RIGHT_EXAMPLE_CONTEXT = """{
   "contents": "Foxes are wild animals which primarily hunt small mammals like rabbits and rodents."
-}}"""
-COT_JOIN_IMAGE_RIGHT_EXAMPLE_CONTEXT = """{{
+}"""
+COT_JOIN_IMAGE_RIGHT_EXAMPLE_CONTEXT = """{
   "image": <bytes>,
   "filename": "img123.png"
-}}"""
-COT_JOIN_AUDIO_RIGHT_EXAMPLE_CONTEXT = """{{
+}"""
+COT_JOIN_AUDIO_RIGHT_EXAMPLE_CONTEXT = """{
   "recording": <bytes>,
   "speaker": "Barbara Walters"
-}}"""
+}"""
 
 COT_JOIN_EXAMPLE_JOIN_CONDITION = "each record mentions the same animal"
 COT_JOIN_IMAGE_EXAMPLE_JOIN_CONDITION = "the images are of the same subject"

@@ -391,15 +391,17 @@ class Generator(Generic[ContextType, InputType]):
 
         # pretty print prompt + full completion output for debugging
         completion_text = completion.choices[0].message.content
-        prompt = ""
+        prompt, system_prompt = "", ""
         for message in messages:
+            if message["role"] == "system":
+                system_prompt += message["content"] + "\n"
             if message["role"] == "user":
                 if message["type"] == "text":
                     prompt += message["content"] + "\n"
                 elif message["type"] == "image":
-                    prompt += "<image>\n"
+                    prompt += "<image>\n" * len(message["content"])
                 elif message["type"] == "input_audio":
-                    prompt += "<audio>\n"
+                    prompt += "<audio>\n" * len(message["content"])
         logger.debug(f"PROMPT:\n{prompt}")
         logger.debug(Fore.GREEN + f"{completion_text}\n" + Style.RESET_ALL)
 
