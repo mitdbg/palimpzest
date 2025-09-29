@@ -27,10 +27,10 @@ Let's think step-by-step in order to answer the question.
 REASONING: Looking at both chunk outputs, they specify that the scientists' formal names are "Augusta Ada King" and "Charles Babbage". Chunk Output 2 indicates that Charles Babbage was a Mathematician and Chunk Output 1 says that Augusta Ada King was an English mathematician. Therefore, the name output should be ["Augusta Ada King", "Charles Babbage"] and the field_of_study output should be ["Mathematician", "Mathematician"].
 
 ANSWER:
-{
+{{
   "name": ["Augusta Ada King", "Charles Babbage"],
   "field_of_study": ["Mathematician", "Mathematician"]
-}
+}}
 ---
 """
 

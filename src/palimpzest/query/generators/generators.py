@@ -296,9 +296,9 @@ class Generator(Generic[ContextType, InputType]):
 
         return field_answers
 
-    def __call__(self, candidate: DataRecord, fields: dict[str, FieldInfo] | None, right_candidate: DataRecord | None = None, json_output: bool=True, **kwargs) -> GenerationOutput:
-        """Take the input record (`candidate`), generate the output `fields`, and return the generated output."""
-        logger.debug(f"Generating for candidate {candidate} with fields {fields}")
+    def __call__(self, candidate: DataRecord | list[DataRecord], fields: dict[str, FieldInfo] | None, right_candidate: DataRecord | None = None, json_output: bool=True, **kwargs) -> GenerationOutput:
+        """Take the input record(s) (`candidate`), generate the output `fields`, and return the generated output."""
+        logger.debug(f"Generating for candidate(s) {candidate} with fields {fields}")
 
         # fields can only be None if the user provides an answer parser
         fields_check = fields is not None or "parse_answer" in kwargs
@@ -338,7 +338,7 @@ class Generator(Generic[ContextType, InputType]):
                     reasoning_effort = "minimal" if self.reasoning_effort is None else self.reasoning_effort
                     completion_kwargs = {"reasoning_effort": reasoning_effort, **completion_kwargs}
             if self.model.is_vllm_model():
-                completion_kwargs = {"api_base": self.api_base, **completion_kwargs}
+                completion_kwargs = {"api_base": self.api_base, "api_key": os.environ.get("VLLM_API_KEY", "fake-api-key") **completion_kwargs}
             completion = litellm.completion(model=self.model_name, messages=messages, **completion_kwargs)
             end_time = time.time()
             logger.debug(f"Generated completion in {end_time - start_time:.2f} seconds")

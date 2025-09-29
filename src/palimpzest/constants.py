@@ -136,13 +136,17 @@ class PromptStrategy(str, Enum):
     performing some task with a specified Model.
     """
 
+    # aggregation prompt strategies
+    AGG = "aggregation"
+    AGG_NO_REASONING = "aggregation-no-reasoning"
+
     # filter prompt strategies
     FILTER = "filter"
     FILTER_NO_REASONING = "filter-no-reasoning"
     FILTER_CRITIC = "filter-critic"
     FILTER_REFINE = "filter-refine"
     FILTER_MOA_PROPOSER = "filter-mixture-of-agents-proposer"
-    FILTER_MOA_AGG = "filter-mixture-of-agents-aggregation"
+    FILTER_MOA_AGG = "filter-mixture-of-agents-aggregator"
     FILTER_SPLIT_PROPOSER = "filter-split-proposer"
     FILTER_SPLIT_MERGER = "filter-split-merger"
 
@@ -156,9 +160,12 @@ class PromptStrategy(str, Enum):
     MAP_CRITIC = "map-critic"
     MAP_REFINE = "map-refine"
     MAP_MOA_PROPOSER = "map-mixture-of-agents-proposer"
-    MAP_MOA_AGG = "map-mixture-of-agents-aggregation"
+    MAP_MOA_AGG = "map-mixture-of-agents-aggregator"
     MAP_SPLIT_PROPOSER = "map-split-proposer"
     MAP_SPLIT_MERGER = "map-split-merger"
+
+    def is_agg_prompt(self):
+        return "aggregation" in self.value
 
     def is_filter_prompt(self):
         return "filter" in self.value
@@ -179,7 +186,7 @@ class PromptStrategy(str, Enum):
         return "mixture-of-agents-proposer" in self.value
 
     def is_moa_aggregator_prompt(self):
-        return "mixture-of-agents-aggregation" in self.value
+        return "mixture-of-agents-aggregator" in self.value
 
     def is_split_proposer_prompt(self):
         return "split-proposer" in self.value
