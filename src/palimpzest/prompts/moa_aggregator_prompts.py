@@ -28,10 +28,10 @@ Let's think step-by-step in order to answer the question.
 REASONING: Looking at both model responses, they agree that the scientist's formal name is "Augusta Ada King". Model Response 2 correctly extracts the birth year from the birthday field as 1815. The responses are consistent and provide sufficient evidence for these values.
 
 ANSWER:
-{{
+{
   "name": "Augusta Ada King",
   "birth_year": 1815
-}}
+}
 ---
 """
 
