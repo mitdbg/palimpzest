@@ -13,6 +13,7 @@ from palimpzest.query.operators.aggregate import (
     CountAggregateOp,
     MaxAggregateOp,
     MinAggregateOp,
+    SemanticAggregate,
 )
 from palimpzest.query.operators.compute import SmolAgentsCompute
 from palimpzest.query.operators.convert import LLMConvertBonded, NonLLMConvert
@@ -804,6 +805,47 @@ class LLMJoinRule(ImplementationRule):
         return cls._perform_substitution(logical_expression, NestedLoopsJoin, runtime_kwargs, variable_op_kwargs)
 
 
+class SemanticAggregateRule(ImplementationRule):
+    """
+    Substitute a logical expression for a SemanticAggregate with an llm physical implementation.
+    """
+
+    @classmethod
+    def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
+        is_match = isinstance(logical_expression.operator, Aggregate) and logical_expression.operator.agg_str is not None
+        logger.debug(f"SemanticAggregateRule matches_pattern: {is_match} for {logical_expression}")
+        return is_match
+
+    @classmethod
+    def substitute(cls, logical_expression: LogicalExpression, **runtime_kwargs) -> set[PhysicalExpression]:
+        logger.debug(f"Substituting SemanticAggregateRule for {logical_expression}")
+
+        # create variable physical operator kwargs for each model which can implement this logical_expression
+        models = [model for model in runtime_kwargs["available_models"] if cls._model_matches_input(model, logical_expression)]
+        # NOTE: right now we exclusively allow image or audio operations, but not both simultaneously
+        prompt_strategy, no_reasoning_prompt_strategy = None, None
+        no_reasoning = runtime_kwargs["reasoning_effort"] in [None, "minimal", "low"]
+        if cls._is_text_only_operation(logical_expression):
+            prompt_strategy = PromptStrategy.COT_AGG
+            no_reasoning_prompt_strategy = PromptStrategy.COT_AGG_NO_REASONING
+        elif cls._is_image_operation(logical_expression):
+            prompt_strategy = PromptStrategy.COT_AGG_IMAGE
+            no_reasoning_prompt_strategy = PromptStrategy.COT_AGG_IMAGE_NO_REASONING
+        elif cls._is_audio_operation(logical_expression):
+            prompt_strategy = PromptStrategy.COT_AGG_AUDIO
+            no_reasoning_prompt_strategy = PromptStrategy.COT_AGG_AUDIO_NO_REASONING
+        variable_op_kwargs = [
+            {
+                "model": model,
+                "prompt_strategy": no_reasoning_prompt_strategy if model.is_reasoning_model() and no_reasoning else prompt_strategy,
+                "reasoning_effort": runtime_kwargs["reasoning_effort"]
+            }
+            for model in models
+        ]
+
+        return cls._perform_substitution(logical_expression, SemanticAggregate, runtime_kwargs, variable_op_kwargs)
+
+
 class AggregateRule(ImplementationRule):
     """
     Substitute the logical expression for an aggregate with its physical counterpart.
@@ -811,7 +853,7 @@ class AggregateRule(ImplementationRule):
 
     @classmethod
     def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
-        is_match = isinstance(logical_expression.operator, Aggregate)
+        is_match = isinstance(logical_expression.operator, Aggregate) and logical_expression.operator.agg_func is not None
         logger.debug(f"AggregateRule matches_pattern: {is_match} for {logical_expression}")
         return is_match
 

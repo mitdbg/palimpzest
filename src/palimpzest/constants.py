@@ -136,6 +136,14 @@ class PromptStrategy(str, Enum):
     performing some task with a specified Model.
     """
 
+    # Chain-of-Thought Aggregation Prompt Strategies
+    COT_AGG = "chain-of-thought-aggregation"
+    COT_AGG_NO_REASONING = "chain-of-thought-aggregation-no-reasoning"
+    COT_AGG_IMAGE = "chain-of-thought-aggregation-image"
+    COT_AGG_IMAGE_NO_REASONING = "chain-of-thought-aggregation-image-no-reasoning"
+    COT_AGG_AUDIO = "chain-of-thought-aggregation-audio"
+    COT_AGG_AUDIO_NO_REASONING = "chain-of-thought-aggregation-audio-no-reasoning"
+
     # Chain-of-Thought Boolean Prompt Strategies
     COT_BOOL = "chain-of-thought-bool"
     COT_BOOL_NO_REASONING = "chain-of-thought-bool-no-reasoning"
@@ -190,6 +198,9 @@ class PromptStrategy(str, Enum):
 
     def is_audio_prompt(self):
         return "audio" in self.value
+
+    def is_agg_prompt(self):
+        return "chain-of-thought-aggregation" in self.value
 
     def is_bool_prompt(self):
         return "bool" in self.value

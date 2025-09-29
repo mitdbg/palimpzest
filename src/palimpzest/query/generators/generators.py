@@ -282,9 +282,9 @@ class Generator(Generic[ContextType, InputType]):
 
         return field_answers
 
-    def __call__(self, candidate: DataRecord, fields: dict[str, FieldInfo] | None, right_candidate: DataRecord | None = None, json_output: bool=True, **kwargs) -> GenerationOutput:
-        """Take the input record (`candidate`), generate the output `fields`, and return the generated output."""
-        logger.debug(f"Generating for candidate {candidate} with fields {fields}")
+    def __call__(self, candidate: DataRecord | list[DataRecord], fields: dict[str, FieldInfo] | None, right_candidate: DataRecord | None = None, json_output: bool=True, **kwargs) -> GenerationOutput:
+        """Take the input record(s) (`candidate`), generate the output `fields`, and return the generated output."""
+        logger.debug(f"Generating for candidate(s) {candidate} with fields {fields}")
 
         # fields can only be None if the user provides an answer parser
         fields_check = fields is not None or "parse_answer" in kwargs

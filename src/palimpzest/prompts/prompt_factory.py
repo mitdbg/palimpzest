@@ -15,6 +15,35 @@ from palimpzest.constants import (
 )
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.lib.schemas import AudioBase64, AudioFilepath, ImageBase64, ImageFilepath, ImageURL
+from palimpzest.prompts.aggregate_prompts import (
+    COT_AGG_AUDIO_DISCLAIMER,
+    COT_AGG_AUDIO_EXAMPLE_AGG_INSTRUCTION,
+    COT_AGG_AUDIO_EXAMPLE_ANSWER,
+    COT_AGG_AUDIO_EXAMPLE_CONTEXT,
+    COT_AGG_AUDIO_EXAMPLE_INPUT_FIELDS,
+    COT_AGG_AUDIO_EXAMPLE_OUTPUT_FIELDS,
+    COT_AGG_AUDIO_EXAMPLE_REASONING,
+    COT_AGG_AUDIO_JOB_INSTRUCTION,
+    COT_AGG_BASE_SYSTEM_PROMPT,
+    COT_AGG_BASE_USER_PROMPT,
+    COT_AGG_EXAMPLE_AGG_INSTRUCTION,
+    COT_AGG_EXAMPLE_ANSWER,
+    COT_AGG_EXAMPLE_CONTEXT,
+    COT_AGG_EXAMPLE_INPUT_FIELDS,
+    COT_AGG_EXAMPLE_OUTPUT_FIELDS,
+    COT_AGG_EXAMPLE_REASONING,
+    COT_AGG_IMAGE_DISCLAIMER,
+    COT_AGG_IMAGE_EXAMPLE_AGG_INSTRUCTION,
+    COT_AGG_IMAGE_EXAMPLE_ANSWER,
+    COT_AGG_IMAGE_EXAMPLE_CONTEXT,
+    COT_AGG_IMAGE_EXAMPLE_INPUT_FIELDS,
+    COT_AGG_IMAGE_EXAMPLE_OUTPUT_FIELDS,
+    COT_AGG_IMAGE_EXAMPLE_REASONING,
+    COT_AGG_IMAGE_JOB_INSTRUCTION,
+    COT_AGG_JOB_INSTRUCTION,
+    COT_AGG_NO_REASONING_BASE_SYSTEM_PROMPT,
+    COT_AGG_NO_REASONING_BASE_USER_PROMPT,
+)
 from palimpzest.prompts.convert_prompts import (
     COT_QA_AUDIO_DISCLAIMER,
     COT_QA_AUDIO_EXAMPLE_ANSWER,
@@ -148,6 +177,12 @@ class PromptFactory:
     """Factory class for generating prompts for the Generator given the input(s)."""
 
     BASE_SYSTEM_PROMPT_MAP = {
+        PromptStrategy.COT_AGG: COT_AGG_BASE_SYSTEM_PROMPT,
+        PromptStrategy.COT_AGG_NO_REASONING: COT_AGG_NO_REASONING_BASE_SYSTEM_PROMPT,
+        PromptStrategy.COT_AGG_AUDIO: COT_AGG_BASE_SYSTEM_PROMPT,
+        PromptStrategy.COT_AGG_AUDIO_NO_REASONING: COT_AGG_NO_REASONING_BASE_SYSTEM_PROMPT,
+        PromptStrategy.COT_AGG_IMAGE: COT_AGG_BASE_SYSTEM_PROMPT,
+        PromptStrategy.COT_AGG_IMAGE_NO_REASONING: COT_AGG_NO_REASONING_BASE_SYSTEM_PROMPT,
         PromptStrategy.COT_BOOL: COT_BOOL_BASE_SYSTEM_PROMPT,
         PromptStrategy.COT_BOOL_NO_REASONING: COT_BOOL_NO_REASONING_BASE_SYSTEM_PROMPT,
         PromptStrategy.COT_BOOL_AUDIO: COT_BOOL_BASE_SYSTEM_PROMPT,
@@ -177,6 +212,12 @@ class PromptFactory:
         PromptStrategy.SPLIT_MERGER: COT_SPLIT_MERGER_BASE_SYSTEM_PROMPT,
     }
     BASE_USER_PROMPT_MAP = {
+        PromptStrategy.COT_AGG: COT_AGG_BASE_USER_PROMPT,
+        PromptStrategy.COT_AGG_NO_REASONING: COT_AGG_NO_REASONING_BASE_USER_PROMPT,
+        PromptStrategy.COT_AGG_AUDIO: COT_AGG_BASE_USER_PROMPT,
+        PromptStrategy.COT_AGG_AUDIO_NO_REASONING: COT_AGG_NO_REASONING_BASE_USER_PROMPT,
+        PromptStrategy.COT_AGG_IMAGE: COT_AGG_BASE_USER_PROMPT,
+        PromptStrategy.COT_AGG_IMAGE_NO_REASONING: COT_AGG_NO_REASONING_BASE_USER_PROMPT,
         PromptStrategy.COT_BOOL: COT_BOOL_BASE_USER_PROMPT,
         PromptStrategy.COT_BOOL_NO_REASONING: COT_BOOL_NO_REASONING_BASE_USER_PROMPT,
         PromptStrategy.COT_BOOL_AUDIO: COT_BOOL_BASE_USER_PROMPT,
@@ -212,7 +253,7 @@ class PromptFactory:
         self.cardinality = cardinality
         self.desc = desc
 
-    def _get_context(self, candidate: DataRecord, input_fields: list[str]) -> str:
+    def _get_context(self, candidate: DataRecord | list[DataRecord], input_fields: list[str]) -> str:
         """
         Returns the context for the prompt.
 
@@ -225,7 +266,11 @@ class PromptFactory:
         """
         # TODO: remove mask_filepaths=True after SemBench evaluation
         # get context from input record (project_cols will be None if not provided in kwargs)
-        context: dict = candidate.to_dict(include_bytes=False, project_cols=input_fields, mask_filepaths=True)
+        if isinstance(candidate, list):
+            context = [record.to_dict(include_bytes=False, project_cols=input_fields, mask_filepaths=True) for record in candidate]
+            context = "\n".join([json.dumps(record, indent=2) for record in context])
+        else:
+            context: dict = candidate.to_dict(include_bytes=False, project_cols=input_fields, mask_filepaths=True)
 
         # TODO: MOVE THIS LOGIC INTO A CHUNKING / CONTEXT MANAGEMENT CLASS
         #   - this class should be able to:
@@ -315,6 +360,19 @@ class PromptFactory:
 
         # strip the last newline characters from the field descriptions and return
         return output_fields_desc[:-1]
+
+    def _get_agg_instruction(self, **kwargs) -> str | None:
+        """
+        Returns the aggregation instruction for the filter operation.
+
+        Returns:
+            str | None: The aggregation instruction (if applicable).
+        """
+        agg_instruction = kwargs.get("agg_instruction")
+        if self.prompt_strategy.is_agg_prompt():
+            assert agg_instruction is not None, "Aggregation instruction must be provided for aggregation operations."
+
+        return agg_instruction
 
     def _get_filter_condition(self, **kwargs) -> str | None:
         """
@@ -433,6 +491,12 @@ class PromptFactory:
             str | None: The job instruction (if applicable).
         """
         prompt_strategy_to_job_instruction = {
+            PromptStrategy.COT_AGG: COT_AGG_JOB_INSTRUCTION,
+            PromptStrategy.COT_AGG_NO_REASONING: COT_AGG_JOB_INSTRUCTION,
+            PromptStrategy.COT_AGG_AUDIO: COT_AGG_AUDIO_JOB_INSTRUCTION,
+            PromptStrategy.COT_AGG_AUDIO_NO_REASONING: COT_AGG_AUDIO_JOB_INSTRUCTION,
+            PromptStrategy.COT_AGG_IMAGE: COT_AGG_IMAGE_JOB_INSTRUCTION,
+            PromptStrategy.COT_AGG_IMAGE_NO_REASONING: COT_AGG_IMAGE_JOB_INSTRUCTION,
             PromptStrategy.COT_BOOL: COT_BOOL_JOB_INSTRUCTION,
             PromptStrategy.COT_BOOL_NO_REASONING: COT_BOOL_JOB_INSTRUCTION,
             PromptStrategy.COT_BOOL_AUDIO: COT_BOOL_AUDIO_JOB_INSTRUCTION,
@@ -525,6 +589,12 @@ class PromptFactory:
             str | None: The example input fields (if applicable).
         """
         prompt_strategy_to_example_input_fields = {
+            PromptStrategy.COT_AGG: COT_AGG_EXAMPLE_INPUT_FIELDS,
+            PromptStrategy.COT_AGG_NO_REASONING: COT_AGG_EXAMPLE_INPUT_FIELDS,
+            PromptStrategy.COT_AGG_AUDIO: COT_AGG_AUDIO_EXAMPLE_INPUT_FIELDS,
+            PromptStrategy.COT_AGG_AUDIO_NO_REASONING: COT_AGG_AUDIO_EXAMPLE_INPUT_FIELDS,
+            PromptStrategy.COT_AGG_IMAGE: COT_AGG_IMAGE_EXAMPLE_INPUT_FIELDS,
+            PromptStrategy.COT_AGG_IMAGE_NO_REASONING: COT_AGG_IMAGE_EXAMPLE_INPUT_FIELDS,
             PromptStrategy.COT_BOOL: COT_BOOL_EXAMPLE_INPUT_FIELDS,
             PromptStrategy.COT_BOOL_NO_REASONING: COT_BOOL_EXAMPLE_INPUT_FIELDS,
             PromptStrategy.COT_BOOL_AUDIO: COT_BOOL_AUDIO_EXAMPLE_INPUT_FIELDS,
@@ -576,6 +646,12 @@ class PromptFactory:
             str | None: The example output fields (if applicable).
         """
         prompt_strategy_to_example_output_fields = {
+            PromptStrategy.COT_AGG: COT_AGG_EXAMPLE_OUTPUT_FIELDS,
+            PromptStrategy.COT_AGG_NO_REASONING: COT_AGG_EXAMPLE_OUTPUT_FIELDS,
+            PromptStrategy.COT_AGG_AUDIO: COT_AGG_AUDIO_EXAMPLE_OUTPUT_FIELDS,
+            PromptStrategy.COT_AGG_AUDIO_NO_REASONING: COT_AGG_AUDIO_EXAMPLE_OUTPUT_FIELDS,
+            PromptStrategy.COT_AGG_IMAGE: COT_AGG_IMAGE_EXAMPLE_OUTPUT_FIELDS,
+            PromptStrategy.COT_AGG_IMAGE_NO_REASONING: COT_AGG_IMAGE_EXAMPLE_OUTPUT_FIELDS,
             PromptStrategy.COT_QA: COT_QA_EXAMPLE_OUTPUT_FIELDS,
             PromptStrategy.COT_QA_NO_REASONING: COT_QA_EXAMPLE_OUTPUT_FIELDS,
             PromptStrategy.COT_QA_AUDIO: COT_QA_AUDIO_EXAMPLE_OUTPUT_FIELDS,
@@ -597,6 +673,12 @@ class PromptFactory:
             str | None: The example context (if applicable).
         """
         prompt_strategy_to_example_context = {
+            PromptStrategy.COT_AGG: COT_AGG_EXAMPLE_CONTEXT,
+            PromptStrategy.COT_AGG_NO_REASONING: COT_AGG_EXAMPLE_CONTEXT,
+            PromptStrategy.COT_AGG_AUDIO: COT_AGG_AUDIO_EXAMPLE_CONTEXT,
+            PromptStrategy.COT_AGG_AUDIO_NO_REASONING: COT_AGG_AUDIO_EXAMPLE_CONTEXT,
+            PromptStrategy.COT_AGG_IMAGE: COT_AGG_IMAGE_EXAMPLE_CONTEXT,
+            PromptStrategy.COT_AGG_IMAGE_NO_REASONING: COT_AGG_IMAGE_EXAMPLE_CONTEXT,
             PromptStrategy.COT_BOOL: COT_BOOL_EXAMPLE_CONTEXT,
             PromptStrategy.COT_BOOL_NO_REASONING: COT_BOOL_EXAMPLE_CONTEXT,
             PromptStrategy.COT_BOOL_AUDIO: COT_BOOL_AUDIO_EXAMPLE_CONTEXT,
@@ -649,6 +731,8 @@ class PromptFactory:
             str: The image disclaimer. If this is a text prompt then it is an empty string.
         """
         prompt_strategy_to_image_disclaimer = {
+            PromptStrategy.COT_AGG_IMAGE: COT_AGG_IMAGE_DISCLAIMER,
+            PromptStrategy.COT_AGG_IMAGE_NO_REASONING: COT_AGG_IMAGE_DISCLAIMER,
             PromptStrategy.COT_BOOL_IMAGE: COT_BOOL_IMAGE_DISCLAIMER,
             PromptStrategy.COT_BOOL_IMAGE_NO_REASONING: COT_BOOL_IMAGE_DISCLAIMER,
             PromptStrategy.COT_JOIN_IMAGE: COT_JOIN_IMAGE_DISCLAIMER,
@@ -669,6 +753,8 @@ class PromptFactory:
             str: The audio disclaimer. If this is a text prompt then it is an empty string.
         """
         prompt_strategy_to_audio_disclaimer = {
+            PromptStrategy.COT_AGG_AUDIO: COT_AGG_AUDIO_DISCLAIMER,
+            PromptStrategy.COT_AGG_AUDIO_NO_REASONING: COT_AGG_AUDIO_DISCLAIMER,
             PromptStrategy.COT_BOOL_AUDIO: COT_BOOL_AUDIO_DISCLAIMER,
             PromptStrategy.COT_BOOL_AUDIO_NO_REASONING: COT_BOOL_AUDIO_DISCLAIMER,
             PromptStrategy.COT_JOIN_AUDIO: COT_JOIN_AUDIO_DISCLAIMER,
@@ -708,6 +794,24 @@ class PromptFactory:
         }
 
         return prompt_strategy_to_audio_disclaimer.get(self.prompt_strategy, "")
+
+    def _get_example_agg_instruction(self) -> str | None:
+        """
+        Returns the example aggregation instruction for the prompt.
+
+        Returns:
+            str | None: The example aggregation instruction (if applicable).
+        """
+        prompt_strategy_to_example_aggregation_instruction = {
+            PromptStrategy.COT_AGG: COT_AGG_EXAMPLE_AGG_INSTRUCTION,
+            PromptStrategy.COT_AGG_NO_REASONING: COT_AGG_EXAMPLE_AGG_INSTRUCTION,
+            PromptStrategy.COT_AGG_AUDIO: COT_AGG_AUDIO_EXAMPLE_AGG_INSTRUCTION,
+            PromptStrategy.COT_AGG_AUDIO_NO_REASONING: COT_AGG_AUDIO_EXAMPLE_AGG_INSTRUCTION,
+            PromptStrategy.COT_AGG_IMAGE: COT_AGG_IMAGE_EXAMPLE_AGG_INSTRUCTION,
+            PromptStrategy.COT_AGG_IMAGE_NO_REASONING: COT_AGG_IMAGE_EXAMPLE_AGG_INSTRUCTION,
+        }
+
+        return prompt_strategy_to_example_aggregation_instruction.get(self.prompt_strategy)
 
     def _get_example_filter_condition(self) -> str | None:
         """
@@ -753,6 +857,9 @@ class PromptFactory:
             str | None: The example reasoning (if applicable).
         """
         prompt_strategy_to_example_reasoning = {
+            PromptStrategy.COT_AGG: COT_AGG_EXAMPLE_REASONING,
+            PromptStrategy.COT_AGG_AUDIO: COT_AGG_AUDIO_EXAMPLE_REASONING,
+            PromptStrategy.COT_AGG_IMAGE: COT_AGG_IMAGE_EXAMPLE_REASONING,
             PromptStrategy.COT_BOOL: COT_BOOL_EXAMPLE_REASONING,
             PromptStrategy.COT_BOOL_AUDIO: COT_BOOL_AUDIO_EXAMPLE_REASONING,
             PromptStrategy.COT_BOOL_IMAGE: COT_BOOL_IMAGE_EXAMPLE_REASONING,
@@ -774,6 +881,12 @@ class PromptFactory:
             str | None: The example answer (if applicable).
         """
         prompt_strategy_to_example_answer = {
+            PromptStrategy.COT_AGG: COT_AGG_EXAMPLE_ANSWER,
+            PromptStrategy.COT_AGG_NO_REASONING: COT_AGG_EXAMPLE_ANSWER,
+            PromptStrategy.COT_AGG_AUDIO: COT_AGG_AUDIO_EXAMPLE_ANSWER,
+            PromptStrategy.COT_AGG_AUDIO_NO_REASONING: COT_AGG_AUDIO_EXAMPLE_ANSWER,
+            PromptStrategy.COT_AGG_IMAGE: COT_AGG_IMAGE_EXAMPLE_ANSWER,
+            PromptStrategy.COT_AGG_IMAGE_NO_REASONING: COT_AGG_IMAGE_EXAMPLE_ANSWER,
             PromptStrategy.COT_QA: COT_QA_EXAMPLE_ANSWER,
             PromptStrategy.COT_QA_NO_REASONING: COT_QA_EXAMPLE_ANSWER,
             PromptStrategy.COT_QA_AUDIO: COT_QA_AUDIO_EXAMPLE_ANSWER,
@@ -788,7 +901,7 @@ class PromptFactory:
         return prompt_strategy_to_example_answer.get(self.prompt_strategy)
 
     def _get_all_format_kwargs(
-        self, candidate: DataRecord, input_fields: list[str], output_fields: list[str], right_candidate: DataRecord | None, right_input_fields: list[str], **kwargs
+        self, candidate: DataRecord | list[DataRecord], input_fields: list[str], output_fields: list[str], right_candidate: DataRecord | None, right_input_fields: list[str], **kwargs
     ) -> dict:
         """
         Returns a dictionary containing all the format kwargs for templating the prompts.
@@ -805,8 +918,9 @@ class PromptFactory:
         # get format kwargs which depend on the input data
         input_format_kwargs = {
             "context": self._get_context(candidate, input_fields),
-            "input_fields_desc": self._get_input_fields_desc(candidate, input_fields),
+            "input_fields_desc": self._get_input_fields_desc(candidate[0] if isinstance(candidate, list) else candidate, input_fields),
             "output_fields_desc": self._get_output_fields_desc(output_fields, **kwargs),
+            "agg_instruction": self._get_agg_instruction(**kwargs),
             "filter_condition": self._get_filter_condition(**kwargs),
             "join_condition": self._get_join_condition(**kwargs),
             "original_output": self._get_original_output(**kwargs),
@@ -839,6 +953,7 @@ class PromptFactory:
             "audio_disclaimer": self._get_audio_disclaimer(),
             "right_image_disclaimer": self._get_right_image_disclaimer(),
             "right_audio_disclaimer": self._get_right_audio_disclaimer(),
+            "example_agg_instruction": self._get_example_agg_instruction(),
             "example_filter_condition": self._get_example_filter_condition(),
             "example_join_condition": self._get_example_join_condition(),
             "example_reasoning": self._get_example_reasoning(),
@@ -848,105 +963,115 @@ class PromptFactory:
         # return all format kwargs
         return {**input_format_kwargs, **prompt_strategy_format_kwargs}
 
-    def _create_audio_messages(self, candidate: DataRecord, input_fields: list[str]) -> list[dict]:
+    def _create_audio_messages(self, candidate: DataRecord | list[DataRecord], input_fields: list[str]) -> list[dict]:
         """
-        Parses the candidate record and returns the audio messages for the chat payload.
+        Parses the candidate record(s) and returns the audio messages for the chat payload.
 
         Args:
-            candidate (DataRecord): The input record.
+            candidate (DataRecord | list[DataRecord]): The input record(s).
             input_fields (list[str]): The list of input fields.
 
         Returns:
             list[dict]: The audio messages for the chat payload.
         """
+        # normalize type to be list[DataRecord]
+        if isinstance(candidate, DataRecord):
+            candidate = [candidate]
+
         # create a message for each audio recording in an input field with an audio (or list of audio) type
         audio_content = []
         for field_name in input_fields:
-            field_value = candidate[field_name]
-            field_type = candidate.get_field_type(field_name)
+            for dr in candidate:
+                field_value = dr[field_name]
+                field_type = dr.get_field_type(field_name)
 
-            # audio filepath (or list of audio filepaths)
-            if field_type.annotation in [AudioFilepath, AudioFilepath | None]:
-                with open(field_value, "rb") as f:
-                    base64_audio_str = base64.b64encode(f.read()).decode("utf-8")
-                audio_content.append(
-                    {"type": "input_audio", "input_audio": {"data": base64_audio_str, "format": "wav"}}
-                )
-
-            elif field_type.annotation in [list[AudioFilepath], list[AudioFilepath] | None]:
-                for audio_filepath in field_value:
-                    with open(audio_filepath, "rb") as f:
+                # audio filepath (or list of audio filepaths)
+                if field_type.annotation in [AudioFilepath, AudioFilepath | None]:
+                    with open(field_value, "rb") as f:
                         base64_audio_str = base64.b64encode(f.read()).decode("utf-8")
                     audio_content.append(
                         {"type": "input_audio", "input_audio": {"data": base64_audio_str, "format": "wav"}}
                     )
 
-            # pre-encoded images (or list of pre-encoded images)
-            elif field_type.annotation in [AudioBase64, AudioBase64 | None]:
-                audio_content.append(
-                    {"type": "input_audio", "input_audio": {"data": field_value, "format": "wav"}}
-                )
+                elif field_type.annotation in [list[AudioFilepath], list[AudioFilepath] | None]:
+                    for audio_filepath in field_value:
+                        with open(audio_filepath, "rb") as f:
+                            base64_audio_str = base64.b64encode(f.read()).decode("utf-8")
+                        audio_content.append(
+                            {"type": "input_audio", "input_audio": {"data": base64_audio_str, "format": "wav"}}
+                        )
 
-            elif field_type.annotation in [list[AudioBase64], list[AudioBase64] | None]:
-                for base64_audio in field_value:
+                # pre-encoded images (or list of pre-encoded images)
+                elif field_type.annotation in [AudioBase64, AudioBase64 | None]:
                     audio_content.append(
-                        {"type": "input_audio", "input_audio": {"data": base64_audio, "format": "wav"}}
+                        {"type": "input_audio", "input_audio": {"data": field_value, "format": "wav"}}
                     )
+
+                elif field_type.annotation in [list[AudioBase64], list[AudioBase64] | None]:
+                    for base64_audio in field_value:
+                        audio_content.append(
+                            {"type": "input_audio", "input_audio": {"data": base64_audio, "format": "wav"}}
+                        )
 
         return [{"role": "user", "type": "input_audio", "content": audio_content}] if len(audio_content) > 0 else []
 
-    def _create_image_messages(self, candidate: DataRecord, input_fields: list[str]) -> list[dict]:
+    def _create_image_messages(self, candidate: DataRecord | list[DataRecord], input_fields: list[str]) -> list[dict]:
         """
-        Parses the candidate record and returns the image messages for the chat payload.
+        Parses the candidate record(s) and returns the image messages for the chat payload.
 
         Args:
-            candidate (DataRecord): The input record.
+            candidate (DataRecord | list[DataRecord]): The input record(s).
             input_fields (list[str]): The list of input fields.
 
         Returns:
             list[dict]: The image messages for the chat payload.
         """
+        # normalize type to be list[DataRecord]
+        if isinstance(candidate, DataRecord):
+            candidate = [candidate]
+
         # create a message for each image in an input field with an image (or list of image) type
         image_content = []
         for field_name in input_fields:
-            field_value = candidate[field_name]
-            field_type = candidate.get_field_type(field_name)
+            for dr in candidate:
+                field_value = dr[field_name]
+                field_type = dr.get_field_type(field_name)
 
-            # image filepath (or list of image filepaths)
-            if field_type.annotation in [ImageFilepath, ImageFilepath | None]:
-                with open(field_value, "rb") as f:
-                    base64_image_str = base64.b64encode(f.read()).decode("utf-8")
-                image_content.append(
-                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image_str}"}}
-                )
-
-            elif field_type.annotation in [list[ImageFilepath], list[ImageFilepath] | None]:
-                for image_filepath in field_value:
-                    with open(image_filepath, "rb") as f:
+                # image filepath (or list of image filepaths)
+                if field_type.annotation in [ImageFilepath, ImageFilepath | None]:
+                    with open(field_value, "rb") as f:
                         base64_image_str = base64.b64encode(f.read()).decode("utf-8")
                     image_content.append(
                         {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image_str}"}}
                     )
 
-            # image url (or list of image urls)
-            elif field_type.annotation in [ImageURL, ImageURL | None]:
-                image_content.append({"type": "image_url", "image_url": {"url": field_value}})
+                elif field_type.annotation in [list[ImageFilepath], list[ImageFilepath] | None]:
+                    for image_filepath in field_value:
+                        with open(image_filepath, "rb") as f:
+                            base64_image_str = base64.b64encode(f.read()).decode("utf-8")
+                        image_content.append(
+                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image_str}"}}
+                        )
 
-            elif field_type.annotation in [list[ImageURL], list[ImageURL] | None]:
-                for image_url in field_value:
-                    image_content.append({"type": "image_url", "image_url": {"url": image_url}})
+                # image url (or list of image urls)
+                elif field_type.annotation in [ImageURL, ImageURL | None]:
+                    image_content.append({"type": "image_url", "image_url": {"url": field_value}})
 
-            # pre-encoded images (or list of pre-encoded images)
-            elif field_type.annotation in [ImageBase64, ImageBase64 | None]:
-                image_content.append(
-                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{field_value}"}}
-                )
+                elif field_type.annotation in [list[ImageURL], list[ImageURL] | None]:
+                    for image_url in field_value:
+                        image_content.append({"type": "image_url", "image_url": {"url": image_url}})
 
-            elif field_type.annotation in [list[ImageBase64], list[ImageBase64] | None]:
-                for base64_image in field_value:
+                # pre-encoded images (or list of pre-encoded images)
+                elif field_type.annotation in [ImageBase64, ImageBase64 | None]:
                     image_content.append(
-                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
+                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{field_value}"}}
                     )
+
+                elif field_type.annotation in [list[ImageBase64], list[ImageBase64] | None]:
+                    for base64_image in field_value:
+                        image_content.append(
+                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
+                        )
 
         return [{"role": "user", "type": "image", "content": image_content}] if len(image_content) > 0 else []
 
@@ -967,12 +1092,12 @@ class PromptFactory:
 
         return base_prompt.format(**format_kwargs)
 
-    def _get_user_messages(self, candidate: DataRecord, input_fields: list[str], right_candidate: DataRecord | None, right_input_fields: list[str], **kwargs) -> str:
+    def _get_user_messages(self, candidate: DataRecord | list[DataRecord], input_fields: list[str], right_candidate: DataRecord | None, right_input_fields: list[str], **kwargs) -> str:
         """
         Returns a list of messages for the chat payload based on the prompt strategy.
 
         Args:
-            candidate (DataRecord): The input record.
+            candidate (DataRecord | list[DataRecord]): The input record(s).
             input_fields (list[str]): The input fields.
             output_fields (list[str]): The output fields.
             kwargs: The formatting kwargs and some keyword arguments provided by the user.
@@ -1119,7 +1244,7 @@ class PromptFactory:
 
         return messages
 
-    def create_messages(self, candidate: DataRecord, output_fields: list[str], right_candidate: DataRecord | None = None, **kwargs) -> list[dict]:
+    def create_messages(self, candidate: DataRecord | list[DataRecord], output_fields: list[str], right_candidate: DataRecord | None = None, **kwargs) -> list[dict]:
         """
         Creates the messages for the chat payload based on the prompt strategy.
 
@@ -1131,7 +1256,7 @@ class PromptFactory:
         }
 
         Args:
-            candidate (DataRecord): The input record.
+            candidate (DataRecord | list[DataRecord]): The input record(s).
             output_fields (list[str]): The output fields.
             right_candidate (DataRecord | None): The other join input record (only provided for joins).
             kwargs: The keyword arguments provided by the user.
@@ -1140,7 +1265,7 @@ class PromptFactory:
             list[dict]: The messages for the chat payload.
         """
         # compute the set of input fields
-        input_fields = self._get_input_fields(candidate, **kwargs)
+        input_fields = self._get_input_fields(candidate[0] if isinstance(candidate, list) else candidate, **kwargs)
         right_input_fields = [] if right_candidate is None else self._get_input_fields(right_candidate, **kwargs)
 
         # if the user provides a prompt, we process that prompt into messages and return them
