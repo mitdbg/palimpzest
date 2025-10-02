@@ -320,7 +320,7 @@ class LLMConvert(ConvertOp):
         est_num_output_tokens = NAIVE_EST_NUM_OUTPUT_TOKENS
 
         # get est. of conversion time per record from model card;
-        model_name = self.model.value if getattr(self, "model", None) is not None else Model.GPT_4o_MINI.value
+        model_name = self.model.value
         model_conversion_time_per_record = MODEL_CARDS[model_name]["seconds_per_output_token"] * est_num_output_tokens
 
         # get est. of conversion cost (in USD) per record from model card

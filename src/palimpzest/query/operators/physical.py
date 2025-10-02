@@ -42,10 +42,13 @@ class PhysicalOperator:
         self.op_id = None
 
         # compute the input modalities (if any) for this physical operator
+        depends_on_short_field_names = [field.split(".")[-1] for field in self.depends_on] if self.depends_on is not None else None
         self.input_modalities = None
         if self.input_schema is not None:
             self.input_modalities = set()
-            for field in self.input_schema.model_fields.values():
+            for field_name, field in self.input_schema.model_fields.items():
+                if self.depends_on is not None and field_name not in depends_on_short_field_names:
+                    continue
                 field_type = field.annotation
                 if field_type in IMAGE_FIELD_TYPES:
                     self.input_modalities.add(Modality.IMAGE)
