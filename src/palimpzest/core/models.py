@@ -56,6 +56,18 @@ class GenerationStats(BaseModel):
     # (if applicable) the total number of embedding LLM calls made by this operator
     total_embedding_llm_calls: int = 0
 
+
+
+    #NEWLY ADDED TOKEN FIELDS
+
+    # the total number of input tokens processed by embedding models
+    total_embedding_input_tokens: float = 0.0
+
+
+    # the total cost of processing input tokens for embedding models
+    total_embedding_cost: float = 0.0
+
+
     def __iadd__(self, other: GenerationStats) -> GenerationStats:
         # self.raw_answers.extend(other.raw_answers)
         for model_field in [
@@ -68,6 +80,9 @@ class GenerationStats(BaseModel):
             "fn_call_duration_secs",
             "total_llm_calls",
             "total_embedding_llm_calls",
+            "total_embedding_input_tokens",
+            "total_embedding_cost"
+            
         ]:
             setattr(self, model_field, getattr(self, model_field) + getattr(other, model_field))
         return self
@@ -85,6 +100,8 @@ class GenerationStats(BaseModel):
                 "cost_per_record",
                 "total_llm_calls",
                 "total_embedding_llm_calls",
+                "total_embedding_input_tokens",
+                "total_embedding_cost"
             ]
         }
         # dct['raw_answers'] = self.raw_answers + other.raw_answers
@@ -107,6 +124,8 @@ class GenerationStats(BaseModel):
             "fn_call_duration_secs",
             "total_llm_calls",
             "total_embedding_llm_calls",
+            "total_embedding_input_tokens",
+            "total_embedding_cost"
         ]:
             setattr(self, model_field, getattr(self, model_field) / quotient)
         return self
@@ -128,6 +147,8 @@ class GenerationStats(BaseModel):
                 "total_llm_calls",
                 "total_embedding_llm_calls",
                 "cost_per_record",
+                "total_embedding_input_tokens",
+                "total_embedding_cost"
             ]
         }
         dct["model_name"] = self.model_name
@@ -213,6 +234,10 @@ class RecordOpStats(BaseModel):
     # typed as a float because GenerationStats may be amortized (i.e. divided) across a number of output records
     total_input_tokens: float = 0.0
 
+    # the total number of input tokens processed by embedding models
+    # typed as a float because GenerationStats may be amortized (i.e. divided) across a number of output records
+    total_embedding_input_tokens: float = 0.0
+
     # the total number of output tokens processed by this operator; None if this operation did not use an LLM
     # typed as a float because GenerationStats may be amortized (i.e. divided) across a number of output records
     total_output_tokens: float = 0.0
@@ -278,6 +303,9 @@ class OperatorStats(BaseModel):
     # the total output tokens processed by this operation
     total_output_tokens: int = 0
 
+    #the total embedding input tokens processed by this operation
+    total_embedding_input_tokens: int = 0
+
     # a list of RecordOpStats processed by the operation
     record_op_stats_lst: list[RecordOpStats] = Field(default_factory=list)
 
@@ -309,6 +337,7 @@ class OperatorStats(BaseModel):
             self.total_op_cost += stats.total_op_cost
             self.total_input_tokens += stats.total_input_tokens
             self.total_output_tokens += stats.total_output_tokens
+            self.total_embedding_input_tokens += stats.total_embedding_input_tokens
             self.record_op_stats_lst.extend(stats.record_op_stats_lst)
 
         elif isinstance(stats, RecordOpStats):
@@ -319,6 +348,8 @@ class OperatorStats(BaseModel):
             self.total_op_cost += stats.cost_per_record
             self.total_input_tokens += stats.total_input_tokens
             self.total_output_tokens += stats.total_output_tokens
+            self.total_embedding_input_tokens += stats.total_embedding_input_tokens
+
 
         else:
             raise TypeError(f"Cannot add {type(stats)} to OperatorStats")
@@ -370,6 +401,10 @@ class BasePlanStats(BaseModel):
     # total output tokens processed by this plan
     total_output_tokens: int = 0
 
+
+    # total embedding input tokens processed by this plan
+    total_embedding_input_tokens: int = 0
+
     # start time for the plan execution; should be set by calling PlanStats.start()
     start_time: float | None = None
 
@@ -385,6 +420,7 @@ class BasePlanStats(BaseModel):
         self.total_plan_cost = self.sum_op_costs() + self.sum_validation_costs()
         self.total_input_tokens = self.sum_input_tokens() + self.sum_validation_input_tokens()
         self.total_output_tokens = self.sum_output_tokens() + self.sum_validation_output_tokens()
+        self.total_embedding_input_tokens = self.sum_embedding_input_tokens() + self.sum_validation_embedding_input()
 
     @staticmethod
     @abstractmethod
@@ -412,6 +448,13 @@ class BasePlanStats(BaseModel):
     def sum_output_tokens(self) -> int:
         """
         Sum the output tokens processed by all operators in this plan.
+        """
+        pass
+
+    @abstractmethod
+    def sum_embedding_input_tokens(self) -> int:
+        """
+        Sum the input embedding tokens processed by all operators in this plan.
         """
         pass
 
@@ -453,6 +496,12 @@ class BasePlanStats(BaseModel):
         Sum the output tokens processed by all validation generations in this plan.
         """
         return sum([gen_stats.total_output_tokens for _, gen_stats in self.validation_gen_stats.items()])
+    
+    def sum_validation_embedding_input(self) -> int:
+        """
+        Sum the input embedding tokens processed by all validation generations in this plan.
+        """
+        return sum([gen_stats.total_embedding_input_tokens for _, gen_stats in self.validation_gen_stats.items()])
 
 
 class PlanStats(BasePlanStats):
@@ -495,6 +544,12 @@ class PlanStats(BasePlanStats):
         Sum the output tokens processed by all operators in this plan.
         """
         return sum([op_stats.total_output_tokens for _, op_stats in self.operator_stats.items()])
+    
+    def sum_embedding_input_tokens (self) -> int:
+        """
+        Sum the input embedding tokens processed by all operators in this plan.
+        """
+        return sum([op_stats.total_output_tokens for _, op_stats in self.operator_stats.items()])
 
     def add_record_op_stats(self, unique_full_op_id: str, record_op_stats: RecordOpStats | list[RecordOpStats]) -> None:
         """
@@ -522,6 +577,7 @@ class PlanStats(BasePlanStats):
         self.total_plan_cost += plan_stats.total_plan_cost
         self.total_input_tokens += plan_stats.total_input_tokens
         self.total_output_tokens += plan_stats.total_output_tokens
+        self.total_embedding_input_tokens += plan_stats.total_embedding_input_tokens
         for unique_full_op_id, op_stats in plan_stats.operator_stats.items():
             if unique_full_op_id in self.operator_stats:
                 self.operator_stats[unique_full_op_id] += op_stats
@@ -533,6 +589,7 @@ class PlanStats(BasePlanStats):
         stats += f"total_plan_cost={self.total_plan_cost} \n"
         stats += f"total_input_tokens={self.total_input_tokens} \n"
         stats += f"total_output_tokens={self.total_output_tokens} \n"
+        stats += f"total_embedding_input_tokens={self.total_embedding_input_tokens} \n"
         for idx, op_stats in enumerate(self.operator_stats.values()):
             stats += f"{idx}. {op_stats.op_name} time={op_stats.total_op_time} cost={op_stats.total_op_cost} \n"
         return stats
@@ -580,6 +637,12 @@ class SentinelPlanStats(BasePlanStats):
         Sum the output tokens processed by all operators in this plan.
         """
         return sum(sum([op_stats.total_output_tokens for _, op_stats in phys_op_stats.items()]) for _, phys_op_stats in self.operator_stats.items())
+    
+    def sum_embedding_input_tokens (self) -> int:
+        """
+        Sum the output tokens processed by all operators in this plan.
+        """
+        return sum(sum([op_stats.total_embedding_input_tokens for _, op_stats in phys_op_stats.items()]) for _, phys_op_stats in self.operator_stats.items())
 
     def add_record_op_stats(self, unique_logical_op_id: str, record_op_stats: RecordOpStats | list[RecordOpStats]) -> None:
         """
@@ -621,6 +684,7 @@ class SentinelPlanStats(BasePlanStats):
         self.total_plan_cost += plan_stats.total_plan_cost
         self.total_input_tokens += plan_stats.total_input_tokens
         self.total_output_tokens += plan_stats.total_output_tokens
+        self.total_embedding_input_tokens += plan_stats.total_embedding_input_tokens
         for unique_logical_op_id, physical_op_stats in plan_stats.operator_stats.items():
             for full_op_id, op_stats in physical_op_stats.items():
                 if unique_logical_op_id in self.operator_stats:
@@ -642,6 +706,7 @@ class SentinelPlanStats(BasePlanStats):
         stats += f"total_plan_cost={self.total_plan_cost} \n"
         stats += f"total_input_tokens={self.total_input_tokens} \n"
         stats += f"total_output_tokens={self.total_output_tokens} \n"
+        stats += f"total_embedding_input_tokens={self.total_output_tokens} \n"
         for outer_idx, physical_op_stats in enumerate(self.operator_stats.values()):
             total_time = sum([op_stats.total_op_time for op_stats in physical_op_stats.values()])
             total_cost = sum([op_stats.total_op_cost for op_stats in physical_op_stats.values()])
@@ -688,6 +753,9 @@ class ExecutionStats(BaseModel):
 
     # total number of output tokens processed
     total_output_tokens: int = 0
+
+     # total number of embedding input tokens processed
+    total_embedding_inputs_tokens: int = 0
 
     # total number of tokens processed
     total_tokens: int = 0
@@ -738,11 +806,12 @@ class ExecutionStats(BaseModel):
         # compute the cost for plan and total execution
         self.plan_execution_cost = self.sum_plan_costs()
         self.total_execution_cost = self.optimization_cost + self.plan_execution_cost
-
+ 
         # compute the tokens for total execution
         self.total_input_tokens = self.sum_input_tokens()
         self.total_output_tokens = self.sum_output_tokens()
-        self.total_tokens = self.total_input_tokens + self.total_output_tokens
+        self.total_embedding_inputs_tokens = self.sum_embedding_input_tokens()
+        self.total_tokens = self.total_input_tokens + self.total_output_tokens + self.total_embedding_inputs_tokens
 
         # compute plan_strs
         self.plan_strs = {plan_id: plan_stats.plan_str for plan_id, plan_stats in self.plan_stats.items()}
@@ -774,6 +843,15 @@ class ExecutionStats(BaseModel):
         sentinel_plan_output_tokens = sum([plan_stats.sum_output_tokens() for _, plan_stats in self.sentinel_plan_stats.items()])
         plan_output_tokens = sum([plan_stats.sum_output_tokens() for _, plan_stats in self.plan_stats.items()])
         return plan_output_tokens + sentinel_plan_output_tokens
+    
+
+    def sum_embedding_input_tokens(self) -> int:
+        """
+        Sum the embedding input tokens processed in this execution
+        """
+        sentinel_plan_embedding_input_tokens = sum([plan_stats.sum_embedding_input_tokens() for _, plan_stats in self.sentinel_plan_stats.items()])
+        plan_embedding_input_tokens = sum([plan_stats.sum_embedding_input_tokens() for _, plan_stats in self.plan_stats.items()])
+        return plan_embedding_input_tokens + sentinel_plan_embedding_input_tokens
 
     def add_plan_stats(self, plan_stats: PlanStats | SentinelPlanStats | list[PlanStats] | list[SentinelPlanStats]) -> None:
         """
