@@ -57,7 +57,7 @@ def create_input_record(input_schema: type[BaseModel], idx: int) -> DataRecord:
 
 
 def mock_generator_call(candidate, fields, right_candidate=None, json_output=True, **kwargs):
-    field_answers = {"num_elephants": 3}
+    field_answers = {"num_elephants": [3]}
     reasoning = "The input shows three elephants."
     generation_stats = GenerationStats(cost_per_record=1.0, time_per_record=1.0, num_input_tokens=10, num_output_tokens=10)
     messages = []
