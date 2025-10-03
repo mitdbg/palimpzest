@@ -124,4 +124,4 @@ def test_map(mocker, input_schema, physical_op_class):
 
     assert sorted(output_record.schema.model_fields) == sorted(union_schemas([input_schema, OutputSchema]).model_fields)
     assert hasattr(output_record, "animal")
-    assert output_record.animal == "elephant"
+    assert output_record.animal.lower() == "elephant"

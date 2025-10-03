@@ -12,7 +12,14 @@ from palimpzest.core.lib.schemas import (
     IMAGE_LIST_FIELD_TYPES,
 )
 from palimpzest.prompts import CONTEXT_SEARCH_PROMPT
-from palimpzest.query.operators.aggregate import ApplyGroupByOp, AverageAggregateOp, CountAggregateOp
+from palimpzest.query.operators.aggregate import (
+    ApplyGroupByOp,
+    AverageAggregateOp,
+    CountAggregateOp,
+    MaxAggregateOp,
+    MinAggregateOp,
+    SemanticAggregate,
+)
 from palimpzest.query.operators.compute import SmolAgentsCompute
 from palimpzest.query.operators.convert import LLMConvertBonded, NonLLMConvert
 from palimpzest.query.operators.critique_and_refine import CritiqueAndRefineConvert, CritiqueAndRefineFilter
@@ -941,6 +948,35 @@ class EmbeddingJoinRule(ImplementationRule):
 
         return cls._perform_substitution(logical_expression, EmbeddingJoin, runtime_kwargs, variable_op_kwargs)
 
+class SemanticAggregateRule(ImplementationRule):
+    """
+    Substitute a logical expression for a SemanticAggregate with an llm physical implementation.
+    """
+
+    @classmethod
+    def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
+        is_match = isinstance(logical_expression.operator, Aggregate) and logical_expression.operator.agg_str is not None
+        logger.debug(f"SemanticAggregateRule matches_pattern: {is_match} for {logical_expression}")
+        return is_match
+
+    @classmethod
+    def substitute(cls, logical_expression: LogicalExpression, **runtime_kwargs) -> set[PhysicalExpression]:
+        logger.debug(f"Substituting SemanticAggregateRule for {logical_expression}")
+
+        # create variable physical operator kwargs for each model which can implement this logical_expression
+        models = [model for model in runtime_kwargs["available_models"] if cls._model_matches_input(model, logical_expression) and not model.is_llama_model()]
+        no_reasoning = runtime_kwargs["reasoning_effort"] in [None, "minimal", "low"]
+        variable_op_kwargs = [
+            {
+                "model": model,
+                "prompt_strategy": PromptStrategy.AGG_NO_REASONING if model.is_reasoning_model() and no_reasoning else PromptStrategy.AGG,
+                "reasoning_effort": runtime_kwargs["reasoning_effort"]
+            }
+            for model in models
+        ]
+
+        return cls._perform_substitution(logical_expression, SemanticAggregate, runtime_kwargs, variable_op_kwargs)
+
 
 class AggregateRule(ImplementationRule):
     """
@@ -949,7 +985,7 @@ class AggregateRule(ImplementationRule):
 
     @classmethod
     def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
-        is_match = isinstance(logical_expression.operator, Aggregate)
+        is_match = isinstance(logical_expression.operator, Aggregate) and logical_expression.operator.agg_func is not None
         logger.debug(f"AggregateRule matches_pattern: {is_match} for {logical_expression}")
         return is_match
 
@@ -963,6 +999,10 @@ class AggregateRule(ImplementationRule):
             physical_op_class = CountAggregateOp
         elif logical_expression.operator.agg_func == AggFunc.AVERAGE:
             physical_op_class = AverageAggregateOp
+        elif logical_expression.operator.agg_func == AggFunc.MIN:
+            physical_op_class = MinAggregateOp
+        elif logical_expression.operator.agg_func == AggFunc.MAX:
+            physical_op_class = MaxAggregateOp
         else:
             raise Exception(f"Cannot support aggregate function: {logical_expression.operator.agg_func}")
 

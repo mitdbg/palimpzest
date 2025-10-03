@@ -558,10 +558,52 @@ class Dataset:
         operator = Aggregate(input_schema=self.schema, agg_func=AggFunc.AVERAGE)
         return Dataset(sources=[self], operator=operator, schema=operator.output_schema)
 
+    def min(self) -> Dataset:
+        """Apply an min operator to this set"""
+        operator = Aggregate(input_schema=self.schema, agg_func=AggFunc.MIN)
+        return Dataset(sources=[self], operator=operator, schema=operator.output_schema)
+
+    def max(self) -> Dataset:
+        """Apply an max operator to this set"""
+        operator = Aggregate(input_schema=self.schema, agg_func=AggFunc.MAX)
+        return Dataset(sources=[self], operator=operator, schema=operator.output_schema)
+
     def groupby(self, groupby: GroupBySig) -> Dataset:
         output_schema = groupby.output_schema()
         operator = GroupByAggregate(input_schema=self.schema, output_schema=output_schema, group_by_sig=groupby)
         return Dataset(sources=[self], operator=operator, schema=output_schema)
+
+    def sem_agg(self, col: dict | type[BaseModel], agg: str, depends_on: str | list[str] | None = None) -> Dataset:
+        """
+        Apply a semantic aggregation to this set. The `agg` string will be applied using an LLM
+        over the entire set of inputs' fields specified in `depends_on` to generate the output `col`.
+
+        Example:
+            sem_agg(
+                col={'name': 'overall_sentiment', 'desc': 'The overall sentiment of the reviews', 'type': str},
+                agg="Compute the overall sentiment of the reviews as POSITIVE or NEGATIVE.",
+                depends_on="review_text",
+            )
+        """
+        # construct new output schema
+        new_output_schema = None
+        if isinstance(col, dict):
+            col_schema = create_schema_from_fields([col])
+            new_output_schema = union_schemas([self.schema, col_schema])
+        elif issubclass(col, BaseModel):
+            assert len(col.model_fields) == 1, "For semantic aggregation, when passing a BaseModel to `col` it must have exactly one field."
+            new_output_schema = union_schemas([self.schema, col])
+        else:
+            raise ValueError("`col` must be a dictionary or a single-field BaseModel.")
+
+        # enforce type for depends_on
+        if isinstance(depends_on, str):
+            depends_on = [depends_on]
+
+        # construct logical operator
+        operator = Aggregate(input_schema=self.schema, output_schema=new_output_schema, agg_str=agg, depends_on=depends_on)
+
+        return Dataset(sources=[self], operator=operator, schema=operator.output_schema)
 
     def retrieve(
         self,

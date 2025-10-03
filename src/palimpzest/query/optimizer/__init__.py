@@ -51,6 +51,9 @@ from palimpzest.query.optimizer.rules import (
     Rule as _Rule,
 )
 from palimpzest.query.optimizer.rules import (
+    SemanticAggregateRule as _SemanticAggregateRule,
+)
+from palimpzest.query.optimizer.rules import (
     SplitRule as _SplitRule,
 )
 from palimpzest.query.optimizer.rules import (
@@ -76,6 +79,7 @@ ALL_RULES = [
     _ReorderConverts,
     _RetrieveRule,
     _Rule,
+    _SemanticAggregateRule,
     _SplitRule,
     _TransformationRule,
 ]

@@ -208,6 +208,12 @@ class Average(BaseModel):
 class Count(BaseModel):
     count: int = Field(description="The count of items in the dataset")
 
+class Min(BaseModel):
+    min: int | float = Field(description="The minimum value of some items in the dataset")
+
+class Max(BaseModel):
+    max: int | float = Field(description="The maximum value of some items in the dataset")
+
 class OperatorDerivedSchema(BaseModel):
     """Schema defined by an operator, e.g., a join or a group by"""
 
