@@ -9,7 +9,7 @@ from palimpzest.constants import AggFunc, Cardinality
 from palimpzest.core.data import context, dataset
 from palimpzest.core.elements.filters import Filter
 from palimpzest.core.elements.groupbysig import GroupBySig
-from palimpzest.core.lib.schemas import Average, Count
+from palimpzest.core.lib.schemas import Average, Count, Max, Min
 from palimpzest.utils.hash_helpers import hash_for_id
 
 
@@ -149,27 +149,39 @@ class Aggregate(LogicalOperator):
 
     def __init__(
         self,
-        agg_func: AggFunc,
+        agg_func: AggFunc | None = None,
+        agg_str: str | None = None,
         *args,
         **kwargs,
     ):
+        assert agg_func is not None or agg_str is not None, "Either agg_func or agg_str must be provided"
         if kwargs.get("output_schema") is None:
             if agg_func == AggFunc.COUNT:
                 kwargs["output_schema"] = Count
             elif agg_func == AggFunc.AVERAGE:
                 kwargs["output_schema"] = Average
+            elif agg_func == AggFunc.MIN:
+                kwargs["output_schema"] = Min
+            elif agg_func == AggFunc.MAX:
+                kwargs["output_schema"] = Max
             else:
                 raise ValueError(f"Unsupported aggregation function: {agg_func}")
 
         super().__init__(*args, **kwargs)
         self.agg_func = agg_func
+        self.agg_str = agg_str
 
     def __str__(self):
-        return f"{self.__class__.__name__}(function: {str(self.agg_func.value)})"
+        desc = f"function: {str(self.agg_func.value)}" if self.agg_func else f"agg: {self.agg_str}"
+        return f"{self.__class__.__name__}({desc})"
 
     def get_logical_id_params(self) -> dict:
         logical_id_params = super().get_logical_id_params()
-        logical_id_params = {"agg_func": self.agg_func, **logical_id_params}
+        logical_id_params = {
+            "agg_func": self.agg_func,
+            "agg_str": self.agg_str,
+            **logical_id_params,
+        }
 
         return logical_id_params
 
@@ -177,6 +189,7 @@ class Aggregate(LogicalOperator):
         logical_op_params = super().get_logical_op_params()
         logical_op_params = {
             "agg_func": self.agg_func,
+            "agg_str": self.agg_str,
             **logical_op_params,
         }
 
