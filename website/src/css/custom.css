@@ -28,3 +28,17 @@
   --ifm-color-primary-lightest: #eeb177;
   --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
 }
+
+
+.scrollable-images {
+  display: flex;
+  overflow-x: auto;
+  gap: 1rem;
+  padding: 1rem 0;
+}
+
+.scrollable-images img {
+  height: auto;
+  max-height: 300px; /* You can adjust this */
+  flex-shrink: 0;
+}

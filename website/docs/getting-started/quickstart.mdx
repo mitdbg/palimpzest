@@ -1,0 +1,223 @@
+---
+title: Quick Start Tutorial
+---
+{/* ## Goal
+This page should expand upon the "teaser" code shown at the very beginning of `docs/index.md`.
+
+Every user who reads this page should be left with the following impression:
+
+1. PZ is easy to get started with
+2. PZ is powerful: many (serious) AI programs can be written in PZ
+3. PZ has an optimizer, which can help optimize the user's program
+4. The user can interact with and override the optimizer's decisions
+
+The ideal way to do this is with the old mantra "show don't tell." A great example application can start very small and simple (1.), then grow to be more complex (2.), then make a call to our optimizer (3.), after which a user inspects the plan and modifies certain aspects of it (4.).
+
+(In this page, I don't expect us to do any more than call `plan = ds.optimize()` for demonstrating (3.). For now, we should only allude to more powerful optimization which we will talk about later in the docs). -->
+*/}
+
+### 💽 Creating a Dataset
+Let's revisit our example from the [Getting Started](intro.mdx) page in more depth, starting with the first two lines:
+```python
+import palimpzest as pz
+
+emails = pz.TextFileDataset(id="enron-emails", path="emails/")
+```
+In this example, we provide `pz.TextFileDataset`'s constructor with a unique identifier for the dataset and a path to the local directory containing the dataset files. The directory has a flat structure, with one email per file:
+```bash
+emails
+├── allen-p-inbox-42.txt
+├── allen-p-inbox-45.txt
+...
+└── whalley-g-merchant-investments-3.txt
+```
+Given this directory, PZ will create a [`pz.IterDataset`](user-guide/dataset.mdx), which iterates over the files in the directory at runtime.
+
+<details>
+  <summary>What if my data isn't simply text files?</summary>
+
+  That's perfectly fine!
+    
+  The `pz.IterDataset` class can be subclassed by the user to read data from more complex sources. The user just has to:
+    
+    1. implement `pz.IterDataset`'s `__len__()` method
+    2. implement `pz.IterDataset`'s `__getitem__(idx)` method
+
+    PZ also provides the following built-in dataset classes for reading local files:
+    - `pz.MemoryDataset`
+      - Loads data from (1) a list of dictionaries or (2) a pandas DataFrame provided by the user. Useful for small datasets which can fit in memory.
+    - `pz.PDFFileDataset`
+      - Loads all PDF files in a directory. Yields `filename`, `contents`, and `text_contents` fields, where the latter is the text extracted from the PDF.
+    - `pz.ImageFileDataset`
+      - Loads all image files in a directory. Yields `filename` and `contents` fields, where the latter is the base-64 encoded version of the image.
+    - `pz.AudioFileDataset`
+      - Loads all audio files (.wav) in a directory. Yields `filename` and `contents` fields, where the latter is the base-64 encoded version of the audio file.
+    - `pz.HTMLFileDataset`
+      - Loads all HTML files in a directory. Yields `filename`, `html`, and `text` fields, where the latter is the text parsed from the raw HTML.
+    - `pz.XLSFileDataset`
+      - Loads all Excel files (.xls, .xlsx) in a directory. Yields `filename`, `contents`, `sheet_names`, and `number_sheets`.
+
+  More details can be found in our [user guide for custom Datasets](user-guide/dataset.mdx).
+</details>
+
+
+The `pz.IterDataset` will emit one dictionary per file to the next operator in the program. By default, each dictionary will have two keys: `contents` and `filename` which map to the file's contents and filename, respectively:
+
+```python
+import palimpzest as pz
+
+emails = pz.TextFileDataset(id="enron-emails", path="emails/")
+output = emails.run()
+
+print(output.to_df())
+
+# This produces the following output:
+#                    filename                                           contents
+# 0      giron-d-inbox-13.txt  Message-ID: <14025496.1075840554055.JavaMail.e...
+# 1      cash-m-inbox-143.txt  Message-ID: <26598080.1075855360503.JavaMail.e...
+# 2     cuilla-m-inbox-24.txt  Message-ID: <300661.1075853095557.JavaMail.eva...
+# 3      beck-s-inbox-149.txt  Message-ID: <17744967.1075840358477.JavaMail.e...
+# 4      allen-p-inbox-78.txt  Message-ID: <26175277.1075863149462.JavaMail.e...
+# ..                      ...                                                ...
+# 245    allen-p-inbox-84.txt  Message-ID: <7182251.1075863149647.JavaMail.ev...
+# 246  delainey-d-inbox-9.txt  Message-ID: <15156489.1075859109691.JavaMail.e...
+# 247    allen-p-inbox-45.txt  Message-ID: <31239550.1075858645503.JavaMail.e...
+# 248   blair-l-inbox-248.txt  Message-ID: <457022.1075861908047.JavaMail.eva...
+# 249   forney-j-inbox-53.txt  Message-ID: <12770457.1075859220577.JavaMail.e...
+
+# [250 rows x 2 columns]
+```
+
+<details>
+  <summary>What is `output`?</summary>
+
+  The `output` in the program above has type [`pz.DataRecordCollection`](../api/data/datarecordcollection.md).
+    
+  This object contains:
+    1. The data emitted by the PZ program
+    2. The execution stats (i.e. cost, runtime, and quality metrics) for the entire program
+
+  We expose the `pz.DataRecordCollection.to_df()` method to make it easy for users to get the output(s) of their program in a Pandas DataFrame. We will also expose other utility methods for processing execution statistics in the near future.
+</details>
+
+
+### 🪄 Computing New Fields
+A key feature of PZ is that it provides users with the ability to compute new fields using semantic operators. To compute new fields, users need to invoke the `sem_map()` method with a list of dictionaries defining the field(s) the system should compute:
+```python
+emails = emails.sem_map([
+    {"name": "subject", "type": str, "desc": "the subject of the email"},
+    {"name": "sender", "type": str, "desc": "the email address of the sender"},
+    {"name": "summary", "type": str, "desc": "a brief summary of the email"},
+])
+```
+In order to fully define a field, each dictionary must have the following three keys:
+
+1. `name`: the name of the field
+2. `type`: the type of the field (one of `str`, `int`, `float`, `bool`, `list[str]`, ..., `list[bool]`)
+3. `desc`: a short natural langague description defining what the field represents
+
+Equivalently, users can also define schemas using a `pydantic.BaseModel`:
+```python
+from pydantic import BaseModel, Field
+
+class EmailSchema(BaseModel):
+    subject: str = Field(description="the subject of the email")
+    sender: str = Field(description="the email address of the sender")
+    summary: str = Field(description="a brief summary of the email")
+
+...
+emails = emails.sem_map(EmailSchema)
+```
+PZ will then use LLM(s) to generate the field(s) for each input (i.e. for each email in this example).
+
+:::tip[But what is `sem_map()` actually doing to generate the field(s)?]
+
+    It depends! (and this is where PZ's optimizer comes in handy)
+
+    Depending on the difficulty of the task and your preferred optimization objective (e.g. `max_quality`) PZ will select one implementation from a set of `PhysicalOperators` to generate your field(s).
+
+    PZ can choose from thousands of possible implementations of its `PhysicalOperators`. Each operator uses one (or more) LLMs and may use techniques such as RAG, Mixture-of-Agents, Critique and Refine, etc. to produce a final output.
+
+    For a full list of `PhysicalOperators` in PZ, please consult our documentation on [Operators](api/operators/physical.md).
+:::
+
+### ✂️ Filtering Inputs
+PZ also provides users with the ability to filter inputs using natural language. In order to apply a semantic filter, users need to invoke the `sem_filter()` method with a natural language description of the critieria they are *selecting for*:
+```python
+emails = emails.sem_filter(
+    'The email refers to one of the following business transactions: "Raptor", "Deathstar", "Chewco", and/or "Fat Boy")',
+)
+emails = emails.sem_filter(
+    "The email contains a first-hand discussion of the business transaction",
+)
+```
+These filters will keep all emails which involve a first-hand discussion of one of the specified business transactions.
+
+### ⚒️ Naive Optimization and Execution
+Finally, once we've defined our program in PZ, we can execute it in order to generate our output:
+```python
+output = emails.run(max_quality=True)
+```
+The `run()` method triggers PZ's execution of the program that has been defined by applying semantic operators to `emails`. The `run()` method also takes a number of keyword arguments which can configure the execution of the program.
+
+In particular, users can specify one ***optimization objective*** and (optionally) one ***constraint***:
+
+**Optimization objectives:**
+
+- `max_quality=True` (maximize output quality) 
+- `min_cost=True` (minimize program cost)
+- `min_time=True` (minimize program runtime)
+
+**Constraints:**
+
+- `quality_threshold=<float>` (threshold in range [0, 1])
+- `cost_budget=<float>` (cost in US Dollars)
+- `time_budget=<float>` (time in seconds)
+
+:::note[More Info on Constraints]
+
+    PZ can only *estimate* the cost, quality, and runtime of each physical operator, therefore constraints are not guaranteed to be met. Furthermore, some constraints may be infeasible (even with perfect estimates).
+
+    In any case, PZ will make a best effort attempt to find the optimal plan for your stated objective and constraint (if present).
+
+    To achieve better estimates -- and thus better optimization outcomes -- please read our [Optimization User Guide](user-guide/optimization.mdx).
+:::
+
+### ✨ Optimizing Execution with a Validator
+In the example above, we do not use a `pz.Validator` to help optimize the program. Therefore, operator quality is estimated using the MMLU Pro score(s) of the model(s) used by each operator, and the optimizer will simply use these estimates to select the highest quality operator(s).
+
+In our [Optimization User Guide](user-guide/optimization.mdx) we show you how to provide a `pz.Validator` to improve the optimizer's performance. This includes both:
+1. Using an LLM-as-a-judge to optimize performance
+2. Using labeled validation data to optimize performance
+
+In brief, we can specify the LLM judge for a `pz.Validator` and use it to optimize our program as follows:
+```python
+validator = pz.Validator(model=pz.Model.GPT_5)
+output = emails.optimize_and_run(max_quality=True, validator=validator)
+```
+:::info
+PZ's [sample-based optimizer (Abacus)](https://arxiv.org/pdf/2505.14661) is only activated when `.optimize_and_run()` is used with a `pz.Validator`. Otherwise, PZ will use naive optimization based on MMLU Pro scores. 
+:::
+
+In this setting, PZ will evaluate the performance of different implementations of each semantic operator using GPT-5 while also measuring the cost and latency of each operator. After a fixed sampling budget is exhausted, PZ will select and execute the optimal plan for the program based on the observed performance of each operator.
+
+### 🔎 Examining Program Output
+Finally, once your program finishes executing you can convert its output to a Pandas DataFrame and examine the results:
+```python
+print(output.to_df(cols=["filename", "sender", "subject", "summary"]))
+```
+The `cols` keyword argument allows you to select which columns should populate your DataFrame (if it is `None`, then all columns are selected).
+
+As mentioned above, the `output` is a `pz.DataRecordCollection` object which contains the program output and all of the execution statistics for your program. We can use this to examine the total cost and runtime of our program:
+```python
+print(f"Total time: {output.execution_stats.total_execution_time:.1f}")
+print(f"Total cost: {output.execution_stats.total_execution_cost:.3f}")
+```
+Which will produce an output like:
+```
+Total time: 18.70s
+Total cost: $0.5390
+```
+
+### ➡️ What's Next?
+Click below to proceed to the `Next Steps`.

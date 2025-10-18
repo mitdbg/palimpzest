@@ -207,6 +207,7 @@ class Modality(str, Enum):
 class AggFunc(str, Enum):
     COUNT = "count"
     AVERAGE = "average"
+    SUM = "sum"
     MIN = "min"
     MAX = "max"
 

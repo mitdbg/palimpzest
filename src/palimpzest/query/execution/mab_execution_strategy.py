@@ -14,8 +14,8 @@ from palimpzest.query.operators.convert import LLMConvert
 from palimpzest.query.operators.filter import FilterOp, LLMFilter, NonLLMFilter
 from palimpzest.query.operators.join import JoinOp
 from palimpzest.query.operators.physical import PhysicalOperator
-from palimpzest.query.operators.retrieve import RetrieveOp
 from palimpzest.query.operators.scan import ContextScanOp, ScanPhysicalOp
+from palimpzest.query.operators.topk import TopKOp
 from palimpzest.query.optimizer.plan import SentinelPlan
 from palimpzest.utils.progress import create_progress_manager
 from palimpzest.validator.validator import Validator
@@ -66,8 +66,8 @@ class OpFrontier:
         self.is_llm_join = isinstance(sample_op, JoinOp)
         is_llm_convert = isinstance(sample_op, LLMConvert)
         is_llm_filter = isinstance(sample_op, LLMFilter)
-        is_llm_retrieve = isinstance(sample_op, RetrieveOp) and isinstance(sample_op.index, Collection)
-        self.is_llm_op = is_llm_convert or is_llm_filter or is_llm_retrieve or self.is_llm_join
+        is_llm_topk = isinstance(sample_op, TopKOp) and isinstance(sample_op.index, Collection)
+        self.is_llm_op = is_llm_convert or is_llm_filter or is_llm_topk or self.is_llm_join
 
         # get order in which we will sample physical operators for this logical operator
         sample_op_indices = self._get_op_index_order(op_set, seed)
@@ -95,6 +95,12 @@ class OpFrontier:
         Returns the set of frontier operators for this OpFrontier.
         """
         return self.frontier_ops
+
+    def get_off_frontier_ops(self) -> list[PhysicalOperator]:
+        """
+        Returns the set of off-frontier operators for this OpFrontier.
+        """
+        return self.off_frontier_ops
 
     def _compute_op_id_to_pareto_distance(self, priors: dict[str, dict[str, float]]) -> dict[str, float]:
         """
@@ -298,7 +304,7 @@ class OpFrontier:
         def remove_unavailable_root_datasets(source_indices: str | tuple) -> str | tuple | None:
             # base case: source_indices is a string
             if isinstance(source_indices, str):
-                return source_indices if source_indices.split("-")[0] in self.root_dataset_ids else None
+                return source_indices if source_indices.split("---")[0] in self.root_dataset_ids else None
 
             # recursive case: source_indices is a tuple
             left_indices = source_indices[0]
@@ -382,6 +388,12 @@ class OpFrontier:
 
             # compute final list of record op stats
             full_op_id_to_record_op_stats[full_op_id] = list(record_id_to_max_quality_record_op_stats.values())
+
+        # NOTE: it is possible for the full_op_id_to_record_op_stats to be empty if there is a duplicate operator
+        # (e.g. a scan of the same dataset) which has all of its results cached and no new_record_op_stats;
+        # in this case, we do not update the frontier
+        if full_op_id_to_record_op_stats == {}:
+            return
 
         # update the set of source indices processed by each physical operator
         for full_op_id, source_indices_processed in full_op_id_to_source_indices_processed.items():
@@ -641,8 +653,8 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
         """
         Returns the operator in the frontier with the highest (estimated) quality.
         """
-        # get the operators in the frontier set for this logical_op_id
-        frontier_ops = op_frontiers[unique_logical_op_id].get_frontier_ops()
+        # get the (off) frontier operators for this logical_op_id
+        frontier_ops = op_frontiers[unique_logical_op_id].get_frontier_ops() + op_frontiers[unique_logical_op_id].get_off_frontier_ops()
 
         # get a mapping from full_op_id --> list[RecordOpStats]
         full_op_id_to_op_stats: dict[str, OperatorStats] = plan_stats.operator_stats.get(unique_logical_op_id, {})
@@ -693,14 +705,21 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
                 max_quality_op = self._get_max_quality_op(unique_logical_op_id, op_frontiers, plan_stats)
 
                 # get frontier ops and their next input
-                def is_filtered_out(tup: tuple) -> bool:
-                    return tup[-1] is None or isinstance(tup[-1], list) and all([record is None for record in tup[-1]])
+                def filter_and_clean_inputs(frontier_op_inputs: list[tuple]) -> bool:
+                    cleaned_inputs = []
+                    for tup in frontier_op_inputs:
+                        input = tup[-1]
+                        if isinstance(input, list):
+                            input = [record for record in input if record is not None]
+                        if input is not None and input != []:
+                            cleaned_inputs.append((tup[0], tup[1], input))
+                    return cleaned_inputs
                 frontier_op_inputs = op_frontiers[unique_logical_op_id].get_frontier_op_inputs(source_indices_to_sample, max_quality_op)
-                frontier_op_inputs = list(filter(lambda tup: not is_filtered_out(tup), frontier_op_inputs))
+                frontier_op_inputs = filter_and_clean_inputs(frontier_op_inputs)
 
                 # break out of the loop if frontier_op_inputs is empty, as this means all records have been filtered out
                 if len(frontier_op_inputs) == 0:
-                    break
+                    continue
 
                 # run sampled operators on sampled inputs and update the number of samples drawn
                 source_indices_to_record_set_tuples, num_llm_ops = self._execute_op_set(unique_logical_op_id, frontier_op_inputs)
@@ -764,7 +783,7 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
         dataset_id_to_shuffled_source_indices = {}
         for dataset_id, dataset in train_dataset.items():
             total_num_samples = len(dataset)
-            shuffled_source_indices = [f"{dataset_id}-{int(idx)}" for idx in np.arange(total_num_samples)]
+            shuffled_source_indices = [f"{dataset_id}---{int(idx)}" for idx in np.arange(total_num_samples)]
             self.rng.shuffle(shuffled_source_indices)
             dataset_id_to_shuffled_source_indices[dataset_id] = shuffled_source_indices
 

@@ -140,7 +140,7 @@ class DataRecord:
     def schema(self) -> type[BaseModel]:
         return type(self._data_item)
 
-    def copy(self):
+    def copy(self) -> DataRecord:
         # get the set of fields to copy from the parent record
         copy_field_names = [field.split(".")[-1] for field in self.get_field_names()]
 
@@ -228,18 +228,18 @@ class DataRecord:
     @staticmethod
     def from_join_parents(
         schema: type[BaseModel],
-        left_parent_record: DataRecord,
-        right_parent_record: DataRecord,
+        left_parent_record: DataRecord | None,
+        right_parent_record: DataRecord | None,
         project_cols: list[str] | None = None,
         cardinality_idx: int = None,
     ) -> DataRecord:
         # get the set of fields and field descriptions to copy from the parent record(s)
-        left_copy_field_names = (
+        left_copy_field_names = [] if left_parent_record is None else (
             left_parent_record.get_field_names()
             if project_cols is None
             else [col for col in project_cols if col in left_parent_record.get_field_names()]
         )
-        right_copy_field_names = (
+        right_copy_field_names = [] if right_parent_record is None else (
             right_parent_record.get_field_names()
             if project_cols is None
             else [col for col in project_cols if col in right_parent_record.get_field_names()]
@@ -255,11 +255,20 @@ class DataRecord:
                 new_field_name = f"{field_name}_right"
             data_item[new_field_name] = right_parent_record[field_name]
 
+        # for any missing fields in the schema, set them to None
+        for field_name in schema.model_fields:
+            if field_name not in data_item:
+                data_item[field_name] = None
+
         # make new record which has left and right parent record as its parents
+        left_parent_source_indices = [] if left_parent_record is None else list(left_parent_record._source_indices)
+        right_parent_source_indices = [] if right_parent_record is None else list(right_parent_record._source_indices)
+        left_parent_record_id = [] if left_parent_record is None else [left_parent_record._id]
+        right_parent_record_id = [] if right_parent_record is None else [right_parent_record._id]
         new_dr = DataRecord(
             schema(**data_item),
-            source_indices=list(left_parent_record._source_indices) + list(right_parent_record._source_indices),
-            parent_ids=[left_parent_record._id, right_parent_record._id],
+            source_indices=left_parent_source_indices + right_parent_source_indices,
+            parent_ids=left_parent_record_id + right_parent_record_id,
             cardinality_idx=cardinality_idx,
         )
 

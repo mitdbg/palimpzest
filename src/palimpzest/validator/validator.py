@@ -19,7 +19,7 @@ from palimpzest.query.generators.generators import get_json_from_answer
 from palimpzest.query.operators.convert import LLMConvert
 from palimpzest.query.operators.filter import LLMFilter
 from palimpzest.query.operators.join import JoinOp
-from palimpzest.query.operators.retrieve import RetrieveOp
+from palimpzest.query.operators.topk import TopKOp
 
 
 class Validator:
@@ -47,7 +47,7 @@ class Validator:
     def join_score_fn(self, condition: str, left_input_record: dict, right_input_record: dict, output: bool) -> float | None:
         raise NotImplementedError("Validator.join_score_fn not implemented.")
 
-    def retrieve_score_fn(self, fields: list[str], input_record: dict, output: dict) -> float | None:
+    def topk_score_fn(self, fields: list[str], input_record: dict, output: dict) -> float | None:
         raise NotImplementedError("Validator.map_score_fn not implemented.")
 
     def _get_gen_stats_from_completion(self, completion, start_time: float) -> GenerationStats:
@@ -218,11 +218,11 @@ class Validator:
 
         return score, gen_stats
 
-    def _default_retrieve_score_fn(self, op: RetrieveOp, fields: list[str], input_record: DataRecord, output: dict) -> tuple[float | None, GenerationStats]:
+    def _default_topk_score_fn(self, op: TopKOp, fields: list[str], input_record: DataRecord, output: dict) -> tuple[float | None, GenerationStats]:
         """
         Compute the quality of the generated output for the given fields and input_record.
         """
-        # TODO: retrieve k=25; score each item based on relevance; compute F1
+        # TODO: top-k k=25; score each item based on relevance; compute F1
         # TODO: support retrieval over images
         # create prompt factory
         factory = PromptFactory(PromptStrategy.MAP, self.model, Cardinality.ONE_TO_ONE)
@@ -294,11 +294,11 @@ class Validator:
             score, gen_stats = self._default_join_score_fn(op, condition, left_input_record, right_input_record, output)
             return score, gen_stats, full_hash
 
-    def _score_retrieve(self, op: RetrieveOp, fields: list[str], input_record: DataRecord, output: dict, full_hash: str) -> tuple[float | None, GenerationStats, str]:
+    def _score_topk(self, op: TopKOp, fields: list[str], input_record: DataRecord, output: dict, full_hash: str) -> tuple[float | None, GenerationStats, str]:
         try:
-            out = self.retrieve_score_fn(fields, input_record.to_dict(), output)
+            out = self.topk_score_fn(fields, input_record.to_dict(), output)
             score, gen_stats = out if isinstance(out, tuple) else (out, GenerationStats())
             return score, gen_stats, full_hash
         except NotImplementedError:
-            score, gen_stats = self._default_retrieve_score_fn(op, fields, input_record, output)
+            score, gen_stats = self._default_topk_score_fn(op, fields, input_record, output)
             return score, gen_stats, full_hash

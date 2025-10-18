@@ -5,38 +5,49 @@ import os
 import string
 import time
 
-import chromadb
 import numpy as np
 import regex as re
-from chromadb.utils.embedding_functions import (
-    SentenceTransformerEmbeddingFunction,
-)
-from chromadb.utils.embedding_functions.openai_embedding_function import (
-    OpenAIEmbeddingFunction,
-)
 
 import palimpzest as pz
 from palimpzest.constants import Model
 from palimpzest.core.lib.schemas import ImageBase64
 
+CORRUPTED_IMAGE_IDS = [
+    "17ae0616ac745e70781203267f3a382d",
+    "bf201cbbd058ef51aef89b1be4158c2a",
+    "ef457a7b3ab437cd78ab9f82dc083048",
+    "225c3db49d60b5ef30ed0bfc649ebf78",
+    "b413cc1dc4969dcbe4cb6a55c0f2e359",
+    "e81b2acfd792b171389c8f47a0e14504",
+]
+
 mmqa_entry_cols = [
     {"name": "qid", "type": str, "desc": "The id of the MMQA question"},
     {"name": "question", "type": str, "desc": "The question which needs to be answered"},
 ]
+mmqa_text_search_cols = [
+    {"name": "text_search_string", "type": str, "desc": "A string used to search for relevant text snippets."},
+]
+mmqa_table_search_cols = [
+    {"name": "table_search_string", "type": str, "desc": "A string used to search for relevant tables."},
+]
+mmqa_image_search_cols = [
+    {"name": "image_search_string", "type": str, "desc": "A string used to search for relevant images."},
+]
 
 mmqa_text_cols = [
-    {"name": "supporting_text_ids", "type": list[str], "desc": "A list of text ids for text snippets which may support the question."},
-    {"name": "supporting_texts", "type": list[str], "desc": "A list of text snippets which may support the question."},
+    {"name": "text_id", "type": str, "desc": "The id for the given text snippet."},
+    {"name": "text", "type": str, "desc": "A text snippet which may or may not support the question."},
 ]
 
 mmqa_table_cols = [
-    {"name": "supporting_table_ids", "type": list[str], "desc": "A list of table ids for tables which may support the question."},
-    {"name": "supporting_tables", "type": list[str], "desc": "A list of tables which may support the question."},
+    {"name": "table_id", "type": str, "desc": "The id for the given table."},
+    {"name": "table", "type": str, "desc": "A table which may or may not support the question."},
 ]
 
 mmqa_image_cols = [
-    {"name": "supporting_image_ids", "type": list[str], "desc": "A list of image ids whose images may support the question."},
-    {"name": "supporting_images", "type": list[ImageBase64], "desc": "A list of images which may support the question."},
+    {"name": "image_id", "type": str, "desc": "The id for the given image."},
+    {"name": "image", "type": ImageBase64, "desc": "An image which may or may not support the question."},
 ]
 
 mmqa_answer_cols = [
@@ -80,32 +91,9 @@ def get_json_from_answer(answer: str):
 
 
 class MMQAValidator(pz.Validator):
-    def __init__(
-        self,
-        num_samples: int = 5,
-        shuffle: bool = False,
-        seed: int = 42,
-    ):
+    def __init__(self, dataset: list[dict]):
         super().__init__()
-
-        # read the appropriate dataset
-        dataset = []
-        with open("data/MMQA_train.jsonl") as f:
-            for line in f:
-                dict_line = json.loads(line)
-                if "image" in dict_line["metadata"]["modalities"] and len(dict_line["metadata"]["modalities"]) > 1:
-                    dataset.append(dict_line)
-
-        # shuffle the questions for the given seed
-        if shuffle:
-            rng = np.random.default_rng(seed=seed)
-            rng.shuffle(dataset)
-
-        # trim to number of samples
-        self.dataset = dataset[:num_samples]
-        self.num_samples = num_samples
-        self.shuffle = shuffle
-        self.seed = seed
+        self.dataset = dataset
 
         # compute qid to label mapping
         self.qid_to_labels = self._compute_qid_to_labels()
@@ -116,21 +104,15 @@ class MMQAValidator(pz.Validator):
         for entry in self.dataset:
             # get the answers
             answers = [answer["answer"] for answer in entry["answers"]]
-            supporting_text_doc_ids = [context["doc_id"] for context in entry["supporting_context"] if context["doc_part"] == "text"]
-            supporting_table_doc_ids = [context["doc_id"] for context in entry["supporting_context"] if context["doc_part"] == "table"]
-            supporting_image_doc_ids = [context["doc_id"] for context in entry["supporting_context"] if context["doc_part"] == "image"]
+            supporting_text_ids = [context["doc_id"] for context in entry["supporting_context"] if context["doc_part"] == "text"]
+            supporting_table_ids = [context["doc_id"] for context in entry["supporting_context"] if context["doc_part"] == "table"]
+            supporting_image_ids = [context["doc_id"] for context in entry["supporting_context"] if context["doc_part"] == "image"]
 
-            # NOTE: inside the optimizer, our qualities will effectively be divided by two,
-            #       because we are not providing a label for supporting texts, tables, and images,
-            #       however this should be okay b/c it will affect all records equally
             label_dict = {
                 "answers": answers,
-                "supporting_text_ids": supporting_text_doc_ids,
-                "supporting_table_ids": supporting_table_doc_ids,
-                "supporting_image_ids": supporting_image_doc_ids,
-                "supporting_texts": [],
-                "supporting_tables": [],
-                "supporting_images": [],
+                "supporting_text_ids": supporting_text_ids,
+                "supporting_table_ids": supporting_table_ids,
+                "supporting_image_ids": supporting_image_ids,
             }
             qid_to_labels[entry["qid"]] = label_dict
 
@@ -205,72 +187,178 @@ class MMQAValidator(pz.Validator):
             return 0.0
 
     def map_score_fn(self, fields: list[str], input_record: dict, output: dict) -> float | None:
+        if "answers" not in fields:
+            return None
         preds = output.get("answers")
         targets = self.qid_to_labels[str(input_record["qid"])]["answers"]
         return self.f1(preds, targets)
 
-    def topk_score_fn(self, fields: list[str], input_record: dict, output: dict) -> float | None:
-        if "supporting_text_ids" in fields:
-            preds = output.get("supporting_text_ids")
-            targets = self.qid_to_labels[str(input_record["qid"])]["supporting_text_ids"]
-            return self.recall(preds, targets)
-        elif "supporting_table_ids" in fields:
-            preds = output.get("supporting_table_ids")
-            targets = self.qid_to_labels[str(input_record["qid"])]["supporting_table_ids"]
-            return self.recall(preds, targets)
-        elif "supporting_image_ids" in fields:
-            preds = output.get("supporting_image_ids")
-            targets = self.qid_to_labels[str(input_record["qid"])]["supporting_image_ids"]
-            return self.recall(preds, targets)
+    def join_score_fn(self, condition: str, left_input_record: dict, right_input_record: dict, output: bool) -> float | None:
+        if condition == "The text snippet is relevant to the question based on the text search string.":
+            pred = right_input_record["text_id"]
+            targets = self.qid_to_labels[left_input_record["qid"]]["supporting_text_ids"]
+            return pred in targets and output or pred not in targets and not output
+        elif condition == "The table is relevant to the question based on the table search string.":
+            pred = right_input_record["table_id"]
+            targets = self.qid_to_labels[left_input_record["qid"]]["supporting_table_ids"]
+            return pred in targets and output or pred not in targets and not output
+        elif condition == "The image is relevant to the question based on the image search string.":
+            pred = right_input_record["image_id"]
+            targets = self.qid_to_labels[left_input_record["qid"]]["supporting_image_ids"]
+            return pred in targets and output or pred not in targets and not output
         else:
-            raise NotImplementedError(f"Validator.topk_score_fn not implemented for fields {fields}.")
+            raise NotImplementedError(f"Validator.join_score_fn not implemented for condition {condition}.")
 
 
-class MMQADataset(pz.IterDataset):
-    def __init__(
-        self,
-        num_samples: int = 5,
-        split: str = "dev",
-        shuffle: bool = False,
-        seed: int = 42,
-    ):
-        super().__init__(id="mmqa", schema=mmqa_entry_cols)
-
-        # read the appropriate dataset
-        dataset = []
-        with open(f"data/MMQA_{split}.jsonl") as f:
-            for line in f:
-                dict_line = json.loads(line)
-                if "image" in dict_line["metadata"]["modalities"] and len(dict_line["metadata"]["modalities"]) > 1:
-                    dataset.append(dict_line)
-
-        # shuffle the questions for the given seed
-        if shuffle:
-            rng = np.random.default_rng(seed=seed)
-            rng.shuffle(dataset)
-
-        # trim to number of samples
-        self.dataset = dataset[:num_samples]
-        self.num_samples = num_samples
-        self.shuffle = shuffle
-        self.seed = seed
-        self.split = split
+class MMQAQuestionDataset(pz.IterDataset):
+    def __init__(self, dataset: list[dict]):
+        super().__init__(id="mmqa-questions", schema=mmqa_entry_cols)
+        self.dataset = [{"qid": entry["qid"], "question": entry["question"]} for entry in dataset]
 
     def __len__(self):
         return len(self.dataset)
 
     def __getitem__(self, idx: int):
-        # get entry
-        entry = self.dataset[idx]
+        return self.dataset[idx]
 
-        # get input fields
-        qid = entry["qid"]
-        question = entry["question"]
 
-        # create item with fields
-        item = {"qid": qid, "question": question}
+class MMQATextDataset(pz.IterDataset):
+    def __init__(self, dataset: list[dict]):
+        super().__init__(id="mmqa-texts", schema=mmqa_text_cols)
 
-        return item
+        # construct mapping from text id to text
+        text_id_to_text = {}
+        with open("data/MMQA_texts.jsonl") as f:
+            for line in f:
+                dict_line = json.loads(line)
+                text_id_to_text[dict_line["id"]] = f"{dict_line['title']}: {dict_line['text']}"
+
+        # construct dataset
+        self.dataset = []
+        for entry in dataset:
+            for context in entry["supporting_context"]:
+                if context["doc_part"] == "text":
+                    text_id = context["doc_id"]
+                    text = text_id_to_text[text_id]
+                    self.dataset.append({"text_id": text_id, "text": text})
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def __getitem__(self, idx: int):
+        return self.dataset[idx]
+
+
+class MMQATableDataset(pz.IterDataset):
+    def __init__(self, dataset: list[dict]):
+        super().__init__(id="mmqa-tables", schema=mmqa_table_cols)
+
+        # construct mapping from table id to table string
+        table_id_to_table = {}
+        with open("data/MMQA_tables.jsonl") as f:
+            for line in f:
+                dict_line = json.loads(line)
+
+                # get page title and table name
+                page_title = dict_line["title"]
+                table_name = dict_line["table"]["table_name"]
+
+                # get table column names and empty column indices
+                table_header = dict_line["table"]["header"]
+                column_names = [col["column_name"] for col in table_header if col["column_name"] != ""]
+                empty_col_indices = set([idx for idx, col in enumerate(table_header) if col["column_name"] == ""])
+
+                # create string for table data
+                text = f"{page_title}: {table_name}\n\n{','.join(column_names)}\n"
+
+                # parse table row data
+                table_rows = dict_line["table"]["table_rows"]
+                for row in table_rows:
+                    row_data = []
+                    for idx, cell in enumerate(row):
+                        if idx in empty_col_indices:
+                            continue
+                        row_data.append(cell["text"])
+
+                    text += ",".join(row_data) + "\n"
+
+                table_id_to_table[dict_line["id"]] = text
+
+        # construct dataset
+        self.dataset = []
+        for entry in dataset:
+            for context in entry["supporting_context"]:
+                if context["doc_part"] == "table":
+                    table_id = context["doc_id"]
+                    table = table_id_to_table[table_id]
+                    self.dataset.append({"table_id": table_id, "table": table})
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def __getitem__(self, idx: int):
+        return self.dataset[idx]
+
+
+class MMQAImageDataset(pz.IterDataset):
+    def __init__(self, dataset: list[dict]):
+        super().__init__(id="mmqa-images", schema=mmqa_image_cols)
+
+        # construct mapping from image id to image base64 object
+        image_id_to_image = {}
+        with open("data/MMQA_images.jsonl") as f:
+            possible_endings = {'.JPG', '.png', '.jpeg', '.jpg', '.tif', '.JPEG', '.tiff', '.PNG', '.Jpg', '.gif'}
+            for line in f:
+                dict_line = json.loads(line)
+                image_id = dict_line["id"]
+
+                # skip corrupted images:
+                if image_id in CORRUPTED_IMAGE_IDS:
+                    continue
+
+                # find the correct image file
+                image_filepath = None
+                for ending in possible_endings:
+                    filepath = f"data/final_dataset_images/{image_id}{ending}"
+                    if os.path.exists(filepath):
+                        image_filepath = filepath
+                        break
+
+                # read the image file and convert to base64
+                with open(image_filepath, "rb") as f:
+                    contents = base64.b64encode(f.read()).decode("utf-8")
+                    image_id_to_image[image_id] = contents
+
+        # construct dataset
+        self.dataset = []
+        for entry in dataset:
+            for context in entry["supporting_context"]:
+                if context["doc_part"] == "image":
+                    image_id = context["doc_id"]
+                    image = image_id_to_image[image_id]
+                    self.dataset.append({"image_id": image_id, "image": image})
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def __getitem__(self, idx: int):
+        return self.dataset[idx]
+
+
+def get_dataset(split: str, shuffle: bool, seed: int, num_samples: int | None) -> list[str]:
+    dataset = []
+    with open(f"data/MMQA_{split}.jsonl") as f:
+        for line in f:
+            dict_line = json.loads(line)
+            if "image" in dict_line["metadata"]["modalities"] and len(dict_line["metadata"]["modalities"]) > 1:
+                dataset.append(dict_line)
+
+    # shuffle the questions for the given seed
+    if shuffle:
+        rng = np.random.default_rng(seed=seed)
+        rng.shuffle(dataset)
+    
+    return dataset if num_samples is None else dataset[:num_samples]
 
 
 def compute_f1(final_df, answers_df):
@@ -404,7 +492,7 @@ if __name__ == "__main__":
     execution_strategy = args.execution_strategy
     sentinel_execution_strategy = args.sentinel_execution_strategy
     exp_name = (
-        f"mmqa-final-{sentinel_execution_strategy}-k{k}-j{j}-budget{sample_budget}-seed{seed}"
+        f"mmqa-complex-final-{sentinel_execution_strategy}-k{k}-j{j}-budget{sample_budget}-seed{seed}"
         if args.exp_name is None
         else args.exp_name
     )
@@ -419,106 +507,82 @@ if __name__ == "__main__":
     if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None and os.getenv("ANTHROPIC_API_KEY") is None:
         print("WARNING: OPENAI_API_KEY, TOGETHER_API_KEY, and ANTHROPIC_API_KEY are unset")
 
+    # create the train and test dataset
+    train_dataset = get_dataset(split="train", shuffle=True, seed=seed, num_samples=val_examples)
+    test_dataset = get_dataset(split="dev", shuffle=True, seed=seed, num_samples=100)
+
     # create validator for MMQA
-    validator = MMQAValidator(num_samples=val_examples, shuffle=True, seed=seed)
+    validator = MMQAValidator(train_dataset)
 
-    # create datasets for MMQA
-    train_dataset = MMQADataset(split="train", num_samples=val_examples, shuffle=True, seed=seed)
-    train_dataset = {train_dataset.id: train_dataset}
-
-    # load index [text-embedding-3-small]
-    chroma_client = chromadb.PersistentClient(".chroma-mmqa")
-    openai_ef = OpenAIEmbeddingFunction(
-        api_key=os.environ["OPENAI_API_KEY"],
-        model_name="text-embedding-3-small",
-    )
-    sentence_transformer_ef = SentenceTransformerEmbeddingFunction(
-        model_name="clip-ViT-B-32"
-    )
-    text_index = chroma_client.get_collection("mmqa-texts", embedding_function=openai_ef)
-    table_index = chroma_client.get_collection("mmqa-tables", embedding_function=openai_ef)
-    image_index = chroma_client.get_collection("mmqa-images", embedding_function=sentence_transformer_ef)
-
-    def get_results_and_ids(index: chromadb.Collection, query: list[list[float]], n_results: int, image=False) -> tuple[list[str]]:
-        # execute query with embeddings
-        results = index.query(query, n_results=n_results)
-
-        # get list of result terms with their cosine similarity scores
-        final_results = []
-        for query_doc_ids, query_docs, query_distances in zip(results["ids"], results["documents"], results["distances"]):
-            for doc_id, doc, dist in zip(query_doc_ids, query_docs, query_distances):
-                cosine_similarity = 1 - dist
-                final_results.append({"content": doc, "id": doc_id, "similarity": cosine_similarity})
-
-        # sort the results by similarity score
-        sorted_results = sorted(final_results, key=lambda result: result["similarity"], reverse=True)
-
-        # remove duplicates
-        sorted_results_set = set()
-        final_sorted_results, final_sorted_result_ids = [], []
-        for result in sorted_results:
-            if result["content"] not in sorted_results_set:
-                sorted_results_set.add(result["content"])
-                final_sorted_results.append(result["content"])
-                final_sorted_result_ids.append(result["id"])
-
-        # return the top-k similar results and generation stats
-        return final_sorted_results[:n_results], final_sorted_result_ids[:n_results]
-
-    def text_search_func(index: chromadb.Collection, query: list[list[float]], k: int) -> list[str]:
-        # execute query with embeddings
-        results, result_ids = get_results_and_ids(index, query, n_results=k)
-        return {"supporting_texts": results, "supporting_text_ids": result_ids}
-
-    def table_search_func(index: chromadb.Collection, query: list[list[float]], k: int) -> list[str]:
-        # execute query with embeddings
-        results, result_ids = get_results_and_ids(index, query, n_results=k)
-        return {"supporting_tables": results, "supporting_table_ids": result_ids}
-
-    def image_search_func(index: chromadb.Collection, query: list[list[float]], k: int) -> list[str]:
-        # limit max number of results to 5
-        # k = min(k, 5)
-
-        # execute query with embeddings
-        _, result_ids = get_results_and_ids(index, query, n_results=k, image=True)
-        possible_endings = {'.JPG', '.png', '.jpeg', '.jpg', '.tif', '.JPEG', '.tiff', '.PNG', '.Jpg', '.gif'}
-
-        results = []
-        for image_id in result_ids:
-            # find the correct image file
-            for ending in possible_endings:
-                if os.path.exists(f"testdata/mmqa-images/{image_id}{ending}"):
-                    image_id += ending
-                    break
-
-            # load image from disk
-            with open(f"testdata/mmqa-images/{image_id}", "rb") as f:
-                base64_image_str = base64.b64encode(f.read())
-                results.append(base64_image_str)
-
-        return {"supporting_images": results, "supporting_image_ids": result_ids}
+    # create train datasets for questions, texts, tables, and images
+    train_question_dataset = MMQAQuestionDataset(train_dataset)
+    train_text_dataset = MMQATextDataset(train_dataset)
+    train_table_dataset = MMQATableDataset(train_dataset)
+    train_image_dataset = MMQAImageDataset(train_dataset)
+    train_dataset = {
+        train_question_dataset.id: train_question_dataset,
+        train_text_dataset.id: train_text_dataset,
+        train_table_dataset.id: train_table_dataset,
+        train_image_dataset.id: train_image_dataset,
+    }
 
     # construct plan
-    plan = MMQADataset(split="dev", num_samples=100, shuffle=True, seed=seed)
-    plan = plan.sem_topk(
-        index=text_index,
-        search_func=text_search_func,
-        search_attr="question",
-        output_attrs=mmqa_text_cols,
+    test_question_dataset = MMQAQuestionDataset(test_dataset)
+    print(f"Test Question Dataset: {len(test_question_dataset)}")
+    test_text_dataset = MMQATextDataset(test_dataset)
+    print(f"Text Dataset: {len(test_text_dataset)}")
+    test_table_dataset = MMQATableDataset(test_dataset)
+    print(f"Table Dataset: {len(test_table_dataset)}")
+    test_image_dataset = MMQAImageDataset(test_dataset)
+    print(f"Image Dataset: {len(test_image_dataset)}")
+    text_plan = test_question_dataset.sem_map(mmqa_text_search_cols, depends_on=["question"])
+    text_plan = text_plan.sem_join(
+        test_text_dataset,
+        condition="The text snippet is relevant to the question based on the text search string.",
+        depends_on=["text_search_string", "text"],
+        how="left",
     )
-    plan = plan.sem_topk(
-        index=table_index,
-        search_func=table_search_func,
-        search_attr="question",
-        output_attrs=mmqa_table_cols,
+    text_plan = text_plan.groupby(pz.GroupBySig(["qid", "question", "text_search_string"], agg_funcs=["list", "list"], agg_fields=["text_id", "text"]))
+    text_plan = text_plan.map(
+        udf=lambda record: {"text": "...".join(record["list(text)"]) if record["list(text)"] != [None] else "None", **record},
+        cols=[{"name": "text", "type": str, "desc": "All relevant text snippets concatenated together."}],
     )
-    plan = plan.sem_topk(
-        index=image_index,
-        search_func=image_search_func,
-        search_attr="question",
-        output_attrs=mmqa_image_cols,
+    text_plan = text_plan.project(["qid", "question", "text"])
+
+    table_plan = test_question_dataset.sem_map(mmqa_table_search_cols, depends_on=["question"])
+    table_plan = table_plan.sem_join(
+        test_table_dataset,
+        condition="The table is relevant to the question based on the table search string.",
+        depends_on=["table_search_string", "table"],
+        how="left",
     )
-    plan = plan.sem_map(mmqa_answer_cols)
+    table_plan = table_plan.groupby(pz.GroupBySig(["qid", "question", "table_search_string"], agg_funcs=["list", "list"], agg_fields=["table_id", "table"]))
+    table_plan = table_plan.map(
+        udf=lambda record: {"table": "\n\n".join(record["list(table)"]) if record["list(table)"] != [None] else "None", **record},
+        cols=[{"name": "table", "type": str, "desc": "All relevant tables concatenated together."}],
+    )
+    table_plan = table_plan.project(["qid", "question", "table"])
+
+    image_plan = test_question_dataset.sem_map(mmqa_image_search_cols, depends_on=["question"])
+    image_plan = image_plan.sem_join(
+        test_image_dataset,
+        condition="The image is relevant to the question based on the image search string.",
+        depends_on=["image_search_string", "image"],
+        how="left",
+    )
+    image_plan = image_plan.groupby(pz.GroupBySig(["qid", "question", "image_search_string"], agg_funcs=["list", "list"], agg_fields=["image_id", "image"]))
+    image_plan = image_plan.map(
+        udf=lambda record: {"image": record["list(image)"] if record["list(image)"] != [None] else "None", **record},
+        cols=[{"name": "image", "type": list[ImageBase64], "desc": "All relevant images."}],
+    )
+    image_plan = image_plan.project(["qid", "question", "image"])
+    plan = text_plan.join(table_plan, on=["qid", "question"]).join(image_plan, on=["qid", "question"])
+    plan = plan.sem_map(mmqa_answer_cols, depends_on=["question", "text", "table", "image"])
+
+    # TODO:
+    # 1. add "how" argument to sem_join
+    #    a. have left / right outer join return None for missing values
+    # 2. add join operator
 
     # execute pz plan
     config = pz.QueryProcessorConfig(

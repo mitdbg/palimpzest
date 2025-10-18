@@ -27,6 +27,7 @@ const sidebars: SidebarsConfig = {
         'getting-started/quickstart',
         'getting-started/next-steps',
       ],
+      collapsed: false,
     },
     {
       type: 'category',
@@ -34,9 +35,23 @@ const sidebars: SidebarsConfig = {
       items: [
         'user-guide/overview',
         'user-guide/dataset',
-        'user-guide/operators',
+        {
+          type: 'category',
+          label: 'Semantic Operators',
+          items: [
+            'user-guide/operators/overview',
+            'user-guide/operators/sem_map',
+            'user-guide/operators/sem_filter',
+            'user-guide/operators/sem_join',
+            'user-guide/operators/sem_agg',
+            'user-guide/operators/sem_topk',
+            'user-guide/operators/relational',
+          ],
+          collapsed: false,
+        },
         'user-guide/optimization',
       ],
+      collapsed: false,
     }
   ],
   documentationSidebar: [
@@ -45,31 +60,31 @@ const sidebars: SidebarsConfig = {
       label: 'Documentation',
       items: [
         'api/overview',
-        {
-          type: 'category',
-          label: 'Data',
-          items: [
-            'api/data/dataset',
-            'api/data/datarecord',
-            'api/data/datarecordcollection',
-            'api/data/context',
-            'api/data/iter-dataset',
-          ],
-        },
-        {
-          type: 'category',
-          label: 'Operators',
-          items: [
-            'api/operators/aggregate',
-            {
-              type: 'category',
-              label: 'Filters',
-              items: [
-                'api/operators/filter/filter',
-                'api/operators/filter/llm-filter',
-                'api/operators/filter/non-llm-filter',
-              ],
-            },
+        // {
+        //   type: 'category',
+        //   label: 'Data',
+        //   items: [
+        //     'api/data/dataset',
+        //     'api/data/datarecord',
+        //     'api/data/datarecordcollection',
+        //     'api/data/context',
+        //     'api/data/iter-dataset',
+        //   ],
+        // },
+        // {
+        //   type: 'category',
+        //   label: 'Operators',
+        //   items: [
+        //     'api/operators/aggregate',
+        //     {
+        //       type: 'category',
+        //       label: 'Filters',
+        //       items: [
+        //         'api/operators/filter/filter',
+        //         'api/operators/filter/llm-filter',
+        //         'api/operators/filter/non-llm-filter',
+        //       ],
+        //     },
             // {
             //   type: 'category',
             //   label: 'Joins',
@@ -79,25 +94,25 @@ const sidebars: SidebarsConfig = {
             //     'api/operators/join/embedding-join',
             //   ],
             // },
-            'api/operators/limit',
-            'api/operators/logical',
-            {
-              type: 'category',
-              label: 'Maps',
-              items: [
-                'api/operators/convert/convert',
-                'api/operators/convert/critique-and-refine-convert',
-                'api/operators/convert/llm-convert',
-                'api/operators/convert/mixture-of-agents-convert',
-                'api/operators/convert/non-llm-convert',
-                'api/operators/convert/rag-convert',
-              ],
-            },
-            'api/operators/physical',
-            'api/operators/retrieve',
-            'api/operators/scan',
-          ],
-        },
+            // 'api/operators/limit',
+            // 'api/operators/logical',
+            // {
+            //   type: 'category',
+            //   label: 'Maps',
+            //   items: [
+            //     'api/operators/convert/convert',
+            //     'api/operators/convert/critique-and-refine-convert',
+            //     'api/operators/convert/llm-convert',
+            //     'api/operators/convert/mixture-of-agents-convert',
+            //     'api/operators/convert/non-llm-convert',
+            //     'api/operators/convert/rag-convert',
+            //   ],
+            // },
+            // 'api/operators/physical',
+            // 'api/operators/topk',
+            // 'api/operators/scan',
+        //   ],
+        // },
       ],
     }
   ],

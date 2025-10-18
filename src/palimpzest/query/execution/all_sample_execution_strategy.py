@@ -225,7 +225,7 @@ class AllSamplingExecutionStrategy(SentinelExecutionStrategy):
         dataset_id_to_source_indices = {}
         for dataset_id, dataset in train_dataset.items():
             total_num_samples = len(dataset)
-            source_indices = [f"{dataset_id}-{int(idx)}" for idx in np.arange(total_num_samples)]
+            source_indices = [f"{dataset_id}---{int(idx)}" for idx in np.arange(total_num_samples)]
             dataset_id_to_source_indices[dataset_id] = source_indices
 
         # initialize set of physical operators for each logical operator

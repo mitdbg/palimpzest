@@ -1,0 +1,124 @@
+---
+title: Semantic Top-K
+---
+The `sem_topk()` operator allows users to retrieve the top-K most relevant entries from a vector database for each row in a dataset. PZ implements this operator with a function (typically powered by an embedding model) that evaluates the relevance of entries in the vector database to each row in the dataset and returns the top-K entries based on embedding similarity.
+
+Semantic Top-K is useful for augmenting a dataset with additional context or information from an external knowledge base. For example, retrieving the top-K most relevant documents from a knowledge base for each query in a dataset of search queries.
+
+:::info[Key Features of `sem_topk()`]
+1. The operator takes a `pz.Dataset` as input and produces a new dataset with the same number of rows, where each row is augmented with the top-K relevant entries from the vector database.
+2. The operator takes an `index` (i.e. a vector database) as input, currently PZ only supports `chromadb.Collection` objects as indices.
+3. The number of entries to retrieve (K) can be specified via the `k` parameter. If left unspecified, PZ's optimizer can search for the best value of K (when using `.optimize_and_run()`)
+4. A custom `search_func` can be provided to customize how the vector database is queried and how results are returned.
+:::
+
+### Semantic Top-K
+To illustrate the use of `sem_topk()`, consider the following example where we have a dataset of research topics and want to augment each topic with the top-3 most relevant papers from a vector database of research papers. Suppose we have already created a ChromaDB collection with embeddings for the following papers:
+```
+research-papers
+├── battery.pdf
+├── crowddb.pdf
+├── dctcp.pdf
+├── hstoredb.pdf
+├── ionic-and-electronic-conductivity.pdf
+├── pie-bufferbloat.pdf
+├── semiconductor-mixed-ion.pdf
+├── snowflakedb.pdf
+└── xcp.pdf
+```
+We can then write the following PZ program to augment a dataset of research topics with the top-3 most relevant papers from the vector database:
+```python
+import palimpzest as pz
+import chromadb
+from chromadb.utils.embedding_functions.openai_embedding_function import OpenAIEmbeddingFunction
+import os
+
+# get vector database index (ChromaDB Collection)
+client = chromadb.PersistentClient(path=".chromadb-research-papers")
+openai_ef = OpenAIEmbeddingFunction(
+    api_key=os.environ["OPENAI_API_KEY"],
+    model_name="text-embedding-3-small",
+)
+collection = client.get_collection(name="research-papers", embedding_function=openai_ef)
+
+# create dataset of research topics
+topics = [
+    {"topic": "battery technology"},
+    {"topic": "database systems"},
+    {"topic": "network congestion control"},
+]
+ds = pz.MemoryDataset(
+    id="research-topics",
+    vals=topics,
+    schema=[{"name": "topic", "type": str, "desc": "A research topic"}],
+)
+
+# define the search function logic for returning top-k results
+def search_func(index: chromadb.Collection, query: list[list[float]], k: int) -> dict[str, list]:
+    # execute query with embeddings
+    results = index.query(query, n_results=k)
+
+    # return the top-k similar paper ids and paper texts
+    return {"paper_ids": results["ids"][0], "paper_texts": results["documents"][0]}
+
+# retrieve the top-3 most relevant papers for each topic
+ds = ds.sem_topk(
+    index=collection,
+    search_func=search_func,
+    search_attr="topic",
+    output_attrs=[
+        {"name": "paper_ids", "type": list[str], "desc": "The IDs of the top-3 most relevant papers"},
+        {"name": "paper_texts", "type": list[str], "desc": "The text contents of the top-3 most relevant papers"},
+    ],
+    k=3,
+)
+
+# execute the program
+output = ds.run(max_quality=True)
+print(output.to_df())
+```
+We load the precomputed ChromaDB collection using the `chromadb` library. The call to `pz.MemoryDataset()` creates a dataset with one record for each research topic in the `topics` list. The call to `sem_topk()` uses the `topic` field to generate a query embedding which is provided to the `search_func` along with the value of `k`. The `collection` is then queried and the top-k results are returned. Ultimately, the `sem_topk()` operator produces a new dataset with the `paper_ids` and `paper_texts` fields computed for each research topic in the input dataset.
+
+An example output might look like the following:
+```
+                        topic                                          paper_ids                                        paper_texts
+0            database systems       [hstoredb.pdf, snowflakedb.pdf, crowddb.pdf]  [H-Store: A High-Performance, Distributed Main...
+1          battery technology  [semiconductor-mixed-ion.pdf, battery.pdf, ion...  [PCCP\nPAPER\nCite this: Phys. Chem. Chem. Phy...
+2  network congestion control          [dctcp.pdf, xcp.pdf, pie-bufferbloat.pdf]  [Data Center TCP (DCTCP)\nMohammad Alizadeh‡†,...
+```
+
+:::info[Providing a Custom Search Function]
+In the above example, we provided a custom `search_func` to define how the vector database is queried and how results are returned. The `search_func` takes three parameters: the `index` (i.e., the ChromaDB collection), a list of query embeddings, and the number of results to return (K). The function executes the query on the index and returns a dictionary containing the top-K relevant paper IDs and paper texts.
+
+The keys of the dictionary returned by `search_func` must match the names of the fields specified in the `output_attrs` parameter of `sem_topk()`. This ensures that the results from the search function are correctly mapped to the output fields in the resulting dataset.
+
+PZ has a default `search_func` that can be used if the user does not provide one, however this default function will only work if the `output_attrs` contain a single field.
+:::
+
+### Optimizing k
+Palimpzest can automatically optimize the value of `k` (the number of top entries to retrieve) when using the `.optimize_and_run()` method. For example, we can modify the previous example to optimize `k` as follows:
+```python
+import palimpzest as pz
+...
+# retrieve the most relevant papers for each topic
+ds = ds.sem_topk(
+    index=collection,
+    search_func=search_func,
+    search_attr="topic",
+    output_attrs=[
+        {"name": "paper_ids", "type": list[str], "desc": "The IDs of the top-3 most relevant papers"},
+        {"name": "paper_texts", "type": list[str], "desc": "The text contents of the top-3 most relevant papers"},
+    ],
+)
+
+# execute the program
+config = pz.QueryProcessorConfig(
+    sample_budget=15,
+    policy=pz.MaxQuality(),
+)
+output = ds.optimize_and_run(config, validator=pz.Validator(model=pz.Model.GPT_5))
+print(output.to_df())
+```
+:::tip[Optimizing K with Labels]
+To effectively optimize `k`, it is recommended to provide a labeling function in the `pz.Validator` that can evaluate the quality of the results based on your specific criteria. In our experience, using an LLM-as-a-judge in this setting shows mixed results, as the LLM may optimize for recall instead of e.g. precision.
+:::

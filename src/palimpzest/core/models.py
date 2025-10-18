@@ -51,10 +51,10 @@ class GenerationStats(BaseModel):
     fn_call_duration_secs: float = 0.0
 
     # (if applicable) the total number of LLM calls made by this operator
-    total_llm_calls: int = 0
+    total_llm_calls: float = 0
 
     # (if applicable) the total number of embedding LLM calls made by this operator
-    total_embedding_llm_calls: int = 0
+    total_embedding_llm_calls: float = 0
 
     def __iadd__(self, other: GenerationStats) -> GenerationStats:
         # self.raw_answers.extend(other.raw_answers)
@@ -243,10 +243,10 @@ class RecordOpStats(BaseModel):
     fn_call_duration_secs: float = 0.0
 
     # (if applicable) the total number of LLM calls made by this operator
-    total_llm_calls: int = 0
+    total_llm_calls: float = 0
 
     # (if applicable) the total number of embedding LLM calls made by this operator
-    total_embedding_llm_calls: int = 0
+    total_embedding_llm_calls: float = 0
 
     # (if applicable) a boolean indicating whether this is the statistics captured from a failed convert operation
     failed_convert: bool | None = None
