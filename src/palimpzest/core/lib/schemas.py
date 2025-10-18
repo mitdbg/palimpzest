@@ -208,6 +208,9 @@ class Average(BaseModel):
 class Count(BaseModel):
     count: int = Field(description="The count of items in the dataset")
 
+class Sum(BaseModel):
+    sum: int = Field(description="The summation of items in the dataset")
+
 class Min(BaseModel):
     min: int | float = Field(description="The minimum value of some items in the dataset")
 

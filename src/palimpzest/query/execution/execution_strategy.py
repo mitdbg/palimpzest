@@ -14,8 +14,8 @@ from palimpzest.query.operators.convert import LLMConvert
 from palimpzest.query.operators.filter import LLMFilter
 from palimpzest.query.operators.join import JoinOp
 from palimpzest.query.operators.physical import PhysicalOperator
-from palimpzest.query.operators.retrieve import RetrieveOp
 from palimpzest.query.operators.scan import ContextScanOp, ScanPhysicalOp
+from palimpzest.query.operators.topk import TopKOp
 from palimpzest.query.optimizer.plan import PhysicalPlan, SentinelPlan
 from palimpzest.utils.progress import PZSentinelProgressManager
 from palimpzest.validator.validator import Validator
@@ -123,7 +123,7 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
             return (
                 not isinstance(op, LLMConvert)
                 and not isinstance(op, LLMFilter)
-                and not isinstance(op, RetrieveOp)
+                and not isinstance(op, TopKOp)
                 and not isinstance(op, JoinOp)
             )
 
@@ -167,8 +167,8 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
                             full_hashes.add(full_hash)
                             futures.append(executor.submit(validator._score_flat_map, op, fields, input_record, output, full_hash))
 
-                    # create future for retrieve
-                    elif isinstance(op, RetrieveOp):
+                    # create future for top-k
+                    elif isinstance(op, TopKOp):
                         fields = op.generated_fields
                         input_record: DataRecord = record_set.input
                         output = record_set.data_records[0].to_dict(project_cols=fields)
@@ -176,7 +176,7 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
                         full_hash = f"{hash(input_record)}{hash(output_str)}"
                         if full_hash not in full_hashes:
                             full_hashes.add(full_hash)
-                            futures.append(executor.submit(validator._score_retrieve, op, fields, input_record, output, full_hash))
+                            futures.append(executor.submit(validator._score_topk, op, fields, input_record, output, full_hash))
 
                     # create future for filter
                     elif isinstance(op, LLMFilter):
@@ -235,7 +235,7 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
 
                 # TODO: this scoring function will (likely) bias towards small values of k since it
                 # measures precision and not recall / F1; will need to revisit this in the future
-                elif isinstance(op, RetrieveOp):
+                elif isinstance(op, TopKOp):
                     fields = op.generated_fields
                     input_record: DataRecord = record_set.input
                     output_str = record_set.data_records[0].to_json_str(project_cols=fields, bytes_to_str=True, sorted=True)
@@ -341,9 +341,9 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
     def _is_llm_op(self, physical_op: PhysicalOperator) -> bool:
         is_llm_convert = isinstance(physical_op, LLMConvert)
         is_llm_filter = isinstance(physical_op, LLMFilter)
-        is_llm_retrieve = isinstance(physical_op, RetrieveOp) and isinstance(physical_op.index, Collection)
+        is_llm_topk = isinstance(physical_op, TopKOp) and isinstance(physical_op.index, Collection)
         is_llm_join = isinstance(physical_op, JoinOp)
-        return is_llm_convert or is_llm_filter or is_llm_retrieve or is_llm_join
+        return is_llm_convert or is_llm_filter or is_llm_topk or is_llm_join
 
     @abstractmethod
     def execute_sentinel_plan(self, sentinel_plan: SentinelPlan, train_dataset: dict[str, Dataset], validator: Validator) -> SentinelPlanStats:

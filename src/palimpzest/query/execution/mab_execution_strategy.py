@@ -14,8 +14,8 @@ from palimpzest.query.operators.convert import LLMConvert
 from palimpzest.query.operators.filter import FilterOp, LLMFilter, NonLLMFilter
 from palimpzest.query.operators.join import JoinOp
 from palimpzest.query.operators.physical import PhysicalOperator
-from palimpzest.query.operators.retrieve import RetrieveOp
 from palimpzest.query.operators.scan import ContextScanOp, ScanPhysicalOp
+from palimpzest.query.operators.topk import TopKOp
 from palimpzest.query.optimizer.plan import SentinelPlan
 from palimpzest.utils.progress import create_progress_manager
 from palimpzest.validator.validator import Validator
@@ -66,8 +66,8 @@ class OpFrontier:
         self.is_llm_join = isinstance(sample_op, JoinOp)
         is_llm_convert = isinstance(sample_op, LLMConvert)
         is_llm_filter = isinstance(sample_op, LLMFilter)
-        is_llm_retrieve = isinstance(sample_op, RetrieveOp) and isinstance(sample_op.index, Collection)
-        self.is_llm_op = is_llm_convert or is_llm_filter or is_llm_retrieve or self.is_llm_join
+        is_llm_topk = isinstance(sample_op, TopKOp) and isinstance(sample_op.index, Collection)
+        self.is_llm_op = is_llm_convert or is_llm_filter or is_llm_topk or self.is_llm_join
 
         # get order in which we will sample physical operators for this logical operator
         sample_op_indices = self._get_op_index_order(op_set, seed)

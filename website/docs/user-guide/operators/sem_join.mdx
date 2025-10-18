@@ -1,0 +1,100 @@
+---
+title: Semantic Join
+---
+The `sem_join()` operator allows users to perform joins between two datasets based on a specified join condition. PZ implements this operator with a function (typically powered by an LLM) that evaluates the join condition for each pair of rows from the two datasets and outputs the pairs that satisfy the condition.
+
+Semantic join is useful for combining data from different sources based on natural language criteria which may be difficult to express with traditional join conditions. For example, joining a dataset of product descriptions with a dataset of reviews based on whether the review is primarily foces on the product.
+
+Semantic join is also useful for joining multiple modalities of data, such as joining a dataset of animal images with a dataset of animal descriptions based on whether the description describes the animal in the image. (We have even joined images of animals to audio recordings of the animal's sounds!)
+
+:::info[Key Features of `sem_join()`]
+1. The operator takes a left `pz.Dataset` and a right `pz.Dataset` as input and produces a new dataset with the pairs of rows that satisfy the join condition.
+2. The type of join can be specified via the `how` parameter, which can take on the values `"inner"` (default), `"left"`, `"right"`, or `"outer"`.
+3. If the two datasets have overlapping field names, the duplicate fields from the right dataset will be suffixed with `_right` in the output dataset to avoid naming conflicts.
+4. The (subset of) input field(s) which are used to apply the filter predicate can be specified via the `depends_on` parameter. Omitting a field from this list will not drop the field from the output dataset; it will simply not template the field into the prompt when computing the join condition.
+:::
+
+### Semantic Join
+Suppose we have two datasets: one containing descriptions of animals and another containing images of animals:
+```
+animal-descs
+├── chamois.txt
+├── dog.txt
+├── elephant.txt
+├── lion.txt
+└── zebra.txt
+animal-images
+├── chamois.jpg
+├── elephant.jpg
+├── gorilla.jpg
+├── monkey.jpg
+└── zebra.jpg
+```
+We can write the following PZ program to join these datasets based on whether the description matches the animal in the image.
+
+```python
+import palimpzest as pz
+
+# create datasets of animal descriptions and animal images
+text_ds = pz.TextFileDataset(
+    id="animal-descriptions",
+    path="animal-descs/",
+)
+image_ds = pz.ImageFileDataset(
+    id="animal-images",
+    path="animal-images/",
+)
+
+# use sem_join to join the datasets based on whether the description matches the animal in the image
+joined_ds = text_ds.sem_join(
+    image_ds,
+    "The description matches the animal in the image",
+)
+
+# execute the program
+output = joined_ds.run(max_quality=True)
+print(output.to_df())
+```
+The call to `pz.TextFileDataset()` will create a dataset with one record for each text file in the `animal-descs/` directory. Each record will have a `filename` and `contents` field, where `contents` is the text read from the file. Similarly, the call to `pz.ImageFileDataset()` will create a dataset with one record for each image file in the `animal-images/` directory. Each record will have a `filename` and `contents` field, where `contents` is the image data read from the file. The call to `sem_join()` will produce a new dataset with the pairs of records from the two input datasets that satisfy the join condition.
+
+An example output might look like the following:
+```
+       filename                                           contents filename_right                                     contents_right
+0  elephant.txt  Elephants are the largest living land animals....   elephant.jpg  /9j/4QB4RXhpZgAATU0AKgAAAAgABQEaAAUAAAABAAAASg...
+1   chamois.txt  The chamois (/ˈʃæmwɑː/;[2] French: [ʃamwa] ⓘ) ...    chamois.jpg  /9j/4QCKRXhpZgAATU0AKgAAAAgABgEaAAUAAAABAAAAVg...
+2     zebra.txt  Zebras (US: /ˈziːbrəz/, UK: /ˈzɛbrəz, ˈziː-/)[...      zebra.jpg  /9j/2wBDAAQDAwQDAwQEAwQFBAQFBgoHBgYGBg0JCggKDw...
+```
+
+:::info[Context Management with `depends_on`]
+In the above example, the `sem_join()` operator will feed all of the left and right fields into the LLM when computing whether or not a join tuple satisfies the join predicate.
+
+However, if we want to ensure that only the text and image contents are being used to compute the join, the `depends_on` parameter can be used in order to specify which field(s) should be presented to the underlying LLM(s) when computing the join predicate.
+
+To this end, we could modify the `sem_join()` call as follows:
+```python
+joined_ds = text_ds.sem_join(
+    image_ds,
+    "The description matches the animal in the image",
+    depends_on=["contents", "contents_right"],
+)
+```
+This ensures that only the text and image `contents` fields are included in the prompt when computing the predicate. Note that we have to use `contents_right` to refer to the `contents` field from the right dataset, as it is automatically renamed to avoid naming conflicts.
+:::
+
+It is also possible to perform left, right, and outer semantic joins by specifying the `how` parameter. For example, to perform a left semantic join, we could modify the `sem_join()` call as follows:
+```python
+joined_ds = text_ds.sem_join(
+    image_ds,
+    "The description matches the animal in the image",
+    how="left",
+)
+```
+This will produce a dataset with all records from the left dataset and the matching records from the right dataset (if any). Records from the left dataset that do not have a matching record in the right dataset will have `None` values for the fields from the right dataset:
+```
+       filename                                           contents filename_right                                     contents_right
+0   chamois.txt  The chamois (/ˈʃæmwɑː/;[2] French: [ʃamwa] ⓘ) ...    chamois.jpg  /9j/4QCKRXhpZgAATU0AKgAAAAgABgEaAAUAAAABAAAAVg...
+1     zebra.txt  Zebras (US: /ˈziːbrəz/, UK: /ˈzɛbrəz, ˈziː-/)[...      zebra.jpg  /9j/2wBDAAQDAwQDAwQEAwQFBAQFBgoHBgYGBg0JCggKDw...
+2  elephant.txt  Elephants are the largest living land animals....   elephant.jpg  /9j/4QB4RXhpZgAATU0AKgAAAAgABQEaAAUAAAABAAAASg...
+3       dog.txt  The dog (Canis familiaris or Canis lupus famil...           None                                               None
+4      lion.txt  The lion (Panthera leo) is a large cat of the ...           None                                               None
+```

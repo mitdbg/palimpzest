@@ -207,7 +207,7 @@ class MMQAValidator(pz.Validator):
             targets = self.qid_to_labels[left_input_record["qid"]]["supporting_image_ids"]
             return pred in targets and output or pred not in targets and not output
         else:
-            raise NotImplementedError(f"Validator.retrieve_score_fn not implemented for condition {condition}.")
+            raise NotImplementedError(f"Validator.join_score_fn not implemented for condition {condition}.")
 
 
 class MMQAQuestionDataset(pz.IterDataset):

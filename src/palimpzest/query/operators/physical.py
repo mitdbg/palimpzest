@@ -194,7 +194,7 @@ class PhysicalOperator:
         in the candidate. This is important for operators with retry logic, where we may only need to
         recompute a subset of self.generated_fields.
 
-        Right now this is only used by convert and retrieve operators.
+        Right now this is only used by convert and top-k operators.
         """
         fields_to_generate = [
             field_name

@@ -22,7 +22,7 @@ from palimpzest.query.operators.logical import (
     LimitScan,
     LogicalOperator,
     Project,
-    RetrieveScan,
+    TopKScan,
 )
 from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.utils.hash_helpers import hash_for_serialized_dict
@@ -370,7 +370,6 @@ class Dataset:
 
         return Dataset(sources=[self], operator=operator, schema=new_output_schema)
 
-
     def sem_add_columns(self, cols: list[dict] | type[BaseModel],
                         cardinality: Cardinality = Cardinality.ONE_TO_ONE,
                         desc: str | None = None,
@@ -558,6 +557,11 @@ class Dataset:
         operator = Aggregate(input_schema=self.schema, agg_func=AggFunc.AVERAGE)
         return Dataset(sources=[self], operator=operator, schema=operator.output_schema)
 
+    def sum(self) -> Dataset:
+        """Apply a summation to this set"""
+        operator = Aggregate(input_schema=self.schema, agg_func=AggFunc.SUM)
+        return Dataset(sources=[self], operator=operator, schema=operator.output_schema)
+
     def min(self) -> Dataset:
         """Apply an min operator to this set"""
         operator = Aggregate(input_schema=self.schema, agg_func=AggFunc.MIN)
@@ -605,7 +609,7 @@ class Dataset:
 
         return Dataset(sources=[self], operator=operator, schema=operator.output_schema)
 
-    def retrieve(
+    def sem_topk(
         self,
         index: Collection,
         search_attr: str,
@@ -632,7 +636,7 @@ class Dataset:
         # index = index_factory(index)
 
         # construct logical operator
-        operator = RetrieveScan(
+        operator = TopKScan(
             input_schema=self.schema,
             output_schema=new_output_schema,
             index=index,

@@ -45,9 +45,6 @@ from palimpzest.query.optimizer.rules import (
     ReorderConverts as _ReorderConverts,
 )
 from palimpzest.query.optimizer.rules import (
-    RetrieveRule as _RetrieveRule,
-)
-from palimpzest.query.optimizer.rules import (
     Rule as _Rule,
 )
 from palimpzest.query.optimizer.rules import (
@@ -55,6 +52,9 @@ from palimpzest.query.optimizer.rules import (
 )
 from palimpzest.query.optimizer.rules import (
     SplitRule as _SplitRule,
+)
+from palimpzest.query.optimizer.rules import (
+    TopKRule as _TopKRule,
 )
 from palimpzest.query.optimizer.rules import (
     TransformationRule as _TransformationRule,
@@ -77,7 +77,7 @@ ALL_RULES = [
     _RAGRule,
     _RelationalJoinRule,
     _ReorderConverts,
-    _RetrieveRule,
+    _TopKRule,
     _Rule,
     _SemanticAggregateRule,
     _SplitRule,

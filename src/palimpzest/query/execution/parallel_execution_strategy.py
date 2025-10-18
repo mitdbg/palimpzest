@@ -41,6 +41,20 @@ class ParallelExecutionStrategy(ExecutionStrategy):
         upstream_future_queues = {upstream_unique_full_op_id: future_queues[upstream_unique_full_op_id] for upstream_unique_full_op_id in upstream_unique_full_op_ids}
         return not (self._any_queue_not_empty(upstream_input_queues) or self._any_queue_not_empty(upstream_future_queues))
 
+    def _finish_outer_join(self, executor: ThreadPoolExecutor, plan: PhysicalPlan, unique_full_op_id: str, input_queues: dict[str, dict[str, list]], future_queues: dict[str, list]) -> None:
+        join_op_upstream_finished = self._upstream_ops_finished(plan, unique_full_op_id, input_queues, future_queues)
+        join_input_queues_empty = all(len(inputs) == 0 for inputs in input_queues[unique_full_op_id].values())
+        join_future_queue_empty = len(future_queues[unique_full_op_id]) == 0
+        if join_op_upstream_finished and join_input_queues_empty and join_future_queue_empty:
+            # process the join one last time with final=True to handle any left/right/outer join logic
+            operator = self.unique_full_op_id_to_operator[unique_full_op_id]
+            if not operator.finished:
+                def finalize_op(operator):
+                    return operator([], [], final=True)
+                future = executor.submit(finalize_op, operator)
+                future_queues[unique_full_op_id].append(future)
+                operator.set_finished()
+
     def _process_future_results(self, unique_full_op_id: str, future_queues: dict[str, list], plan_stats: PlanStats) -> list[DataRecord]:
         """
         Helper function which takes a full operator id, the future queues, and plan stats, and performs
@@ -117,23 +131,16 @@ class ParallelExecutionStrategy(ExecutionStrategy):
 
                             # if the source is a left/right/outer join operator with no more inputs to process, then finish it
                             if self.is_outer_join_op[source_unique_full_op_id]:
-                                join_op_upstream_finished = self._upstream_ops_finished(plan, source_unique_full_op_id, input_queues, future_queues)
-                                join_input_queues_empty = all(len(inputs) == 0 for inputs in input_queues[source_unique_full_op_id].values())
-                                join_future_queue_empty = len(future_queues[source_unique_full_op_id]) == 0
-                                if join_op_upstream_finished and join_input_queues_empty and join_future_queue_empty:
-                                    # process the join one last time with final=True to handle any left/right/outer join logic
-                                    source_operator = self.unique_full_op_id_to_operator[source_unique_full_op_id]
-                                    if not source_operator.finished:
-                                        def finalize_op(operator):
-                                            return operator([], [], final=True)
-                                        future = executor.submit(finalize_op, source_operator)
-                                        future_queues[source_unique_full_op_id].append(future)
-                                        source_operator.set_finished()
+                                self._finish_outer_join(executor, plan, source_unique_full_op_id, input_queues, future_queues)
 
                     # for the final operator, add any finished futures to the output_records
                     if unique_full_op_id == f"{topo_idx}-{final_op.get_full_op_id()}":
                         records = self._process_future_results(unique_full_op_id, future_queues, plan_stats)
                         output_records.extend(records)
+
+                        # if this is a left/right/outer join operator with no more inputs to process, then finish it
+                        if self.is_outer_join_op[unique_full_op_id]:
+                            self._finish_outer_join(executor, plan, unique_full_op_id, input_queues, future_queues)
 
                     # if this operator does not have enough inputs to execute, then skip it
                     num_inputs = sum(len(inputs) for inputs in input_queues[unique_full_op_id].values())

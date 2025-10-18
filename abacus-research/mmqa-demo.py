@@ -209,7 +209,7 @@ class MMQAValidator(pz.Validator):
         targets = self.qid_to_labels[str(input_record["qid"])]["answers"]
         return self.f1(preds, targets)
 
-    def retrieve_score_fn(self, fields: list[str], input_record: dict, output: dict) -> float | None:
+    def topk_score_fn(self, fields: list[str], input_record: dict, output: dict) -> float | None:
         if "supporting_text_ids" in fields:
             preds = output.get("supporting_text_ids")
             targets = self.qid_to_labels[str(input_record["qid"])]["supporting_text_ids"]
@@ -223,7 +223,7 @@ class MMQAValidator(pz.Validator):
             targets = self.qid_to_labels[str(input_record["qid"])]["supporting_image_ids"]
             return self.recall(preds, targets)
         else:
-            raise NotImplementedError(f"Validator.retrieve_score_fn not implemented for fields {fields}.")
+            raise NotImplementedError(f"Validator.topk_score_fn not implemented for fields {fields}.")
 
 
 class MMQADataset(pz.IterDataset):
@@ -500,19 +500,19 @@ if __name__ == "__main__":
 
     # construct plan
     plan = MMQADataset(split="dev", num_samples=100, shuffle=True, seed=seed)
-    plan = plan.retrieve(
+    plan = plan.sem_topk(
         index=text_index,
         search_func=text_search_func,
         search_attr="question",
         output_attrs=mmqa_text_cols,
     )
-    plan = plan.retrieve(
+    plan = plan.sem_topk(
         index=table_index,
         search_func=table_search_func,
         search_attr="question",
         output_attrs=mmqa_table_cols,
     )
-    plan = plan.retrieve(
+    plan = plan.sem_topk(
         index=image_index,
         search_func=image_search_func,
         search_attr="question",
