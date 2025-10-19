@@ -38,8 +38,8 @@ class JoinOp(PhysicalOperator, ABC):
     def __init__(
         self,
         condition: str,
-        how: str,
-        on: list[str] | None,
+        how: str = "inner",
+        on: list[str] | None = None,
         join_parallelism: int = 64,
         retain_inputs: bool = True,
         desc: str | None = None,
