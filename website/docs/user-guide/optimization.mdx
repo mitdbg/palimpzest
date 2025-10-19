@@ -1,0 +1,283 @@
+---
+title: Optimization
+---
+{/* ## Goal
+This page should provide the reader with a brief overview of the PZ optimizer, and -- more importantly -- demonstrate how they can interact with and control the optimization process.
+
+Key takeaways for the reader should include:
+
+1. Having a very basic understanding of what the optimizer does
+    - (Without scaring the user) I want to leave them with the impression that the optimizer is doing "real work" which provides value to them
+2. Knowing how to provide validation data to the optimizer
+3. Knowing how to examine the plan output by the optimizer
+4. Having a very basic understanding of how to pass hyperparameters to constrain the optimizer's search
+
+Keeping in line with "show don't tell", this page should have a motivating use case for which the user calls `plan = dataset.optimize()` and prints the resulting `plan`. We should then show how to construct e.g. 3 validation examples for the program, feed them into another call to `dataset.optimize()`, and print the new `plan` (ideally showing that it is more optimal).
+
+Finally, for (4.) we can show how to limit the optimizer's access to specific models (using the `avaiable_models` config option) ***for all operators***. In the near future, we may want to do some engineering to support per-operator limits on models. (Of course, we don't want users feeling like they have to tinker with the `Optimizer` too much. However, I think most new users will gravitate towards restricting models and customizing prompts -- and we should support this in the near term.)
+*/}
+
+When a user calls the `.run()` method on a PZ dataset, the PZ program is executed without any sample-based optimization. Instead, PZ uses naive prior beliefs about the quality, cost, and latency of each operator to generate a physical execution plan. This plan is then executed to produce the final output dataset.
+
+In order to use Palimpzest's [Abacus optimizer](https://arxiv.org/abs/2505.14661), users can call the `.optimize_and_run()` method on a PZ dataset instead. This method will:
+1. Sample inputs and physical operators for each semantic operator in the PZ program
+2. Run the sampled operators on the sampled inputs and observe the quality, cost, and latency of each operator
+3. Iteratively draw more samples until a sample budget (default 100 operator-input pairs) is exhausted
+4. Compute the optimal physical execution plan given the sample-based estimates for each operator and the user's optimization objective
+5. Execute the optimal plan on the user's dataset
+
+In this guide, we will illustrate how to use the `.optimize_and_run()` method and how to customize the optimization process. Specifically, we will cover:
+1. [How to use an LLM judge to validate operator quality](#using-an-llm-judge-to-validate-operator-quality)
+2. [How to use labels to validate operator quality](#using-labels-to-validate-operator-quality)
+3. [How to provide a separate training (i.e. validation) dataset for the optimization process](#providing-a-separate-training-dataset)
+
+:::info[LLM Judges vs. Labels]
+Using an LLM judge is a great way to quickly get started with optimization in PZ. However, LLM judges are not always accurate or faithful to the user's intent. For this reason, we recommend using labels to validate operator quality whenever possible (see [below](#using-labels-to-validate-operator-quality)).
+
+Additionally, users can use both LLM judges and labels together to validate operator quality. In this case, the LLM judge will be used to evaluate the quality of operators for which no labels are available, while the labels will be used to evaluate the quality of operators when they are avaiable. We also cover this setting in more detail [below](#dealing-with-partial-labels).
+:::
+
+:::tip[How Many Labels Do I Need?]
+In our experience, we've found that even using as few as 5-10 labels can significantly improve the quality of the optimized plan.
+:::
+
+### Using an LLM Judge to Validate Operator Quality
+This simplest way to get started with optimization in PZ is to use an LLM judge to evaluate the quality of each operator. This is done by providing a `pz.Validator` object with a specified model to the `.optimize_and_run()` method.
+
+For example, consider the email filtering program from our [introduction](intro.mdx), where we are computing the sender, subject, and a summary for each email which contains a firsthand discussion of specific business transaction(s):
+```python
+import palimpzest as pz
+
+# load the emails into a dataset
+emails = pz.TextFileDataset(id="enron-emails", path="emails/")
+
+# filter for emails matching natural language criteria
+emails = emails.sem_filter(
+    'The email refers to one of the following business transactions: "Raptor", "Deathstar", "Chewco", and/or "Fat Boy")',
+)
+emails = emails.sem_filter(
+    "The email contains a first-hand discussion of the business transaction",
+)
+
+# extract structured fields for each email
+emails = emails.sem_map([
+    {"name": "subject", "type": str, "desc": "the subject of the email"},
+    {"name": "sender", "type": str, "desc": "the email address of the sender"},
+    {"name": "summary", "type": str, "desc": "a brief summary of the email"},
+])
+
+# optimize and execute the program and print the output
+validator = pz.Validator(model=pz.Model.GPT_5)
+output = emails.optimize_and_run(max_quality=True, validator=validator)
+
+print(output.to_df(cols=["filename", "sender", "subject", "summary"]))
+```
+In this example, instead of simply calling `emails.run(max_quality=True)`, we create a `pz.Validator` object which uses the `GPT-5` model to evaluate the quality of each operator during the optimization process. We then pass this validator to the `.optimize_and_run()` method, along with the `max_quality=True` argument to indicate that we want to optimize for quality.
+
+PZ will then sample `k` (default `k=6`) physical operators and `j` (default `j=4`) inputs for each semantic operator in the program (i.e. both semantic filters and the semantic map). For each operator-input pair, PZ will execute the operator on the input and use the LLM judge to evaluate the quality of the output on a [0, 1] scale. This process will continue until the sample budget (default `n=100`) is exhausted, at which point PZ will compute the optimal physical execution plan and execute it on the user's dataset.
+
+If a `train_dataset` is provided ([see below](#providing-a-separate-training-dataset)), PZ will draw samples from the `train_dataset` instead of the user's dataset. If no `train_dataset` is provided, PZ will draw samples from the user's dataset.
+
+### Using Labels to Validate Operator Quality
+Whenever possible, we recommend using labels to validate operator quality during the optimization process. Users can provide labels to Palimpzest by subclassing the `pz.Validator` class and implementing the appropriate methods which score the quality of different semantic operators. The abstract methods for the `pz.Validator` class are shown below:
+```python
+class Validator:
+    """
+    The Validator is used during optimization to score the output of physical operator(s).
+    """
+    def __init__(self, model: Model = Model.o4_MINI):
+        self.model = model
+        ...
+
+    def map_score_fn(self, fields: list[str], input_record: dict, output: dict) -> float | None:
+        """
+        The map_score_fn takes in the fields being computed, the input record, and the output
+        generated by the semantic map operator. It should return a score in the range [0, 1]
+        indicating the quality of the output, or None if the score cannot be computed for this
+        map operation.
+        """
+        raise NotImplementedError("Validator.map_score_fn not implemented.")
+
+    def flat_map_score_fn(self, fields: list[str], input_record: dict, output: list[dict]) -> float | None:
+        """
+        The flat_map_score_fn takes in the fields being computed, the input record, and the output
+        generated by the semantic map operator. It should return a score in the range [0, 1] indicating
+        the quality of the output, or None if the score cannot be computed for this map operation.
+        """
+        raise NotImplementedError("Validator.flat_map_score_fn not implemented.")
+
+    def filter_score_fn(self, filter_str: str, input_record: dict, output: bool) -> float | None:
+        """
+        The filter_score_fn takes in the predicate filter_str being evaluated, the input record,
+        and the output (True/False) decision generated by the semantic filter. It should return a score
+        in the range [0, 1] indicating the quality of the output, or None if the score cannot be computed
+        for this filter operation.
+        """
+        raise NotImplementedError("Validator.filter_score_fn not implemented.")
+
+    def join_score_fn(self, condition: str, left_input_record: dict, right_input_record: dict, output: bool) -> float | None:
+        """
+        The join_score_fn takes in the join condition being evaluated, the left input record,
+        the right input record, and the output (True/False) join decision generated by the semantic join.
+        It should return a score in the range [0, 1] indicating the quality of the output, or None if the
+        score cannot be computed for this join operation.
+        """
+        raise NotImplementedError("Validator.join_score_fn not implemented.")
+
+    def topk_score_fn(self, fields: list[str], input_record: dict, output: dict) -> float | None:
+        """
+        The topk_score_fn takes in the fields being added by the top-k operation, the input record,
+        and the output generated by the semantic top-k operator. It should return a score in the range
+        [0, 1] indicating the quality of the output, or None if the score cannot be computed for this
+        top-k operation.
+        """
+        raise NotImplementedError("Validator.map_score_fn not implemented.")
+```
+Users can implement any subset of these methods to provide labels for the corresponding semantic operators. For example, if the user can only provide labels for (some) semantic map(s), they can implement the `map_score_fn` method and leave the other methods unimplemented. In this case, PZ will use the user's implementation of `map_score_fn` to evaluate the quality of the semantic map(s) during optimization, and will fall back to using an LLM judge for the other semantic operators.
+
+Furthermore, for plans which involve multiple semantic operators of the same type (e.g. two semantic filters), users can use the `fields`, `filter_str`, or `condition` arguments to differentiate between the different operators.
+
+We share an example of our `pz.Validator` for the email processing workload below:
+```python
+# labels_file is a JSON file mapping from each email filename to the sender and subject
+# of the email and whether or not it should pass each filter, e.g.:
+# {
+#   "kaminski-v-all-documents-2355.txt": {
+#     "sender": "ron.baker@enron.com",
+#     "subject": "Raptor Position Reports for 12/28/00",
+#     "mentions_transaction": true,
+#     "firsthand_discussion": true
+#   },
+#   "kaminski-v-inbox-291.txt": {
+#     "sender": "baker@enron.com",
+#     "subject": "RE: Pricing of restriction on Enron stock",
+#     "mentions_transaction": true,
+#     "firsthand_discussion": true
+#   },
+#   ...
+# }
+class EnronValidator(pz.Validator):
+    def __init__(self, labels_file: str):
+        super().__init__()
+        with open(labels_file) as f:
+            self.filename_to_labels = json.load(f)
+
+    def filter_score_fn(self, filter_str: str, input_record: dict, output: bool) -> float | None:
+        filename = input_record["filename"]
+        labels = self.filename_to_labels[filename]
+        if labels is None:
+            return None
+
+        if "business transactions" in filter_str:
+            return float(labels["mentions_transaction"] == output)
+        elif "first-hand discussion" in filter_str:
+            return float(labels["firsthand_discussion"] == output)
+        else:
+            return None
+
+    def map_score_fn(self, fields: list[str], input_record: dict, output: dict) -> float | None:
+        # NOTE: we score the map based on the sender and subject fields only, as summary is too subjective;
+        #       we could also use an LLM judge within this function to score the summary field if desired
+        filename = input_record["filename"]
+        labels = self.filename_to_labels[filename]
+        if labels is None:
+            return None
+
+        return (float(labels["sender"] == output["sender"]) + float(labels["subject"] == output["subject"])) / 2.0
+```
+The `EnronValidator` class reads in a JSON file containing the labels for each email, and implements the `filter_score_fn` and `map_score_fn` methods to score the quality of the semantic filters and semantic map, respectively. The `filter_score_fn` method checks whether the output of each filter matches the corresponding label, while the `map_score_fn` method checks whether the `sender` and `subject` fields match the corresponding labels. We do not score the `summary` field in the `map_score_fn` as it is subjective; however, we could easily use an LLM judge within this function to score the `summary` field if desired.
+
+Implementations for `flat_map_score_fn`, `join_score_fn`, and `topk_score_fn` are not necessary for this workload, so we leave them unimplemented.
+
+#### Dealing with Partial Labels
+In many cases, users may only have labels for a subset of the operators in their program. PZ handles this case gracefully, by using the user labels where applicable and falling back to an LLM judge for operators where no labels are available. For example, if the user only had labels for the semantic map in the email processing program, they could implement the `EnronValidator` as follows:
+```python
+class EnronValidator(pz.Validator):
+    def __init__(self, labels_file: str):
+        super().__init__()
+        with open(labels_file) as f:
+            self.filename_to_labels = json.load(f)
+
+    def map_score_fn(self, fields: list[str], input_record: dict, output: dict) -> float | None:
+        filename = input_record["filename"]
+        labels = self.filename_to_labels[filename]
+        if labels is None:
+            return None
+
+        return (float(labels["sender"] == output["sender"]) + float(labels["subject"] == output["subject"])) / 2.0
+```
+This would allow PZ to use the user-provided labels to score the semantic map, while using an LLM judge to score the two semantic filters.
+
+### Providing a Separate Training Dataset
+In some cases, users may want to provide a separate training (i.e. validation) dataset for the optimization process. This can be done by providing a `pz.Dataset` object to the `train_dataset` argument of the `.optimize_and_run()` method:
+```python
+# create validator and train_dataset
+validator = EnronValidator(labels_file="enron-eval-medium-labels.json")
+train_dataset = pz.TextFileDataset(id="enron-emails", path="train-emails/")
+
+# construct plan
+emails = pz.TextFileDataset(id="enron-emails", path="test-emails/")
+emails = emails.sem_filter(
+    'The email refers to one of the following business transactions: "Raptor", "Deathstar", "Chewco", and/or "Fat Boy")',
+)
+emails = emails.sem_filter(
+    "The email contains a first-hand discussion of the business transaction",
+)
+emails = emails.sem_map([
+    {"name": "subject", "type": str, "desc": "the subject of the email"},
+    {"name": "sender", "type": str, "desc": "the email address of the sender"},
+    {"name": "summary", "type": str, "desc": "a brief summary of the email"},
+])
+
+# optimize and execute plan with training dataset and validator
+output = emails.optimize_and_run(train_dataset=train_dataset, validator=validator, max_quality=True)
+
+# print output dataframe
+print(output.to_df())
+```
+In this case, PZ will draw samples from the `train_dataset` instead of the user's dataset when optimizing the plan.
+
+:::info[Matching Train and Test Dataset IDs]
+When providing a `train_dataset`, ensure that the `id` of the `train_dataset` matches the `id` of the corresponding test dataset. This allows PZ to correctly match input records between the training and test datasets during optimization (especially when semantic joins between multiple datasets are involved).
+:::
+
+### Specifying Constrained Optimization Objective
+In addition to optimizing for maximum quality, minimum cost, or minimum latency, users can also specify constraints for the optimization objective. In total, PZ supports the following optimization objectives:
+- `pz.MaxQuality()`
+- `pz.MinCost()`
+- `pz.MinTime()`
+- `pz.MaxQualityAtFixedCost(max_cost: float)`
+- `pz.MaxQualityAtFixedTime(max_time: float)`
+- `pz.MinCostAtFixedQuality(min_quality: float)`
+- `pz.MinTimeAtFixedQuality(min_quality: float)`
+
+The `max_cost`, `max_time`, and `min_quality` parameters are represent the dollars, seconds, and quality score (between 0 and 1) constraints, respectively, for processing the entire (test) dataset with the final optimized plan. For example, to optimize for maximum quality subject to a cost constraint of $0.50, users can call the `.optimize_and_run()` method as follows:
+```python
+import palimpzest as pz
+
+# load the emails into a dataset
+emails = pz.TextFileDataset(id="enron-emails", path="emails/")
+
+# filter for emails matching natural language criteria
+emails = emails.sem_filter(
+    'The email refers to one of the following business transactions: "Raptor", "Deathstar", "Chewco", and/or "Fat Boy")',
+)
+emails = emails.sem_filter(
+    "The email contains a first-hand discussion of the business transaction",
+)
+
+# extract structured fields for each email
+emails = emails.sem_map([
+    {"name": "subject", "type": str, "desc": "the subject of the email"},
+    {"name": "sender", "type": str, "desc": "the email address of the sender"},
+    {"name": "summary", "type": str, "desc": "a brief summary of the email"},
+])
+
+# optimize and execute the program (subject to a cost constraint) and print the output
+policy = pz.MaxQualityAtFixedCost(max_cost=0.50)
+config = pz.QueryProcessorConfig(policy=policy)
+validator = pz.Validator(model=pz.Model.GPT_5)
+output = emails.optimize_and_run(config=config, validator=validator)
+
+print(output.to_df(cols=["filename", "sender", "subject", "summary"]))
+```

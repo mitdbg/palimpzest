@@ -284,10 +284,11 @@ class Optimizer:
                 all_properties["filters"] = set([op_filter_str])
 
         elif isinstance(op, JoinOp):
+            unique_join_str = str(sorted(op.on)) if op.condition is None else op.condition
             if "joins" in all_properties:
-                all_properties["joins"].add(op.condition)
+                all_properties["joins"].add(unique_join_str)
             else:
-                all_properties["joins"] = set([op.condition])
+                all_properties["joins"] = set([unique_join_str])
 
         elif isinstance(op, LimitScan):
             op_limit_str = op.get_logical_op_id()

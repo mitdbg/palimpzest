@@ -1,0 +1,110 @@
+---
+title: Semantic Map and Flat Map
+---
+The primary way to compute new fields in PZ is through the use of the `sem_map()` and `sem_flat_map()` operators. These operators allow users to apply a function (typically powered by an LLM) to each row in a dataset, producing either a single new row (`sem_map()`) or multiple new rows (`sem_flat_map()`) for each input row.
+
+Semantic map is not only good for information extraction (e.g. extracting entities from text / images / audio), but also for transforming data (e.g. translating text, captioning an image, summarizing audio, etc.).
+
+:::info[Key Features of `sem_map()` and `sem_flat_map()`]
+1. Each of these operators takes a `pz.Dataset` as input and produces a new dataset with the computed field(s) as output.
+2. Multiple fields can be computed in a single map operation by specifying a list of fields to compute.
+3. The (subset of) input field(s) which are used to compute the new field(s) can be specified via the `depends_on` parameter. Omitting a field from this list will not drop the field from the output dataset; it will simply not template the field into the prompt when computing the new field(s).
+:::
+
+### Semantic Map
+To illustrate the use of `sem_map()`, consider the following example where we have a dataset of research papers and we want to extract the title and generate a summary for each paper.
+```python
+import palimpzest as pz
+
+# define the columns we wish to compute
+paper_cols = [
+    {"name": "title", "type": str, "desc": "The title of the paper"},
+    {"name": "summary", "type": str, "desc": "A brief summary of the paper's main contributions"},
+]
+
+# create dataset from directory of research papers
+ds = pz.PDFFileDataset(id="research-papers", path="path/to/papers")
+
+# use sem_map to extract title and generate summary for each paper
+ds = ds.sem_map(paper_cols)
+
+# execute the program
+output = ds.run(max_quality=True)
+print(output.to_df())
+```
+The call to `pz.PDFFileDataset()` will create a dataset with one record for each PDF in the `path/to/papers` directory. Each record will have a `filename`, `contents`, and `text_contents` fields, where `text_contents` is the text extracted from the PDF. The call to `sem_map()` will produce a new dataset with the `title` and `summary` fields computed for each research paper in the input dataset.
+
+An example output might look like the following:
+```
+         filename                                           contents                                      text_contents                                              title                                            summary
+0     crowddb.pdf  b'%PDF-1.4\n%\xe2\xe3\xcf\xd3\n2 0 obj\n<</Len...  CrowdDB: Query Processing with the VLDB Crowd\...      CrowdDB: Query Processing with the VLDB Crowd  CrowdDB is a hybrid database system that exten...
+1   webtables.pdf  b'%PDF-1.3\n%\xc4\xe5\xf2\xe5\xeb\xa7\xf3\xa0\...  WebTables: Exploring the Power of Tables on th...  WebTables: Exploring the Power of Tables on th...  The paper introduces WebTables, a system that ...
+2    pandemic.pdf  b'%PDF-1.3\n1 0 obj\n<<\n/Type /Pages\n/Count ...   \n \nSince January 2020 Elsevier has created ...  Novel fractional order SIDARTHE mathematical m...  The paper introduces a novel fractional-order ...
+3  causallogs.pdf  b'%PDF-1.5\n%\xbf\xf7\xa2\xfe\n461 0 obj\n<< /...  Unpublished working draft.Not for distribution...  From Logs to Causal Analysis: Extracting Data ...  The paper introduces a framework and prototype...
+4     battery.pdf  b'%PDF-1.4\r%\xe2\xe3\xcf\xd3\r\n735 0 obj\r<<...  Review ARticle\nhttps:/ / doi.org/10.1038/s415...  Moving beyond 99.9% Coulombic efficiency for l...  This review assesses the state of lithium meta...
+5      tinydb.pdf  b'%PDF-1.4\n3 0 obj <<\n/Length 2702      \n/F...  TinyDB: An Acquisitional Query Processing\nSys...  TinyDB: An Acquisitional Query Processing Syst...  The paper introduces TinyDB, a distributed, SQ...
+```
+
+:::info[Context Management with `depends_on`]
+In the above example, the `sem_map()` operator will feed all of the `filename`, `contents`, and `text_contents` fields into the LLM when computing the `title` and `summary`. However, only the `text_contents` field is really necessary, and including the raw bytes of the `contents` field is redundant (increasing cost) and potentially distracting to the LLM as it clutters the context.
+
+To address these concerns, the `depends_on` parameter can be used in order to specify which field(s) should be presented to the underlying LLM(s) when computing the output fields for a semantic map.
+
+For example, if we only wanted to use the `text_contents` field to compute the `title` and `summary`, we could modify the `sem_map()` call as follows:
+```python
+ds = ds.sem_map(paper_cols, depends_on=["text_contents"])
+```
+This ensures that only the `text_contents` field is included in the prompt when generating the `title` and `summary`, reducing token usage and potentially improving performance.
+:::
+
+### Semantic Flat Map
+In some cases, you may want to produce multiple output rows for each input row. This can be accomplished using the `sem_flat_map()` operator.
+
+For example, suppose that we want to extract the name, institution, and email address of each author from the dataset of research papers. We can use `sem_flat_map()` to achieve this as follows:
+```python
+import palimpzest as pz
+
+# define the columns we wish to compute
+author_cols = [
+    {"name": "author_name", "type": str, "desc": "The name of the author"},
+    {"name": "institution", "type": str, "desc": "The institution the author is affiliated with"},
+    {"name": "email", "type": str, "desc": "The email address of the author"},
+]
+
+# create dataset from directory of research papers
+ds = pz.PDFFileDataset(id="research-papers", path="path/to/papers")
+
+# use sem_flat_map to extract authors for each paper
+ds = ds.sem_flat_map(author_cols, depends_on=["text_contents"])
+
+# execute the program
+output = ds.run(max_quality=True)
+print(output.to_df(cols=["filename", "author_name", "institution", "email"]))
+```
+The call to `sem_flat_map()` will produce a new dataset with one record for each author extracted from each research paper in the input dataset. An example output might look like the following:
+```
+          filename            author_name                                        institution                     email
+0      crowddb.pdf             Amber Feng                                AMPLab, UC Berkeley   amber.feng@berkeley.edu
+1      crowddb.pdf       Michael Franklin                                AMPLab, UC Berkeley  franklin@cs.berkeley.edu
+2      crowddb.pdf        Donald Kossmann                          Systems Group, ETH Zurich       donaldk@inf.ethz.ch
+3      crowddb.pdf             Tim Kraska                                AMPLab, UC Berkeley    kraska@cs.berkeley.edu
+4      crowddb.pdf          Samuel Madden                                         CSAIL, MIT      madden@csail.mit.edu
+5      crowddb.pdf         Sukriti Ramesh                          Systems Group, ETH Zurich    ramess@student.ethz.ch
+6      crowddb.pdf            Andrew Wang                                AMPLab, UC Berkeley     awang@cs.berkeley.edu
+7      crowddb.pdf            Reynold Xin                                AMPLab, UC Berkeley      rxin@cs.berkeley.edu
+8   causallogs.pdf                   None                                               None                      None
+9       tinydb.pdf       Samuel R. Madden              Massachusetts Institute of Technology                      None
+10      tinydb.pdf    Michael J. Franklin                                        UC Berkeley                      None
+11      tinydb.pdf  Joseph M. Hellerstein                                        UC Berkeley                      None
+12      tinydb.pdf               Wei Hong                           Intel Research, Berkeley                      None
+13     battery.pdf        Y. Shirley Meng                 University of California San Diego           shmeng@ucsd.edu
+14     battery.pdf         Yang Shao-Horn              Massachusetts Institute of Technology          shaohorn@mit.edu
+15     battery.pdf       Betar M. Gallant              Massachusetts Institute of Technology          bgallant@mit.edu
+16    pandemic.pdf              M. Higazy  Department of Mathematics and Statistics, Facu...        m.higazy@tu.edu.sa
+17   webtables.pdf   Michael J. Cafarella                           University of Washington     mjc@cs.washington.edu
+18   webtables.pdf            Alon Halevy                                       Google, Inc.         halevy@google.com
+19   webtables.pdf         Zhe Daisy Wang                                        UC Berkeley    daisyw@cs.berkeley.edu
+20   webtables.pdf              Eugene Wu                                                MIT          eugenewu@mit.edu
+21   webtables.pdf             Yang Zhang                                                MIT          yaaang@gmail.com
+```
+Note that the `causallogs.pdf` paper did not have any author information, so the computed field values are `None` for that record. Similarly, the `tinydb.pdf` paper only had author names and institutions, but no email addresses, so the `email` field is `None` for those records.

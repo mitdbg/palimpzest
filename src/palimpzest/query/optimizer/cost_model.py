@@ -131,16 +131,16 @@ class SampleBasedCostModel:
                 # compute selectivity
                 selectivity = physical_op_df.passed_operator.sum() / num_source_records
 
+                # compute quality; if all qualities are None then this will be NaN
+                quality = physical_op_df.quality.mean()
+
+                # set operator stats for this physical operator
                 operator_to_stats[unique_logical_op_id][full_op_id] = {
                     "cost": physical_op_df.cost_per_record.mean(),
                     "time": physical_op_df.time_per_record.mean(),
-                    "quality": physical_op_df.quality.mean(),
+                    "quality": 1.0 if pd.isna(quality) else quality,
                     "selectivity": selectivity,
                 }
-
-        # if this is an experiment, log the dataframe and operator_to_stats dictionary
-        if self.exp_name is not None:
-            operator_stats_df.to_csv(f"opt-profiling-data/{self.exp_name}-operator-stats.csv", index=False)
 
         logger.debug(f"Done computing operator statistics for {len(operator_to_stats)} operators!")
         return operator_to_stats

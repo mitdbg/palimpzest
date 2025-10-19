@@ -203,9 +203,8 @@ class PhysicalPlan(Plan):
         # return the current index and the upstream unique full_op_ids for this operator
         return current_idx, self.operator.get_full_op_id(), upstream_map[this_unique_full_op_id]
 
-    def get_upstream_unique_full_op_ids(self, topo_idx: int, operator: PhysicalOperator) -> list[str]:
-        """Return the list of unique full_op_ids for the upstream operators of this operator."""
-        unique_full_op_id = f"{topo_idx}-{operator.get_full_op_id()}"
+    def get_upstream_unique_full_op_ids(self, unique_full_op_id: str) -> list[str]:
+        """Return the list of unique full_op_ids for the upstream operators of the operator specified by `unique_full_op_id`."""
         return self.unique_full_op_id_to_upstream_full_op_ids[unique_full_op_id]
 
     def _compute_source_unique_full_op_ids_map(self, source_map: dict[str, list[str]], current_idx: int | None = None) -> tuple[int, str]:

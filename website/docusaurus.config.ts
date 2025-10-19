@@ -49,7 +49,11 @@ const config: Config = {
           // Please change this to your repo.
           // Remove this to remove the "edit this page" links.
           editUrl:
-            'https://github.com/mitdbg/palimpzest',
+            'https://github.com/mitdbg/palimpzest/tree/main/website/',
+          admonitions: {
+            keywords: ['note', 'tip', 'info', 'warning', 'danger'],
+            extendDefaults: true,
+          }
         },
         blog: {
           showReadingTime: true,

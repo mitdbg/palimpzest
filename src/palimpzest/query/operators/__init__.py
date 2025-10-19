@@ -5,6 +5,7 @@ from palimpzest.query.operators.aggregate import CountAggregateOp as _CountAggre
 from palimpzest.query.operators.aggregate import MaxAggregateOp as _MaxAggregateOp
 from palimpzest.query.operators.aggregate import MinAggregateOp as _MinAggregateOp
 from palimpzest.query.operators.aggregate import SemanticAggregate as _SemanticAggregate
+from palimpzest.query.operators.aggregate import SumAggregateOp as _SumAggregateOp
 from palimpzest.query.operators.convert import ConvertOp as _ConvertOp
 from palimpzest.query.operators.convert import LLMConvert as _LLMConvert
 from palimpzest.query.operators.convert import LLMConvertBonded as _LLMConvertBonded
@@ -50,7 +51,7 @@ from palimpzest.query.operators.logical import (
     Project as _Project,
 )
 from palimpzest.query.operators.logical import (
-    RetrieveScan as _RetrieveScan,
+    TopKScan as _TopKScan,
 )
 from palimpzest.query.operators.mixture_of_agents import MixtureOfAgentsConvert as _MixtureOfAgentsConvert
 from palimpzest.query.operators.mixture_of_agents import MixtureOfAgentsFilter as _MixtureOfAgentsFilter
@@ -58,11 +59,11 @@ from palimpzest.query.operators.physical import PhysicalOperator as _PhysicalOpe
 from palimpzest.query.operators.project import ProjectOp as _ProjectOp
 from palimpzest.query.operators.rag import RAGConvert as _RAGConvert
 from palimpzest.query.operators.rag import RAGFilter as _RAGFilter
-from palimpzest.query.operators.retrieve import RetrieveOp as _RetrieveOp
 from palimpzest.query.operators.scan import MarshalAndScanDataOp as _MarshalAndScanDataOp
 from palimpzest.query.operators.scan import ScanPhysicalOp as _ScanPhysicalOp
 from palimpzest.query.operators.split import SplitConvert as _SplitConvert
 from palimpzest.query.operators.split import SplitFilter as _SplitFilter
+from palimpzest.query.operators.topk import TopKOp as _TopKOp
 
 LOGICAL_OPERATORS = [
     _LogicalOperator,
@@ -75,12 +76,12 @@ LOGICAL_OPERATORS = [
     _LogicalJoinOp,
     _LimitScan,
     _Project,
-    _RetrieveScan,
+    _TopKScan,
 ]
 
 PHYSICAL_OPERATORS = (
     # aggregate
-    [_AggregateOp, _ApplyGroupByOp, _AverageAggregateOp, _CountAggregateOp, _MaxAggregateOp, _MinAggregateOp, _SemanticAggregate]
+    [_AggregateOp, _ApplyGroupByOp, _AverageAggregateOp, _CountAggregateOp, _MaxAggregateOp, _MinAggregateOp, _SemanticAggregate, _SumAggregateOp]
     # convert
     + [_ConvertOp, _NonLLMConvert, _LLMConvert, _LLMConvertBonded]
     # critique and refine
@@ -103,8 +104,8 @@ PHYSICAL_OPERATORS = (
     + [_ProjectOp]
     # rag
     + [_RAGConvert, _RAGFilter]
-    # retrieve
-    + [_RetrieveOp]
+    # top-k
+    + [_TopKOp]
     # split
     + [_SplitConvert, _SplitFilter]
 )

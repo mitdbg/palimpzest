@@ -75,8 +75,9 @@ class MixtureOfAgentsConvert(LLMConvert):
         In practice, this naive quality estimate will be overwritten by the CostModel's estimate
         once it executes a few instances of the operator.
         """
-        # temporarily set self.model so that super().naive_cost_estimates(...) can compute an estimate
+        # temporarily set self.model and self.prompt_strategy so that super().naive_cost_estimates(...) can compute an estimate
         self.model = self.proposer_models[0]
+        self.prompt_strategy = PromptStrategy.MAP_MOA_PROPOSER
 
         # get naive cost estimates for single LLM call and scale it by number of LLMs used in MoA
         naive_op_cost_estimates = super().naive_cost_estimates(source_op_cost_estimates)
@@ -98,6 +99,7 @@ class MixtureOfAgentsConvert(LLMConvert):
 
         # reset self.model to be None
         self.model = None
+        self.prompt_strategy = None
 
         return naive_op_cost_estimates
 

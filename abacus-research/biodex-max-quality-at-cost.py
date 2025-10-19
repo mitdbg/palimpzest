@@ -135,14 +135,14 @@ class BiodexValidator(pz.Validator):
         else:
             raise NotImplementedError(f"Validator.map_score_fn not implemented for field {field_name}.")
 
-    def retrieve_score_fn(self, fields: list[str], input_record: dict, output: dict) -> float | None:
+    def topk_score_fn(self, fields: list[str], input_record: dict, output: dict) -> float | None:
         field_name = fields[0]
         if field_name == "reaction_labels":
             preds = output.get(field_name)
             targets = self.pmid_to_label[input_record["pmid"]]
             return self.term_recall(preds, targets)
         else:
-            raise NotImplementedError(f"Validator.retrieve_score_fn not implemented for field {field_name}.")
+            raise NotImplementedError(f"Validator.topk_score_fn not implemented for field {field_name}.")
 
 
 class BiodexDataset(pz.IterDataset):
@@ -346,7 +346,7 @@ if __name__ == "__main__":
     # construct plan
     plan = BiodexDataset(split="test", num_samples=250, shuffle=True, seed=seed)
     plan = plan.sem_map(biodex_reactions_cols)
-    plan = plan.retrieve(
+    plan = plan.sem_topk(
         index=index,
         search_func=search_func,
         search_attr="reactions",

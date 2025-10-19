@@ -9,7 +9,6 @@ from palimpzest.query.operators.aggregate import AggregateOp
 from palimpzest.query.operators.distinct import DistinctOp
 from palimpzest.query.operators.join import JoinOp
 from palimpzest.query.operators.limit import LimitScanOp
-from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.scan import ContextScanOp, ScanPhysicalOp
 from palimpzest.query.optimizer.plan import PhysicalPlan
 from palimpzest.utils.progress import create_progress_manager
@@ -35,13 +34,26 @@ class ParallelExecutionStrategy(ExecutionStrategy):
                 return True
         return False
 
-    def _upstream_ops_finished(self, plan: PhysicalPlan, topo_idx: int, operator: PhysicalOperator, input_queues: dict[str, dict[str, list]], future_queues: dict[str, list]) -> bool:
+    def _upstream_ops_finished(self, plan: PhysicalPlan, unique_full_op_id: str, input_queues: dict[str, dict[str, list]], future_queues: dict[str, list]) -> bool:
         """Helper function to check if agg / join operator is ready to process its inputs."""
-        # for agg / join operator, we can only process it when all upstream operators have finished processing their inputs
-        upstream_unique_full_op_ids = plan.get_upstream_unique_full_op_ids(topo_idx, operator)
+        upstream_unique_full_op_ids = plan.get_upstream_unique_full_op_ids(unique_full_op_id)
         upstream_input_queues = {upstream_unique_full_op_id: input_queues[upstream_unique_full_op_id] for upstream_unique_full_op_id in upstream_unique_full_op_ids}
         upstream_future_queues = {upstream_unique_full_op_id: future_queues[upstream_unique_full_op_id] for upstream_unique_full_op_id in upstream_unique_full_op_ids}
         return not (self._any_queue_not_empty(upstream_input_queues) or self._any_queue_not_empty(upstream_future_queues))
+
+    def _finish_outer_join(self, executor: ThreadPoolExecutor, plan: PhysicalPlan, unique_full_op_id: str, input_queues: dict[str, dict[str, list]], future_queues: dict[str, list]) -> None:
+        join_op_upstream_finished = self._upstream_ops_finished(plan, unique_full_op_id, input_queues, future_queues)
+        join_input_queues_empty = all(len(inputs) == 0 for inputs in input_queues[unique_full_op_id].values())
+        join_future_queue_empty = len(future_queues[unique_full_op_id]) == 0
+        if join_op_upstream_finished and join_input_queues_empty and join_future_queue_empty:
+            # process the join one last time with final=True to handle any left/right/outer join logic
+            operator = self.unique_full_op_id_to_operator[unique_full_op_id]
+            if not operator.finished:
+                def finalize_op(operator):
+                    return operator([], [], final=True)
+                future = executor.submit(finalize_op, operator)
+                future_queues[unique_full_op_id].append(future)
+                operator.set_finished()
 
     def _process_future_results(self, unique_full_op_id: str, future_queues: dict[str, list], plan_stats: PlanStats) -> list[DataRecord]:
         """
@@ -117,15 +129,23 @@ class ParallelExecutionStrategy(ExecutionStrategy):
                             records = self._process_future_results(source_unique_full_op_id, future_queues, plan_stats)
                             input_queues[unique_full_op_id][source_unique_full_op_id].extend(records)
 
+                            # if the source is a left/right/outer join operator with no more inputs to process, then finish it
+                            if self.is_outer_join_op[source_unique_full_op_id]:
+                                self._finish_outer_join(executor, plan, source_unique_full_op_id, input_queues, future_queues)
+
                     # for the final operator, add any finished futures to the output_records
                     if unique_full_op_id == f"{topo_idx}-{final_op.get_full_op_id()}":
                         records = self._process_future_results(unique_full_op_id, future_queues, plan_stats)
                         output_records.extend(records)
 
+                        # if this is a left/right/outer join operator with no more inputs to process, then finish it
+                        if self.is_outer_join_op[unique_full_op_id]:
+                            self._finish_outer_join(executor, plan, unique_full_op_id, input_queues, future_queues)
+
                     # if this operator does not have enough inputs to execute, then skip it
                     num_inputs = sum(len(inputs) for inputs in input_queues[unique_full_op_id].values())
-                    agg_op_not_ready = isinstance(operator, AggregateOp) and not self._upstream_ops_finished(plan, topo_idx, operator, input_queues, future_queues)
-                    join_op_not_ready = isinstance(operator, JoinOp) and not self.join_has_downstream_limit_op[unique_full_op_id] and not self._upstream_ops_finished(plan, topo_idx, operator, input_queues, future_queues)
+                    agg_op_not_ready = isinstance(operator, AggregateOp) and not self._upstream_ops_finished(plan, unique_full_op_id, input_queues, future_queues)
+                    join_op_not_ready = isinstance(operator, JoinOp) and not self.join_has_downstream_limit_op[unique_full_op_id] and not self._upstream_ops_finished(plan, unique_full_op_id, input_queues, future_queues)
                     if num_inputs == 0 or agg_op_not_ready or join_op_not_ready:
                         continue
 
@@ -225,8 +245,9 @@ class ParallelExecutionStrategy(ExecutionStrategy):
         input_queues = self._create_input_queues(plan)
         future_queues = {f"{topo_idx}-{op.get_full_op_id()}": [] for topo_idx, op in enumerate(plan)}
 
-        # precompute which operators are joins and which joins have downstream limit ops
+        # precompute which operators are (outer) joins and which joins have downstream limit ops
         self.is_join_op = {f"{topo_idx}-{op.get_full_op_id()}": isinstance(op, JoinOp) for topo_idx, op in enumerate(plan)}
+        self.is_outer_join_op = {f"{topo_idx}-{op.get_full_op_id()}": isinstance(op, JoinOp) and op.how in ("left", "right", "outer") for topo_idx, op in enumerate(plan)}
         self.join_has_downstream_limit_op = {}
         for topo_idx, op in enumerate(plan):
             if isinstance(op, JoinOp):
@@ -239,6 +260,9 @@ class ParallelExecutionStrategy(ExecutionStrategy):
                         has_downstream_limit_op = True
                         break
                 self.join_has_downstream_limit_op[unique_full_op_id] = has_downstream_limit_op
+
+        # precompute mapping from unique_full_op_id to operator instance
+        self.unique_full_op_id_to_operator = {f"{topo_idx}-{op.get_full_op_id()}": op for topo_idx, op in enumerate(plan)}
 
         # initialize and start the progress manager
         self.progress_manager = create_progress_manager(plan, num_samples=self.num_samples, progress=self.progress)

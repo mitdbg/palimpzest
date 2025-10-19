@@ -9,7 +9,7 @@ from palimpzest.constants import AggFunc, Cardinality
 from palimpzest.core.data import context, dataset
 from palimpzest.core.elements.filters import Filter
 from palimpzest.core.elements.groupbysig import GroupBySig
-from palimpzest.core.lib.schemas import Average, Count, Max, Min
+from palimpzest.core.lib.schemas import Average, Count, Max, Min, Sum
 from palimpzest.utils.hash_helpers import hash_for_id
 
 
@@ -25,7 +25,7 @@ class LogicalOperator:
     - LimitScan (scans up to N records from a Set)
     - GroupByAggregate (applies a group by on the Set)
     - Aggregate (applies an aggregation on the Set)
-    - RetrieveScan (fetches documents from a provided input for a given query)
+    - TopKScan (fetches documents from a provided input for a given query)
     - Map (applies a function to each record in the Set without adding any new columns)
     - ComputeOperator (executes a computation described in natural language)
     - SearchOperator (executes a search query on the input Context)
@@ -160,6 +160,8 @@ class Aggregate(LogicalOperator):
                 kwargs["output_schema"] = Count
             elif agg_func == AggFunc.AVERAGE:
                 kwargs["output_schema"] = Average
+            elif agg_func == AggFunc.SUM:
+                kwargs["output_schema"] = Sum
             elif agg_func == AggFunc.MIN:
                 kwargs["output_schema"] = Min
             elif agg_func == AggFunc.MAX:
@@ -411,17 +413,25 @@ class GroupByAggregate(LogicalOperator):
 
 
 class JoinOp(LogicalOperator):
-    def __init__(self, condition: str, desc: str | None = None, *args, **kwargs):
+    def __init__(self, condition: str, on: list[str] | None = None, how: str = "inner", desc: str | None = None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.condition = condition
+        self.on = on
+        self.how = how
         self.desc = desc
 
     def __str__(self):
-        return f"Join(condition={self.condition})"
+        return f"Join(condition={self.condition})" if self.on is None else f"Join(on={self.on}, how={self.how})"
 
     def get_logical_id_params(self) -> dict:
         logical_id_params = super().get_logical_id_params()
-        logical_id_params = {"condition": self.condition, "desc": self.desc, **logical_id_params}
+        logical_id_params = {
+            "condition": self.condition,
+            "on": self.on,
+            "how": self.how,
+            "desc": self.desc,
+            **logical_id_params,
+        }
 
         return logical_id_params
 
@@ -429,6 +439,8 @@ class JoinOp(LogicalOperator):
         logical_op_params = super().get_logical_op_params()
         logical_op_params = {
             "condition": self.condition,
+            "on": self.on,
+            "how": self.how,
             "desc": self.desc,
             **logical_op_params,
         }
@@ -484,8 +496,8 @@ class Project(LogicalOperator):
         return logical_op_params
 
 
-class RetrieveScan(LogicalOperator):
-    """A RetrieveScan is a logical operator that represents a scan of a particular input Dataset, with a convert-like retrieve applied."""
+class TopKScan(LogicalOperator):
+    """A TopKScan is a logical operator that represents a scan of a particular input Dataset, with a top-k operation applied."""
 
     def __init__(
         self,
@@ -505,7 +517,7 @@ class RetrieveScan(LogicalOperator):
         self.k = k
 
     def __str__(self):
-        return f"RetrieveScan({self.input_schema} -> {str(self.output_schema)})"
+        return f"TopKScan({self.input_schema} -> {str(self.output_schema)})"
 
     def get_logical_id_params(self) -> dict:
         # NOTE: if we allow optimization over index, then we will need to include it in the id params

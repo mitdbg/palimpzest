@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import time
 from typing import Any
 
@@ -14,7 +15,7 @@ from palimpzest.constants import (
 )
 from palimpzest.core.elements.groupbysig import GroupBySig
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
-from palimpzest.core.lib.schemas import Average, Count, Max, Min
+from palimpzest.core.lib.schemas import Average, Count, Max, Min, Sum
 from palimpzest.core.models import OperatorCostEstimates, RecordOpStats
 from palimpzest.query.generators.generators import Generator
 from palimpzest.query.operators.physical import PhysicalOperator
@@ -68,6 +69,16 @@ class ApplyGroupByOp(AggregateOp):
             return 0
         elif func.lower() == "average":
             return (0, 0)
+        elif func.lower() == "sum":
+            return 0
+        elif func.lower() == "min":
+            return float("inf")
+        elif func.lower() == "max":
+            return float("-inf")
+        elif func.lower() == "list":
+            return []
+        elif func.lower() == "set":
+            return set()
         else:
             raise Exception("Unknown agg function " + func)
 
@@ -76,16 +87,34 @@ class ApplyGroupByOp(AggregateOp):
         if func.lower() == "count":
             return state + 1
         elif func.lower() == "average":
-            sum, cnt = state
+            sum_, cnt = state
             if val is None:
-                return (sum, cnt)
-            return (sum + val, cnt + 1)
+                return (sum_, cnt)
+            return (sum_ + val, cnt + 1)
+        elif func.lower() == "sum":
+            if val is None:
+                return state
+            return state + sum(val) if isinstance(val, list) else state + val
+        elif func.lower() == "min":
+            if val is None:
+                return state
+            return min(state, min(val) if isinstance(val, list) else val)
+        elif func.lower() == "max":
+            if val is None:
+                return state
+            return max(state, max(val) if isinstance(val, list) else val)
+        elif func.lower() == "list":
+            state.append(val)
+            return state
+        elif func.lower() == "set":
+            state.add(val)
+            return state
         else:
             raise Exception("Unknown agg function " + func)
 
     @staticmethod
     def agg_final(func, state):
-        if func.lower() == "count":
+        if func.lower() in ["count", "sum", "min", "max", "list", "set"]:
             return state
         elif func.lower() == "average":
             sum, cnt = state
@@ -222,6 +251,82 @@ class AverageAggregateOp(AggregateOp):
             except Exception:
                 pass
         data_item = Average(average=summation / total)
+        dr = DataRecord.from_agg_parents(data_item, parent_records=candidates)
+
+        # create RecordOpStats object
+        record_op_stats = RecordOpStats(
+            record_id=dr._id,
+            record_parent_ids=dr._parent_ids,
+            record_source_indices=dr._source_indices,
+            record_state=dr.to_dict(include_bytes=False),
+            full_op_id=self.get_full_op_id(),
+            logical_op_id=self.logical_op_id,
+            op_name=self.op_name(),
+            time_per_record=time.time() - start_time,
+            cost_per_record=0.0,
+        )
+
+        return DataRecordSet([dr], [record_op_stats])
+
+
+class SumAggregateOp(AggregateOp):
+    # NOTE: we don't actually need / use agg_func here (yet)
+
+    def __init__(self, agg_func: AggFunc, *args, **kwargs):
+        # enforce that output schema is correct
+        assert kwargs["output_schema"].model_fields.keys() == Sum.model_fields.keys(), "SumAggregateOp requires output_schema to be Sum"
+
+        # enforce that input schema is a single numeric field
+        input_field_types = list(kwargs["input_schema"].model_fields.values())
+        assert len(input_field_types) == 1, "SumAggregateOp requires input_schema to have exactly one field"
+        numeric_field_types = [
+            bool, int, float, int | float,
+            bool | None, int | None, float | None, int | float | None,
+            bool | Any, int | Any, float | Any, int | float | Any,
+            bool | None | Any, int | None | Any, float | None | Any, int | float | None | Any,
+        ]
+        is_numeric = input_field_types[0].annotation in numeric_field_types
+        assert is_numeric, f"SumAggregateOp requires input_schema to have a numeric field type, i.e. one of: {numeric_field_types}\nGot: {input_field_types[0]}"
+
+        # call parent constructor
+        super().__init__(*args, **kwargs)
+        self.agg_func = agg_func
+
+    def __str__(self):
+        op = super().__str__()
+        op += f"    Function: {str(self.agg_func)}\n"
+        return op
+
+    def get_id_params(self):
+        id_params = super().get_id_params()
+        return {"agg_func": str(self.agg_func), **id_params}
+
+    def get_op_params(self):
+        op_params = super().get_op_params()
+        return {"agg_func": self.agg_func, **op_params}
+
+    def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
+        # for now, assume applying the aggregation takes negligible additional time (and no cost in USD)
+        return OperatorCostEstimates(
+            cardinality=1,
+            time_per_record=0,
+            cost_per_record=0,
+            quality=1.0,
+        )
+
+    def __call__(self, candidates: list[DataRecord]) -> DataRecordSet:
+        start_time = time.time()
+
+        # NOTE: we currently do not guarantee that input values conform to their specified type;
+        #       as a result, we simply omit any values which do not parse to a float from the average
+        # NOTE: right now we perform a check in the constructor which enforces that the input_schema
+        #       has a single field which is numeric in nature; in the future we may want to have a
+        #       cleaner way of computing the value (rather than `float(list(candidate...))` below)
+        summation = 0
+        for candidate in candidates:
+            with contextlib.suppress(Exception):
+                summation += float(list(candidate.to_dict().values())[0])
+        data_item = Sum(sum=summation)
         dr = DataRecord.from_agg_parents(data_item, parent_records=candidates)
 
         # create RecordOpStats object

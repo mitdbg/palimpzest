@@ -1,0 +1,49 @@
+---
+title: Semantic Filter
+---
+The `sem_filter()` operator allows users to filter rows in a dataset based on a natural language predicate. PZ implements this operator with a function (typically powered by an LLM) that applies the predicate to each row in the dataset and retains only those rows for which the predicate evaluates to true.
+
+Semantic filter is good for filtering data based on natural language criteria which may be difficult to express with traditional boolean logic. For example, filtering a dataset of products to only include those that are "eco-friendly" or "suitable for children".
+
+:::info[Key Features of `sem_filter()`]
+1. The operator takes a `pz.Dataset` as input and produces a new dataset with only the subset of rows that satisfy the predicate.
+2. The (subset of) input field(s) which are used to apply the filter predicate can be specified via the `depends_on` parameter. Omitting a field from this list will not drop the field from the output dataset; it will simply not template the field into the prompt when computing the filter condition.
+:::
+
+### Semantic Filter
+To illustrate the use of `sem_filter()`, consider the following example where we have a dataset of research papers and we want to filter for papers that are about batteries and from MIT.
+```python
+import palimpzest as pz
+
+# create dataset from directory of research papers
+ds = pz.PDFFileDataset(id="research-papers", path="path/to/papers")
+
+# use sem_filter to retain only papers about batteries from MIT
+ds = ds.sem_filter("The paper is about batteries and from MIT")
+
+# execute the program
+output = ds.run(max_quality=True)
+print(output.to_df())
+```
+The call to `pz.PDFFileDataset()` will create a dataset with one record for each PDF in the `path/to/papers` directory. Each record will have a `filename`, `contents`, and `text_contents` fields, where `text_contents` is the text extracted from the PDF. The call to `sem_filter()` will produce a new dataset with only the records for research papers that are about batteries and from MIT.
+
+An example output might look like the following:
+```
+      filename                                           contents                                      text_contents
+0  battery.pdf  b'%PDF-1.4\r%\xe2\xe3\xcf\xd3\r\n735 0 obj\r<<...  Review ARticle\nhttps:/ / doi.org/10.1038/s415...
+```
+
+:::info[Context Management with `depends_on`]
+In the above example, the `sem_filter()` operator will feed all of the `filename`, `contents`, and `text_contents` fields into the LLM when computing whether or not the paper satisfies the filter predicate. However, only the `text_contents` field is really necessary, and including the raw bytes of the `contents` field is redundant (increasing cost) and potentially distracting to the LLM as it clutters the context.
+
+To address these concerns, the `depends_on` parameter can be used in order to specify which field(s) should be presented to the underlying LLM(s) when computing the predicate for a semantic filter.
+
+For example, if we only wanted to use the `text_contents` field to apply the predicate, we could modify the `sem_filter()` call as follows:
+```python
+ds = ds.sem_filter(
+    "The paper is about batteries and from MIT",
+    depends_on=["text_contents"],
+)
+```
+This ensures that only the `text_contents` field is included in the prompt when computing the predicate, reducing token usage and potentially improving performance.
+:::

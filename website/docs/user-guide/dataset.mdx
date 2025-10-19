@@ -1,0 +1,281 @@
+---
+title: Creating Your Own Dataset
+---
+{/* ## Goal
+This page should provide the reader with a brief demonstration of how they can implement their own `Dataset`.
+
+Key takeaways for the reader should include:
+
+1. Knowing how to build a basic `Dataset`: (provide a schema, implement `__len__()`, implement `__getitem__()`)
+2. knowing how the data returned by `__getitem__()` can be accessed later in the program
+3. knowing how to provide multi-modal input (images must be `PIL.Image | list[PIL.Image]`)
+4. Knowing when and how the user can take advantage of an off-the-shelf `Dataset` provided by PZ
+
+Keeping in line with "show don't tell", this page should have a motivating use case and start with the implementation of a simple `Dataset`. The problem should then be expanded to include image and text inputs, with a demonstration of the changes made to the `Dataset` to support these.
+
+I would strongly suggest that we finish with example(s) demonstrating how to use our off-the-shelf `Datasets`. If the user understands (1.), (2.), and (3.), then (4.) will follow quite naturally. However, the inverse is not necessarily true.
+*/}
+
+As shown in our [Quick Start Tutorial](getting-started/quickstart.mdx), Palimpzest provides built-in support for local datasets which consist solely of text, PDF, image, or audio files (as well as a few other special file types).
+
+However, many datasets contain heterogenous file types and/or more diverse input fields than just `filename` and `contents`. Fortunately, PZ's `pz.IterDataset` class can easily be extended to support virtually any dataset.
+
+In this guide, we will demonstrate how to create your own custom dataset by subclassing `pz.IterDataset`.
+
+## 🔤 The Basics
+**The goal** of the `pz.IterDataset` class is to provide a simple interface for iterating over a dataset of records. Each record is represented as a dictionary, where the keys are the column names and the values are the corresponding data for that record.
+
+In order to create your own dataset you will need to subclass `pz.IterDataset` and implement two methods:
+- `__len__()` which specifies the size of the dataset
+- `__getitem__(idx)` which returns a dictionary containing the keys and values for the `idx` item in the dataset
+
+Additionally, you will need to provide an `id` and a `schema` when initializing your dataset.
+
+We explore each of these aspects of the `pz.IterDataset` class in the following example.
+
+### 👉🏽 Example: Dataset for Zoo Animals
+Suppose you have a dataset of animals in a zoo, where each animal has an age, type (e.g. dog, cat, etc.), and name. Let's assume each of these fields is stored in a separate list as follows:
+```
+ages = [5, 3, 8, 2, 4]
+animals = ["dog", "cat", "parrot", "rabbit", "hamster"]
+names = ["Buddy", "Whiskers", "Polly", "Thumper", "Nibbles"]
+```
+We can create a custom dataset for these animals by subclassing `pz.IterDataset` as follows:
+```python
+import palimpzest as pz
+
+animal_schema = [
+    {"name": "age", "type": int, "desc": "The animal's age in years"},
+    {"name": "animal", "type": str, "desc": "The type of animal (dog, cat, etc.)"},
+    {"name": "name", "type": str, "desc": "The name of the animal"},
+]
+
+class AnimalDataset(pz.IterDataset):
+    def __init__(self, ages: list[int], animals: list[str], names: list[str]) -> None:
+        super().__init__(id="zoo-animals", schema=animal_schema)
+        self.ages = ages
+        self.animals = animals
+        self.names = names
+
+    def __len__(self) -> int:
+        return len(self.names)
+
+    def __getitem__(self, idx: int) -> dict:
+        return {"age": self.ages[idx], "animal": self.animals[idx], "name": self.names[idx]}
+```
+Once we have defined our `AnimalDataset`, we can create an instance of it and use it in a PZ program as follows:
+```python
+# create dataset instance
+ages = [5, 3, 8, 2, 4]
+animals = ["dog", "cat", "parrot", "rabbit", "hamster"]
+names = ["Buddy", "Whiskers", "Polly", "Thumper", "Nibbles"]
+dataset = AnimalDataset(ages, animals, names)
+
+# use dataset in a PZ program
+dataset = dataset.sem_filter("The animal has four legs and is younger than five years old.")
+dataset = dataset.sem_map(
+    cols=[
+        {"name": "greeting", "type": str, "desc": "A greeting for the animal"},
+    ],
+)
+output = dataset.run(max_quality=True)
+print(output.to_df())
+```
+This will output a dataframe containing the animals that match the filter criteria, along with a greeting for each animal.
+```
+   age   animal      name                                           greeting
+0    3      cat  Whiskers       Hello Whiskers, you adorable 3-year-old cat!
+1    2   rabbit   Thumper               Hello Thumper the 2-year-old rabbit!
+2    4  hamster   Nibbles  Hello Nibbles the hamster! At 4 years old, you...
+```
+
+### 🔑 Key Points
+1. The `id` parameter in the `pz.IterDataset` constructor (i.e. `"zoo-animals"`) is a unique identifier for the dataset. It can be any string, but it should be unique across all datasets used in a PZ program.
+2. The `schema` parameter in the `pz.IterDataset` constructor is a list of dictionaries, where each dictionary describes a column in the dataset. Each dictionary should contain the following keys:
+   - `name`: The name of the column (string)
+   - `type`: The data type of the column (e.g. `str`, `int`, `float`, etc.)
+   - `desc`: A brief description of the column (string)
+3. The `__len__()` method should return the number of records in the dataset.
+4. The `__getitem__(idx)` method should return a dictionary containing the keys and values for the `idx` item in the dataset. The keys should match the column names specified in the `schema`, and the values should be of the corresponding data type.
+5. The data returned by `__getitem__()` can be accessed later in the program using the column names specified in the `schema`. For example, we could filter for animals with `age < 5` using the `age` column as follows:
+   ```python
+   dataset = dataset.filter(lambda record: record["age"] < 5)
+   ```
+
+:::tip[Using the Same Dataset Multiple Times in a Single Program]
+If you need to use the same dataset multiple times in a program, you can create multiple instances of the dataset with different `id`s. For example:
+```python
+class AnimalDataset(pz.IterDataset):
+    def __init__(self, id: str, ages: list[int], ...) -> None:
+        super().__init__(id=id, schema=animal_schema)
+        self.ages = ages
+        ...
+
+dataset1 = AnimalDataset("zoo-animals1", ages, animals, names)
+dataset2 = AnimalDataset("zoo-animals2", ages, animals, names)
+ds = dataset1.sem_join(dataset2, "both animals have four legs")
+...
+```
+:::
+
+## ⚒️ Using Built-in Datasets
+PZ provides several built-in datasets for common use cases, including:
+- `pz.MemoryDataset`
+    - Loads data from a list of dictionaries or a pandas DataFrame provided by the user. Useful for small datasets which can fit in memory.
+- `pz.PDFFileDataset`
+    - Loads all PDF files in a directory. Yields `filename`, `contents`, and `text_contents` fields, where `text_contents` is the text extracted from the PDF.
+- `pz.ImageFileDataset`
+    - Loads all image files in a directory. Yields `filename` and `contents` fields, where `contents` is the base-64 encoded version of the image.
+- `pz.AudioFileDataset`
+    - Loads all audio files (.wav) in a directory. Yields `filename` and `contents` fields, where `contents` is the base-64 encoded version of the audio file.
+- `pz.HTMLFileDataset`
+    - Loads all HTML files in a directory. Yields `filename`, `html`, and `text` fields, where `text` is the text parsed from the raw HTML.
+- `pz.XLSFileDataset`
+    - Loads all Excel files (.xls, .xlsx) in a directory. Yields `filename`, `contents`, `sheet_names`, and `number_sheets`.
+
+Revisiting our zoo animal example, we could use a `pz.MemoryDataset` to load the animal data as follows:
+```python
+import palimpzest as pz
+
+# create dataset instance
+data = [
+    {"age": 5, "animal": "dog", "name": "Buddy"},
+    {"age": 3, "animal": "cat", "name": "Whiskers"},
+    {"age": 8, "animal": "parrot", "name": "Polly"},
+    {"age": 2, "animal": "rabbit", "name": "Thumper"},
+    {"age": 4, "animal": "hamster", "name": "Nibbles"},
+]
+dataset = pz.MemoryDataset(id="zoo-animals", vals=data)
+# dataset = pz.MemoryDataset(id="zoo-animals", vals=pd.DataFrame(data))  # alternatively, load from a pandas DataFrame
+
+# use dataset in a PZ program
+dataset = dataset.sem_filter("The animal has four legs and is younger than five years old.")
+dataset = dataset.sem_map(
+    cols=[
+        {"name": "greeting", "type": str, "desc": "A greeting for the animal"},
+    ],
+)
+output = dataset.run(max_quality=True)
+print(output.to_df())
+```
+Note that when using a `pz.MemoryDataset`, we do not need to provide a `schema`, as it is automatically inferred from the data.
+
+For more information on PZ's built-in datasets, please see the [API documentation](api/overview.mdx) (coming soon).
+
+## 🖼️ Multi-Modal Datasets
+Many datasets contain multiple modalities of data, such as text and images. PZ's `pz.IterDataset` class can easily be extended to support multi-modal datasets by returning dictionaries with fields of type `pz.ImageFilepath` or `pz.AudioFilepath`.
+
+Palimpzest supports semantic operations over any combination of text, image(s), and audio data. Furthermore, if the image / audio data is not stored on disk, you can also use the `pz.ImageBase64` and `pz.AudioBase64` types to provide base-64 encoded data directly.
+
+### 👉🏽 Example: Dataset for Real Estate Listings
+Suppose we have a dataset of real estate listings, where each listing contains a text description and multiple images of the home:
+
+<div className="scrollable-images">
+  <img src="/img/listing-img1.png" alt="img1" />
+  <img src="/img/listing-img2.png" alt="img2" />
+  <img src="/img/listing-img3.png" alt="img3" />
+</div>
+```
+DESCRIPTION
+-----------
+Address: 123 Main St Unit 1A, Cambridge, MA 02139
+Home List Price: $1,234,000
+
+Built in 2015, this 1763 sq ft contemporary townhouse is only minutes away from the heart of Central Square...
+```
+And suppose that we store each listing in a directory, where the text description is stored in a `.txt` file and the images are stored as `.png` files:
+```
+├── listing1
+│   ├── img1.png
+│   ├── img2.png
+│   ├── img3.png
+│   └── listing-text.txt
+├── listing2
+│   ├── img1.png
+│   ├── img2.png
+│   ├── img3.png
+│   └── listing-text.txt
+└── listing3
+    ├── img1.png
+    ├── img2.png
+    ├── img3.png
+    └── listing-text.txt
+```
+We can load each listing's description and images in a single data record as follows:
+```python
+import palimpzest as pz
+
+real_estate_listing_cols = [
+    {"name": "listing", "type": str, "desc": "The name of the listing"},
+    {"name": "text_content", "type": str, "desc": "The content of the listing's text description"},
+    {"name": "image_filepaths", "type": list[pz.ImageFilepath], "desc": "A list of the filepaths for each image of the listing"},
+]
+
+class RealEstateDataset(pz.IterDataset):
+    def __init__(self, listings_dir):
+        super().__init__(id="real-estate", schema=real_estate_listing_cols)
+        self.listings_dir = listings_dir
+        self.listings = sorted(os.listdir(self.listings_dir))
+
+    def __len__(self):
+        return len(self.listings)
+
+    def __getitem__(self, idx: int):
+        # get listing: e.g. "listing1", "listing2", etc.
+        listing = self.listings[idx]
+
+        # get fields
+        image_filepaths, text_content = [], None
+        listing_dir = os.path.join(self.listings_dir, listing)
+        for file in os.listdir(listing_dir):
+            if file.endswith(".txt"):
+                with open(os.path.join(listing_dir, file), "rb") as f:
+                    text_content = f.read().decode("utf-8")
+            elif file.endswith(".png"):
+                image_filepaths.append(os.path.join(listing_dir, file))
+
+        # construct and return dictionary with fields
+        return {"listing": listing, "text_content": text_content, "image_filepaths": image_filepaths}
+```
+We can now use this `RealEstateDataset` in a PZ program to find listings which are modern and attractive, have lots of natural sunlight, and are within our budget:
+```python
+import palimpzest as pz
+
+text_based_cols = [
+    {"name": "address", "type": str, "desc": "The address of the property"},
+    {"name": "price", "type": int | float, "desc": "The listed price of the property"},
+]
+
+image_based_cols = [
+    {"name": "is_modern_and_attractive", "type": bool, "desc": "True if the home interior design is modern and attractive and False otherwise"},
+    {"name": "has_natural_sunlight", "type": bool, "desc": "True if the home interior has lots of natural sunlight and False otherwise"},
+]
+
+def in_price_range(record: dict):
+    try:
+        price = record["price"]
+        if isinstance(price, str):
+            price = price.strip()
+            price = int(price.replace("$", "").replace(",", ""))
+        return 6e5 < price <= 2e6
+    except Exception:
+        return False
+
+# create PZ program
+ds = RealEstateDataset(listings_dir="path/to/listings")
+ds = ds.sem_map(text_based_cols, depends_on="text_content")
+ds = ds.sem_map(image_based_cols, depends_on="image_filepaths")
+ds = ds.sem_filter(
+    "The interior is modern and attractive, and has lots of natural sunlight",
+    depends_on=["is_modern_and_attractive", "has_natural_sunlight"],
+)
+ds = ds.filter(in_price_range, depends_on="price")
+
+# run the program
+output = ds.run(max_quality=True)
+print(output.to_df())
+```
+This program will extract the address and price from each listing's text description, determine whether the interior design is modern and attractive and whether the home has lots of natural sunlight from the images, filter for listings which meet our criteria, and finally return a dataframe containing the matching listings.
+
+### ➡️ What's Next?
+Click below to proceed to the overview on `Semantic Operators` supported in PZ.

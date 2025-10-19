@@ -225,7 +225,7 @@ if __name__ == "__main__":
         return {"reaction_labels": final_sorted_results[:k]}
 
     # construct plan
-    plan = dataset.retrieve(
+    plan = dataset.sem_topk(
         index=index,
         search_func=search_func,
         search_attr="reactions",

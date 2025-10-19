@@ -1,0 +1,53 @@
+---
+title: Semantic Aggregate
+---
+The `sem_agg()` operator allows users to perform an aggregation specified in natural language on a dataset. PZ implements this operator with a function (typically powered by an LLM) that aggregates over all rows in the input dataset and produces a single aggregate row as output.
+
+Semantic aggregation is useful for summarizing data based on natural language criteria which may be difficult to express with traditional aggregation functions. For example, aggregating a dataset of customer reviews to produce a summary of the overall sentiment and key themes.
+
+:::info[Key Features of `sem_agg()`]
+1. The operator takes a `pz.Dataset` as input and produces a new dataset with a single row containing the aggregate information.
+2. The (subset of) input field(s) which are used to apply the filter predicate can be specified via the `depends_on` parameter. Omitting a field from this list will ensure that it is not templated into the prompt when computing the aggregate.
+:::
+
+### Semantic Aggregate
+To illustrate the use of `sem_agg()`, consider the following example where we have a dataset of product reviews and want to generate a summary of the primary complaints mentioned in the reviews.
+```python
+import palimpzest as pz
+
+# create dataset from directory of product reviews
+ds = pz.TextFileDataset(id="product-reviews", path="path/to/reviews")
+
+# use sem_agg to generate a summary of the primary complaints in the reviews
+ds = ds.sem_agg(
+    col={'name': 'top_complaints', 'type': str, 'desc': 'The top-3 most common complaints mentioned in the reviews'},
+    agg="Compute the top-3 most common complaints mentioned in the reviews",
+)
+
+# execute the program
+output = ds.run(max_quality=True)
+print(output.to_df())
+```
+The call to `pz.TextFileDataset()` will create a dataset with one record for each text file in the `path/to/reviews` directory. Each record will have a `filename` and `contents` field, where `contents` is the text read from the file. The call to `sem_agg()` will produce a new dataset with a single record containing the `top_complaints` field computed from all of the reviews in the input dataset.
+
+An example output might look like the following:
+```
+                                      top_complaints
+0  1. Poor battery life\n2. Slow performance\n3. ...
+```
+
+:::info[Context Management with `depends_on`]
+In the above example, the `sem_agg()` operator will feed both the `filename` and `contents` fields into the LLM when computing the aggregate. However, only the `contents` field is really necessary.
+
+The `depends_on` parameter can be used to specify which field(s) should be presented to the underlying LLM(s) when computing the semantic aggregate.
+
+For example, if we only wanted to use the `contents` field to compute the aggregate, we could modify the `sem_agg()` call as follows:
+```python
+ds = ds.sem_agg(
+    col={'name': 'top_complaints', 'type': str, 'desc': 'The top-3 most common complaints mentioned in the reviews'},
+    agg="Compute the top-3 most common complaints mentioned in the reviews",
+    depends_on=["contents"],
+)
+```
+This ensures that only the `contents` field is included in the prompt when computing the aggregate, reducing token usage and potentially improving performance.
+:::

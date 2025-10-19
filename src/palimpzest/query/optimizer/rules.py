@@ -19,13 +19,14 @@ from palimpzest.query.operators.aggregate import (
     MaxAggregateOp,
     MinAggregateOp,
     SemanticAggregate,
+    SumAggregateOp,
 )
 from palimpzest.query.operators.compute import SmolAgentsCompute
 from palimpzest.query.operators.convert import LLMConvertBonded, NonLLMConvert
 from palimpzest.query.operators.critique_and_refine import CritiqueAndRefineConvert, CritiqueAndRefineFilter
 from palimpzest.query.operators.distinct import DistinctOp
 from palimpzest.query.operators.filter import LLMFilter, NonLLMFilter
-from palimpzest.query.operators.join import EmbeddingJoin, NestedLoopsJoin
+from palimpzest.query.operators.join import EmbeddingJoin, NestedLoopsJoin, RelationalJoin
 from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.operators.logical import (
     Aggregate,
@@ -39,19 +40,19 @@ from palimpzest.query.operators.logical import (
     JoinOp,
     LimitScan,
     Project,
-    RetrieveScan,
     SearchOperator,
+    TopKScan,
 )
 from palimpzest.query.operators.mixture_of_agents import MixtureOfAgentsConvert, MixtureOfAgentsFilter
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.project import ProjectOp
 from palimpzest.query.operators.rag import RAGConvert, RAGFilter
-from palimpzest.query.operators.retrieve import RetrieveOp
 from palimpzest.query.operators.scan import ContextScanOp, MarshalAndScanDataOp
 from palimpzest.query.operators.search import (
     SmolAgentsSearch,  # SmolAgentsCustomManagedSearch,  # SmolAgentsManagedSearch
 )
 from palimpzest.query.operators.split import SplitConvert, SplitFilter
+from palimpzest.query.operators.topk import TopKOp
 from palimpzest.query.optimizer.primitives import Expression, Group, LogicalExpression, PhysicalExpression
 
 logger = logging.getLogger(__name__)
@@ -796,26 +797,26 @@ class SplitRule(ImplementationRule):
         return cls._perform_substitution(logical_expression, phys_op_cls, runtime_kwargs, variable_op_kwargs)
 
 
-class RetrieveRule(ImplementationRule):
+class TopKRule(ImplementationRule):
     """
-    Substitute a logical expression for a RetrieveScan with a Retrieve physical implementation.
+    Substitute a logical expression for a TopKScan with a TopK physical implementation.
     """
     k_budgets = [1, 3, 5, 10, 15, 20, 25]
 
     @classmethod
     def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
-        is_match = isinstance(logical_expression.operator, RetrieveScan)
-        logger.debug(f"RetrieveRule matches_pattern: {is_match} for {logical_expression}")
+        is_match = isinstance(logical_expression.operator, TopKScan)
+        logger.debug(f"TopKRule matches_pattern: {is_match} for {logical_expression}")
         return is_match
 
     @classmethod
     def substitute(cls, logical_expression: LogicalExpression, **runtime_kwargs) -> set[PhysicalExpression]:
-        logger.debug(f"Substituting RetrieveRule for {logical_expression}")
+        logger.debug(f"Substituting TopKRule for {logical_expression}")
 
         # create variable physical operator kwargs for each model which can implement this logical_expression
         ks = cls.k_budgets if logical_expression.operator.k == -1 else [logical_expression.operator.k]
         variable_op_kwargs = [{"k": k} for k in ks]
-        return cls._perform_substitution(logical_expression, RetrieveOp, runtime_kwargs, variable_op_kwargs)
+        return cls._perform_substitution(logical_expression, TopKOp, runtime_kwargs, variable_op_kwargs)
 
 
 class NonLLMFilterRule(ImplementationRule):
@@ -867,6 +868,23 @@ class LLMFilterRule(ImplementationRule):
         return cls._perform_substitution(logical_expression, LLMFilter, runtime_kwargs, variable_op_kwargs)
 
 
+class RelationalJoinRule(ImplementationRule):
+    """
+    Substitute a logical expression for a JoinOp with a RelationalJoin physical implementation.
+    """
+
+    @classmethod
+    def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
+        is_match = isinstance(logical_expression.operator, JoinOp) and logical_expression.operator.condition == ""
+        logger.debug(f"RelationalJoinRule matches_pattern: {is_match} for {logical_expression}")
+        return is_match
+
+    @classmethod
+    def substitute(cls, logical_expression: LogicalExpression, **runtime_kwargs) -> set[PhysicalExpression]:
+        logger.debug(f"Substituting RelationalJoinRule for {logical_expression}")
+        return cls._perform_substitution(logical_expression, RelationalJoin, runtime_kwargs)
+
+
 class NestedLoopsJoinRule(ImplementationRule):
     """
     Substitute a logical expression for a JoinOp with an (LLM) NestedLoopsJoin physical implementation.
@@ -874,7 +892,7 @@ class NestedLoopsJoinRule(ImplementationRule):
 
     @classmethod
     def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
-        is_match = isinstance(logical_expression.operator, JoinOp)
+        is_match = isinstance(logical_expression.operator, JoinOp) and logical_expression.operator.condition != ""
         logger.debug(f"NestedLoopsJoinRule matches_pattern: {is_match} for {logical_expression}")
         return is_match
 
@@ -906,7 +924,7 @@ class EmbeddingJoinRule(ImplementationRule):
 
     @classmethod
     def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
-        is_match = isinstance(logical_expression.operator, JoinOp) and not cls._is_audio_operation(logical_expression)
+        is_match = isinstance(logical_expression.operator, JoinOp) and logical_expression.operator.condition != "" and not cls._is_audio_operation(logical_expression)
         logger.debug(f"EmbeddingJoinRule matches_pattern: {is_match} for {logical_expression}")
         return is_match
 
@@ -982,6 +1000,8 @@ class AggregateRule(ImplementationRule):
             physical_op_class = CountAggregateOp
         elif logical_expression.operator.agg_func == AggFunc.AVERAGE:
             physical_op_class = AverageAggregateOp
+        elif logical_expression.operator.agg_func == AggFunc.SUM:
+            physical_op_class = SumAggregateOp
         elif logical_expression.operator.agg_func == AggFunc.MIN:
             physical_op_class = MinAggregateOp
         elif logical_expression.operator.agg_func == AggFunc.MAX:

@@ -17,7 +17,7 @@ from palimpzest.core.models import GenerationStats, OperatorCostEstimates, Recor
 from palimpzest.query.operators.physical import PhysicalOperator
 
 
-class RetrieveOp(PhysicalOperator):
+class TopKOp(PhysicalOperator):
     def __init__(
         self,
         index: Collection,
@@ -29,7 +29,7 @@ class RetrieveOp(PhysicalOperator):
         **kwargs,
     ) -> None:
         """
-        Initialize the RetrieveOp object.
+        Initialize the TopKOp object.
         
         Args:
             index (Collection): The PZ index to use for retrieval.
@@ -59,7 +59,7 @@ class RetrieveOp(PhysicalOperator):
 
     def __str__(self):
         op = super().__str__()
-        op += f"    Retrieve: {self.index.__class__.__name__} with top {self.k}\n"
+        op += f"    Top-K: {self.index.__class__.__name__} with k={self.k}\n"
         return op
 
     def get_id_params(self):
@@ -89,8 +89,8 @@ class RetrieveOp(PhysicalOperator):
 
     def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         """
-        Compute naive cost estimates for the Retrieve operation. These estimates assume
-        that the Retrieve (1) has no cost and (2) has perfect quality.
+        Compute naive cost estimates for the Top-K operation. These estimates assume
+        that the Top-K (1) has negligible cost and (2) has perfect quality.
         """
         return OperatorCostEstimates(
             cardinality=source_op_cost_estimates.cardinality,
@@ -101,7 +101,7 @@ class RetrieveOp(PhysicalOperator):
 
     def default_search_func(self, index: Collection, query: list[str] | list[list[float]], k: int) -> list[str] | list[list[str]]:
         """
-        Default search function for the Retrieve operation. This function uses the index to
+        Default search function for the Top-K operation. This function uses the index to
         retrieve the top-k results for the given query. The query will be a (possibly singleton)
         list of strings or a list of lists of floats (i.e., embeddings). The function will return
         the top-k results per-query in (descending) sorted order. If the input is a singleton list,
@@ -111,7 +111,7 @@ class RetrieveOp(PhysicalOperator):
         Args:
             index (PZIndex): The index to use for retrieval.
             query (list[str] | list[list[float]]): The query (or queries) to search for.
-            k (int): The maximum number of results the retrieve operator will return.
+            k (int): The maximum number of results the top-k operator will return.
 
         Returns:
             list[str] | list[list[str]]: The top results in (descending) sorted order per query.
@@ -260,10 +260,10 @@ class RetrieveOp(PhysicalOperator):
             top_results = self.search_func(self.index, inputs, self.k)
 
         except Exception:
-            top_results = ["error-in-retrieve"]
-            os.makedirs("retrieve-errors", exist_ok=True)
+            top_results = ["error-in-topk"]
+            os.makedirs("topk-errors", exist_ok=True)
             ts = time.time()
-            with open(f"retrieve-errors/error-{ts}.txt", "w") as f:
+            with open(f"topk-errors/error-{ts}.txt", "w") as f:
                 f.write(str(query))
 
         # TODO: the user is always right! let's drop this post-processing in the future
