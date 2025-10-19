@@ -6,7 +6,6 @@ from pydantic import BaseModel
 
 from palimpzest.core.lib.schemas import create_schema_from_fields
 
-
 # TODO:
 # - move the arguments for group_by_fields, agg_funcs, and agg_fields into the Dataset.groupby() operator
 # - construct the correct output schema using the input schema and the group by and aggregation fields
