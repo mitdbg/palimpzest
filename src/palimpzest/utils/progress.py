@@ -283,7 +283,7 @@ class PZProgressManager(ProgressManager):
         self.unique_full_op_id_to_stats[unique_full_op_id].memory_usage_mb = get_memory_usage()
 
 class PZSentinelProgressManager(ProgressManager):
-    def __init__(self, plan: SentinelPlan, sample_budget: int):
+    def __init__(self, plan: SentinelPlan, sample_budget: int | None, sample_cost_budget: float | None):
         # overall progress bar
         self.overall_progress = RichProgress(
             SpinnerColumn(),
@@ -298,7 +298,9 @@ class PZSentinelProgressManager(ProgressManager):
             refresh_per_second=10,
             expand=True,   # Use full width
         )
-        self.overall_task_id = self.overall_progress.add_task("", total=sample_budget, cost=0.0, recent="")
+        self.use_cost_budget = sample_cost_budget is not None
+        total = sample_cost_budget if self.use_cost_budget else sample_budget
+        self.overall_task_id = self.overall_progress.add_task("", total=total, cost=0.0, recent="")
 
         # logical operator progress bars
         self.op_progress = RichProgress(
@@ -333,6 +335,9 @@ class PZSentinelProgressManager(ProgressManager):
 
         # initialize start time
         self.start_time = None
+
+        # initialize validation cost
+        self.validation_cost = 0.0
 
         # add a task to the progress manager for each operator in the plan
         for topo_idx, (logical_op_id, op_set) in enumerate(plan):
@@ -387,14 +392,33 @@ class PZSentinelProgressManager(ProgressManager):
         # start progress bars
         self.live_display.start()
 
+    def incr_overall_progress_cost(self, cost_delta: float):
+        """Advance the overall progress bar by the given cost delta"""
+        self.validation_cost += cost_delta
+        self.overall_progress.update(
+            self.overall_task_id,
+            advance=cost_delta,
+            cost=sum(stats.total_cost for _, stats in self.unique_logical_op_id_to_stats.items()) + self.validation_cost,
+            refresh=True,
+        )
+
+        # force the live display to refresh
+        self.live_display.refresh()
+
     def incr(self, unique_logical_op_id: str, num_samples: int, display_text: str | None = None, **kwargs):
         # TODO: (above) organize progress bars into a Live / Table / Panel or something
         # get the task for the given operation
         task = self.unique_logical_op_id_to_task.get(unique_logical_op_id)
 
+        # store the cost before updating stats
+        previous_total_cost = self.unique_logical_op_id_to_stats[unique_logical_op_id].total_cost
+
         # update statistics with any additional keyword arguments
         if kwargs != {}:
             self.update_stats(unique_logical_op_id, **kwargs)
+
+        # compute the cost delta
+        cost_delta = self.unique_logical_op_id_to_stats[unique_logical_op_id].total_cost - previous_total_cost
 
         # update progress bar and recent text in one update
         if display_text is not None:
@@ -414,10 +438,11 @@ class PZSentinelProgressManager(ProgressManager):
         )
 
         # advance the overall progress bar
+        advance = cost_delta if self.use_cost_budget else num_samples
         self.overall_progress.update(
             self.overall_task_id,
-            advance=num_samples,
-            cost=sum(stats.total_cost for _, stats in self.unique_logical_op_id_to_stats.items()),
+            advance=advance,
+            cost=sum(stats.total_cost for _, stats in self.unique_logical_op_id_to_stats.items()) + self.validation_cost,
             refresh=True,
         )
 
@@ -451,6 +476,7 @@ def create_progress_manager(
     plan: PhysicalPlan | SentinelPlan,
     num_samples: int | None = None,
     sample_budget: int | None = None,
+    sample_cost_budget: float | None = None,
     progress: bool = True,
 ) -> ProgressManager:
     """Factory function to create appropriate progress manager based on environment"""
@@ -458,7 +484,7 @@ def create_progress_manager(
         return MockProgressManager(plan, num_samples)
 
     if isinstance(plan, SentinelPlan):
-        assert sample_budget is not None, "Sample budget must be specified for SentinelPlan progress manager"
-        return PZSentinelProgressManager(plan, sample_budget)
+        assert sample_budget is not None or sample_cost_budget is not None, "Sample budget must be specified for SentinelPlan progress manager"
+        return PZSentinelProgressManager(plan, sample_budget, sample_cost_budget)
 
     return PZProgressManager(plan, num_samples)
