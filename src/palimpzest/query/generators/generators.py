@@ -338,7 +338,7 @@ class Generator(Generic[ContextType, InputType]):
                     reasoning_effort = "minimal" if self.reasoning_effort is None else self.reasoning_effort
                     completion_kwargs = {"reasoning_effort": reasoning_effort, **completion_kwargs}
             if self.model.is_vllm_model():
-                completion_kwargs = {"api_base": self.api_base, "api_key": os.environ.get("VLLM_API_KEY", "fake-api-key") **completion_kwargs}
+                completion_kwargs = {"api_base": self.api_base, "api_key": os.environ.get("VLLM_API_KEY", "fake-api-key"), **completion_kwargs}
             completion = litellm.completion(model=self.model_name, messages=messages, **completion_kwargs)
             end_time = time.time()
             logger.debug(f"Generated completion in {end_time - start_time:.2f} seconds")
