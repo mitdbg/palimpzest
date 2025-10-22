@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from typing import Any
 
 from numpy import dot
 from numpy.linalg import norm
@@ -153,8 +154,8 @@ class RAGConvert(LLMConvert):
             field = candidate.get_field_type(field_name)
 
             # skip this field if it is not a string or a list of strings
-            is_string_field = field.annotation in [str, str | None]
-            is_list_string_field = field.annotation in [list[str], list[str] | None]
+            is_string_field = field.annotation in [str, str | None, str | Any]
+            is_list_string_field = field.annotation in [list[str], list[str] | None, list[str] | Any]
             if not (is_string_field or is_list_string_field):
                 continue
 
@@ -358,8 +359,8 @@ class RAGFilter(LLMFilter):
             field = candidate.get_field_type(field_name)
 
             # skip this field if it is not a string or a list of strings
-            is_string_field = field.annotation in [str, str | None]
-            is_list_string_field = field.annotation in [list[str], list[str] | None]
+            is_string_field = field.annotation in [str, str | None, str | Any]
+            is_list_string_field = field.annotation in [list[str], list[str] | None, list[str] | Any]
             if not (is_string_field or is_list_string_field):
                 continue
 
