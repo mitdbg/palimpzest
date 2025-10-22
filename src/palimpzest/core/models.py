@@ -454,6 +454,12 @@ class BasePlanStats(BaseModel):
         """
         return sum([gen_stats.total_output_tokens for _, gen_stats in self.validation_gen_stats.items()])
 
+    def get_total_cost_so_far(self) -> float:
+        """
+        Get the total cost incurred so far in this plan execution.
+        """
+        return self.sum_op_costs() + self.sum_validation_costs()
+
 
 class PlanStats(BasePlanStats):
     """

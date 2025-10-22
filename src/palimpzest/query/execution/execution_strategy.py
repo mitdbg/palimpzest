@@ -82,10 +82,11 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
     """
     def __init__(
         self,
-        k: int,
-        j: int,
-        sample_budget: int,
         policy: Policy,
+        k: int = 6,
+        j: int = 4,
+        sample_budget: int = 100,
+        sample_cost_budget: float | None = None,
         priors: dict | None = None,
         use_final_op_quality: bool = False,
         seed: int = 42,
@@ -97,6 +98,7 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
         self.k = k
         self.j = j
         self.sample_budget = sample_budget
+        self.sample_cost_budget = sample_cost_budget
         self.policy = policy
         self.priors = priors
         self.use_final_op_quality = use_final_op_quality

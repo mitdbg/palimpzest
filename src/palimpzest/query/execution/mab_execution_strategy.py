@@ -680,6 +680,9 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
 
         return max_quality_op
 
+    def _compute_termination_condition(self, samples_drawn: int, sampling_cost: float) -> bool:
+        return (samples_drawn >= self.sample_budget) if self.sample_cost_budget is None else (sampling_cost >= self.sample_cost_budget)
+
     def _execute_sentinel_plan(
             self,
             plan: SentinelPlan,
@@ -688,8 +691,8 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
             plan_stats: SentinelPlanStats,
         ) -> SentinelPlanStats:
         # sample records and operators and update the frontiers
-        samples_drawn = 0
-        while samples_drawn < self.sample_budget:
+        samples_drawn, sampling_cost = 0, 0.0
+        while not self._compute_termination_condition(samples_drawn, sampling_cost):
             # pre-compute the set of source indices which will need to be sampled
             source_indices_to_sample = set()
             for op_frontier in op_frontiers.values():
@@ -732,6 +735,9 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
                 }
                 source_indices_to_all_record_sets, val_gen_stats = self._score_quality(validator, source_indices_to_all_record_sets)
 
+                # update the progress manager with validation cost
+                self.progress_manager.incr_overall_progress_cost(val_gen_stats.cost_per_record)
+
                 # remove records that were read from the execution cache before adding to record op stats
                 new_record_op_stats = []
                 for _, record_set_tuples in source_indices_to_record_set_tuples.items():
@@ -742,6 +748,7 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
                 # update plan stats
                 plan_stats.add_record_op_stats(unique_logical_op_id, new_record_op_stats)
                 plan_stats.add_validation_gen_stats(unique_logical_op_id, val_gen_stats)
+                sampling_cost = plan_stats.get_total_cost_so_far()
 
                 # provide the best record sets as inputs to the next logical operator
                 next_unique_logical_op_id = plan.get_next_unique_logical_op_id(unique_logical_op_id)
@@ -813,7 +820,7 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
                 op_frontiers[unique_logical_op_id] = OpFrontier(op_set, source_unique_logical_op_ids, root_dataset_ids, source_indices, self.k, self.j, self.seed, self.policy, self.priors)
 
         # initialize and start the progress manager
-        self.progress_manager = create_progress_manager(plan, sample_budget=self.sample_budget, progress=self.progress)
+        self.progress_manager = create_progress_manager(plan, sample_budget=self.sample_budget, sample_cost_budget=self.sample_cost_budget, progress=self.progress)
         self.progress_manager.start()
 
         # NOTE: we must handle progress manager outside of _execute_sentinel_plan to ensure that it is shut down correctly;

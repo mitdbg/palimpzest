@@ -44,6 +44,7 @@ class QueryProcessorConfig(BaseModel):
     k: int = Field(default=6)
     j: int = Field(default=4)
     sample_budget: int = Field(default=100)
+    sample_cost_budget: float | None = Field(default=None)
     seed: int = Field(default=42)
     exp_name: str | None = Field(default=None)
     priors: dict | None = Field(default=None)
