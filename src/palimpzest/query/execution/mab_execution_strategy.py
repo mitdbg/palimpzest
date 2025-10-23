@@ -44,6 +44,7 @@ class OpFrontier:
             seed: int,
             policy: Policy,
             priors: dict | None = None,
+            dont_use_priors: bool = False,  # TODO: remove after abacus experiments
         ):
         # set k and j, which are the initial number of operators in the frontier and the
         # initial number of records to sample for each frontier operator
@@ -51,6 +52,7 @@ class OpFrontier:
         self.j = j
         self.source_indices = source_indices
         self.root_dataset_ids = root_dataset_ids
+        self.dont_use_priors = dont_use_priors  # TODO: remove after abacus experiments
 
         # store the policy that we are optimizing under
         self.policy = policy
@@ -190,7 +192,7 @@ class OpFrontier:
         Returns a list of indices for the operators in the op_set.
         """
         # if this is not an llm-operator, we simply return the indices in random order
-        if not self.is_llm_op:
+        if not self.is_llm_op or self.dont_use_priors:
             rng = np.random.default_rng(seed=seed)
             op_indices = np.arange(len(op_set))
             rng.shuffle(op_indices)
@@ -805,7 +807,7 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
                 assert len(root_dataset_ids) == 1, f"Scan for {sample_op} has {len(root_dataset_ids)} > 1 root dataset ids"
                 root_dataset_id = root_dataset_ids[0]
                 source_indices = dataset_id_to_shuffled_source_indices[root_dataset_id]
-                op_frontiers[unique_logical_op_id] = OpFrontier(op_set, source_unique_logical_op_ids, root_dataset_ids, source_indices, self.k, self.j, self.seed, self.policy, self.priors)
+                op_frontiers[unique_logical_op_id] = OpFrontier(op_set, source_unique_logical_op_ids, root_dataset_ids, source_indices, self.k, self.j, self.seed, self.policy, self.priors, self.dont_use_priors)
             elif isinstance(sample_op, JoinOp):
                 assert len(source_unique_logical_op_ids) == 2, f"Join for {sample_op} has {len(source_unique_logical_op_ids)} != 2 source logical operators"
                 left_source_indices = op_frontiers[source_unique_logical_op_ids[0]].source_indices
@@ -814,10 +816,10 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
                 for left_source_idx in left_source_indices:
                     for right_source_idx in right_source_indices:
                         source_indices.append((left_source_idx, right_source_idx))
-                op_frontiers[unique_logical_op_id] = OpFrontier(op_set, source_unique_logical_op_ids, root_dataset_ids, source_indices, self.k, self.j, self.seed, self.policy, self.priors)
+                op_frontiers[unique_logical_op_id] = OpFrontier(op_set, source_unique_logical_op_ids, root_dataset_ids, source_indices, self.k, self.j, self.seed, self.policy, self.priors, self.dont_use_priors)
             else:
                 source_indices = op_frontiers[source_unique_logical_op_ids[0]].source_indices
-                op_frontiers[unique_logical_op_id] = OpFrontier(op_set, source_unique_logical_op_ids, root_dataset_ids, source_indices, self.k, self.j, self.seed, self.policy, self.priors)
+                op_frontiers[unique_logical_op_id] = OpFrontier(op_set, source_unique_logical_op_ids, root_dataset_ids, source_indices, self.k, self.j, self.seed, self.policy, self.priors, self.dont_use_priors)
 
         # initialize and start the progress manager
         self.progress_manager = create_progress_manager(plan, sample_budget=self.sample_budget, sample_cost_budget=self.sample_cost_budget, progress=self.progress)
