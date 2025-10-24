@@ -15,13 +15,13 @@ def compute_final_metrics(metric: str, dir: str, exp_base_name: str):
         if os.path.exists(f"{dir}/{exp_name}-stats.json"):
             with open(f"{dir}/{exp_name}-stats.json") as f:
                 metrics = json.load(f)
-        qualities.append(metrics["f1"])
-        opt_costs.append(metrics["optimization_cost"])
-        opt_times.append(metrics["optimization_time"])
-        run_costs.append(metrics["plan_execution_cost"])
-        run_times.append(metrics["plan_execution_time"])
-        total_costs.append(metrics["total_execution_cost"])
-        total_times.append(metrics["total_execution_time"])
+            qualities.append(metrics["f1"])
+            opt_costs.append(metrics["optimization_cost"])
+            opt_times.append(metrics["optimization_time"])
+            run_costs.append(metrics["plan_execution_cost"])
+            run_times.append(metrics["plan_execution_time"])
+            total_costs.append(metrics["total_execution_cost"])
+            total_times.append(metrics["total_execution_time"])
     
     print(f"Opt. Cost: {np.mean(opt_costs):.3f} +/- {np.std(opt_costs):.3f}")
     print(f"Opt. Time: {np.mean(opt_times):.3f} +/- {np.std(opt_times):.3f}")
@@ -33,6 +33,6 @@ def compute_final_metrics(metric: str, dir: str, exp_base_name: str):
     print("-------")
 
 if __name__ == "__main__":
-    compute_final_metrics("quality", "opt-profiling-data", "mmqa-complex-final-mab-k6-j4-budget250")
-    compute_final_metrics("cost", "opt-profiling-data", "mmqa-complex-mincostatfixedquality-k6-j4-budget250")
-    compute_final_metrics("latency", "opt-profiling-data", "mmqa-complex-minlatencyatfixedquality-k6-j4-budget250")
+    compute_final_metrics("quality", "opt-profiling-data", "mmqa-complex-final-mab-k6-j4-budget350")
+    # compute_final_metrics("cost", "opt-profiling-data", "mmqa-complex-mincostatfixedquality-k6-j4-budget250")
+    # compute_final_metrics("latency", "opt-profiling-data", "mmqa-complex-minlatencyatfixedquality-k6-j4-budget250")

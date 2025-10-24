@@ -410,7 +410,11 @@ if __name__ == "__main__":
     )
 
     policy = pz.MaxQuality()
-    if args.quality is not None and args.policy == "mincostatfixedquality":
+    if args.policy == "mincost":
+        policy = pz.MinCost()
+    elif args.policy == "minlatency":
+        policy = pz.MinTime()
+    elif args.quality is not None and args.policy == "mincostatfixedquality":
         policy = pz.MinCostAtFixedQuality(min_quality=args.quality)
     elif args.quality is not None and args.policy == "minlatencyatfixedquality":
         policy = pz.MinTimeAtFixedQuality(min_quality=args.quality)
