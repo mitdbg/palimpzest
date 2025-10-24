@@ -472,7 +472,7 @@ class EmbeddingJoin(LLMJoin):
     # specialized use cases (e.g., speech-to-text) with strict requirements on things like e.g. sample rate
     def __init__(
         self,
-        num_samples: int = 10,
+        num_samples: int = 20,
         *args,
         **kwargs,
     ):
@@ -703,17 +703,30 @@ class EmbeddingJoin(LLMJoin):
                 ]
 
                 # collect results as they complete
+                similarities, joined = [], []
                 for future in as_completed(futures):
                     self.join_idx += 1
                     join_output_record, join_output_record_op_stats, embedding_sim = future.result()
                     output_records.append(join_output_record)
                     output_record_op_stats.append(join_output_record_op_stats)
+                    similarities.append(embedding_sim)
+                    joined.append(join_output_record._passed_operator)
                     print(f"{self.join_idx} JOINED")
 
-                    # update similarity thresholds
-                    records_joined = join_output_record._passed_operator
+                # sort join results by embedding similarity
+                sorted_sim_join_tuples = sorted(zip(similarities, joined), key=lambda x: x[0])
+
+                # compute threshold below which no records joined
+                for embedding_sim, records_joined in sorted_sim_join_tuples:
+                    if records_joined:
+                        break
                     if not records_joined and embedding_sim > self.max_non_matching_sim:
                         self.max_non_matching_sim = embedding_sim
+
+                # compute threshold above which all records joined
+                for embedding_sim, records_joined in reversed(sorted_sim_join_tuples):
+                    if not records_joined:
+                        break
                     if records_joined and embedding_sim < self.min_matching_sim:
                         self.min_matching_sim = embedding_sim
 
@@ -727,43 +740,56 @@ class EmbeddingJoin(LLMJoin):
              with ThreadPoolExecutor(max_workers=self.join_parallelism) as executor:
                 futures = []
                 for left_candidate, right_candidate, embedding_sim in join_candidates:
-                    llm_call_needed = (
-                        self.min_matching_sim == float("inf")
-                        or self.max_non_matching_sim == float("-inf")
-                        or self.min_matching_sim <= embedding_sim <= self.max_non_matching_sim
-                    )
-
-                    if llm_call_needed:
-                        futures.append(executor.submit(self._process_join_candidate_pair, left_candidate, right_candidate, gen_kwargs, embedding_sim))
-
-                    elif embedding_sim < self.min_matching_sim:
+                    # if the embedding similarity is lower than the threshold below which no records joined,
+                    # then we can skip the LLM call and mark the records as not joined
+                    if embedding_sim < self.max_non_matching_sim:
                         self.join_idx += 1
                         output_record, record_op_stats = self._process_join_candidate_with_sim(left_candidate, right_candidate, passed_operator=False)
                         output_records.append(output_record)
                         output_record_op_stats.append(record_op_stats)
-                        print(f"{self.join_idx} SKIPPED (low sim: {embedding_sim:.4f} < {self.min_matching_sim:.4f})")
+                        print(f"{self.join_idx} SKIPPED (low sim: {embedding_sim:.4f} < {self.max_non_matching_sim:.4f})")
 
-                    elif embedding_sim > self.max_non_matching_sim:
+                    # if the embedding similarity is higher than the threshold above which all records joined,
+                    # then we can skip the LLM call and mark the records as joined
+                    elif embedding_sim > self.min_matching_sim:
                         self.join_idx += 1
                         output_record, record_op_stats = self._process_join_candidate_with_sim(left_candidate, right_candidate, passed_operator=True)
                         output_records.append(output_record)
                         output_record_op_stats.append(record_op_stats)
                         print(f"{self.join_idx} JOINED (high sim: {embedding_sim:.4f} > {self.max_non_matching_sim:.4f})")
 
+                    # otherwise, we will process the LLM call
+                    else:
+                        futures.append(executor.submit(self._process_join_candidate_pair, left_candidate, right_candidate, gen_kwargs, embedding_sim))
+
                     num_inputs_processed += 1
 
                 # collect results as they complete
+                similarities, joined = [], []
                 for future in as_completed(futures):
                     self.join_idx += 1
                     join_output_record, join_output_record_op_stats, embedding_sim = future.result()
                     output_records.append(join_output_record)
                     output_record_op_stats.append(join_output_record_op_stats)
+                    similarities.append(embedding_sim)
+                    joined.append(join_output_record._passed_operator)
                     print(f"{self.join_idx} JOINED")
 
-                    # update similarity thresholds
-                    records_joined = join_output_record._passed_operator
+                ### update thresholds if there are llm calls which incrementally squeeze the boundaries ###
+                # sort join results by embedding similarity
+                sorted_sim_join_tuples = sorted(zip(similarities, joined), key=lambda x: x[0])
+
+                # potentially update threshold below which no records joined
+                for embedding_sim, records_joined in sorted_sim_join_tuples:
+                    if records_joined:
+                        break
                     if not records_joined and embedding_sim > self.max_non_matching_sim:
                         self.max_non_matching_sim = embedding_sim
+
+                # potentially update threshold above which all records joined
+                for embedding_sim, records_joined in reversed(sorted_sim_join_tuples):
+                    if not records_joined:
+                        break
                     if records_joined and embedding_sim < self.min_matching_sim:
                         self.min_matching_sim = embedding_sim
 

@@ -498,7 +498,11 @@ if __name__ == "__main__":
     )
 
     policy = pz.MaxQuality()
-    if args.quality is not None and args.policy == "mincostatfixedquality":
+    if args.policy == "mincost":
+        policy = pz.MinCost()
+    elif args.policy == "minlatency":
+        policy = pz.MinTime()
+    elif args.quality is not None and args.policy == "mincostatfixedquality":
         policy = pz.MinCostAtFixedQuality(min_quality=args.quality)
     elif args.quality is not None and args.policy == "minlatencyatfixedquality":
         policy = pz.MinTimeAtFixedQuality(min_quality=args.quality)
@@ -535,6 +539,7 @@ if __name__ == "__main__":
     print(f"Table Dataset: {len(test_table_dataset)}")
     test_image_dataset = MMQAImageDataset(test_dataset)
     print(f"Image Dataset: {len(test_image_dataset)}")
+
     text_plan = test_question_dataset.sem_map(mmqa_text_search_cols, depends_on=["question"])
     text_plan = text_plan.sem_join(
         test_text_dataset,
@@ -544,7 +549,7 @@ if __name__ == "__main__":
     )
     text_plan = text_plan.groupby(pz.GroupBySig(["qid", "question", "text_search_string"], agg_funcs=["list", "list"], agg_fields=["text_id", "text"]))
     text_plan = text_plan.map(
-        udf=lambda record: {"text": "...".join(record["list(text)"]) if record["list(text)"] != [None] else "None", **record},
+        udf=lambda record: {"text": "...".join(record["list(text)"]) if record["list(text)"] != [None] else [None], **record},
         cols=[{"name": "text", "type": str, "desc": "All relevant text snippets concatenated together."}],
     )
     text_plan = text_plan.project(["qid", "question", "text"])
@@ -558,7 +563,7 @@ if __name__ == "__main__":
     )
     table_plan = table_plan.groupby(pz.GroupBySig(["qid", "question", "table_search_string"], agg_funcs=["list", "list"], agg_fields=["table_id", "table"]))
     table_plan = table_plan.map(
-        udf=lambda record: {"table": "\n\n".join(record["list(table)"]) if record["list(table)"] != [None] else "None", **record},
+        udf=lambda record: {"table": "\n\n".join(record["list(table)"]) if record["list(table)"] != [None] else [None], **record},
         cols=[{"name": "table", "type": str, "desc": "All relevant tables concatenated together."}],
     )
     table_plan = table_plan.project(["qid", "question", "table"])
@@ -572,17 +577,12 @@ if __name__ == "__main__":
     )
     image_plan = image_plan.groupby(pz.GroupBySig(["qid", "question", "image_search_string"], agg_funcs=["list", "list"], agg_fields=["image_id", "image"]))
     image_plan = image_plan.map(
-        udf=lambda record: {"image": record["list(image)"] if record["list(image)"] != [None] else "None", **record},
+        udf=lambda record: {"image": record["list(image)"] if record["list(image)"] != [None] else [None], **record},
         cols=[{"name": "image", "type": list[ImageBase64], "desc": "All relevant images."}],
     )
     image_plan = image_plan.project(["qid", "question", "image"])
     plan = text_plan.join(table_plan, on=["qid", "question"]).join(image_plan, on=["qid", "question"])
     plan = plan.sem_map(mmqa_answer_cols, depends_on=["question", "text", "table", "image"])
-
-    # TODO:
-    # 1. add "how" argument to sem_join
-    #    a. have left / right outer join return None for missing values
-    # 2. add join operator
 
     # execute pz plan
     config = pz.QueryProcessorConfig(
