@@ -13,12 +13,12 @@ from pydantic.fields import FieldInfo
 from sentence_transformers import SentenceTransformer
 
 from palimpzest.constants import (
-    MODEL_CARDS,
-    NAIVE_EST_JOIN_SELECTIVITY,
-    NAIVE_EST_NUM_INPUT_TOKENS,
-    Cardinality,
-    Model,
-    PromptStrategy,
+     MODEL_CARDS,
+     NAIVE_EST_JOIN_SELECTIVITY,
+     NAIVE_EST_NUM_INPUT_TOKENS,
+     Cardinality,
+     Model,
+     PromptStrategy,
 )
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.core.lib.schemas import AUDIO_FIELD_TYPES, IMAGE_FIELD_TYPES, ImageFilepath
@@ -26,6 +26,25 @@ from palimpzest.core.models import GenerationStats, OperatorCostEstimates, Recor
 from palimpzest.query.generators.generators import Generator
 from palimpzest.query.operators.physical import PhysicalOperator
 
+
+class Singleton:
+     def __new__(cls, *args, **kw):
+         if not hasattr(cls, '_instance'):
+             orig = super(Singleton, cls)  # noqa: UP008
+             cls._instance = orig.__new__(cls, *args, **kw)
+         return cls._instance
+
+class Locks(Singleton):
+    model = None
+    clip_lock = threading.Lock()
+    exec_lock = threading.Lock()
+
+    @classmethod
+    def get_model(cls, model_name: str):
+        with cls.clip_lock:
+            if cls.model is None:
+                cls.model = SentenceTransformer(model_name)
+            return cls.model
 
 def compute_similarity(left_embedding: list[float], right_embedding: list[float]) -> float:
     """
@@ -472,7 +491,7 @@ class EmbeddingJoin(LLMJoin):
     # specialized use cases (e.g., speech-to-text) with strict requirements on things like e.g. sample rate
     def __init__(
         self,
-        num_samples: int = 20,
+        num_samples: int = 10,
         *args,
         **kwargs,
     ):
@@ -487,8 +506,7 @@ class EmbeddingJoin(LLMJoin):
             if field_name.split(".")[-1] in self.get_input_fields()
         ])
         self.embedding_model = Model.TEXT_EMBEDDING_3_SMALL if self.text_only else Model.CLIP_VIT_B_32
-        self.clip_model = None
-        self._lock = threading.Lock()
+        self.locks = Locks()
 
         # keep track of embedding costs that could not be amortized if no output records were produced
         self.residual_embedding_cost = 0.0
@@ -560,12 +578,6 @@ class EmbeddingJoin(LLMJoin):
             quality=quality,
         )
 
-    def _get_clip_model(self):
-        with self._lock:
-            if self.clip_model is None:
-                self.clip_model = SentenceTransformer(self.embedding_model.value)
-            return self.clip_model
-
     def _compute_embeddings(self, candidates: list[DataRecord], input_fields: list[str]) -> tuple[np.ndarray, GenerationStats]:
         # return empty array and empty stats if no candidates  
         if len(candidates) == 0:
@@ -581,7 +593,7 @@ class EmbeddingJoin(LLMJoin):
             total_input_tokens = response.usage.total_tokens
             embeddings = np.array([item.embedding for item in response.data])
         else:
-            model = self._get_clip_model()
+            model = self.locks.get_model(self.embedding_model.value)
             embeddings = np.zeros((len(candidates), 512))  # CLIP embeddings are 512-dimensional
             num_input_fields_present = 0
             for field in input_fields:
@@ -690,49 +702,50 @@ class EmbeddingJoin(LLMJoin):
         output_records, output_record_op_stats, num_inputs_processed = [], [], 0
 
         # draw samples until num_samples is reached
-        if self.samples_drawn < self.num_samples:
-            samples_to_draw = min(self.num_samples - self.samples_drawn, len(join_candidates))
-            join_candidate_samples = join_candidates[:samples_to_draw]
-            join_candidates = join_candidates[samples_to_draw:]
+        with self.locks.exec_lock:
+            if self.samples_drawn < self.num_samples:
+                samples_to_draw = min(self.num_samples - self.samples_drawn, len(join_candidates))
+                join_candidate_samples = join_candidates[:samples_to_draw]
+                join_candidates = join_candidates[samples_to_draw:]
 
-            # apply the generator to each pair of candidates
-            with ThreadPoolExecutor(max_workers=self.join_parallelism) as executor:
-                futures = [
-                    executor.submit(self._process_join_candidate_pair, left_candidate, right_candidate, gen_kwargs, embedding_sim)
-                    for left_candidate, right_candidate, embedding_sim in join_candidate_samples
-                ]
+                # apply the generator to each pair of candidates
+                with ThreadPoolExecutor(max_workers=self.join_parallelism) as executor:
+                    futures = [
+                        executor.submit(self._process_join_candidate_pair, left_candidate, right_candidate, gen_kwargs, embedding_sim)
+                        for left_candidate, right_candidate, embedding_sim in join_candidate_samples
+                    ]
 
-                # collect results as they complete
-                similarities, joined = [], []
-                for future in as_completed(futures):
-                    self.join_idx += 1
-                    join_output_record, join_output_record_op_stats, embedding_sim = future.result()
-                    output_records.append(join_output_record)
-                    output_record_op_stats.append(join_output_record_op_stats)
-                    similarities.append(embedding_sim)
-                    joined.append(join_output_record._passed_operator)
-                    print(f"{self.join_idx} JOINED")
+                    # collect results as they complete
+                    similarities, joined = [], []
+                    for future in as_completed(futures):
+                        self.join_idx += 1
+                        join_output_record, join_output_record_op_stats, embedding_sim = future.result()
+                        output_records.append(join_output_record)
+                        output_record_op_stats.append(join_output_record_op_stats)
+                        similarities.append(embedding_sim)
+                        joined.append(join_output_record._passed_operator)
+                        print(f"{self.join_idx} JOINED")
 
-                # sort join results by embedding similarity
-                sorted_sim_join_tuples = sorted(zip(similarities, joined), key=lambda x: x[0])
+                    # sort join results by embedding similarity
+                    sorted_sim_join_tuples = sorted(zip(similarities, joined), key=lambda x: x[0])
 
-                # compute threshold below which no records joined
-                for embedding_sim, records_joined in sorted_sim_join_tuples:
-                    if records_joined:
-                        break
-                    if not records_joined and embedding_sim > self.max_non_matching_sim:
-                        self.max_non_matching_sim = embedding_sim
+                    # compute threshold below which no records joined
+                    for embedding_sim, records_joined in sorted_sim_join_tuples:
+                        if records_joined:
+                            break
+                        if not records_joined and embedding_sim > self.max_non_matching_sim:
+                            self.max_non_matching_sim = embedding_sim
 
-                # compute threshold above which all records joined
-                for embedding_sim, records_joined in reversed(sorted_sim_join_tuples):
-                    if not records_joined:
-                        break
-                    if records_joined and embedding_sim < self.min_matching_sim:
-                        self.min_matching_sim = embedding_sim
+                    # compute threshold above which all records joined
+                    for embedding_sim, records_joined in reversed(sorted_sim_join_tuples):
+                        if not records_joined:
+                            break
+                        if records_joined and embedding_sim < self.min_matching_sim:
+                            self.min_matching_sim = embedding_sim
 
-            # update samples drawn and num_inputs_processed
-            self.samples_drawn += samples_to_draw
-            num_inputs_processed += samples_to_draw
+                # update samples drawn and num_inputs_processed
+                self.samples_drawn += samples_to_draw
+                num_inputs_processed += samples_to_draw
 
         # process remaining candidates based on embedding similarity
         if len(join_candidates) > 0:

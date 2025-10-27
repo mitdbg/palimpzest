@@ -942,7 +942,7 @@ class EmbeddingJoinRule(ImplementationRule):
                 "join_parallelism": runtime_kwargs["join_parallelism"],
                 "reasoning_effort": runtime_kwargs["reasoning_effort"],
                 "retain_inputs": not runtime_kwargs["is_validation"],
-                "num_samples": 20, # TODO: iterate over different choices of num_samples
+                "num_samples": 10, # TODO: iterate over different choices of num_samples
             }
             for model in models
         ]
