@@ -70,6 +70,7 @@ class OpFrontier:
         is_llm_filter = isinstance(sample_op, LLMFilter)
         is_llm_topk = isinstance(sample_op, TopKOp) and isinstance(sample_op.index, Collection)
         self.is_llm_op = is_llm_convert or is_llm_filter or is_llm_topk or self.is_llm_join
+        self.is_llm_convert = is_llm_convert
 
         # get order in which we will sample physical operators for this logical operator
         sample_op_indices = self._get_op_index_order(op_set, seed)
@@ -193,6 +194,8 @@ class OpFrontier:
         """
         # if this is not an llm-operator, we simply return the indices in random order
         if not self.is_llm_op or self.dont_use_priors:
+            if self.is_llm_convert:
+                print("Using NO PRIORS for operator sampling order")
             rng = np.random.default_rng(seed=seed)
             op_indices = np.arange(len(op_set))
             rng.shuffle(op_indices)
@@ -200,6 +203,8 @@ class OpFrontier:
 
         # if this is an llm-operator, but we do not have priors, we first compute naive priors
         if self.priors is None or any([op_id not in self.priors for op_id in map(lambda op: op.get_op_id(), op_set)]):
+            if self.is_llm_convert:
+                print("Using NAIVE PRIORS for operator sampling order")
             self.priors = self._compute_naive_priors(op_set)
 
         # NOTE: self.priors is a dictionary with format:
