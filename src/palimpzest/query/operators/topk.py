@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import threading
 import time
 from typing import Callable
 
@@ -16,6 +17,24 @@ from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.core.models import GenerationStats, OperatorCostEstimates, RecordOpStats
 from palimpzest.query.operators.physical import PhysicalOperator
 
+
+class Singleton:
+     def __new__(cls, *args, **kw):
+         if not hasattr(cls, '_instance'):
+             orig = super(Singleton, cls)  # noqa: UP008
+             cls._instance = orig.__new__(cls, *args, **kw)
+         return cls._instance
+
+class ClipModel(Singleton):
+    model = None
+    lock = threading.Lock()
+
+    @classmethod
+    def get_model(cls, model_name: str):
+        with cls.lock:
+            if cls.model is None:
+                cls.model = SentenceTransformer(model_name)
+            return cls.model
 
 class TopKOp(PhysicalOperator):
     def __init__(
@@ -56,6 +75,7 @@ class TopKOp(PhysicalOperator):
         self.output_attrs = output_attrs
         self.search_func = search_func if search_func is not None else self.default_search_func
         self.k = k
+        self.clip_model = ClipModel()
 
     def __str__(self):
         op = super().__str__()
@@ -185,7 +205,6 @@ class TopKOp(PhysicalOperator):
         # construct and return the record set
         return DataRecordSet(drs, record_op_stats_lst)
 
-
     def __call__(self, candidate: DataRecord) -> DataRecordSet:
         start_time = time.time()
 
@@ -209,9 +228,9 @@ class TopKOp(PhysicalOperator):
         inputs, gen_stats = None, GenerationStats()
         if isinstance(self.index, Collection):
             uses_openai_embedding_fcn = isinstance(self.index._embedding_function, OpenAIEmbeddingFunction)
-            uses_sentence_transformer_embedding_fcn = isinstance(self.index._embedding_function, SentenceTransformerEmbeddingFunction)
+            uses_clip_model = isinstance(self.index._embedding_function, SentenceTransformerEmbeddingFunction)
             error_msg = "ChromaDB index must use OpenAI or SentenceTransformer embedding function; see: https://docs.trychroma.com/integrations/embedding-models/openai"
-            assert uses_openai_embedding_fcn or uses_sentence_transformer_embedding_fcn, error_msg
+            assert uses_openai_embedding_fcn or uses_clip_model, error_msg
 
             model_name = self.index._embedding_function.model_name if uses_openai_embedding_fcn else "clip-ViT-B-32"
             err_msg = f"For Chromadb, we currently only support `text-embedding-3-small` and `clip-ViT-B-32`; your index uses: {model_name}"
@@ -228,8 +247,8 @@ class TopKOp(PhysicalOperator):
                     total_input_tokens = response.usage.total_tokens
                     inputs = [item.embedding for item in response.data]
 
-                elif uses_sentence_transformer_embedding_fcn:
-                    model = SentenceTransformer(model_name)
+                elif uses_clip_model:
+                    model = self.clip_model.get_model(model_name)
                     inputs = model.encode(query)
 
                 embed_total_time = time.time() - embed_start_time
