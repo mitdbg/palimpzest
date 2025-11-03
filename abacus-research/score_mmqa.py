@@ -2,6 +2,7 @@ import json
 
 import numpy as np
 
+
 def compute_final_metrics(metric: str, dir: str, exp_base_name: str):
     qualities = []
     opt_costs, run_costs = [], []
