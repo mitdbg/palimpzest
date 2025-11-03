@@ -34,5 +34,5 @@ def compute_final_metrics(metric: str, dir: str, exp_base_name: str):
 
 if __name__ == "__main__":
     compute_final_metrics("quality", "opt-profiling-data", "mmqa-complex-final-mab-k6-j4-budget350")
-    # compute_final_metrics("cost", "opt-profiling-data", "mmqa-complex-mincostatfixedquality-k6-j4-budget250")
-    # compute_final_metrics("latency", "opt-profiling-data", "mmqa-complex-minlatencyatfixedquality-k6-j4-budget250")
+    compute_final_metrics("cost", "opt-profiling-data", "mmqa-complex-mincost-k6-j4-budget350")
+    compute_final_metrics("latency", "opt-profiling-data", "mmqa-complex-minlatency-k6-j4-budget350")

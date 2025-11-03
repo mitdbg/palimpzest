@@ -195,12 +195,6 @@ if __name__ == "__main__":
         help="The optimizer strategy to use. One of pareto or greedy",
     )
     parser.add_argument(
-        "--sentinel-execution-strategy",
-        default="mab",
-        type=str,
-        help="The sentinel execution strategy to use. One of mab or random",
-    )
-    parser.add_argument(
         "--seed",
         default=42,
         type=int,
@@ -231,6 +225,12 @@ if __name__ == "__main__":
         help="The experiment name.",
     )
     parser.add_argument(
+        "--policy",
+        default=None,
+        type=str,
+        help="The policy (one of 'mincost' or 'maxquality').",
+    )
+    parser.add_argument(
         "--priors-file",
         default=None,
         type=str,
@@ -246,7 +246,6 @@ if __name__ == "__main__":
     j = args.j
     sample_budget = args.sample_budget
     optimizer_strategy = args.optimizer_strategy
-    sentinel_execution_strategy = args.sentinel_execution_strategy
     exp_name = args.exp_name
     priors = None
     if args.priors_file is not None and os.path.exists(args.priors_file):
@@ -254,7 +253,11 @@ if __name__ == "__main__":
             priors = json.load(f)
 
     # set the optimization policy; constraint set to 80% of mean quality from unconstrained plans (Table 2)
-    policy = pz.MinCostAtFixedQuality(min_quality=0.8 * 0.261)
+    policy = (
+        pz.MinCostAtFixedQuality(min_quality=0.8 * 0.261)
+        if args.policy == "mincost"
+        else pz.MaxQualityAtFixedCost(max_cost=0.5 * 0.7)
+    )
     print(f"USING POLICY: {policy}")
 
     if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None and os.getenv("ANTHROPIC_API_KEY") is None:
@@ -328,14 +331,13 @@ if __name__ == "__main__":
         Model.LLAMA3_1_8B,
         Model.LLAMA3_3_70B,
         # Model.MIXTRAL,  # NOTE: only available in tag `abacus-paper-experiments`
-        Model.DEEPSEEK_R1_DISTILL_QWEN_1_5B,
+        # Model.DEEPSEEK_R1_DISTILL_QWEN_1_5B,
     ]
 
     # execute pz plan
     config = pz.QueryProcessorConfig(
         policy=policy,
         optimizer_strategy=optimizer_strategy,
-        sentinel_execution_strategy=sentinel_execution_strategy,
         execution_strategy="parallel",
         use_final_op_quality=True,
         max_workers=64,
@@ -352,6 +354,7 @@ if __name__ == "__main__":
         seed=seed,
         exp_name=exp_name,
         priors=priors,
+        dont_use_priors=(priors is None),
     )
 
     data_record_collection = plan.optimize_and_run(config=config, train_dataset=train_dataset, validator=validator)

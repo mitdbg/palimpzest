@@ -40,8 +40,8 @@ mmqa_image_cols = [
 ]
 
 mmqa_answer_cols = [
-    {"name": "answers", "type": list[str], "desc": "The answer(s) to the question. Answer the question using the relevant information from gathered image(s), text(s), and table(s). Return your answer as a JSON list of strings. Do not include any additional context or an explanation in your answer, simply list the entities asked for by the question"},
-]
+    {"name": "answers", "type": list[str], "desc": "The answer(s) to the question. Answer the question using the relevant information from gathered image(s), text(s), and table(s). Do not include any additional context or an explanation in your final list, simply list the entities asked for by the question"},
+] # Return your answer as a JSON list of strings.
 
 def get_json_from_answer(answer: str):
     """
@@ -142,6 +142,9 @@ class MMQAValidator(pz.Validator):
 
         tp, fn = 0, 0
         try:
+            if isinstance(preds, list) and len(preds) > 0 and isinstance(preds[0], list):
+                preds = preds[0]
+
             # compute recall of retrieved ids and return
             preds = [str(pred).lower() for pred in preds]
             targets = [str(target).lower() for target in targets]
@@ -172,6 +175,9 @@ class MMQAValidator(pz.Validator):
 
         tp, fp, fn = 0, 0, 0
         try:
+            if isinstance(preds, list) and len(preds) > 0 and isinstance(preds[0], list):
+                preds = preds[0]
+
             # compute recall of retrieved ids and return
             preds = [str(pred).lower() for pred in preds]
             targets = [str(target).lower() for target in targets]
@@ -285,15 +291,19 @@ def compute_f1(final_df, answers_df):
                 preds = preds.replace("'", '"')
                 # try parsing preds as JSON list and cast everything to str to match targets
                 preds = get_json_from_answer(preds)
+                if isinstance(preds, list) and len(preds) > 0 and isinstance(preds[0], list):
+                    preds = preds[0]
                 preds = [str(pred).lower() for pred in preds]
             except Exception:
                 # if that fails, give it a shot as a singleton answer that the LLM failed to wrap in a list
-                preds = [preds.lower()]
+                preds = [str(preds).lower()]
             remove_tokens = [c for c in string.punctuation if c != "/"]
             for token in remove_tokens:
                 preds = [pred.replace(token, "") for pred in preds]
                 targets = [target.replace(token, "") for target in targets]
         elif isinstance(preds, list):
+            if isinstance(preds, list) and len(preds) > 0 and isinstance(preds[0], list):
+                preds = preds[0]
             preds = [str(pred).lower() for pred in preds]
             remove_tokens = [c for c in string.punctuation if c != "/"]
             for token in remove_tokens:
@@ -491,13 +501,13 @@ if __name__ == "__main__":
         for image_id in result_ids:
             # find the correct image file
             for ending in possible_endings:
-                if os.path.exists(f"testdata/mmqa-images/{image_id}{ending}"):
+                if os.path.exists(f"/ssd1/mdrusso/mmqa-images/{image_id}{ending}"):
                     image_id += ending
                     break
 
             # load image from disk
-            with open(f"testdata/mmqa-images/{image_id}", "rb") as f:
-                base64_image_str = base64.b64encode(f.read())
+            with open(f"/ssd1/mdrusso/mmqa-images/{image_id}", "rb") as f:
+                base64_image_str = base64.b64encode(f.read()).decode("utf-8")
                 results.append(base64_image_str)
 
         return {"supporting_images": results, "supporting_image_ids": result_ids}
@@ -522,7 +532,7 @@ if __name__ == "__main__":
         search_attr="question",
         output_attrs=mmqa_image_cols,
     )
-    plan = plan.sem_map(mmqa_answer_cols)
+    plan = plan.sem_map(mmqa_answer_cols, depends_on=["question", "supporting_texts", "supporting_tables", "supporting_images"])
 
     # execute pz plan
     config = pz.QueryProcessorConfig(
@@ -531,7 +541,7 @@ if __name__ == "__main__":
         sentinel_execution_strategy=sentinel_execution_strategy,
         execution_strategy=execution_strategy,
         use_final_op_quality=True,
-        max_workers=64,
+        max_workers=1,
         verbose=verbose,
         available_models=[
             Model.GPT_4o_MINI,
