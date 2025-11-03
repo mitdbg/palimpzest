@@ -48,6 +48,7 @@ class QueryProcessorConfig(BaseModel):
     seed: int = Field(default=42)
     exp_name: str | None = Field(default=None)
     priors: dict | None = Field(default=None)
+    dont_use_priors: bool = Field(default=False)
 
     def to_dict(self) -> dict:
         """Convert the config to a dict representation."""

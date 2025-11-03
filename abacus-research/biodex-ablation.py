@@ -188,39 +188,11 @@ class BiodexDataset(pz.IterDataset):
 if __name__ == "__main__":
     # parse arguments
     parser = argparse.ArgumentParser(description="Run a simple demo")
-    parser.add_argument("--verbose", default=False, action="store_true", help="Print verbose output")
-    parser.add_argument("--progress", default=False, action="store_true", help="Print progress output")
-    parser.add_argument("--constrained", default=False, action="store_true", help="Use constrained objective")
-    parser.add_argument("--gpt4-mini-only", default=False, action="store_true", help="Use only GPT-4o-mini")
     parser.add_argument(
-        "--execution-strategy",
-        default="parallel",
+        "--optimizer-strategy",
+        default="pareto",
         type=str,
-        help="The plan executor to use. One of sequential, pipelined, parallel",
-    )
-    parser.add_argument(
-        "--sentinel-execution-strategy",
-        default="mab",
-        type=str,
-        help="The sentinel execution strategy to use. One of mab or random",
-    )
-    parser.add_argument(
-        "--policy",
-        default="maxquality",
-        type=str,
-        help="One of 'mincost', 'mintime', 'maxquality'",
-    )
-    parser.add_argument(
-        "--val-examples",
-        default=25,
-        type=int,
-        help="Number of validation examples to sample from",
-    )
-    parser.add_argument(
-        "--model",
-        default="gpt-4o",
-        type=str,
-        help="One of 'gpt-4o', 'gpt-4o-mini', 'llama'",
+        help="The optimizer strategy to use. One of pareto or greedy",
     )
     parser.add_argument(
         "--seed",
@@ -253,52 +225,39 @@ if __name__ == "__main__":
         help="The experiment name.",
     )
     parser.add_argument(
+        "--policy",
+        default=None,
+        type=str,
+        help="The policy (one of 'mincost' or 'maxquality').",
+    )
+    parser.add_argument(
         "--priors-file",
         default=None,
         type=str,
         help="A file with a dictionary mapping physical operator ids to prior belief on their performance",
     )
-    parser.add_argument(
-        "--quality",
-        default=None,
-        type=float,
-        help="Quality threshold",
-    )
-
     args = parser.parse_args()
 
     # create directory for profiling data
-    os.makedirs("opt-profiling-data", exist_ok=True)
+    os.makedirs("ablation-data", exist_ok=True)
 
-    verbose = args.verbose
-    progress = args.progress
     seed = args.seed
-    val_examples = args.val_examples
     k = args.k
     j = args.j
     sample_budget = args.sample_budget
-    execution_strategy = args.execution_strategy
-    sentinel_execution_strategy = args.sentinel_execution_strategy
-    exp_name = (
-        f"biodex-final-{sentinel_execution_strategy}-k{k}-j{j}-budget{sample_budget}-seed{seed}"
-        if args.exp_name is None
-        else args.exp_name
-    )
+    optimizer_strategy = args.optimizer_strategy
+    exp_name = args.exp_name
     priors = None
-    if args.priors_file is not None:
+    if args.priors_file is not None and os.path.exists(args.priors_file):
         with open(args.priors_file) as f:
             priors = json.load(f)
 
-    # set the optimization policy; constraint set to 25% percentile from unconstrained plans
-    policy = pz.MaxQuality() if not args.constrained else pz.MaxQualityAtFixedCost(max_cost=2.250)
-    if args.policy == "mincost":
-        policy = pz.MinCost()
-    elif args.policy == "minlatency":
-        policy = pz.MinTime()
-    elif args.quality is not None and args.policy == "mincostatfixedquality":
-        policy = pz.MinCostAtFixedQuality(min_quality=args.quality)
-    elif args.quality is not None and args.policy == "minlatencyatfixedquality":
-        policy = pz.MinTimeAtFixedQuality(min_quality=args.quality)
+    # set the optimization policy; constraint set to 80% of mean quality from unconstrained plans (Table 2)
+    policy = (
+        pz.MinCostAtFixedQuality(min_quality=0.8 * 0.261)
+        if args.policy == "mincost"
+        else pz.MaxQualityAtFixedCost(max_cost=0.5 * 0.7)
+    )
     print(f"USING POLICY: {policy}")
 
     if os.getenv("OPENAI_API_KEY") is None and os.getenv("TOGETHER_API_KEY") is None and os.getenv("ANTHROPIC_API_KEY") is None:
@@ -307,7 +266,7 @@ if __name__ == "__main__":
     # create validator
     validator = BiodexValidator(
         rp_at_k=5,
-        num_samples=val_examples,
+        num_samples=20,
         shuffle=True,
         seed=seed,
     )
@@ -315,7 +274,7 @@ if __name__ == "__main__":
     # create train dataset for validator
     train_dataset = BiodexDataset(
         split="train",
-        num_samples=val_examples,
+        num_samples=20,
         shuffle=True,
         seed=seed,
     )
@@ -366,30 +325,28 @@ if __name__ == "__main__":
     plan = plan.sem_map(biodex_ranked_reactions_labels_cols, depends_on=["title", "abstract", "fulltext", "reaction_labels"])
 
     # set models
-    models = [Model.GPT_4o_MINI] if args.gpt4_mini_only else [
+    models = [
         Model.GPT_4o,
         Model.GPT_4o_MINI,
         Model.LLAMA3_1_8B,
         Model.LLAMA3_3_70B,
         # Model.MIXTRAL,  # NOTE: only available in tag `abacus-paper-experiments`
-        Model.DEEPSEEK_R1_DISTILL_QWEN_1_5B,
+        # Model.DEEPSEEK_R1_DISTILL_QWEN_1_5B,
     ]
 
     # execute pz plan
     config = pz.QueryProcessorConfig(
         policy=policy,
-        optimizer_strategy="pareto",
-        sentinel_execution_strategy=sentinel_execution_strategy,
-        execution_strategy=execution_strategy,
+        optimizer_strategy=optimizer_strategy,
+        execution_strategy="parallel",
         use_final_op_quality=True,
         max_workers=64,
-        verbose=verbose,
         available_models=models,
         allow_bonded_query=True,
         allow_critic=True,
         allow_mixtures=True,
         allow_rag_reduction=True,
-        progress=progress,
+        progress=True,
         k=k,
         j=j,
         sample_budget=sample_budget,
@@ -397,16 +354,17 @@ if __name__ == "__main__":
         seed=seed,
         exp_name=exp_name,
         priors=priors,
+        dont_use_priors=(priors is None),
     )
 
     data_record_collection = plan.optimize_and_run(config=config, train_dataset=train_dataset, validator=validator)
 
     print(data_record_collection.to_df())
-    data_record_collection.to_df().to_csv(f"opt-profiling-data/{exp_name}-output.csv", index=False)
+    data_record_collection.to_df().to_csv(f"ablation-data/{exp_name}-output.csv", index=False)
 
     # create filepaths for records and stats
-    records_path = f"opt-profiling-data/{exp_name}-records.json"
-    stats_path = f"opt-profiling-data/{exp_name}-profiling.json"
+    records_path = f"ablation-data/{exp_name}-records.json"
+    stats_path = f"ablation-data/{exp_name}-profiling.json"
 
     # save record outputs
     record_jsons = []
@@ -488,7 +446,7 @@ if __name__ == "__main__":
         "total_execution_cost": data_record_collection.execution_stats.total_execution_cost,
         "plan_str": final_plan_str,
     }
-    with open(f"opt-profiling-data/{exp_name}-metrics.json", "w") as f:
+    with open(f"ablation-data/{exp_name}-metrics.json", "w") as f:
         json.dump(stats_dict, f)
 
     print(f"bad: {bad}")
