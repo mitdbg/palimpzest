@@ -44,6 +44,7 @@ class OpFrontier:
             seed: int,
             policy: Policy,
             priors: dict | None = None,
+            dont_use_priors: bool = False,
         ):
         # set k and j, which are the initial number of operators in the frontier and the
         # initial number of records to sample for each frontier operator
@@ -51,6 +52,7 @@ class OpFrontier:
         self.j = j
         self.source_indices = source_indices
         self.root_dataset_ids = root_dataset_ids
+        self.dont_use_priors = dont_use_priors
 
         # store the policy that we are optimizing under
         self.policy = policy
@@ -68,6 +70,7 @@ class OpFrontier:
         is_llm_filter = isinstance(sample_op, LLMFilter)
         is_llm_topk = isinstance(sample_op, TopKOp) and isinstance(sample_op.index, Collection)
         self.is_llm_op = is_llm_convert or is_llm_filter or is_llm_topk or self.is_llm_join
+        self.is_llm_convert = is_llm_convert
 
         # get order in which we will sample physical operators for this logical operator
         sample_op_indices = self._get_op_index_order(op_set, seed)
@@ -190,7 +193,9 @@ class OpFrontier:
         Returns a list of indices for the operators in the op_set.
         """
         # if this is not an llm-operator, we simply return the indices in random order
-        if not self.is_llm_op:
+        if not self.is_llm_op or self.dont_use_priors:
+            if self.is_llm_convert:
+                print("Using NO PRIORS for operator sampling order")
             rng = np.random.default_rng(seed=seed)
             op_indices = np.arange(len(op_set))
             rng.shuffle(op_indices)
@@ -198,6 +203,8 @@ class OpFrontier:
 
         # if this is an llm-operator, but we do not have priors, we first compute naive priors
         if self.priors is None or any([op_id not in self.priors for op_id in map(lambda op: op.get_op_id(), op_set)]):
+            if self.is_llm_convert:
+                print("Using NAIVE PRIORS for operator sampling order")
             self.priors = self._compute_naive_priors(op_set)
 
         # NOTE: self.priors is a dictionary with format:
@@ -805,7 +812,7 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
                 assert len(root_dataset_ids) == 1, f"Scan for {sample_op} has {len(root_dataset_ids)} > 1 root dataset ids"
                 root_dataset_id = root_dataset_ids[0]
                 source_indices = dataset_id_to_shuffled_source_indices[root_dataset_id]
-                op_frontiers[unique_logical_op_id] = OpFrontier(op_set, source_unique_logical_op_ids, root_dataset_ids, source_indices, self.k, self.j, self.seed, self.policy, self.priors)
+                op_frontiers[unique_logical_op_id] = OpFrontier(op_set, source_unique_logical_op_ids, root_dataset_ids, source_indices, self.k, self.j, self.seed, self.policy, self.priors, self.dont_use_priors)
             elif isinstance(sample_op, JoinOp):
                 assert len(source_unique_logical_op_ids) == 2, f"Join for {sample_op} has {len(source_unique_logical_op_ids)} != 2 source logical operators"
                 left_source_indices = op_frontiers[source_unique_logical_op_ids[0]].source_indices
@@ -814,10 +821,10 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
                 for left_source_idx in left_source_indices:
                     for right_source_idx in right_source_indices:
                         source_indices.append((left_source_idx, right_source_idx))
-                op_frontiers[unique_logical_op_id] = OpFrontier(op_set, source_unique_logical_op_ids, root_dataset_ids, source_indices, self.k, self.j, self.seed, self.policy, self.priors)
+                op_frontiers[unique_logical_op_id] = OpFrontier(op_set, source_unique_logical_op_ids, root_dataset_ids, source_indices, self.k, self.j, self.seed, self.policy, self.priors, self.dont_use_priors)
             else:
                 source_indices = op_frontiers[source_unique_logical_op_ids[0]].source_indices
-                op_frontiers[unique_logical_op_id] = OpFrontier(op_set, source_unique_logical_op_ids, root_dataset_ids, source_indices, self.k, self.j, self.seed, self.policy, self.priors)
+                op_frontiers[unique_logical_op_id] = OpFrontier(op_set, source_unique_logical_op_ids, root_dataset_ids, source_indices, self.k, self.j, self.seed, self.policy, self.priors, self.dont_use_priors)
 
         # initialize and start the progress manager
         self.progress_manager = create_progress_manager(plan, sample_budget=self.sample_budget, sample_cost_budget=self.sample_cost_budget, progress=self.progress)

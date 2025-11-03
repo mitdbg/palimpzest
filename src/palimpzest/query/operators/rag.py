@@ -156,7 +156,7 @@ class RAGConvert(LLMConvert):
             # skip this field if it is not a string or a list of strings
             is_string_field = field.annotation in [str, str | None, str | Any]
             is_list_string_field = field.annotation in [list[str], list[str] | None, list[str] | Any]
-            if not (is_string_field or is_list_string_field):
+            if not (is_string_field or is_list_string_field) or candidate[field_name] is None:
                 continue
 
             # if this is a list of strings, join the strings
