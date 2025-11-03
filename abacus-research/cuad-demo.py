@@ -768,6 +768,7 @@ def main():
         seed=seed,
         exp_name=exp_name,
         priors=priors,
+        dont_use_priors=(priors is None),
     )
 
     print(f"EXPERIMENT NAME: {exp_name}")

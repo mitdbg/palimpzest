@@ -635,7 +635,7 @@ class EmbeddingJoin(LLMJoin):
         output_record, output_record_op_stats = super()._process_join_candidate_pair(left_candidate, right_candidate, gen_kwargs)
         return output_record, output_record_op_stats, embedding_sim
 
-    def _process_join_candidate_with_sim(self, left_candidate: DataRecord, right_candidate: DataRecord, passed_operator: bool) -> tuple[DataRecord, RecordOpStats]:
+    def _process_join_candidate_with_sim(self, left_candidate: DataRecord, right_candidate: DataRecord, embedding_sim: float, passed_operator: bool) -> tuple[DataRecord, RecordOpStats]:
         # compute output record and add to output_records
         join_dr = DataRecord.from_join_parents(self.output_schema, left_candidate, right_candidate)
         join_dr._passed_operator = passed_operator
@@ -668,7 +668,7 @@ class EmbeddingJoin(LLMJoin):
             op_details={k: str(v) for k, v in self.get_id_params().items()},
         )
 
-        return join_dr, record_op_stats
+        return join_dr, record_op_stats, embedding_sim
 
     def __call__(self, left_candidates: list[DataRecord], right_candidates: list[DataRecord], final: bool = False) -> tuple[DataRecordSet, int]:
         # get the set of input fields from both records in the join
@@ -756,20 +756,12 @@ class EmbeddingJoin(LLMJoin):
                     # if the embedding similarity is lower than the threshold below which no records joined,
                     # then we can skip the LLM call and mark the records as not joined
                     if embedding_sim < self.max_non_matching_sim:
-                        self.join_idx += 1
-                        output_record, record_op_stats = self._process_join_candidate_with_sim(left_candidate, right_candidate, passed_operator=False)
-                        output_records.append(output_record)
-                        output_record_op_stats.append(record_op_stats)
-                        print(f"{self.join_idx} SKIPPED (low sim: {embedding_sim:.4f} < {self.max_non_matching_sim:.4f})")
+                        futures.append(executor.submit(self._process_join_candidate_with_sim, left_candidate, right_candidate, embedding_sim, passed_operator=False))
 
                     # if the embedding similarity is higher than the threshold above which all records joined,
                     # then we can skip the LLM call and mark the records as joined
                     elif embedding_sim > self.min_matching_sim:
-                        self.join_idx += 1
-                        output_record, record_op_stats = self._process_join_candidate_with_sim(left_candidate, right_candidate, passed_operator=True)
-                        output_records.append(output_record)
-                        output_record_op_stats.append(record_op_stats)
-                        print(f"{self.join_idx} JOINED (high sim: {embedding_sim:.4f} > {self.max_non_matching_sim:.4f})")
+                        futures.append(executor.submit(self._process_join_candidate_with_sim, left_candidate, right_candidate, embedding_sim, passed_operator=True))
 
                     # otherwise, we will process the LLM call
                     else:
