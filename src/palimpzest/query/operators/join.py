@@ -13,12 +13,12 @@ from pydantic.fields import FieldInfo
 from sentence_transformers import SentenceTransformer
 
 from palimpzest.constants import (
-     MODEL_CARDS,
-     NAIVE_EST_JOIN_SELECTIVITY,
-     NAIVE_EST_NUM_INPUT_TOKENS,
-     Cardinality,
-     Model,
-     PromptStrategy,
+    MODEL_CARDS,
+    NAIVE_EST_JOIN_SELECTIVITY,
+    NAIVE_EST_NUM_INPUT_TOKENS,
+    Cardinality,
+    Model,
+    PromptStrategy,
 )
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.core.lib.schemas import AUDIO_FIELD_TYPES, IMAGE_FIELD_TYPES, ImageFilepath

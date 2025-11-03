@@ -44,7 +44,7 @@ class OpFrontier:
             seed: int,
             policy: Policy,
             priors: dict | None = None,
-            dont_use_priors: bool = False,  # TODO: remove after abacus experiments
+            dont_use_priors: bool = False,
         ):
         # set k and j, which are the initial number of operators in the frontier and the
         # initial number of records to sample for each frontier operator
@@ -52,7 +52,7 @@ class OpFrontier:
         self.j = j
         self.source_indices = source_indices
         self.root_dataset_ids = root_dataset_ids
-        self.dont_use_priors = dont_use_priors  # TODO: remove after abacus experiments
+        self.dont_use_priors = dont_use_priors
 
         # store the policy that we are optimizing under
         self.policy = policy

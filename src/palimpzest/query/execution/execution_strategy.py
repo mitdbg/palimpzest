@@ -91,7 +91,7 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
         use_final_op_quality: bool = False,
         seed: int = 42,
         exp_name: str | None = None,
-        dont_use_priors: bool = False,  # TODO: remove after abacus experiments
+        dont_use_priors: bool = False,
         *args,
         **kwargs,
     ):
@@ -106,7 +106,7 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
         self.seed = seed
         self.rng = np.random.default_rng(seed=seed)
         self.exp_name = exp_name
-        self.dont_use_priors = dont_use_priors  # TODO: remove after abacus experiments
+        self.dont_use_priors = dont_use_priors
 
         # general cache which maps hash(logical_op_id, phys_op_id, hash(input)) --> record_set
         self.cache: dict[int, DataRecordSet] = {}
