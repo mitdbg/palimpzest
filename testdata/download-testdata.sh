@@ -34,6 +34,7 @@ wget -nc https://people.csail.mit.edu/gerarvit/PalimpzestData/real-estate-eval-1
 wget -nc https://people.csail.mit.edu/gerarvit/PalimpzestData/real-estate-eval-20.tar.gz
 wget -nc https://people.csail.mit.edu/gerarvit/PalimpzestData/real-estate-eval-5.tar.gz
 wget -nc https://people.csail.mit.edu/gerarvit/PalimpzestData/real-estate-eval-tiny.tar.gz
+wget -nc https://palimpzest-workloads.s3.us-east-1.amazonaws.com/real-estate-eval-100.tar
 wget -nc https://people.csail.mit.edu/gerarvit/PalimpzestData/vldbdownload.tar.gz
 wget -nc https://people.csail.mit.edu/gerarvit/PalimpzestData/real-estate-eval-25.tar.gz
 wget -nc https://people.csail.mit.edu/gerarvit/PalimpzestData/real-estate-eval-30.tar.gz 
