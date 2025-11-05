@@ -35,11 +35,17 @@ class GenerationStats(BaseModel):
     # typed as a float because GenerationStats may be amortized (i.e. divided) across a number of output records
     total_output_tokens: float = 0.0
 
+    # the total number of input tokens processed by embedding models
+    total_embedding_input_tokens: float = 0.0
+
     # the total cost of processing the input tokens; None if this operation did not use an LLM
     total_input_cost: float = 0.0
 
     # the total cost of processing the output tokens; None if this operation did not use an LLM
     total_output_cost: float = 0.0
+
+    # the total cost of processing input tokens for embedding models
+    total_embedding_cost: float = 0.0
 
     # the total cost of processing the input and output tokens; None if this operation did not use an LLM
     cost_per_record: float = 0.0
@@ -55,18 +61,6 @@ class GenerationStats(BaseModel):
 
     # (if applicable) the total number of embedding LLM calls made by this operator
     total_embedding_llm_calls: int = 0
-
-
-
-    #NEWLY ADDED TOKEN FIELDS
-
-    # the total number of input tokens processed by embedding models
-    total_embedding_input_tokens: float = 0.0
-
-
-    # the total cost of processing input tokens for embedding models
-    total_embedding_cost: float = 0.0
-
 
     def __iadd__(self, other: GenerationStats) -> GenerationStats:
         # self.raw_answers.extend(other.raw_answers)
@@ -234,13 +228,13 @@ class RecordOpStats(BaseModel):
     # typed as a float because GenerationStats may be amortized (i.e. divided) across a number of output records
     total_input_tokens: float = 0.0
 
-    # the total number of input tokens processed by embedding models
-    # typed as a float because GenerationStats may be amortized (i.e. divided) across a number of output records
-    total_embedding_input_tokens: float = 0.0
-
     # the total number of output tokens processed by this operator; None if this operation did not use an LLM
     # typed as a float because GenerationStats may be amortized (i.e. divided) across a number of output records
     total_output_tokens: float = 0.0
+
+    # the total number of input tokens processed by embedding models
+    # typed as a float because GenerationStats may be amortized (i.e. divided) across a number of output records
+    total_embedding_input_tokens: float = 0.0
 
     # the total cost of processing the input tokens; None if this operation did not use an LLM
     total_input_cost: float = 0.0
@@ -350,7 +344,6 @@ class OperatorStats(BaseModel):
             self.total_output_tokens += stats.total_output_tokens
             self.total_embedding_input_tokens += stats.total_embedding_input_tokens
 
-
         else:
             raise TypeError(f"Cannot add {type(stats)} to OperatorStats")
 
@@ -400,7 +393,6 @@ class BasePlanStats(BaseModel):
 
     # total output tokens processed by this plan
     total_output_tokens: int = 0
-
 
     # total embedding input tokens processed by this plan
     total_embedding_input_tokens: int = 0
