@@ -420,7 +420,7 @@ class BasePlanStats(BaseModel):
         self.total_plan_cost = self.sum_op_costs() + self.sum_validation_costs()
         self.total_input_tokens = self.sum_input_tokens() + self.sum_validation_input_tokens()
         self.total_output_tokens = self.sum_output_tokens() + self.sum_validation_output_tokens()
-        self.total_embedding_input_tokens = self.sum_embedding_input_tokens() + self.sum_validation_embedding_input()
+        self.total_embedding_input_tokens = self.sum_embedding_input_tokens() + self.sum_validation_embedding_input_tokens()
 
     @staticmethod
     @abstractmethod
@@ -497,7 +497,7 @@ class BasePlanStats(BaseModel):
         """
         return sum([gen_stats.total_output_tokens for _, gen_stats in self.validation_gen_stats.items()])
     
-    def sum_validation_embedding_input(self) -> int:
+    def sum_validation_embedding_input_tokens(self) -> int:
         """
         Sum the input embedding tokens processed by all validation generations in this plan.
         """
@@ -545,11 +545,11 @@ class PlanStats(BasePlanStats):
         """
         return sum([op_stats.total_output_tokens for _, op_stats in self.operator_stats.items()])
     
-    def sum_embedding_input_tokens (self) -> int:
+    def sum_embedding_input_tokens(self) -> int:
         """
         Sum the input embedding tokens processed by all operators in this plan.
         """
-        return sum([op_stats.total_output_tokens for _, op_stats in self.operator_stats.items()])
+        return sum([op_stats.total_embedding_input_tokens for _, op_stats in self.operator_stats.items()])
 
     def add_record_op_stats(self, unique_full_op_id: str, record_op_stats: RecordOpStats | list[RecordOpStats]) -> None:
         """
@@ -638,7 +638,7 @@ class SentinelPlanStats(BasePlanStats):
         """
         return sum(sum([op_stats.total_output_tokens for _, op_stats in phys_op_stats.items()]) for _, phys_op_stats in self.operator_stats.items())
     
-    def sum_embedding_input_tokens (self) -> int:
+    def sum_embedding_input_tokens(self) -> int:
         """
         Sum the output tokens processed by all operators in this plan.
         """
@@ -706,7 +706,7 @@ class SentinelPlanStats(BasePlanStats):
         stats += f"total_plan_cost={self.total_plan_cost} \n"
         stats += f"total_input_tokens={self.total_input_tokens} \n"
         stats += f"total_output_tokens={self.total_output_tokens} \n"
-        stats += f"total_embedding_input_tokens={self.total_output_tokens} \n"
+        stats += f"total_embedding_input_tokens={self.total_embedding_input_tokens} \n"
         for outer_idx, physical_op_stats in enumerate(self.operator_stats.values()):
             total_time = sum([op_stats.total_op_time for op_stats in physical_op_stats.values()])
             total_cost = sum([op_stats.total_op_cost for op_stats in physical_op_stats.values()])
@@ -755,7 +755,7 @@ class ExecutionStats(BaseModel):
     total_output_tokens: int = 0
 
      # total number of embedding input tokens processed
-    total_embedding_inputs_tokens: int = 0
+    total_embedding_input_tokens: int = 0
 
     # total number of tokens processed
     total_tokens: int = 0
@@ -806,12 +806,12 @@ class ExecutionStats(BaseModel):
         # compute the cost for plan and total execution
         self.plan_execution_cost = self.sum_plan_costs()
         self.total_execution_cost = self.optimization_cost + self.plan_execution_cost
- 
+
         # compute the tokens for total execution
         self.total_input_tokens = self.sum_input_tokens()
         self.total_output_tokens = self.sum_output_tokens()
-        self.total_embedding_inputs_tokens = self.sum_embedding_input_tokens()
-        self.total_tokens = self.total_input_tokens + self.total_output_tokens + self.total_embedding_inputs_tokens
+        self.total_embedding_input_tokens = self.sum_embedding_input_tokens()
+        self.total_tokens = self.total_input_tokens + self.total_output_tokens + self.total_embedding_input_tokens
 
         # compute plan_strs
         self.plan_strs = {plan_id: plan_stats.plan_str for plan_id, plan_stats in self.plan_stats.items()}

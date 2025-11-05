@@ -108,20 +108,15 @@ class RAGConvert(LLMConvert):
 
         # compute the generation stats object
         model_card = MODEL_CARDS[model_name]
-        # computing for all inputs
-        total_input_tokens = response.usage.total_tokens
-        total_input_cost = model_card["usd_per_input_token"] * total_input_tokens
-        #computiong for embedding tokens
-        total_embedding_input_tokens = response.usage.total_embedding_input_tokens # equal to response.usage.total_tokens ???
+        total_embedding_input_tokens = response.usage.total_tokens
         total_embedding_cost = model_card["usd_per_input_token"] * total_embedding_input_tokens
-
         embed_stats = GenerationStats(
             model_name=model_name,  # NOTE: this should be overwritten by generation model in convert()
             total_input_tokens=0.0,
             total_output_tokens=0.0,
+            total_embedding_input_tokens=total_embedding_input_tokens,
             total_input_cost=0.0,
             total_output_cost=0.0,
-            total_embedding_input_tokens=total_embedding_input_tokens,
             total_embedding_cost=total_embedding_cost,
             cost_per_record=total_embedding_cost,
             llm_call_duration_secs=total_time,
@@ -324,19 +319,15 @@ class RAGFilter(LLMFilter):
 
         # compute the generation stats object
         model_card = MODEL_CARDS[model_name]
-        # computing for all inputs
-        total_input_tokens = response.usage.total_tokens
-        total_input_cost = model_card["usd_per_input_token"] * total_input_tokens
-        #computiong for embedding tokens
-        total_embedding_input_tokens = response.usage.total_embedding_input_tokens
+        total_embedding_input_tokens = response.usage.total_tokens
         total_embedding_cost = model_card["usd_per_input_token"] * total_embedding_input_tokens
         embed_stats = GenerationStats(
-            model_name=model_name,  # NOTE: this should be overwritten by generation model in filter()
+            model_name=model_name,  # NOTE: this should be overwritten by generation model in convert()
             total_input_tokens=0.0,
             total_output_tokens=0.0,
+            total_embedding_input_tokens=total_embedding_input_tokens,
             total_input_cost=0.0,
             total_output_cost=0.0,
-            total_embedding_input_tokens=total_embedding_input_tokens,
             total_embedding_cost=total_embedding_cost,
             cost_per_record=total_embedding_cost,
             llm_call_duration_secs=total_time,

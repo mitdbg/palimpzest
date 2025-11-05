@@ -333,13 +333,13 @@ class EmbeddingJoin(JoinOp):
             return np.zeros((0, 512)), GenerationStats()
 
         start_time = time.time()
-        total_input_tokens = 0
+        total_embedding_input_tokens = 0
         embeddings = None
         if self.text_only:
             client = OpenAI()
             inputs = [dr.to_json_str(bytes_to_str=True, project_cols=input_fields, sorted=True) for dr in candidates]
             response = client.embeddings.create(input=inputs, model=self.embedding_model.value)
-            total_input_tokens = response.usage.total_tokens
+            total_embedding_input_tokens = response.usage.total_tokens
             embeddings = np.array([item.embedding for item in response.data])
         else:
             model = SentenceTransformer(self.embedding_model.value)
@@ -365,14 +365,16 @@ class EmbeddingJoin(JoinOp):
 
         # compute cost of embedding(s)
         model_card = MODEL_CARDS[self.embedding_model.value]
-        total_input_cost = model_card["usd_per_input_token"] * total_input_tokens
+        total_embedding_cost = model_card["usd_per_input_token"] * total_embedding_input_tokens
         embedding_gen_stats = GenerationStats(
             model_name=self.embedding_model.value,
-            total_input_tokens=total_input_tokens,
+            total_input_tokens=0.0,
             total_output_tokens=0.0,
-            total_input_cost=total_input_cost,
+            total_embedding_input_tokens=total_embedding_input_tokens,
+            total_input_cost=0.0,
             total_output_cost=0.0,
-            cost_per_record=total_input_cost,
+            total_embedding_cost=total_embedding_cost,
+            cost_per_record=total_embedding_cost,
             llm_call_duration_secs=time.time() - start_time,
             total_llm_calls=1,
             total_embedding_llm_calls=len(candidates),
