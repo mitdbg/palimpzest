@@ -777,7 +777,7 @@ class MABExecutionStrategy(SentinelExecutionStrategy):
 
                 # if the operator is a non-llm filter which has filtered out records, remove those records from
                 # all downstream operators' full_op_id_to_sources_not_processed
-                if isinstance(op_set[0], NonLLMFilter):
+                if isinstance(op_set[0], NonLLMFilter) and next_unique_logical_op_id is not None:
                     self._remove_filtered_records_from_downstream_ops(topo_idx, plan, op_frontiers, source_indices_to_all_record_sets)
 
         # finalize plan stats
