@@ -92,6 +92,9 @@ class QueryProcessorFactory:
         # set the final set of available models in the config
         config.available_models = available_models
 
+        if len(config.available_models) == 0:
+            raise ValueError("No available models found.")
+
         openai_key = os.getenv("OPENAI_API_KEY")
         anthropic_key = os.getenv("ANTHROPIC_API_KEY")
         together_key = os.getenv("TOGETHER_API_KEY")
