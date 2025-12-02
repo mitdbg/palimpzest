@@ -34,12 +34,37 @@ class AggregateOp(PhysicalOperator):
 class ApplyGroupByOp(AggregateOp):
     """
     Implementation of a GroupBy operator. This operator groups records by a set of fields
-    and applies a function to each group. The group_by_sig object contains the fields to
-    group by and the aggregation functions to apply to each group.
+    and applies a function to each group.
+    
+    Can be initialized in two ways:
+    1. Legacy: group_by_sig parameter containing fields and functions
+    2. New: gby_fields, agg_fields, agg_funcs parameters directly
     """
-    def __init__(self, group_by_sig: GroupBySig, *args, **kwargs):
+    def __init__(self, group_by_sig: GroupBySig = None, gby_fields: list[str] = None, 
+                 agg_fields: list[str] = None, agg_funcs: list[str] = None, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.group_by_sig = group_by_sig
+        
+        # Support both old API (group_by_sig) and new API (individual fields)
+        if group_by_sig is not None:
+            # Legacy API: use group_by_sig
+            self.group_by_sig = group_by_sig
+            self.gby_fields = group_by_sig.group_by_fields
+            self.agg_fields = group_by_sig.agg_fields
+            self.agg_funcs = group_by_sig.agg_funcs
+        elif gby_fields is not None and agg_fields is not None and agg_funcs is not None:
+            # New API: construct group_by_sig from individual fields
+            self.gby_fields = gby_fields
+            self.agg_fields = agg_fields
+            self.agg_funcs = agg_funcs
+            # Create a GroupBySig for backwards compatibility with existing code
+            from palimpzest.core.elements.groupbysig import GroupBySig
+            self.group_by_sig = GroupBySig(
+                group_by_fields=gby_fields,
+                agg_fields=agg_fields,
+                agg_funcs=agg_funcs
+            )
+        else:
+            raise ValueError("Either group_by_sig or (gby_fields, agg_fields, agg_funcs) must be provided")
 
     def __str__(self):
         op = super().__str__()
@@ -664,3 +689,245 @@ class SemanticAggregate(AggregateOp):
         )
 
         return DataRecordSet([dr], [record_op_stats])
+    
+class SemanticGroupByOp(AggregateOp):
+    """
+    Implementation of a semantic GroupBy operator using LLMs. This operator groups records by a set 
+    of fields and applies aggregation functions to each group using an LLM to determine the groups.
+    """
+    def __init__(self, gby_fields: list[str], agg_fields: list[str], agg_funcs: list[str], 
+                 model: Model | None = None, prompt_strategy: PromptStrategy = PromptStrategy.AGG, 
+                 reasoning_effort: str | None = None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.gby_fields = gby_fields
+        self.agg_fields = agg_fields
+        self.agg_funcs = agg_funcs
+        self.model = model if model is not None else Model.GPT_4O_MINI
+        self.prompt_strategy = prompt_strategy
+        self.reasoning_effort = reasoning_effort
+        
+        # Initialize the generator for LLM calls
+        self.generator = Generator(self.model, self.prompt_strategy, self.reasoning_effort, self.api_base)
+
+    def __str__(self):
+        op = super().__str__()
+        op += f"    Group-by Fields: {self.gby_fields}\n"
+        op += f"    Agg. Fields: {self.agg_fields}\n"
+        op += f"    Agg. Funcs: {self.agg_funcs}\n"
+        op += f"    Model: {self.model.value}\n"
+        op += f"    Prompt Strategy: {self.prompt_strategy}\n"
+        return op
+
+    def get_id_params(self):
+        id_params = super().get_id_params()
+        return {
+            "gby_fields": self.gby_fields, 
+            "agg_fields": self.agg_fields, 
+            "agg_funcs": self.agg_funcs,
+            "model": self.model.value,
+            "prompt_strategy": self.prompt_strategy.value,
+            "reasoning_effort": self.reasoning_effort,
+            **id_params
+        }
+
+    def get_op_params(self):
+        op_params = super().get_op_params()
+        return {
+            "gby_fields": self.gby_fields, 
+            "agg_fields": self.agg_fields, 
+            "agg_funcs": self.agg_funcs,
+            "model": self.model,
+            "prompt_strategy": self.prompt_strategy,
+            "reasoning_effort": self.reasoning_effort,
+            **op_params
+        }
+    
+    def get_model_name(self) -> str:
+        return self.model.value
+    
+    def get_fields_to_generate(self, candidate: DataRecord) -> list[str]:
+        """
+        For aggregation operators, we need to generate ALL output fields (including group-by fields),
+        not just the new fields. This overrides the default behavior.
+        """
+        return list(self.output_schema.model_fields.keys())
+
+    def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
+        """
+        Compute naive cost estimates for the semantic group by operation using an LLM.
+        """
+        # estimate number of input and output tokens
+        est_num_input_tokens = NAIVE_EST_NUM_INPUT_TOKENS * source_op_cost_estimates.cardinality
+        est_num_output_tokens = NAIVE_EST_NUM_OUTPUT_TOKENS * NAIVE_EST_NUM_GROUPS
+
+        # get est. of conversion time per record from model card
+        model_name = self.model.value
+        model_conversion_time_per_record = MODEL_CARDS[model_name]["seconds_per_output_token"] * est_num_output_tokens
+
+        # get est. of conversion cost (in USD) per record from model card
+        usd_per_input_token = MODEL_CARDS[model_name].get("usd_per_input_token")
+        model_conversion_usd_per_record = (
+            usd_per_input_token * est_num_input_tokens
+            + MODEL_CARDS[model_name]["usd_per_output_token"] * est_num_output_tokens
+        )
+
+        # estimate quality of output based on the strength of the model being used
+        quality = (MODEL_CARDS[model_name]["overall"] / 100.0)
+
+        return OperatorCostEstimates(
+            cardinality=NAIVE_EST_NUM_GROUPS,
+            time_per_record=model_conversion_time_per_record,
+            cost_per_record=model_conversion_usd_per_record,
+            quality=quality,
+        )
+
+    def __call__(self, candidates: list[DataRecord]) -> DataRecordSet:
+        """
+        Execute the semantic group by operation on the given candidates using a two-phase approach:
+        Phase 1: LLM assigns each record to a group (MAP)
+        Phase 2: Apply aggregation functions to each group (REDUCE)
+        
+        Args:
+            candidates: List of DataRecords to group and aggregate
+            
+        Returns:
+            DataRecordSet containing one DataRecord per group with aggregated values
+        """
+        start_time = time.time()
+        
+        # Handle empty input
+        if len(candidates) == 0:
+            return DataRecordSet([], [])
+        
+        # Use LLM to assign each record to a semantic group
+        group_assignments, phase1_stats = self._assign_groups_llm(candidates)
+        
+        # Group candidates by their assigned group labels
+        groups = {}
+        for candidate, group_label in zip(candidates, group_assignments):
+            if group_label not in groups:
+                groups[group_label] = []
+            groups[group_label].append(candidate)
+        
+        # Apply aggregation functions to each group
+        drs = []
+        record_op_stats_lst = []
+        total_cost = phase1_stats.cost_per_record * len(candidates)
+        
+        for group_label, group_members in groups.items():
+            # Build aggregated data item for this group
+            data_item = {}
+            
+            # Add group-by field value
+            data_item[self.gby_fields[0]] = group_label
+            
+            # Use LLM to compute aggregations for this group
+            # Use LLM to compute aggregations for this group
+            fields_to_generate = [agg_func.lower() for agg_func in self.agg_funcs]
+            fields = {field: self.output_schema.model_fields[field].annotation for field in fields_to_generate}
+            
+            # Construct generation kwargs
+            gen_kwargs = {
+                "project_cols": self.get_input_fields(),
+                "output_schema": self.output_schema,
+                "agg_instruction": f"Compute the following aggregations for group '{group_label}': {', '.join([f'{func}({field})' for func, field in zip(self.agg_funcs, self.agg_fields)])}"
+            }
+            
+            # Generate aggregation results
+            field_answers, _, agg_stats, _ = self.generator(group_members, fields, **gen_kwargs)
+            agg_results = {field: field_answers[field][0] for field in fields_to_generate}
+            
+            # Add aggregation results to data_item
+            for agg_field, agg_func in zip(self.agg_fields, self.agg_funcs):
+                output_field_name = agg_func.lower()
+                data_item[output_field_name] = agg_results.get(output_field_name)
+            
+            # Accumulate aggregation costs
+            total_cost += agg_stats.cost_per_record * len(group_members)
+            
+            # Create the DataRecord for this group
+            data_item_obj = self.output_schema(**data_item)
+            dr = DataRecord.from_agg_parents(data_item_obj, parent_records=group_members)
+            drs.append(dr)
+            
+            # Create RecordOpStats for this group
+            record_op_stats = RecordOpStats(
+                record_id=dr._id,
+                record_parent_ids=dr._parent_ids,
+                record_source_indices=dr._source_indices,
+                record_state=dr.to_dict(include_bytes=False),
+                full_op_id=self.get_full_op_id(),
+                logical_op_id=self.logical_op_id or "semantic-groupby",
+                op_name=self.op_name(),
+                time_per_record=(time.time() - start_time) / len(groups),
+                cost_per_record=total_cost / len(groups),
+                model_name=self.get_model_name(),
+                input_fields=self.get_input_fields(),
+                generated_fields=list(self.output_schema.model_fields.keys()),
+                total_input_tokens=phase1_stats.total_input_tokens,
+                total_output_tokens=phase1_stats.total_output_tokens,
+                total_input_cost=phase1_stats.total_input_cost,
+                total_output_cost=phase1_stats.total_output_cost,
+                llm_call_duration_secs=phase1_stats.llm_call_duration_secs,
+                fn_call_duration_secs=phase1_stats.fn_call_duration_secs,
+                total_llm_calls=phase1_stats.total_llm_calls,
+                op_details={k: str(v) for k, v in self.get_id_params().items()},
+            )
+            record_op_stats_lst.append(record_op_stats)
+        
+        return DataRecordSet(drs, record_op_stats_lst)
+    
+    def _assign_groups_llm(self, candidates: list[DataRecord]) -> tuple[list[str], any]:
+        """
+        Phase 1: Use LLM to assign each candidate to a semantic group.
+        
+        Args:
+            candidates: List of DataRecords to classify into groups
+            
+        Returns:
+            Tuple of (list of group labels, generation stats)
+        """
+        # Create a schema that just extracts the group-by field
+        from palimpzest.core.lib.schemas import create_schema_from_fields
+        groupby_schema = create_schema_from_fields([
+            {"name": self.gby_fields[0], "type": str, "desc": f"The semantic category for {self.gby_fields[0]}"}
+        ])
+        
+        # Process candidates to extract group labels
+        group_labels = []
+        total_stats = None
+        
+        # Get input fields once
+        input_fields = self.get_input_fields()
+        fields = {self.gby_fields[0]: str}
+        
+        for candidate in candidates:
+            # Ask LLM to classify this record - pass single candidate, not list
+            gen_kwargs = {
+                "project_cols": input_fields,
+                "output_schema": groupby_schema,
+                "agg_instruction": f"Determine the '{self.gby_fields[0]}' category for this record."
+            }
+            
+            field_answers, _, gen_stats, _ = self.generator(candidate, fields, **gen_kwargs)
+            
+            # Extract the group label - field_answers returns dict with field->list mapping
+            group_label = field_answers.get(self.gby_fields[0], [None])[0]
+            if group_label is None:
+                # Fallback: use a default group
+                group_label = "unknown"
+            group_labels.append(group_label)
+            
+            # Accumulate stats
+            if total_stats is None:
+                total_stats = gen_stats
+            else:
+                # Sum up the stats
+                total_stats.total_input_tokens += gen_stats.total_input_tokens
+                total_stats.total_output_tokens += gen_stats.total_output_tokens
+                total_stats.total_input_cost += gen_stats.total_input_cost
+                total_stats.total_output_cost += gen_stats.total_output_cost
+                total_stats.llm_call_duration_secs += gen_stats.llm_call_duration_secs
+                total_stats.total_llm_calls += gen_stats.total_llm_calls
+        
+        return group_labels, total_stats
