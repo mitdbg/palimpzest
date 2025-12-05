@@ -318,47 +318,47 @@ class Generator(Generic[ContextType, InputType]):
         # generate the text completion
         start_time = time.time()
         completion = None
-        try:
-            completion_kwargs = {}
-            if not self.model.is_o_model() and not self.model.is_gpt_5_model():
-                completion_kwargs = {"temperature": kwargs.get("temperature", 0.0), **completion_kwargs}
-            if is_audio_op:
-                completion_kwargs = {"modalities": ["text"], **completion_kwargs}
-            if self.model.is_reasoning_model():
-                if self.model.is_vertex_model():
-                    reasoning_effort = self.reasoning_effort
-                    if self.reasoning_effort is None and self.model == Model.GEMINI_2_5_PRO:
-                        reasoning_effort = "low"
-                    elif self.reasoning_effort is None:
-                        reasoning_effort = "disable"
-                    completion_kwargs = {"reasoning_effort": reasoning_effort, **completion_kwargs}
-                elif self.model.is_anthropic_model() and self.reasoning_effort is not None:
-                    completion_kwargs = {"reasoning_effort": self.reasoning_effort, **completion_kwargs}
-                elif self.model.is_openai_model():
-                    reasoning_effort = "minimal" if self.reasoning_effort is None else self.reasoning_effort
-                    completion_kwargs = {"reasoning_effort": reasoning_effort, **completion_kwargs}
-            if self.model.is_vllm_model():
-                completion_kwargs = {"api_base": self.api_base, "api_key": os.environ.get("VLLM_API_KEY", "fake-api-key"), **completion_kwargs}
-            completion = litellm.completion(model=self.model_name, messages=messages, **completion_kwargs)
-            end_time = time.time()
-            logger.debug(f"Generated completion in {end_time - start_time:.2f} seconds")
+        # try:
+        completion_kwargs = {}
+        if not self.model.is_o_model() and not self.model.is_gpt_5_model():
+            completion_kwargs = {"temperature": kwargs.get("temperature", 0.0), **completion_kwargs}
+        if is_audio_op:
+            completion_kwargs = {"modalities": ["text"], **completion_kwargs}
+        if self.model.is_reasoning_model():
+            if self.model.is_vertex_model():
+                reasoning_effort = self.reasoning_effort
+                if self.reasoning_effort is None and self.model == Model.GEMINI_2_5_PRO:
+                    reasoning_effort = "low"
+                elif self.reasoning_effort is None:
+                    reasoning_effort = "disable"
+                completion_kwargs = {"reasoning_effort": reasoning_effort, **completion_kwargs}
+            elif self.model.is_anthropic_model() and self.reasoning_effort is not None:
+                completion_kwargs = {"reasoning_effort": self.reasoning_effort, **completion_kwargs}
+            elif self.model.is_openai_model():
+                reasoning_effort = "minimal" if self.reasoning_effort is None else self.reasoning_effort
+                completion_kwargs = {"reasoning_effort": reasoning_effort, **completion_kwargs}
+        if self.model.is_vllm_model():
+            completion_kwargs = {"api_base": self.api_base, "api_key": os.environ.get("VLLM_API_KEY", "fake-api-key"), **completion_kwargs}
+        completion = litellm.completion(model=self.model_name, messages=messages, **completion_kwargs)
+        end_time = time.time()
+        logger.debug(f"Generated completion in {end_time - start_time:.2f} seconds")
         # if there's an error generating the completion, we have to return an empty answer
         # and can only account for the time spent performing the failed generation
-        except Exception as e:
-            logger.error(f"Error generating completion: {e}")
-            field_answers = (
-                {"passed_operator": False}
-                if self.prompt_strategy.is_filter_prompt() or self.prompt_strategy.is_join_prompt()
-                else {field_name: None for field_name in fields}
-            )
-            reasoning = None
-            generation_stats = GenerationStats(
-                model_name=self.model_name,
-                llm_call_duration_secs=time.time() - start_time,
-                total_llm_calls=1,
-            )
+        # except Exception as e:
+        #     logger.error(f"Error generating completion: {e}")
+        #     field_answers = (
+        #         {"passed_operator": False}
+        #         if self.prompt_strategy.is_filter_prompt() or self.prompt_strategy.is_join_prompt()
+        #         else {field_name: None for field_name in fields}
+        #     )
+        #     reasoning = None
+        #     generation_stats = GenerationStats(
+        #         model_name=self.model_name,
+        #         llm_call_duration_secs=time.time() - start_time,
+        #         total_llm_calls=1,
+        #     )
 
-            return field_answers, reasoning, generation_stats, messages
+        # return field_answers, reasoning, generation_stats, messages
 
         # parse usage statistics and create the GenerationStats
         generation_stats = None

@@ -4,7 +4,7 @@ from palimpzest.constants import Model
 
 
 # TODO: better handle vertex vs. google for gemini models
-def get_models(include_embedding: bool = False, use_vertex: bool = True, gemini_credentials_path: str | None = None, api_base: str | None = None) -> list[Model]:
+def get_models(include_embedding: bool = False, use_vertex: bool = False, gemini_credentials_path: str | None = None, api_base: str | None = None) -> list[Model]:
     """
     Return the set of models which the system has access to based on the set environment variables.
     """
@@ -38,7 +38,7 @@ def get_models(include_embedding: bool = False, use_vertex: bool = True, gemini_
         if gemini_credentials_path is None
         else gemini_credentials_path
     )
-    if os.getenv("GEMINI_API_KEY") is not None or os.path.exists(gemini_credentials_path):
+    if os.getenv("GEMINI_API_KEY") is not None or (use_vertex and os.path.exists(gemini_credentials_path)):
         vertex_models = [model for model in Model if model.is_vertex_model()]
         google_models = [model for model in Model if model.is_google_model()]
         if not include_embedding:
