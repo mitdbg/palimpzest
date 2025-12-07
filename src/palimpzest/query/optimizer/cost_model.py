@@ -105,9 +105,10 @@ class SampleBasedCostModel:
                     "time_per_record": record_op_stats.time_per_record,
                     "quality": record_op_stats.quality,
                     "passed_operator": record_op_stats.passed_operator,
-                    "source_indices": record_op_stats.record_source_indices,  # TODO: remove
-                    "op_details": record_op_stats.op_details,                 # TODO: remove
-                    "answer": record_op_stats.answer,                         # TODO: remove
+                    "source_indices": record_op_stats.record_source_indices,
+                    "op_details": record_op_stats.op_details,
+                    "answer": record_op_stats.answer,
+                    "op_name": record_op_stats.op_name,
                 }
                 execution_record_op_stats.append(record_op_stats_dict)
 
@@ -128,8 +129,12 @@ class SampleBasedCostModel:
                     else physical_op_df.source_indices.apply(tuple).nunique()
                 )
 
-                # compute selectivity
+                # compute selectivity; for filters this may be 1.0 on smalle samples;
+                # always put something slightly less than 1.0 to ensure that filters are pushed down when possible
                 selectivity = physical_op_df.passed_operator.sum() / num_source_records
+                op_name = physical_op_df.op_name.iloc[0].lower()
+                if selectivity == 1.0 and "filter" in op_name:
+                    selectivity -= 1e-3
 
                 # compute quality; if all qualities are None then this will be NaN
                 quality = physical_op_df.quality.mean()
