@@ -1,4 +1,5 @@
 import logging
+import os
 from enum import Enum
 
 from palimpzest.core.data.dataset import Dataset
@@ -90,6 +91,27 @@ class QueryProcessorFactory:
 
         # set the final set of available models in the config
         config.available_models = available_models
+
+        if len(config.available_models) == 0:
+            raise ValueError("No available models found.")
+
+        openai_key = os.getenv("OPENAI_API_KEY")
+        anthropic_key = os.getenv("ANTHROPIC_API_KEY")
+        together_key = os.getenv("TOGETHER_API_KEY")
+        gemini_key = os.getenv("GEMINI_API_KEY")
+        google_key = os.getenv("GOOGLE_API_KEY")
+
+        for model in config.available_models:
+            if model.is_openai_model() and not openai_key:
+                raise ValueError("OPENAI_API_KEY must be set to use OpenAI models.")
+            if model.is_anthropic_model() and not anthropic_key:
+                raise ValueError("ANTHROPIC_API_KEY must be set to use Anthropic models.")
+            if model.is_together_model() and not together_key:
+                raise ValueError("TOGETHER_API_KEY must be set to use Together models.")
+            if model.is_google_model() and not (gemini_key or google_key or config.gemini_credentials_path):
+                raise ValueError("GEMINI_API_KEY, GOOGLE_API_KEY, or gemini_credentials path must be set to use Google Gemini models.")
+            if model.is_vllm_model() and config.api_base is None:
+                raise ValueError("api_base must be set to use vLLM models.")
 
         return config, validator
 
