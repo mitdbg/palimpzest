@@ -110,7 +110,7 @@ class QueryProcessorFactory:
                 raise ValueError("ANTHROPIC_API_KEY must be set to use Anthropic models.")
             if model.is_together_model() and not together_key:
                 raise ValueError("TOGETHER_API_KEY must be set to use Together models.")
-            if model.is_google_model() and not (gemini_key or google_key or config.gemini_credentials_path):
+            if model.is_google_ai_studio_model() and not (gemini_key or google_key or config.gemini_credentials_path):
                 raise ValueError("GEMINI_API_KEY, GOOGLE_API_KEY, or gemini_credentials path must be set to use Google Gemini models.")
             if model.is_vllm_model() and config.api_base is None:
                 raise ValueError("api_base must be set to use vLLM models.")
