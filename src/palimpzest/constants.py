@@ -31,9 +31,9 @@ class Model(str, Enum):
     GEMINI_2_0_FLASH = "vertex_ai/gemini-2.0-flash"
     GEMINI_2_5_FLASH = "vertex_ai/gemini-2.5-flash"
     GEMINI_2_5_PRO = "vertex_ai/gemini-2.5-pro"
-    GOOGLE_GEMINI_2_5_FLASH = "google/gemini-2.5-flash"
-    GOOGLE_GEMINI_2_5_FLASH_LITE = "google/gemini-2.5-flash-lite"
-    GOOGLE_GEMINI_2_5_PRO = "google/gemini-2.5-pro"
+    GOOGLE_GEMINI_2_5_FLASH = "gemini/gemini-2.5-flash"
+    GOOGLE_GEMINI_2_5_FLASH_LITE = "gemini/gemini-2.5-flash-lite"
+    GOOGLE_GEMINI_2_5_PRO = "gemini/gemini-2.5-pro"
     LLAMA_4_MAVERICK = "vertex_ai/meta/llama-4-maverick-17b-128e-instruct-maas"
     GPT_4o_AUDIO_PREVIEW = "openai/gpt-4o-audio-preview"
     GPT_4o_MINI_AUDIO_PREVIEW = "openai/gpt-4o-mini-audio-preview"
@@ -72,8 +72,8 @@ class Model(str, Enum):
     def is_vertex_model(self):
         return "vertex_ai" in self.value.lower()
 
-    def is_google_model(self):
-        return "google" in self.value.lower()
+    def is_google_ai_studio_model(self):
+        return "gemini/" in self.value.lower()
 
     def is_vllm_model(self):
         return "hosted_vllm" in self.value.lower()
