@@ -1,5 +1,6 @@
 import logging
 from enum import Enum
+
 from dotenv import load_dotenv
 
 from palimpzest.core.data.dataset import Dataset
@@ -173,7 +174,7 @@ class QueryProcessorFactory:
         train_dataset: dict[str, Dataset] | None = None,
         validator: Validator | None = None,
     ) -> DataRecordCollection:
-        load_dotenv()
+        load_dotenv(override=True)
         logger.info(f"Creating processor for dataset: {dataset}")
         processor = cls.create_processor(dataset, config, train_dataset, validator)
         logger.info(f"Created processor: {processor}")
