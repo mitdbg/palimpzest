@@ -3,13 +3,12 @@ import os
 from palimpzest.constants import Model
 
 
-# TODO: better handle vertex vs. google for gemini models
-def get_models(include_embedding: bool = False, use_vertex: bool = True, gemini_credentials_path: str | None = None, api_base: str | None = None) -> list[Model]:
+def get_models(include_embedding: bool = False, use_vertex: bool = False, gemini_credentials_path: str | None = None, api_base: str | None = None) -> list[Model]:
     """
     Return the set of models which the system has access to based on the set environment variables.
     """
     models = []
-    if os.getenv("OPENAI_API_KEY") is not None:
+    if os.getenv("OPENAI_API_KEY") not in [None, ""]:
         openai_models = [model for model in Model if model.is_openai_model()]
         if not include_embedding:
             openai_models = [
@@ -17,7 +16,7 @@ def get_models(include_embedding: bool = False, use_vertex: bool = True, gemini_
             ]
         models.extend(openai_models)
 
-    if os.getenv("TOGETHER_API_KEY") is not None:
+    if os.getenv("TOGETHER_API_KEY") not in [None, ""]:
         together_models = [model for model in Model if model.is_together_model()]
         if not include_embedding:
             together_models = [
@@ -25,7 +24,7 @@ def get_models(include_embedding: bool = False, use_vertex: bool = True, gemini_
             ]
         models.extend(together_models)
 
-    if os.getenv("ANTHROPIC_API_KEY") is not None:
+    if os.getenv("ANTHROPIC_API_KEY") not in [None, ""]:
         anthropic_models = [model for model in Model if model.is_anthropic_model()]
         if not include_embedding:
             anthropic_models = [
@@ -38,9 +37,9 @@ def get_models(include_embedding: bool = False, use_vertex: bool = True, gemini_
         if gemini_credentials_path is None
         else gemini_credentials_path
     )
-    if os.getenv("GEMINI_API_KEY") is not None or os.path.exists(gemini_credentials_path):
+    if os.getenv("GEMINI_API_KEY") not in [None, ""] or (use_vertex and os.path.exists(gemini_credentials_path)):
         vertex_models = [model for model in Model if model.is_vertex_model()]
-        google_models = [model for model in Model if model.is_google_model()]
+        google_ai_studio_models = [model for model in Model if model.is_google_ai_studio_model()]
         if not include_embedding:
             vertex_models = [
                 model for model in vertex_models if not model.is_embedding_model()
@@ -48,7 +47,7 @@ def get_models(include_embedding: bool = False, use_vertex: bool = True, gemini_
         if use_vertex:
             models.extend(vertex_models)
         else:
-            models.extend(google_models)
+            models.extend(google_ai_studio_models)
 
     if api_base is not None:
         vllm_models = [model for model in Model if model.is_vllm_model()]
