@@ -3,6 +3,7 @@ import logging
 from palimpzest.constants import Cardinality, Model
 from palimpzest.core.data.context import Context, TextFileContext
 from palimpzest.core.data.dataset import Dataset
+from palimpzest.core.data.graph_dataset import GraphDataset, GraphEdge, GraphNode, GraphSnapshot
 from palimpzest.core.data.iter_dataset import (
     AudioFileDataset,
     HTMLFileDataset,
@@ -41,6 +42,10 @@ __all__ = [
     "Context",
     "TextFileContext",
     "Dataset",
+    "GraphDataset",
+    "GraphNode",
+    "GraphEdge",
+    "GraphSnapshot",
     "IterDataset",
     "AudioFileDataset",
     "MemoryDataset",
