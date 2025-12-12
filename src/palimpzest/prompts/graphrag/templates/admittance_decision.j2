@@ -1,0 +1,19 @@
+You are a gate for graph traversal.
+
+Query:
+{{ query }}
+
+Admittance criteria:
+{{ admittance_criteria }}
+
+Candidate node:
+- node_id: {{ node_id }}
+- depth: {{ depth }}
+- score: {{ score }}
+- path_node_ids: {{ path_node_ids }}
+
+Node content (may be truncated):
+{{ node_text }}
+
+Return STRICT JSON only:
+{"decision": true|false, "reason": "..."}

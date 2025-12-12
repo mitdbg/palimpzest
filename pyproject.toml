@@ -17,6 +17,7 @@ dependencies = [
     "fastapi~=0.115.0",
     "gradio>=5.26.0",
     "litellm>=1.76.1",
+    "jinja2>=3.1.4",
     "numpy==2.0.2",
     "openai>=1.0",
     "pandas>=2.1.1",
@@ -39,6 +40,7 @@ dependencies = [
     "together>=1.5.5",
     "tqdm~=4.66.1",
     "rich[jupyter]>=13.9.2",
+    "uvicorn>=0.30.0",
 ]
 classifiers=[
     "Development Status :: 4 - Beta",  # Change as appropriate
@@ -50,6 +52,11 @@ classifiers=[
 ]
 
 [project.optional-dependencies]
+graphrag = [
+    "sentence-transformers>=3.0.0",
+    "transformers>=4.45.0",
+    "torch>=2.2.0",
+]
 vllm = [
     "vllm>=0.10.1.1",
 ]
@@ -63,7 +70,7 @@ where = ["src"]
 namespaces = false
 
 [tool.setuptools.package-data]
-"*" = ["*.txt", "*.rst", "*.md"]
+"*" = ["*.txt", "*.rst", "*.md", "*.j2"]
 
 
 [tool.pytest.ini_options]

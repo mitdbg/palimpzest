@@ -52,6 +52,10 @@ from palimpzest.query.operators.logical import (
 )
 from palimpzest.query.operators.logical import (
     TopKScan as _TopKScan,
+    Traverse as _Traverse,
+)
+from palimpzest.query.operators.logical import (
+    InduceEdges as _InduceEdges,
 )
 from palimpzest.query.operators.mixture_of_agents import MixtureOfAgentsConvert as _MixtureOfAgentsConvert
 from palimpzest.query.operators.mixture_of_agents import MixtureOfAgentsFilter as _MixtureOfAgentsFilter
@@ -64,6 +68,8 @@ from palimpzest.query.operators.scan import ScanPhysicalOp as _ScanPhysicalOp
 from palimpzest.query.operators.split import SplitConvert as _SplitConvert
 from palimpzest.query.operators.split import SplitFilter as _SplitFilter
 from palimpzest.query.operators.topk import TopKOp as _TopKOp
+from palimpzest.query.operators.traverse import TraverseOp as _TraverseOp
+from palimpzest.query.operators.induce import InduceEdgesOp as _InduceEdgesOp
 
 LOGICAL_OPERATORS = [
     _LogicalOperator,
@@ -77,6 +83,8 @@ LOGICAL_OPERATORS = [
     _LimitScan,
     _Project,
     _TopKScan,
+    _Traverse,
+    _InduceEdges,
 ]
 
 PHYSICAL_OPERATORS = (
@@ -106,6 +114,10 @@ PHYSICAL_OPERATORS = (
     + [_RAGConvert, _RAGFilter]
     # top-k
     + [_TopKOp]
+    # traverse
+    + [_TraverseOp]
+    # induce
+    + [_InduceEdgesOp]
     # split
     + [_SplitConvert, _SplitFilter]
 )

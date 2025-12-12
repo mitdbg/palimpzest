@@ -1,0 +1,141 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - img [ref=e6]
+      - heading "SCT Professional Dashboard" [level=1] [ref=e8]
+    - generic [ref=e9]:
+      - generic [ref=e10]:
+        - button "Live" [ref=e11] [cursor=pointer]:
+          - img [ref=e12]
+          - text: Live
+        - button "History" [ref=e14] [cursor=pointer]:
+          - img [ref=e15]
+          - text: History
+        - button "Load File" [ref=e18] [cursor=pointer]:
+          - img [ref=e19]
+          - text: Load File
+        - button "Logs" [ref=e22] [cursor=pointer]:
+          - generic [ref=e23]: Logs
+      - generic [ref=e24]: IDLE
+  - generic [ref=e25]:
+    - generic [ref=e26]:
+      - generic [ref=e27]:
+        - generic [ref=e28]:
+          - generic [ref=e29]: Index
+          - combobox [ref=e30]:
+            - option "hcg_medical.json" [selected]
+            - option "wiki.json"
+          - generic [ref=e31]:
+            - generic [ref=e32]:
+              - checkbox "Show Full Graph" [ref=e33]
+              - generic [ref=e34] [cursor=pointer]: Show Full Graph
+            - generic [ref=e35]:
+              - checkbox "Cross-Reference Nodes" [ref=e36]
+              - generic [ref=e37] [cursor=pointer]: Cross-Reference Nodes
+        - generic [ref=e38]:
+          - generic [ref=e39]: Orchestrator Model
+          - combobox [ref=e40]:
+            - option "grok-4.1-fast" [selected]
+            - option "gemini-2.0-flash-001"
+            - option "gpt-4o"
+            - option "gpt-4o-mini"
+            - option "claude-3-5-sonnet-20240620"
+        - generic [ref=e41]:
+          - generic [ref=e42]: Advanced Model Config
+          - generic [ref=e43]:
+            - generic [ref=e44]: Ranking Model
+            - combobox [ref=e45]:
+              - option "Default (Orchestrator)" [selected]
+              - option "Local Reranker (MiniLM)"
+              - option "Local Reranker (Qwen 0.6B)"
+              - option "grok-4.1-fast"
+              - option "gemini-2.0-flash-001"
+              - option "gpt-4o"
+              - option "gpt-4o-mini"
+              - option "claude-3-5-sonnet-20240620"
+          - generic [ref=e46]:
+            - generic [ref=e47]: Admittance Model
+            - combobox [ref=e48]:
+              - option "Default (Orchestrator)" [selected]
+              - option "grok-4.1-fast"
+              - option "gemini-2.0-flash-001"
+              - option "gpt-4o"
+              - option "gpt-4o-mini"
+              - option "claude-3-5-sonnet-20240620"
+          - generic [ref=e49]:
+            - generic [ref=e50]: Termination Model
+            - combobox [ref=e51]:
+              - option "Default (Orchestrator)" [selected]
+              - option "grok-4.1-fast"
+              - option "gemini-2.0-flash-001"
+              - option "gpt-4o"
+              - option "gpt-4o-mini"
+              - option "claude-3-5-sonnet-20240620"
+          - generic [ref=e52]:
+            - generic [ref=e53]: Entry Points (K)
+            - spinbutton [ref=e54]: "5"
+        - generic [ref=e55]:
+          - button "Single Query" [ref=e56] [cursor=pointer]
+          - button "Workload File" [ref=e57] [cursor=pointer]
+        - textbox "Enter your query..." [ref=e58]: What is the capital of France?
+        - generic [ref=e59]:
+          - button "Run" [active] [ref=e60] [cursor=pointer]:
+            - img [ref=e61]
+            - text: Run
+          - button [disabled] [ref=e63]:
+            - img [ref=e64]
+      - generic [ref=e66]:
+        - generic [ref=e67]:
+          - generic [ref=e68]: Cost
+          - generic [ref=e69]: $0.0000
+        - generic [ref=e70]:
+          - generic [ref=e71]: Calls
+          - generic [ref=e72]: "0"
+        - generic [ref=e73]:
+          - generic [ref=e74]: Tokens
+          - generic [ref=e75]: 0.0k
+        - generic [ref=e76]:
+          - generic [ref=e77]: Shortcuts
+          - generic [ref=e78]: "0"
+      - generic [ref=e79]:
+        - generic [ref=e80]: Current Action
+        - generic [ref=e81]: query_start
+      - generic [ref=e82]:
+        - generic [ref=e83]: Sufficiency
+        - generic [ref=e84]:
+          - generic [ref=e85]: "Status:"
+          - generic [ref=e86]: Exploring
+      - generic [ref=e87]:
+        - heading "Evidence (0)" [level=3] [ref=e88]
+        - heading "Priority Queue" [level=3] [ref=e89]
+        - generic [ref=e91]: Empty
+    - generic [ref=e92]:
+      - generic [ref=e93]:
+        - button [ref=e94] [cursor=pointer]:
+          - img [ref=e95]
+        - generic [ref=e97]:
+          - generic [ref=e98]:
+            - generic [ref=e99]: Step 0
+            - generic [ref=e100]: 1 Events
+          - slider [ref=e101] [cursor=pointer]: "0"
+        - generic [ref=e102]:
+          - button [ref=e103] [cursor=pointer]:
+            - img [ref=e104]
+          - button [ref=e106] [cursor=pointer]:
+            - img [ref=e107]
+      - generic [ref=e109]:
+        - img [ref=e110]
+        - generic:
+          - generic: Nodes
+          - generic: "0"
+        - generic:
+          - generic: Visited
+          - generic: Evidence node
+          - generic: Candidate / Queue
+          - generic: Answer Path
+          - generic: Traversal Edge
+          - generic: Reference Edge
+```

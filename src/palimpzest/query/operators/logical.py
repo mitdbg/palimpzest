@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from palimpzest.constants import AggFunc, Cardinality
 from palimpzest.core.data import context, dataset
+from palimpzest.core.data.graph_dataset import GraphDataset
 from palimpzest.core.elements.filters import Filter
 from palimpzest.core.elements.groupbysig import GroupBySig
 from palimpzest.core.lib.schemas import Average, Count, Max, Min, Sum
@@ -261,6 +262,218 @@ class ContextScan(LogicalOperator):
         logical_op_params = super().get_logical_op_params()
         logical_op_params = {"context": self.context, **logical_op_params}
 
+        return logical_op_params
+
+
+class Traverse(LogicalOperator):
+    """Beam-search traversal over a `GraphDataset`.
+
+    This logical operator expects an input record containing a list of start node ids.
+    The traversal itself is performed by a physical `TraverseOp` implementation.
+
+    Notes:
+    - `ranker` and `visit_filter` are callables used at runtime; they are not included in the
+      logical op id. Use `ranker_id`/`visit_filter_id` if you need stable IDs.
+    - The graph's `graph_id` + `revision` are included in the logical op id so that traversal
+      plans are invalidated when the graph mutates.
+    """
+
+    def __init__(
+        self,
+        graph: GraphDataset,
+        output_schema: type[BaseModel],
+        input_schema: type[BaseModel] | None = None,
+        *,
+        start_field: str = "start_node_ids",
+        edge_type: str | None = None,
+        include_overlay: bool = True,
+        beam_width: int = 32,
+        max_steps: int = 128,
+        allow_revisit: bool = False,
+        ranker: Callable | None = None,
+        ranker_id: str | None = None,
+        visit_filter: Callable | None = None,
+        visit_filter_id: str | None = None,
+        admittance: Callable | None = None,
+        admittance_id: str | None = None,
+        termination: Callable | None = None,
+        termination_id: str | None = None,
+        node_program: Callable | None = None,
+        node_program_id: str | None = None,
+        node_program_config: object | None = None,
+        tracer: Callable | None = None,
+        tracer_id: str | None = None,
+        depends_on: list[str] | None = None,
+    ):
+        depends_on = [start_field] if depends_on is None else depends_on
+        super().__init__(
+            output_schema=output_schema,
+            input_schema=input_schema,
+            depends_on=depends_on,
+        )
+        self.graph = graph
+        self.start_field = start_field
+        self.edge_type = edge_type
+        self.include_overlay = include_overlay
+        self.beam_width = beam_width
+        self.max_steps = max_steps
+        self.allow_revisit = allow_revisit
+        self.ranker = ranker
+        self.ranker_id = ranker_id
+        self.visit_filter = visit_filter
+        self.visit_filter_id = visit_filter_id
+        self.admittance = admittance
+        self.admittance_id = admittance_id
+        self.termination = termination
+        self.termination_id = termination_id
+        self.node_program = node_program
+        self.node_program_id = node_program_id
+        self.node_program_config = node_program_config
+        self.tracer = tracer
+        self.tracer_id = tracer_id
+
+    def __str__(self) -> str:
+        return (
+            f"Traverse(graph_id={self.graph.graph_id}, revision={self.graph.revision}, "
+            f"start_field={self.start_field}, edge_type={self.edge_type}, "
+            f"beam_width={self.beam_width}, max_steps={self.max_steps})"
+        )
+
+    def get_logical_id_params(self) -> dict:
+        logical_id_params = super().get_logical_id_params()
+        logical_id_params = {
+            "graph_id": self.graph.graph_id,
+            "graph_revision": self.graph.revision,
+            "start_field": self.start_field,
+            "edge_type": self.edge_type,
+            "include_overlay": self.include_overlay,
+            "beam_width": self.beam_width,
+            "max_steps": self.max_steps,
+            "allow_revisit": self.allow_revisit,
+            "ranker_id": self.ranker_id,
+            "visit_filter_id": self.visit_filter_id,
+            "admittance_id": self.admittance_id,
+            "termination_id": self.termination_id,
+            "node_program_id": self.node_program_id,
+            **logical_id_params,
+        }
+        return logical_id_params
+
+    def get_logical_op_params(self) -> dict:
+        logical_op_params = super().get_logical_op_params()
+        logical_op_params = {
+            "graph": self.graph,
+            "start_field": self.start_field,
+            "edge_type": self.edge_type,
+            "include_overlay": self.include_overlay,
+            "beam_width": self.beam_width,
+            "max_steps": self.max_steps,
+            "allow_revisit": self.allow_revisit,
+            "ranker": self.ranker,
+            "ranker_id": self.ranker_id,
+            "visit_filter": self.visit_filter,
+            "visit_filter_id": self.visit_filter_id,
+            "admittance": self.admittance,
+            "admittance_id": self.admittance_id,
+            "termination": self.termination,
+            "termination_id": self.termination_id,
+            "node_program": self.node_program,
+            "node_program_id": self.node_program_id,
+            "node_program_config": self.node_program_config,
+            "tracer": self.tracer,
+            "tracer_id": self.tracer_id,
+            **logical_op_params,
+        }
+        return logical_op_params
+
+
+class InduceEdges(LogicalOperator):
+    """Induce (and materialize) edges in a `GraphDataset`.
+
+    Input records must contain `src_field` and `dst_field` node id fields.
+    A runtime `predicate` can optionally gate edge creation.
+
+    Notes:
+    - `predicate` is a callable used at runtime; it is not included in the logical op id.
+      Use `predicate_id` if you need stable IDs.
+    - The graph's `graph_id` + `revision` are included in the logical op id so plans are
+      invalidated when the graph mutates.
+    """
+
+    def __init__(
+        self,
+        graph: GraphDataset,
+        output_schema: type[BaseModel],
+        input_schema: type[BaseModel] | None = None,
+        *,
+        src_field: str = "src_node_id",
+        dst_field: str = "dst_node_id",
+        edge_type: str,
+        include_overlay: bool = True,
+        predicate: Callable | None = None,
+        predicate_id: str | None = None,
+        threshold: float = 0.5,
+        overwrite: bool = False,
+        edge_id_fn: Callable | None = None,
+        edge_attrs_fn: Callable | None = None,
+        depends_on: list[str] | None = None,
+    ):
+        depends_on = [src_field, dst_field] if depends_on is None else depends_on
+        super().__init__(
+            output_schema=output_schema,
+            input_schema=input_schema,
+            depends_on=depends_on,
+        )
+        self.graph = graph
+        self.src_field = src_field
+        self.dst_field = dst_field
+        self.edge_type = edge_type
+        self.include_overlay = include_overlay
+        self.predicate = predicate
+        self.predicate_id = predicate_id
+        self.threshold = threshold
+        self.overwrite = overwrite
+        self.edge_id_fn = edge_id_fn
+        self.edge_attrs_fn = edge_attrs_fn
+
+    def __str__(self) -> str:
+        return (
+            f"InduceEdges(graph_id={self.graph.graph_id}, revision={self.graph.revision}, "
+            f"src_field={self.src_field}, dst_field={self.dst_field}, edge_type={self.edge_type})"
+        )
+
+    def get_logical_id_params(self) -> dict:
+        logical_id_params = super().get_logical_id_params()
+        logical_id_params = {
+            "graph_id": self.graph.graph_id,
+            "graph_revision": self.graph.revision,
+            "src_field": self.src_field,
+            "dst_field": self.dst_field,
+            "edge_type": self.edge_type,
+            "include_overlay": self.include_overlay,
+            "predicate_id": self.predicate_id,
+            "threshold": self.threshold,
+            "overwrite": self.overwrite,
+            **logical_id_params,
+        }
+        return logical_id_params
+
+    def get_logical_op_params(self) -> dict:
+        logical_op_params = super().get_logical_op_params()
+        logical_op_params = {
+            "graph": self.graph,
+            "src_field": self.src_field,
+            "dst_field": self.dst_field,
+            "edge_type": self.edge_type,
+            "include_overlay": self.include_overlay,
+            "predicate": self.predicate,
+            "predicate_id": self.predicate_id,
+            "threshold": self.threshold,
+            "overwrite": self.overwrite,
+            "edge_id_fn": self.edge_id_fn,
+            "edge_attrs_fn": self.edge_attrs_fn,
+            **logical_op_params,
+        }
         return logical_op_params
 
 

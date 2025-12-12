@@ -37,12 +37,15 @@ from palimpzest.query.operators.logical import (
     Distinct,
     FilteredScan,
     GroupByAggregate,
+    InduceEdges,
     JoinOp,
     LimitScan,
     Project,
     SearchOperator,
     TopKScan,
+    Traverse,
 )
+from palimpzest.query.operators.induce import InduceEdgesOp
 from palimpzest.query.operators.mixture_of_agents import MixtureOfAgentsConvert, MixtureOfAgentsFilter
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.project import ProjectOp
@@ -53,6 +56,7 @@ from palimpzest.query.operators.search import (
 )
 from palimpzest.query.operators.split import SplitConvert, SplitFilter
 from palimpzest.query.operators.topk import TopKOp
+from palimpzest.query.operators.traverse import TraverseOp
 from palimpzest.query.optimizer.primitives import Expression, Group, LogicalExpression, PhysicalExpression
 
 logger = logging.getLogger(__name__)
@@ -1072,6 +1076,8 @@ class BasicSubstitutionRule(ImplementationRule):
         LimitScan: LimitScanOp,
         Project: ProjectOp,
         GroupByAggregate: ApplyGroupByOp,
+        Traverse: TraverseOp,
+        InduceEdges: InduceEdgesOp,
     }
 
     @classmethod

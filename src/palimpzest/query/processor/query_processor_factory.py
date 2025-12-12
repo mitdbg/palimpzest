@@ -22,6 +22,47 @@ logger = logging.getLogger(__name__)
 class QueryProcessorFactory:
 
     @classmethod
+    def _dataset_requires_models(cls, dataset: Dataset) -> bool:
+        """Return True if the dataset's logical plan requires LLM/remote models.
+
+        This is a best-effort check to allow purely non-LLM queries to run in
+        environments without API keys configured.
+        """
+        # Import here to avoid circular imports.
+        from palimpzest.query.operators.logical import (
+            ComputeOperator,
+            ConvertScan,
+            FilteredScan,
+            JoinOp,
+            SearchOperator,
+        )
+
+        for ds in dataset:
+            op = getattr(ds, "_operator", None)
+            if op is None:
+                continue
+
+            if isinstance(op, (ComputeOperator, SearchOperator)):
+                return True
+
+            if isinstance(op, ConvertScan):
+                # A ConvertScan without a UDF requires an LLM-backed implementation.
+                if op.udf is None:
+                    return True
+
+            if isinstance(op, FilteredScan):
+                # A FilteredScan with a natural-language condition requires an LLM.
+                if op.filter is not None and getattr(op.filter, "filter_condition", None) is not None:
+                    return True
+
+            if isinstance(op, JoinOp):
+                # LLM join when joining isn't strictly on key columns.
+                if op.on is None:
+                    return True
+
+        return False
+
+    @classmethod
     def _convert_to_enum(cls, enum_type: type[Enum], value: str) -> Enum:
         value = value.upper().replace('-', '_')
         try:
@@ -56,7 +97,7 @@ class QueryProcessorFactory:
         return config
 
     @classmethod
-    def _config_validation_and_normalization(cls, config: QueryProcessorConfig, train_dataset: dict[str, Dataset] | None, validator : Validator | None):
+    def _config_validation_and_normalization(cls, dataset: Dataset, config: QueryProcessorConfig, train_dataset: dict[str, Dataset] | None, validator : Validator | None):
         if config.policy is None:
             raise ValueError("Policy is required for optimizer")
         
@@ -80,9 +121,11 @@ class QueryProcessorFactory:
         # convert the config values for processing, execution, and optimization strategies to enums
         config = cls._normalize_strategies(config)
 
+        requires_models = cls._dataset_requires_models(dataset)
+
         # get available models
         available_models = getattr(config, 'available_models', [])
-        if available_models is None or len(available_models) == 0:
+        if requires_models and (available_models is None or len(available_models) == 0):
             available_models = get_models(use_vertex=config.use_vertex, gemini_credentials_path=config.gemini_credentials_path, api_base=config.api_base)
 
         # remove any models specified in the config
@@ -92,28 +135,30 @@ class QueryProcessorFactory:
             logger.info(f"Removed models from available models based on config: {remove_models}")
 
         # set the final set of available models in the config
-        config.available_models = available_models
+        # For purely non-LLM queries, allow this to be empty.
+        config.available_models = [] if not requires_models and (available_models is None) else available_models
 
-        if len(config.available_models) == 0:
+        if requires_models and len(config.available_models) == 0:
             raise ValueError("No available models found.")
 
-        openai_key = os.getenv("OPENAI_API_KEY")
-        anthropic_key = os.getenv("ANTHROPIC_API_KEY")
-        together_key = os.getenv("TOGETHER_API_KEY")
-        gemini_key = os.getenv("GEMINI_API_KEY")
-        google_key = os.getenv("GOOGLE_API_KEY")
+        if requires_models:
+            openai_key = os.getenv("OPENAI_API_KEY")
+            anthropic_key = os.getenv("ANTHROPIC_API_KEY")
+            together_key = os.getenv("TOGETHER_API_KEY")
+            gemini_key = os.getenv("GEMINI_API_KEY")
+            google_key = os.getenv("GOOGLE_API_KEY")
 
-        for model in config.available_models:
-            if model.is_openai_model() and not openai_key:
-                raise ValueError("OPENAI_API_KEY must be set to use OpenAI models.")
-            if model.is_anthropic_model() and not anthropic_key:
-                raise ValueError("ANTHROPIC_API_KEY must be set to use Anthropic models.")
-            if model.is_together_model() and not together_key:
-                raise ValueError("TOGETHER_API_KEY must be set to use Together models.")
-            if model.is_google_ai_studio_model() and not (gemini_key or google_key or config.gemini_credentials_path):
-                raise ValueError("GEMINI_API_KEY, GOOGLE_API_KEY, or gemini_credentials path must be set to use Google Gemini models.")
-            if model.is_vllm_model() and config.api_base is None:
-                raise ValueError("api_base must be set to use vLLM models.")
+            for model in config.available_models:
+                if model.is_openai_model() and not openai_key:
+                    raise ValueError("OPENAI_API_KEY must be set to use OpenAI models.")
+                if model.is_anthropic_model() and not anthropic_key:
+                    raise ValueError("ANTHROPIC_API_KEY must be set to use Anthropic models.")
+                if model.is_together_model() and not together_key:
+                    raise ValueError("TOGETHER_API_KEY must be set to use Together models.")
+                if model.is_google_ai_studio_model() and not (gemini_key or google_key or config.gemini_credentials_path):
+                    raise ValueError("GEMINI_API_KEY, GOOGLE_API_KEY, or gemini_credentials path must be set to use Google Gemini models.")
+                if model.is_vllm_model() and config.api_base is None:
+                    raise ValueError("api_base must be set to use vLLM models.")
 
         return config, validator
 
@@ -171,7 +216,7 @@ class QueryProcessorFactory:
             config = QueryProcessorConfig()
 
         # apply any additional keyword arguments to the config and validate its contents
-        config, validator = cls._config_validation_and_normalization(config, train_dataset, validator)
+        config, validator = cls._config_validation_and_normalization(dataset, config, train_dataset, validator)
 
         # update the dataset's types if we're not enforcing types
         if not config.enforce_types:

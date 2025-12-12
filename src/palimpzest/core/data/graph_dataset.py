@@ -186,7 +186,23 @@ class GraphDataset:
                 yield edge
 
     def iter_neighbors(self, node_id: str, *, edge_type: str | None = None) -> Iterable[tuple[GraphEdge, GraphNode]]:
+        """Iterate adjacent neighbors.
+
+        Includes both outgoing and incoming edges. For undirected edges, results are deduplicated.
+        """
+
+        seen: set[str] = set()
         for edge in self.iter_out_edges(node_id, edge_type=edge_type):
+            if edge.id in seen:
+                continue
+            seen.add(edge.id)
+            neighbor_id = edge.dst if edge.src == node_id else edge.src
+            yield edge, self._nodes_by_id[neighbor_id]
+
+        for edge in self.iter_in_edges(node_id, edge_type=edge_type):
+            if edge.id in seen:
+                continue
+            seen.add(edge.id)
             neighbor_id = edge.dst if edge.src == node_id else edge.src
             yield edge, self._nodes_by_id[neighbor_id]
 
@@ -244,3 +260,150 @@ class GraphDataset:
         payload = json.loads(path.read_text())
         snapshot = GraphSnapshot.model_validate(payload)
         return cls.from_snapshot(snapshot, name=name)
+
+    def traverse(
+        self,
+        *,
+        start_node_ids: list[str],
+        edge_type: str | None = None,
+        include_overlay: bool = True,
+        beam_width: int = 32,
+        max_steps: int = 128,
+        allow_revisit: bool = False,
+        ranker: callable | None = None,
+        ranker_id: str | None = None,
+        visit_filter: callable | None = None,
+        visit_filter_id: str | None = None,
+        admittance: callable | None = None,
+        admittance_id: str | None = None,
+        termination: callable | None = None,
+        termination_id: str | None = None,
+        node_program: callable | None = None,
+        node_program_id: str | None = None,
+        node_program_output_schema: type[BaseModel] | None = None,
+        node_program_config: object | None = None,
+        tracer: callable | None = None,
+        tracer_id: str | None = None,
+    ):
+        """Create a PZ `Dataset` that traverses this graph using beam search.
+
+        This is a convenience wrapper that builds a one-record `MemoryDataset` seed and applies
+        the `Traverse` logical operator.
+        """
+
+        from palimpzest.core.data.dataset import Dataset
+        from palimpzest.core.data.iter_dataset import MemoryDataset
+        from palimpzest.core.lib.schemas import create_schema_from_fields, union_schemas
+        from palimpzest.query.operators.logical import Traverse
+        from palimpzest.query.operators.traverse import GraphTraversalResult
+
+        class _TraverseSeed(BaseModel):
+            start_node_ids: list[str] = Field(default_factory=list)
+
+        seed = MemoryDataset(
+            id=f"graph-traverse-seed-{self.graph_id}",
+            vals=[{"start_node_ids": start_node_ids}],
+            schema=_TraverseSeed,
+        )
+
+        output_schema: type[BaseModel] = GraphTraversalResult
+        if node_program is not None:
+            if node_program_output_schema is None:
+                raise ValueError("node_program_output_schema is required when node_program is provided")
+
+            # Make program output fields optional (default=None) so traversal-only
+            # records remain valid even if the subprogram yields 0 records.
+            optional_fields: list[dict] = []
+            for field_name, field in node_program_output_schema.model_fields.items():
+                optional_fields.append(
+                    {
+                        "name": field_name,
+                        "type": field.annotation | None,
+                        "description": field.description or f"{field_name} (from node_program)",
+                        "default": None,
+                    }
+                )
+            optional_program_schema = create_schema_from_fields(optional_fields)
+            output_schema = union_schemas([GraphTraversalResult, optional_program_schema])
+
+        operator = Traverse(
+            graph=self,
+            input_schema=seed.schema,
+            output_schema=output_schema,
+            start_field="start_node_ids",
+            edge_type=edge_type,
+            include_overlay=include_overlay,
+            beam_width=beam_width,
+            max_steps=max_steps,
+            allow_revisit=allow_revisit,
+            ranker=ranker,
+            ranker_id=ranker_id,
+            visit_filter=visit_filter,
+            visit_filter_id=visit_filter_id,
+            admittance=admittance,
+            admittance_id=admittance_id,
+            termination=termination,
+            termination_id=termination_id,
+            node_program=node_program,
+            node_program_id=node_program_id,
+            node_program_config=node_program_config,
+            tracer=tracer,
+            tracer_id=tracer_id,
+        )
+
+        return Dataset(sources=[seed], operator=operator, schema=output_schema)
+
+    def induce_edges(
+        self,
+        *,
+        candidate_pairs: list[tuple[str, str]],
+        edge_type: str,
+        include_overlay: bool = True,
+        predicate: callable | None = None,
+        predicate_id: str | None = None,
+        threshold: float = 0.5,
+        overwrite: bool = False,
+        src_field: str = "src_node_id",
+        dst_field: str = "dst_node_id",
+        edge_id_fn: callable | None = None,
+        edge_attrs_fn: callable | None = None,
+    ):
+        """Create a PZ `Dataset` that evaluates candidate pairs and adds edges.
+
+        This is a convenience wrapper that seeds a `MemoryDataset` of candidate (src,dst)
+        pairs and applies the `InduceEdges` logical operator.
+        """
+
+        from palimpzest.core.data.dataset import Dataset
+        from palimpzest.core.data.iter_dataset import MemoryDataset
+        from palimpzest.query.operators.induce import InducedEdgeResult
+        from palimpzest.query.operators.logical import InduceEdges
+
+        class _InduceSeed(BaseModel):
+            src_node_id: str
+            dst_node_id: str
+
+        vals = [{"src_node_id": s, "dst_node_id": d} for (s, d) in candidate_pairs]
+        seed = MemoryDataset(
+            id=f"graph-induce-seed-{self.graph_id}",
+            vals=vals,
+            schema=_InduceSeed,
+        )
+
+        op = InduceEdges(
+            graph=self,
+            input_schema=_InduceSeed,
+            output_schema=InducedEdgeResult,
+            src_field=src_field,
+            dst_field=dst_field,
+            edge_type=edge_type,
+            include_overlay=include_overlay,
+            predicate=predicate,
+            predicate_id=predicate_id,
+            threshold=threshold,
+            overwrite=overwrite,
+            edge_id_fn=edge_id_fn,
+            edge_attrs_fn=edge_attrs_fn,
+        )
+
+        return Dataset(sources=[seed], operator=op, schema=InducedEdgeResult)
