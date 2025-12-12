@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import heapq
+import time
+from collections import Counter
 from dataclasses import dataclass
 from typing import Any, Callable
 
@@ -42,7 +44,6 @@ class TraverseOp(PhysicalOperator):
         start_field: str = "start_node_ids",
         edge_type: str | None = None,
         include_overlay: bool = True,
-        beam_width: int = 32,
         max_steps: int = 128,
         allow_revisit: bool = False,
         ranker: Callable[[str, GraphNode, GraphEdge | None, str | None, list[str], list[str]], float] | None = None,
@@ -58,6 +59,8 @@ class TraverseOp(PhysicalOperator):
         node_program_config: object | None = None,
         tracer: Callable[[dict[str, Any]], None] | None = None,
         tracer_id: str | None = None,
+        trace_full_node_text: bool = False,
+        trace_node_text_preview_len: int = 240,
         *args,
         **kwargs,
     ) -> None:
@@ -66,7 +69,6 @@ class TraverseOp(PhysicalOperator):
         self.start_field = start_field
         self.edge_type = edge_type
         self.include_overlay = include_overlay
-        self.beam_width = beam_width
         self.max_steps = max_steps
         self.allow_revisit = allow_revisit
         self.ranker = ranker
@@ -82,13 +84,16 @@ class TraverseOp(PhysicalOperator):
         self.node_program_config = node_program_config
         self.tracer = tracer
         self.tracer_id = tracer_id
+        self.trace_full_node_text = trace_full_node_text
+        self.trace_node_text_preview_len = trace_node_text_preview_len
+
+        self._trace_seq: int = 0
 
     def __str__(self) -> str:
         op = super().__str__()
         op += f"    Graph: {self.graph.graph_id}@{self.graph.revision}\n"
         op += f"    Start Field: {self.start_field}\n"
         op += f"    Edge Type: {self.edge_type}\n"
-        op += f"    Beam Width: {self.beam_width}\n"
         op += f"    Max Steps: {self.max_steps}\n"
         return op
 
@@ -100,7 +105,6 @@ class TraverseOp(PhysicalOperator):
             "start_field": self.start_field,
             "edge_type": self.edge_type,
             "include_overlay": self.include_overlay,
-            "beam_width": self.beam_width,
             "max_steps": self.max_steps,
             "allow_revisit": self.allow_revisit,
             "ranker_id": self.ranker_id,
@@ -119,7 +123,6 @@ class TraverseOp(PhysicalOperator):
             "start_field": self.start_field,
             "edge_type": self.edge_type,
             "include_overlay": self.include_overlay,
-            "beam_width": self.beam_width,
             "max_steps": self.max_steps,
             "allow_revisit": self.allow_revisit,
             "ranker": self.ranker,
@@ -141,12 +144,32 @@ class TraverseOp(PhysicalOperator):
     def _trace(self, event_type: str, **data: Any) -> None:
         if self.tracer is None:
             return
+        self._trace_seq += 1
+        data.setdefault("ts_ms", int(time.time() * 1000))
+        data.setdefault("trace_seq", int(self._trace_seq))
         payload: dict[str, Any] = {"event_type": event_type, **data}
         try:
             self.tracer(payload)
         except Exception:
             # Tracing must never break traversal.
             return
+
+    def _node_for_trace(self, node: GraphNode) -> dict[str, Any]:
+        if self.trace_full_node_text:
+            return {
+                **node.model_dump(mode="json", exclude={"embedding"}),
+                "embedding_len": len(node.embedding) if isinstance(node.embedding, list) else None,
+                "text_len": len(node.text) if isinstance(node.text, str) else None,
+            }
+
+        txt = node.text if isinstance(node.text, str) else None
+        preview = (txt[: self.trace_node_text_preview_len] if isinstance(txt, str) else None) if self.trace_node_text_preview_len > 0 else None
+        return {
+            **node.model_dump(mode="json", exclude={"embedding", "text"}),
+            "text_preview": preview,
+            "text_len": len(txt) if isinstance(txt, str) else None,
+            "embedding_len": len(node.embedding) if isinstance(node.embedding, list) else None,
+        }
 
     def _run_node_program(
         self,
@@ -293,7 +316,6 @@ class TraverseOp(PhysicalOperator):
             start_node_ids=list(start_node_ids),
             edge_type=self.edge_type,
             include_overlay=self.include_overlay,
-            beam_width=self.beam_width,
             max_steps=self.max_steps,
             allow_revisit=self.allow_revisit,
             ranker_id=self.ranker_id,
@@ -304,6 +326,9 @@ class TraverseOp(PhysicalOperator):
             tracer_id=self.tracer_id,
         )
 
+        # Note: we keep a separate "seen" set to prevent re-enqueue when allow_revisit=False,
+        # and a "visited" set to report unique popped node count (for tracing/termination state).
+        seen: set[str] = set()
         visited: set[str] = set()
         pq: list[_PQItem] = []
 
@@ -319,19 +344,20 @@ class TraverseOp(PhysicalOperator):
                 node_id=start_id,
                 depth=0,
                 score=float(score),
-                node={
-                    **node.model_dump(mode="json", exclude={"embedding"}),
-                    "embedding_len": len(node.embedding) if isinstance(node.embedding, list) else None,
-                },
+                node=self._node_for_trace(node),
             )
             heapq.heappush(pq, _PQItem(neg_score=-score, node_id=start_id, depth=0, path_node_ids=[start_id], path_edge_ids=[]))
             if not self.allow_revisit:
-                visited.add(start_id)
+                seen.add(start_id)
 
         results: list[DataRecord] = []
         stats: list[RecordOpStats] = []
 
         admitted_nodes = 0
+        skip_counts: Counter[str] = Counter()
+        node_visits: Counter[str] = Counter()
+        edge_traversals: Counter[str] = Counter()
+        expansion_counts: Counter[str] = Counter()
 
         steps = 0
         while pq and steps < self.max_steps:
@@ -356,7 +382,10 @@ class TraverseOp(PhysicalOperator):
 
             if not self.graph.has_node(node_id):
                 self._trace("step_skip_missing_node", step=steps, node_id=node_id)
+                skip_counts["missing_node"] += 1
                 continue
+
+            visited.add(node_id)
 
             node = self.graph.get_node(node_id)
             score = -item.neg_score
@@ -365,10 +394,7 @@ class TraverseOp(PhysicalOperator):
                 "step_node_loaded",
                 step=steps,
                 node_id=node_id,
-                node={
-                    **node.model_dump(mode="json", exclude={"embedding"}),
-                    "embedding_len": len(node.embedding) if isinstance(node.embedding, list) else None,
-                },
+                node=self._node_for_trace(node),
             )
 
             # Unified gate: node must pass both visit_filter and admittance (if provided)
@@ -382,8 +408,25 @@ class TraverseOp(PhysicalOperator):
                 visit_filter_id=self.visit_filter_id,
                 depth=item.depth,
                 score=float(score),
+                decision={
+                    "passed": bool(passes_filter),
+                    "kind": "visit_filter",
+                    "id": self.visit_filter_id,
+                },
             )
             if not passes_filter:
+                self._trace(
+                    "step_summary",
+                    step=steps,
+                    node_id=node_id,
+                    admitted=False,
+                    skipped=True,
+                    skip_reason="visit_filter_rejected",
+                    frontier_size_after=len(pq),
+                    visited_count=len(visited),
+                    admitted_nodes=admitted_nodes,
+                    emitted_records=len(results),
+                )
                 self._trace(
                     "step_end",
                     step=steps,
@@ -395,6 +438,7 @@ class TraverseOp(PhysicalOperator):
                     admitted_nodes=admitted_nodes,
                     emitted_records=len(results),
                 )
+                skip_counts["visit_filter_rejected"] += 1
                 continue
 
             is_admitted, adm_meta = self._admittance_decision(node_id, node, item.depth, score, item.path_node_ids, item.path_edge_ids)
@@ -410,8 +454,45 @@ class TraverseOp(PhysicalOperator):
                 raw_output=(adm_meta or {}).get("raw_output"),
                 reason=(adm_meta or {}).get("reason"),
                 model=(adm_meta or {}).get("model"),
+                latency_s=(adm_meta or {}).get("latency_s"),
+                cache_hit=(adm_meta or {}).get("cache_hit"),
+                input_tokens=(adm_meta or {}).get("input_tokens"),
+                output_tokens=(adm_meta or {}).get("output_tokens"),
+                cached_tokens=(adm_meta or {}).get("cached_tokens"),
+                cost_usd=(adm_meta or {}).get("cost_usd"),
+                cached_cost_usd=(adm_meta or {}).get("cached_cost_usd"),
+                cached_input_tokens=(adm_meta or {}).get("cached_input_tokens"),
+                cached_output_tokens=(adm_meta or {}).get("cached_output_tokens"),
+                cached_cached_tokens=(adm_meta or {}).get("cached_cached_tokens"),
+                decision={
+                    "passed": bool(is_admitted),
+                    "kind": "admittance",
+                    "id": self.admittance_id,
+                    "model": (adm_meta or {}).get("model"),
+                    "reason": (adm_meta or {}).get("reason"),
+                    "cache_hit": (adm_meta or {}).get("cache_hit"),
+                    "latency_s": (adm_meta or {}).get("latency_s"),
+                    "tokens": {
+                        "input": (adm_meta or {}).get("input_tokens"),
+                        "output": (adm_meta or {}).get("output_tokens"),
+                        "cached": (adm_meta or {}).get("cached_tokens"),
+                    },
+                    "cost_usd": (adm_meta or {}).get("cost_usd"),
+                },
             )
             if not is_admitted:
+                self._trace(
+                    "step_summary",
+                    step=steps,
+                    node_id=node_id,
+                    admitted=False,
+                    skipped=True,
+                    skip_reason="admittance_rejected",
+                    frontier_size_after=len(pq),
+                    visited_count=len(visited),
+                    admitted_nodes=admitted_nodes,
+                    emitted_records=len(results),
+                )
                 self._trace(
                     "step_end",
                     step=steps,
@@ -423,9 +504,13 @@ class TraverseOp(PhysicalOperator):
                     admitted_nodes=admitted_nodes,
                     emitted_records=len(results),
                 )
+                skip_counts["admittance_rejected"] += 1
                 continue
 
             admitted_nodes += 1
+            node_visits[str(node_id)] += 1
+            for edge_id in item.path_edge_ids:
+                edge_traversals[str(edge_id)] += 1
 
             traversal_data_item = {
                 "node_id": node_id,
@@ -549,6 +634,43 @@ class TraverseOp(PhysicalOperator):
                     raw_output=(term_meta or {}).get("raw_output"),
                     reason=(term_meta or {}).get("reason"),
                     model=(term_meta or {}).get("model"),
+                    latency_s=(term_meta or {}).get("latency_s"),
+                    cache_hit=(term_meta or {}).get("cache_hit"),
+                    input_tokens=(term_meta or {}).get("input_tokens"),
+                    output_tokens=(term_meta or {}).get("output_tokens"),
+                    cached_tokens=(term_meta or {}).get("cached_tokens"),
+                    cost_usd=(term_meta or {}).get("cost_usd"),
+                    cached_cost_usd=(term_meta or {}).get("cached_cost_usd"),
+                    cached_input_tokens=(term_meta or {}).get("cached_input_tokens"),
+                    cached_output_tokens=(term_meta or {}).get("cached_output_tokens"),
+                    cached_cached_tokens=(term_meta or {}).get("cached_cached_tokens"),
+                    decision={
+                        "passed": True,
+                        "kind": "termination",
+                        "id": self.termination_id,
+                        "model": (term_meta or {}).get("model"),
+                        "reason": (term_meta or {}).get("reason"),
+                        "cache_hit": (term_meta or {}).get("cache_hit"),
+                        "latency_s": (term_meta or {}).get("latency_s"),
+                        "tokens": {
+                            "input": (term_meta or {}).get("input_tokens"),
+                            "output": (term_meta or {}).get("output_tokens"),
+                            "cached": (term_meta or {}).get("cached_tokens"),
+                        },
+                        "cost_usd": (term_meta or {}).get("cost_usd"),
+                    },
+                )
+                self._trace(
+                    "step_summary",
+                    step=steps,
+                    node_id=node_id,
+                    admitted=True,
+                    skipped=False,
+                    terminated=True,
+                    frontier_size_after=len(pq),
+                    visited_count=len(visited),
+                    admitted_nodes=admitted_nodes,
+                    emitted_records=len(results),
                 )
                 break
             else:
@@ -563,14 +685,41 @@ class TraverseOp(PhysicalOperator):
                     raw_output=(term_meta or {}).get("raw_output"),
                     reason=(term_meta or {}).get("reason"),
                     model=(term_meta or {}).get("model"),
+                    latency_s=(term_meta or {}).get("latency_s"),
+                    cache_hit=(term_meta or {}).get("cache_hit"),
+                    input_tokens=(term_meta or {}).get("input_tokens"),
+                    output_tokens=(term_meta or {}).get("output_tokens"),
+                    cached_tokens=(term_meta or {}).get("cached_tokens"),
+                    cost_usd=(term_meta or {}).get("cost_usd"),
+                    cached_cost_usd=(term_meta or {}).get("cached_cost_usd"),
+                    cached_input_tokens=(term_meta or {}).get("cached_input_tokens"),
+                    cached_output_tokens=(term_meta or {}).get("cached_output_tokens"),
+                    cached_cached_tokens=(term_meta or {}).get("cached_cached_tokens"),
+                    decision={
+                        "passed": False,
+                        "kind": "termination",
+                        "id": self.termination_id,
+                        "model": (term_meta or {}).get("model"),
+                        "reason": (term_meta or {}).get("reason"),
+                        "cache_hit": (term_meta or {}).get("cache_hit"),
+                        "latency_s": (term_meta or {}).get("latency_s"),
+                        "tokens": {
+                            "input": (term_meta or {}).get("input_tokens"),
+                            "output": (term_meta or {}).get("output_tokens"),
+                            "cached": (term_meta or {}).get("cached_tokens"),
+                        },
+                        "cost_usd": (term_meta or {}).get("cost_usd"),
+                    },
                 )
 
             # Expand neighbors (both directions)
             neighbor_traces: list[dict[str, Any]] = []
+            enqueued = 0
             for edge in self._iter_adjacent_edges(node_id):
                 neighbor_id = edge.dst if edge.src == node_id else edge.src
                 direction = "out" if edge.src == node_id else "in"
-                if not self.allow_revisit and neighbor_id in visited:
+                if not self.allow_revisit and neighbor_id in seen:
+                    expansion_counts["already_visited"] += 1
                     neighbor_traces.append(
                         {
                             "edge_id": edge.id,
@@ -583,6 +732,7 @@ class TraverseOp(PhysicalOperator):
                     )
                     continue
                 if not self.graph.has_node(neighbor_id):
+                    expansion_counts["missing_node"] += 1
                     neighbor_traces.append(
                         {
                             "edge_id": edge.id,
@@ -610,8 +760,10 @@ class TraverseOp(PhysicalOperator):
                         path_edge_ids=new_path_edges,
                     ),
                 )
+                expansion_counts["enqueued"] += 1
+                enqueued += 1
                 if not self.allow_revisit:
-                    visited.add(neighbor_id)
+                    seen.add(neighbor_id)
 
                 neighbor_traces.append(
                     {
@@ -620,7 +772,7 @@ class TraverseOp(PhysicalOperator):
                         "direction": direction,
                         "neighbor_id": neighbor_id,
                         "enqueued": True,
-                        "neighbor_score": float(neighbor_score),
+                        "score": float(neighbor_score),
                         "depth": item.depth + 1,
                         "path_node_ids": list(new_path_nodes),
                         "path_edge_ids": list(new_path_edges),
@@ -638,6 +790,21 @@ class TraverseOp(PhysicalOperator):
             )
 
             self._trace(
+                "step_summary",
+                step=steps,
+                node_id=node_id,
+                admitted=True,
+                skipped=False,
+                terminated=False,
+                expanded_edges=len(neighbor_traces),
+                enqueued=int(enqueued),
+                frontier_size_after=len(pq),
+                visited_count=len(visited),
+                admitted_nodes=admitted_nodes,
+                emitted_records=len(results),
+            )
+
+            self._trace(
                 "step_end",
                 step=steps,
                 node_id=node_id,
@@ -647,6 +814,22 @@ class TraverseOp(PhysicalOperator):
                 admitted_nodes=admitted_nodes,
                 emitted_records=len(results),
             )
+
+        self._trace(
+            "traverse_summary",
+            graph_id=self.graph.graph_id,
+            graph_revision=self.graph.revision,
+            steps=int(steps),
+            admitted_nodes=int(admitted_nodes),
+            visited_count=len(visited),
+            emitted_records=len(results),
+            frontier_size=len(pq),
+            skip_counts=dict(skip_counts),
+            expansion_counts=dict(expansion_counts),
+            unique_nodes=len(node_visits),
+            top_nodes=[{"node_id": k, "count": int(v)} for k, v in node_visits.most_common(50)],
+            top_edges=[{"edge_id": k, "count": int(v)} for k, v in edge_traversals.most_common(50)],
+        )
 
         self._trace(
             "traverse_done",

@@ -266,7 +266,7 @@ class ContextScan(LogicalOperator):
 
 
 class Traverse(LogicalOperator):
-    """Beam-search traversal over a `GraphDataset`.
+    """Priority-queue traversal over a `GraphDataset`.
 
     This logical operator expects an input record containing a list of start node ids.
     The traversal itself is performed by a physical `TraverseOp` implementation.
@@ -287,7 +287,6 @@ class Traverse(LogicalOperator):
         start_field: str = "start_node_ids",
         edge_type: str | None = None,
         include_overlay: bool = True,
-        beam_width: int = 32,
         max_steps: int = 128,
         allow_revisit: bool = False,
         ranker: Callable | None = None,
@@ -303,6 +302,8 @@ class Traverse(LogicalOperator):
         node_program_config: object | None = None,
         tracer: Callable | None = None,
         tracer_id: str | None = None,
+        trace_full_node_text: bool = False,
+        trace_node_text_preview_len: int = 240,
         depends_on: list[str] | None = None,
     ):
         depends_on = [start_field] if depends_on is None else depends_on
@@ -315,7 +316,6 @@ class Traverse(LogicalOperator):
         self.start_field = start_field
         self.edge_type = edge_type
         self.include_overlay = include_overlay
-        self.beam_width = beam_width
         self.max_steps = max_steps
         self.allow_revisit = allow_revisit
         self.ranker = ranker
@@ -331,12 +331,14 @@ class Traverse(LogicalOperator):
         self.node_program_config = node_program_config
         self.tracer = tracer
         self.tracer_id = tracer_id
+        self.trace_full_node_text = trace_full_node_text
+        self.trace_node_text_preview_len = trace_node_text_preview_len
 
     def __str__(self) -> str:
         return (
             f"Traverse(graph_id={self.graph.graph_id}, revision={self.graph.revision}, "
             f"start_field={self.start_field}, edge_type={self.edge_type}, "
-            f"beam_width={self.beam_width}, max_steps={self.max_steps})"
+            f"max_steps={self.max_steps})"
         )
 
     def get_logical_id_params(self) -> dict:
@@ -347,7 +349,6 @@ class Traverse(LogicalOperator):
             "start_field": self.start_field,
             "edge_type": self.edge_type,
             "include_overlay": self.include_overlay,
-            "beam_width": self.beam_width,
             "max_steps": self.max_steps,
             "allow_revisit": self.allow_revisit,
             "ranker_id": self.ranker_id,
@@ -366,7 +367,6 @@ class Traverse(LogicalOperator):
             "start_field": self.start_field,
             "edge_type": self.edge_type,
             "include_overlay": self.include_overlay,
-            "beam_width": self.beam_width,
             "max_steps": self.max_steps,
             "allow_revisit": self.allow_revisit,
             "ranker": self.ranker,
@@ -382,6 +382,8 @@ class Traverse(LogicalOperator):
             "node_program_config": self.node_program_config,
             "tracer": self.tracer,
             "tracer_id": self.tracer_id,
+            "trace_full_node_text": self.trace_full_node_text,
+            "trace_node_text_preview_len": self.trace_node_text_preview_len,
             **logical_op_params,
         }
         return logical_op_params
@@ -412,6 +414,8 @@ class InduceEdges(LogicalOperator):
         include_overlay: bool = True,
         predicate: Callable | None = None,
         predicate_id: str | None = None,
+        decider: Callable | None = None,
+        decider_id: str | None = None,
         threshold: float = 0.5,
         overwrite: bool = False,
         edge_id_fn: Callable | None = None,
@@ -431,6 +435,8 @@ class InduceEdges(LogicalOperator):
         self.include_overlay = include_overlay
         self.predicate = predicate
         self.predicate_id = predicate_id
+        self.decider = decider
+        self.decider_id = decider_id
         self.threshold = threshold
         self.overwrite = overwrite
         self.edge_id_fn = edge_id_fn
@@ -452,6 +458,7 @@ class InduceEdges(LogicalOperator):
             "edge_type": self.edge_type,
             "include_overlay": self.include_overlay,
             "predicate_id": self.predicate_id,
+            "decider_id": self.decider_id,
             "threshold": self.threshold,
             "overwrite": self.overwrite,
             **logical_id_params,
@@ -468,6 +475,8 @@ class InduceEdges(LogicalOperator):
             "include_overlay": self.include_overlay,
             "predicate": self.predicate,
             "predicate_id": self.predicate_id,
+            "decider": self.decider,
+            "decider_id": self.decider_id,
             "threshold": self.threshold,
             "overwrite": self.overwrite,
             "edge_id_fn": self.edge_id_fn,

@@ -29,7 +29,6 @@ def test_traverse_operator_beam_search_and_filter() -> None:
 
     ds = g.traverse(
         start_node_ids=["a"],
-        beam_width=2,
         max_steps=10,
         edge_type="rel",
         ranker=ranker,
@@ -95,7 +94,6 @@ def test_traverse_operator_runs_node_program_per_visit() -> None:
         start_node_ids=["a"],
         edge_type="rel",
         max_steps=10,
-        beam_width=2,
         ranker=ranker,
         ranker_id="toy",
         node_program=node_program,
@@ -186,6 +184,7 @@ def test_traverse_operator_tracer_emits_step_events() -> None:
 
     # Basic lifecycle events
     assert any(e.get("event_type") == "traverse_init" for e in trace)
+    assert any(e.get("event_type") == "traverse_summary" for e in trace)
     assert any(e.get("event_type") == "traverse_done" for e in trace)
 
     # Per-step events include step number and node id
@@ -196,3 +195,46 @@ def test_traverse_operator_tracer_emits_step_events() -> None:
     expands = [e for e in trace if e.get("event_type") == "step_expand"]
     assert expands
     assert isinstance(expands[0].get("neighbors"), list)
+
+    summary = next(e for e in trace if e.get("event_type") == "traverse_summary")
+    assert "top_nodes" in summary
+    assert "top_edges" in summary
+    assert isinstance(summary.get("skip_counts"), dict)
+    assert isinstance(summary.get("ts_ms"), int)
+    assert isinstance(summary.get("trace_seq"), int)
+
+
+def test_traverse_operator_tracer_includes_neighbor_scores_when_ranker_present() -> None:
+    g = GraphDataset(graph_id="g")
+    for node_id in ["a", "b", "c"]:
+        g.add_node(GraphNode(id=node_id, text=f"text-{node_id}"))
+    g.add_edge(GraphEdge(id="e_ab", src="a", dst="b", type="rel"))
+    g.add_edge(GraphEdge(id="e_ac", src="a", dst="c", type="rel"))
+
+    def ranker(node_id, node, edge, from_node_id, path_node_ids, path_edge_ids):
+        return {"a": 0.0, "b": 2.0, "c": 1.0}[node_id]
+
+    trace: list[dict] = []
+
+    def tracer(ev: dict) -> None:
+        trace.append(ev)
+
+    ds = g.traverse(
+        start_node_ids=["a"],
+        edge_type="rel",
+        max_steps=2,
+        ranker=ranker,
+        ranker_id="toy",
+        tracer=tracer,
+        tracer_id="test",
+    )
+    out = ds.run()
+    assert len(out) > 0
+
+    expands = [e for e in trace if e.get("event_type") == "step_expand"]
+    assert expands
+    neighbors = expands[0].get("neighbors")
+    assert isinstance(neighbors, list)
+    enqueued = [n for n in neighbors if n.get("enqueued") is True]
+    assert enqueued
+    assert all("score" in n for n in enqueued)

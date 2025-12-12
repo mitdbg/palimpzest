@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Callable
+from typing import Callable, Protocol
 
 from pydantic import BaseModel, Field
 
@@ -26,6 +26,10 @@ def _default_edge_id(*, src: str, dst: str, edge_type: str) -> str:
     return hash_for_id(f"induce:{edge_type}:{src}->{dst}")
 
 
+class PairDecider(Protocol):
+    def __call__(self, src_id: str, src: GraphNode, dst_id: str, dst: GraphNode, graph: GraphDataset) -> float | bool: ...
+
+
 class InduceEdgesOp(PhysicalOperator):
     """Physical operator that induces/mutates edges in a `GraphDataset`.
 
@@ -43,6 +47,8 @@ class InduceEdgesOp(PhysicalOperator):
         include_overlay: bool = True,
         predicate: Callable[[str, GraphNode, str, GraphNode, GraphDataset], bool | float] | None = None,
         predicate_id: str | None = None,
+        decider: PairDecider | None = None,
+        decider_id: str | None = None,
         threshold: float = 0.5,
         overwrite: bool = False,
         edge_id_fn: Callable[[str, str, str], str] | None = None,
@@ -57,6 +63,8 @@ class InduceEdgesOp(PhysicalOperator):
         self.include_overlay = include_overlay
         self.predicate = predicate
         self.predicate_id = predicate_id
+        self.decider = decider
+        self.decider_id = decider_id
         self.threshold = threshold
         self.overwrite = overwrite
         self.edge_id_fn = edge_id_fn
@@ -82,6 +90,7 @@ class InduceEdgesOp(PhysicalOperator):
             "edge_type": self.edge_type,
             "include_overlay": self.include_overlay,
             "predicate_id": self.predicate_id,
+            "decider_id": self.decider_id,
             "threshold": self.threshold,
             "overwrite": self.overwrite,
             **id_params,
@@ -97,6 +106,8 @@ class InduceEdgesOp(PhysicalOperator):
             "include_overlay": self.include_overlay,
             "predicate": self.predicate,
             "predicate_id": self.predicate_id,
+            "decider": self.decider,
+            "decider_id": self.decider_id,
             "threshold": self.threshold,
             "overwrite": self.overwrite,
             "edge_id_fn": self.edge_id_fn,
@@ -126,9 +137,13 @@ class InduceEdgesOp(PhysicalOperator):
         dst_node_id: str,
         dst_node: GraphNode,
     ) -> tuple[bool, float | None]:
-        if self.predicate is None:
+        if self.predicate is None and self.decider is None:
             return True, None
-        out = self.predicate(src_node_id, src_node, dst_node_id, dst_node, self.graph)
+
+        if self.predicate is None:
+            out = self.decider(src_node_id, src_node, dst_node_id, dst_node, self.graph)
+        else:
+            out = self.predicate(src_node_id, src_node, dst_node_id, dst_node, self.graph)
         if isinstance(out, bool):
             return out, None
         score = float(out)

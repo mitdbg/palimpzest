@@ -10,7 +10,7 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from palimpzest.core.data.graph_dataset import GraphDataset, GraphSnapshot
 from palimpzest.graphrag.deciders import (
@@ -27,14 +27,13 @@ from palimpzest.graphrag.retrieval import (
     EmbeddingModel,
     HFReranker,
     HFRerankerConfig,
-    OpenAIEmbeddingModel,
     OpenAIEmbeddingConfig,
-    SentenceTransformerEmbeddingModel,
+    OpenAIEmbeddingModel,
     SentenceTransformerEmbeddingConfig,
+    SentenceTransformerEmbeddingModel,
     VectorIndex,
     default_node_text,
 )
-
 
 DEFAULT_SNAPSHOT_PATH = Path("CURRENT_WORKSTREAM/exports/cms_standard_graph_snapshot.json")
 
@@ -56,6 +55,8 @@ class RunRequest(BaseModel):
 
     # If true, include detailed per-step traversal trace events.
     debug_trace: bool = False
+    # If true (and debug_trace is enabled), include full node text in traversal trace events.
+    debug_trace_full_text: bool = False
 
 
 @dataclass
@@ -120,16 +121,18 @@ class GraphService:
         for node in snapshot.nodes:
             label = node.label
             if not label:
-                md = (node.attrs or {}).get("metadata")
-                if isinstance(md, dict):
-                    maybe = md.get("name")
-                    if isinstance(maybe, str) and maybe.strip():
-                        label = maybe.strip()
+                # Older snapshots sometimes stored a display name in attrs.
+                maybe = (node.attrs or {}).get("name")
+                if isinstance(maybe, str) and maybe.strip():
+                    label = maybe.strip()
             if label:
                 label_index.append((label.lower(), node.id))
 
-            # heuristic root: CMS file has a single node with attrs.level==3
-            if root_id is None and (node.attrs or {}).get("level") == 3:
+            # heuristic root: CMS hierarchy root has level==3
+            lvl = node.level
+            if lvl is None:
+                lvl = (node.attrs or {}).get("level")
+            if root_id is None and lvl == 3:
                 root_id = node.id
 
         self._label_index = label_index
@@ -285,6 +288,22 @@ def build_events_for_traverse(
     max_candidates_per_update: int = 50,
 ) -> list[dict[str, Any]]:
     events: list[dict[str, Any]] = []
+    seq = 0
+
+    def _emit(event_type: str, *, data: dict[str, Any], **extra: Any) -> None:
+        nonlocal seq
+        seq += 1
+        payload: dict[str, Any] = {
+            "event_type": event_type,
+            "ts_ms": int(time.time() * 1000),
+            "seq": int(seq),
+            # keep query_id for UI compatibility; include run_id for consistency
+            "query_id": run_id,
+            "run_id": run_id,
+            "data": data,
+            **extra,
+        }
+        events.append(payload)
 
     def _summary(node_id: str) -> str:
         node = graph.get_node(node_id)
@@ -297,37 +316,55 @@ def build_events_for_traverse(
                 return name.strip()
         return ""
 
-    events.append({"event_type": "trace_init", "query_id": run_id, "data": {"run_id": run_id}})
-    events.append({"event_type": "query_start", "query_id": run_id, "query_text": query_text, "data": {"query": query_text}})
+    _emit("trace_init", data={"run_id": run_id})
+    _emit("query_start", data={"query": query_text}, query_text=query_text)
 
     if trace_events:
+        # Best-effort mapping for downstream correlation: first admitted step per node id.
+        admitted_step_by_node_id: dict[str, int] = {}
         for te in trace_events:
-            events.append({"event_type": "traverse_trace", "query_id": run_id, "data": te})
+            if te.get("event_type") == "step_end" and te.get("skipped") is False:
+                node_id = te.get("node_id")
+                step = te.get("step")
+                if isinstance(node_id, str) and isinstance(step, int) and node_id not in admitted_step_by_node_id:
+                    admitted_step_by_node_id[node_id] = step
+
+        for te in trace_events:
+            _emit(
+                "traverse_trace",
+                data=te,
+                data_event_type=te.get("event_type"),
+                step=te.get("step"),
+                node_id=te.get("node_id"),
+            )
+    else:
+        admitted_step_by_node_id = {}
 
     # Provide entry points to match the UI's ROOT -> candidates expectation.
     if entry_points:
-        events.append(
-            {
-                "event_type": "frontier_update",
-                "query_id": run_id,
-                "data": {
-                    "parent_id": "",
-                    "candidates": [
-                        {"id": node_id, "score": float(score), "summary": _summary(node_id)}
-                        for (node_id, score) in entry_points
-                    ],
-                },
-            }
+        _emit(
+            "frontier_update",
+            data={
+                "parent_id": "",
+                "candidates": [{"id": node_id, "score": float(score), "summary": _summary(node_id)} for (node_id, score) in entry_points],
+            },
+            parent_id="",
         )
 
     # visited items: {node_id, path_node_ids}
     best_path: list[str] = []
 
-    for item in visited:
+    for idx, item in enumerate(visited, start=1):
         node_id = item.get("node_id")
         if not node_id:
             continue
-        events.append({"event_type": "search_step", "query_id": run_id, "data": {"node_id": node_id}})
+        _emit(
+            "search_step",
+            data={"node_id": node_id},
+            node_id=node_id,
+            step=admitted_step_by_node_id.get(str(node_id)),
+            step_idx=int(idx),
+        )
 
         # Emit the outgoing frontier for queue/path reconstruction in the UI.
         try:
@@ -337,12 +374,12 @@ def build_events_for_traverse(
                 if len(candidates) >= max_candidates_per_update:
                     break
             if candidates:
-                events.append(
-                    {
-                        "event_type": "frontier_update",
-                        "query_id": run_id,
-                        "data": {"parent_id": node_id, "candidates": candidates},
-                    }
+                _emit(
+                    "frontier_update",
+                    data={"parent_id": node_id, "candidates": candidates},
+                    parent_id=node_id,
+                    node_id=node_id,
+                    step=admitted_step_by_node_id.get(str(node_id)),
                 )
         except Exception:
             # Best-effort; events are for visualization only.
@@ -352,17 +389,8 @@ def build_events_for_traverse(
         if isinstance(path, list) and len(path) > len(best_path):
             best_path = [str(x) for x in path]
 
-    events.append(
-        {
-            "event_type": "result",
-            "query_id": run_id,
-            "data": {
-                "answer": f"Visited {len(visited)} nodes.",
-                "path": best_path,
-            },
-        }
-    )
-    events.append({"event_type": "query_end", "query_id": run_id, "data": {"visited": len(visited)}})
+    _emit("result", data={"answer": f"Visited {len(visited)} nodes.", "path": best_path})
+    _emit("query_end", data={"visited": len(visited)})
 
     return events
 
@@ -444,10 +472,7 @@ def create_app(*, snapshot_path: Path | None = None) -> FastAPI:
             return None
 
         # Ranker (default: HF bge reranker). No embedding-based ranker.
-        if req.ranking_model is None:
-            ranking_spec = "hf:BAAI/bge-reranker-base"
-        else:
-            ranking_spec = (req.ranking_model or "").strip()
+        ranking_spec = "hf:BAAI/bge-reranker-base" if req.ranking_model is None else (req.ranking_model or "").strip()
 
         if ranking_spec.lower() in {"", "none", "off", "disabled"}:
             ranking_spec = ""
@@ -505,7 +530,26 @@ def create_app(*, snapshot_path: Path | None = None) -> FastAPI:
 
             def _gate(node_id, node, depth, score, path_node_ids, path_edge_ids):  # noqa: ANN001
                 if node_id in admit_cache:
-                    return admit_cache[node_id], admit_meta_cache.get(node_id, {})
+                    cached = dict(admit_meta_cache.get(node_id, {}))
+                    cached_cost = cached.get("cost_usd")
+                    cached_in = cached.get("input_tokens")
+                    cached_out = cached.get("output_tokens")
+                    cached_cached = cached.get("cached_tokens")
+                    cached.update(
+                        {
+                            "cache_hit": True,
+                            "latency_s": 0.0,
+                            "cost_usd": 0.0,
+                            "input_tokens": 0,
+                            "output_tokens": 0,
+                            "cached_tokens": 0,
+                            "cached_cost_usd": cached_cost,
+                            "cached_input_tokens": cached_in,
+                            "cached_output_tokens": cached_out,
+                            "cached_cached_tokens": cached_cached,
+                        }
+                    )
+                    return admit_cache[node_id], cached
                 txt = default_node_text(node)
                 prompt = render_admittance_decision_prompt(
                     query=query_text,
@@ -516,13 +560,23 @@ def create_app(*, snapshot_path: Path | None = None) -> FastAPI:
                     path_node_ids=[str(x) for x in (path_node_ids[-10:])],
                     node_text=(txt or "")[:2000],
                 )
-                decision, reason, raw_output = decider.decide_prompt(prompt=prompt)
+                decision, reason, raw_output, meta = decider.decide_prompt_with_meta(prompt=prompt)
                 admit_cache[node_id] = bool(decision)
                 meta = {
                     "model": adm_model,
                     "prompt": prompt,
                     "raw_output": raw_output,
                     "reason": reason,
+                    "cache_hit": False,
+                    "latency_s": float(meta.get("latency_s") or 0.0),
+                    "input_tokens": meta.get("input_tokens"),
+                    "output_tokens": meta.get("output_tokens"),
+                    "cached_tokens": meta.get("cached_tokens"),
+                    "cost_usd": meta.get("cost_usd"),
+                    "cached_cost_usd": 0.0,
+                    "cached_input_tokens": 0,
+                    "cached_output_tokens": 0,
+                    "cached_cached_tokens": 0,
                 }
                 admit_meta_cache[node_id] = meta
                 return admit_cache[node_id], meta
@@ -530,8 +584,13 @@ def create_app(*, snapshot_path: Path | None = None) -> FastAPI:
             gate_fn = _gate
 
         # Termination via LLM.
-        # IMPORTANT: only enabled when termination_model is explicitly provided.
+        # Enabled when termination_model is provided OR (by default) when admittance is enabled.
+        # To explicitly disable, set termination_model to "none"/"off".
         term_model = (req.termination_model or "").strip()
+        if not term_model and adm_model:
+            term_model = adm_model
+        if term_model.lower() in {"none", "off", "false", "0"}:
+            term_model = ""
         termination_fn = None
         if term_model:
             # Bootstrap query-specific termination criteria once.
@@ -545,11 +604,51 @@ def create_app(*, snapshot_path: Path | None = None) -> FastAPI:
             # reduce cost/latency: call at most every N steps
             term_interval = 5
 
+            term_cache: dict[str, tuple[bool, dict[str, Any]]] = {}
+
             def _terminate(state):  # noqa: ANN001
                 steps = int(state.get("steps", 0) or 0)
                 if steps % term_interval != 0:
-                    return False
+                    return False, {
+                        "model": term_model,
+                        "prompt": None,
+                        "raw_output": None,
+                        "reason": f"interval_skip:{term_interval}",
+                        "cache_hit": True,
+                        "latency_s": 0.0,
+                        "input_tokens": 0,
+                        "output_tokens": 0,
+                        "cached_tokens": 0,
+                        "cost_usd": 0.0,
+                        "cached_cost_usd": 0.0,
+                        "cached_input_tokens": 0,
+                        "cached_output_tokens": 0,
+                        "cached_cached_tokens": 0,
+                    }
                 node_id = str(state.get("node_id", ""))
+                cache_key = f"{node_id}|{steps}"
+                if cache_key in term_cache:
+                    decision, cached = term_cache[cache_key]
+                    cached = dict(cached)
+                    cached_cost = cached.get("cost_usd")
+                    cached_in = cached.get("input_tokens")
+                    cached_out = cached.get("output_tokens")
+                    cached_cached = cached.get("cached_tokens")
+                    cached.update(
+                        {
+                            "cache_hit": True,
+                            "latency_s": 0.0,
+                            "cost_usd": 0.0,
+                            "input_tokens": 0,
+                            "output_tokens": 0,
+                            "cached_tokens": 0,
+                            "cached_cost_usd": cached_cost,
+                            "cached_input_tokens": cached_in,
+                            "cached_output_tokens": cached_out,
+                            "cached_cached_tokens": cached_cached,
+                        }
+                    )
+                    return bool(decision), cached
                 try:
                     node = graphs.graph.get_node(node_id)
                     txt = default_node_text(node)
@@ -561,13 +660,26 @@ def create_app(*, snapshot_path: Path | None = None) -> FastAPI:
                     state=state,
                     node_text=(txt or "")[:2000],
                 )
-                decision, reason, raw_output = tdecider.decide_prompt(prompt=prompt)
-                return bool(decision), {
+                decision, reason, raw_output, meta = tdecider.decide_prompt_with_meta(prompt=prompt)
+                out_meta = {
                     "model": term_model,
                     "prompt": prompt,
                     "raw_output": raw_output,
                     "reason": reason,
+                    "cache_hit": False,
+                    "latency_s": float(meta.get("latency_s") or 0.0),
+                    "input_tokens": meta.get("input_tokens"),
+                    "output_tokens": meta.get("output_tokens"),
+                    "cached_tokens": meta.get("cached_tokens"),
+                    "cost_usd": meta.get("cost_usd"),
+                    "cached_cost_usd": 0.0,
+                    "cached_input_tokens": 0,
+                    "cached_output_tokens": 0,
+                    "cached_cached_tokens": 0,
                 }
+
+                term_cache[cache_key] = (bool(decision), out_meta)
+                return bool(decision), out_meta
 
             termination_fn = _terminate
 
@@ -602,6 +714,7 @@ def create_app(*, snapshot_path: Path | None = None) -> FastAPI:
                 termination_id=term_model if termination_fn is not None else None,
                 tracer=_tracer if trace_events is not None else None,
                 tracer_id="graphrag_app" if trace_events is not None else None,
+                trace_full_node_text=bool(req.debug_trace_full_text),
             )
             out = ds.run()
             visited_items = [

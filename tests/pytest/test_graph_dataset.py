@@ -88,6 +88,7 @@ def test_graphdataset_save_load_roundtrip(tmp_path) -> None:
     # file is valid json
     payload = json.loads(path.read_text())
     assert payload["graph_id"] == "g1"
+    assert "induction_log" in payload
 
     g2 = GraphDataset.load(path)
     assert g2.graph_id == "g1"

@@ -770,6 +770,9 @@ class ExecutionStats(BaseModel):
     # end time for the optimization;
     optimization_end_time: float | None = None
 
+    # Optional, computed graph usage stats (derived from RecordOpStats).
+    graph_stats: dict[str, Any] = Field(default_factory=dict)
+
     def start(self) -> None:
         """Start the timer for this execution."""
         self.start_time = time.time()
@@ -813,6 +816,9 @@ class ExecutionStats(BaseModel):
 
         # compute plan_strs
         self.plan_strs = {plan_id: plan_stats.plan_str for plan_id, plan_stats in self.plan_stats.items()}
+
+        # derive graph stats from record-level operator stats
+        self.graph_stats = compute_graph_stats(self)
 
     def sum_sentinel_plan_costs(self) -> float:
         """
@@ -881,6 +887,66 @@ class ExecutionStats(BaseModel):
 
         with open(filepath, "w") as f:
             json.dump(self.model_dump(mode="json"), f)
+
+
+def compute_graph_stats(execution_stats: ExecutionStats) -> dict[str, Any]:
+    """Aggregate graph usage stats from RecordOpStats emitted by Traverse/Induce operators."""
+
+    graphs: dict[str, Any] = {}
+
+    def _graph(graph_id: str) -> dict[str, Any]:
+        if graph_id not in graphs:
+            graphs[graph_id] = {
+                "traverse": {"records": 0, "unique_nodes": 0, "node_visits": {}, "edge_traversals": {}},
+                "induce": {"records": 0, "edges_created": 0, "edges_existed": 0, "by_edge_type": {}},
+            }
+        return graphs[graph_id]
+
+    def _iter_operator_stats(plan: BasePlanStats):
+        # PlanStats: {unique_full_op_id -> OperatorStats}
+        # SentinelPlanStats: {unique_logical_op_id -> {full_op_id -> OperatorStats}}
+        for v in plan.operator_stats.values():
+            if isinstance(v, OperatorStats):
+                yield v
+            elif isinstance(v, dict):
+                for op_stats in v.values():
+                    if isinstance(op_stats, OperatorStats):
+                        yield op_stats
+
+    for plan in list(execution_stats.plan_stats.values()) + list(execution_stats.sentinel_plan_stats.values()):
+        for op_stats in _iter_operator_stats(plan):
+            for ros in op_stats.record_op_stats_lst:
+                graph_id = ros.op_details.get("graph_id")
+                if not graph_id:
+                    continue
+                g = _graph(str(graph_id))
+
+                if ros.op_name == "TraverseOp":
+                    g["traverse"]["records"] += 1
+                    node_id = ros.record_state.get("node_id")
+                    if node_id is not None:
+                        g["traverse"]["node_visits"][node_id] = g["traverse"]["node_visits"].get(node_id, 0) + 1
+                    for edge_id in ros.record_state.get("path_edge_ids", []) or []:
+                        g["traverse"]["edge_traversals"][edge_id] = g["traverse"]["edge_traversals"].get(edge_id, 0) + 1
+
+                if ros.op_name == "InduceEdgesOp":
+                    g["induce"]["records"] += 1
+                    if ros.record_state.get("created") is True:
+                        g["induce"]["edges_created"] += 1
+                    if ros.record_state.get("existed") is True:
+                        g["induce"]["edges_existed"] += 1
+                    edge_type = ros.record_state.get("edge_type")
+                    if edge_type is not None:
+                        bucket = g["induce"]["by_edge_type"].setdefault(str(edge_type), {"created": 0, "existed": 0})
+                        if ros.record_state.get("created") is True:
+                            bucket["created"] += 1
+                        if ros.record_state.get("existed") is True:
+                            bucket["existed"] += 1
+
+    for g in graphs.values():
+        g["traverse"]["unique_nodes"] = len(g["traverse"]["node_visits"])
+
+    return graphs
 
 
 class OperatorCostEstimates(BaseModel):

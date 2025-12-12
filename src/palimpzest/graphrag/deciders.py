@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from dataclasses import dataclass
 from typing import Any
 
@@ -24,6 +25,11 @@ class LLMBooleanDecider:
         self.config = config
 
     def decide_prompt(self, *, prompt: str) -> tuple[bool, str | None, str | None]:
+        decision, reason, raw_output, _meta = self.decide_prompt_with_meta(prompt=prompt)
+        return decision, reason, raw_output
+
+    def decide_prompt_with_meta(self, *, prompt: str) -> tuple[bool, str | None, str | None, dict[str, Any]]:
+        t0 = time.perf_counter()
         try:
             resp = litellm.completion(
                 model=self.config.model,
@@ -33,7 +39,52 @@ class LLMBooleanDecider:
                 timeout=self.config.timeout_s,
             )
         except Exception as e:
-            return False, f"litellm_error:{type(e).__name__}", None
+            return False, f"litellm_error:{type(e).__name__}", None, {
+                "latency_s": time.perf_counter() - t0,
+                "input_tokens": None,
+                "output_tokens": None,
+                "cached_tokens": None,
+                "cost_usd": None,
+            }
+
+        latency_s = time.perf_counter() - t0
+
+        usage = None
+        try:
+            usage = getattr(resp, "usage", None)
+        except Exception:
+            usage = None
+
+        # Best-effort token accounting across providers.
+        input_tokens = None
+        output_tokens = None
+        cached_tokens = None
+        try:
+            if isinstance(usage, dict):
+                input_tokens = usage.get("prompt_tokens")
+                output_tokens = usage.get("completion_tokens")
+                # Some providers include nested details.
+                details = usage.get("prompt_tokens_details")
+                if isinstance(details, dict):
+                    cached_tokens = details.get("cached_tokens")
+            else:
+                input_tokens = getattr(usage, "prompt_tokens", None)
+                output_tokens = getattr(usage, "completion_tokens", None)
+                details = getattr(usage, "prompt_tokens_details", None)
+                if isinstance(details, dict):
+                    cached_tokens = details.get("cached_tokens")
+        except Exception:
+            input_tokens = None
+            output_tokens = None
+            cached_tokens = None
+
+        # Best-effort cost (USD) using LiteLLM helpers when available.
+        cost_usd = None
+        try:
+            # litellm.completion_cost supports multiple response formats.
+            cost_usd = float(litellm.completion_cost(resp))  # type: ignore[attr-defined]
+        except Exception:
+            cost_usd = None
 
         content = None
         try:
@@ -42,7 +93,13 @@ class LLMBooleanDecider:
             content = None
 
         if not isinstance(content, str) or not content.strip():
-            return False, "empty_response", content if isinstance(content, str) else None
+            return False, "empty_response", content if isinstance(content, str) else None, {
+                "latency_s": latency_s,
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+                "cached_tokens": cached_tokens,
+                "cost_usd": cost_usd,
+            }
 
         try:
             obj = json.loads(content)
@@ -54,13 +111,31 @@ class LLMBooleanDecider:
                 try:
                     obj = json.loads(content[start : end + 1])
                 except Exception:
-                    return False, "non_json_response", content
+                    return False, "non_json_response", content, {
+                        "latency_s": latency_s,
+                        "input_tokens": input_tokens,
+                        "output_tokens": output_tokens,
+                        "cached_tokens": cached_tokens,
+                        "cost_usd": cost_usd,
+                    }
             else:
-                return False, "non_json_response", content
+                return False, "non_json_response", content, {
+                    "latency_s": latency_s,
+                    "input_tokens": input_tokens,
+                    "output_tokens": output_tokens,
+                    "cached_tokens": cached_tokens,
+                    "cost_usd": cost_usd,
+                }
 
         decision = bool(obj.get("decision"))
         reason = obj.get("reason")
-        return decision, reason if isinstance(reason, str) else None, content
+        return decision, reason if isinstance(reason, str) else None, content, {
+            "latency_s": latency_s,
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "cached_tokens": cached_tokens,
+            "cost_usd": cost_usd,
+        }
 
     def decide(self, *, instruction: str, payload: dict[str, Any]) -> tuple[bool, str | None, str | None]:
         prompt = (
