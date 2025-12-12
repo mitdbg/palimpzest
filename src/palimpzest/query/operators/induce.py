@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Callable, Protocol
+import inspect
+from typing import Any, Callable, Protocol
 
 from pydantic import BaseModel, Field
 
@@ -30,6 +31,14 @@ class PairDecider(Protocol):
     def __call__(self, src_id: str, src: GraphNode, dst_id: str, dst: GraphNode, graph: GraphDataset) -> float | bool: ...
 
 
+class EdgeAttrsFn(Protocol):
+    def __call__(self, src: str, dst: str, edge_type: str, score: float | None) -> dict[str, Any]: ...
+
+
+class EdgeAttrsFnWithCandidate(Protocol):
+    def __call__(self, src: str, dst: str, edge_type: str, score: float | None, candidate: DataRecord) -> dict[str, Any]: ...
+
+
 class InduceEdgesOp(PhysicalOperator):
     """Physical operator that induces/mutates edges in a `GraphDataset`.
 
@@ -52,7 +61,7 @@ class InduceEdgesOp(PhysicalOperator):
         threshold: float = 0.5,
         overwrite: bool = False,
         edge_id_fn: Callable[[str, str, str], str] | None = None,
-        edge_attrs_fn: Callable[[str, str, str, float | None], dict] | None = None,
+        edge_attrs_fn: EdgeAttrsFn | EdgeAttrsFnWithCandidate | None = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -69,6 +78,7 @@ class InduceEdgesOp(PhysicalOperator):
         self.overwrite = overwrite
         self.edge_id_fn = edge_id_fn
         self.edge_attrs_fn = edge_attrs_fn
+        self._edge_attrs_fn_accepts_candidate = self._fn_accepts_candidate(edge_attrs_fn)
 
     def __str__(self) -> str:
         op = super().__str__()
@@ -154,13 +164,36 @@ class InduceEdgesOp(PhysicalOperator):
             return _default_edge_id(src=src, dst=dst, edge_type=self.edge_type)
         return self.edge_id_fn(src, dst, self.edge_type)
 
-    def _edge_attrs(self, *, src: str, dst: str, score: float | None) -> dict:
+    @staticmethod
+    def _fn_accepts_candidate(fn: object | None) -> bool:
+        if fn is None:
+            return False
+        try:
+            sig = inspect.signature(fn)
+        except (TypeError, ValueError):
+            # Builtins/partials/etc: assume candidate is ok (we'll fall back if needed).
+            return True
+        if any(p.kind == inspect.Parameter.VAR_POSITIONAL for p in sig.parameters.values()):
+            return True
+        positional = [
+            p
+            for p in sig.parameters.values()
+            if p.kind in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+        ]
+        return len(positional) >= 5
+
+    def _edge_attrs(self, *, src: str, dst: str, score: float | None, candidate: DataRecord) -> dict[str, Any]:
         if self.edge_attrs_fn is None:
             attrs: dict = {}
             if score is not None:
                 attrs["predicate_score"] = score
             return attrs
-        return self.edge_attrs_fn(src, dst, self.edge_type, score)
+        if self._edge_attrs_fn_accepts_candidate:
+            try:
+                return self.edge_attrs_fn(src, dst, self.edge_type, score, candidate)  # type: ignore[misc]
+            except TypeError:
+                return self.edge_attrs_fn(src, dst, self.edge_type, score)  # type: ignore[misc]
+        return self.edge_attrs_fn(src, dst, self.edge_type, score)  # type: ignore[misc]
 
     def __call__(self, candidate: DataRecord) -> DataRecordSet:
         if not self._passes_edge_type_filter():
@@ -229,7 +262,7 @@ class InduceEdgesOp(PhysicalOperator):
                     src=src_node_id,
                     dst=dst_node_id,
                     type=self.edge_type,
-                    attrs=self._edge_attrs(src=src_node_id, dst=dst_node_id, score=score),
+                    attrs=self._edge_attrs(src=src_node_id, dst=dst_node_id, score=score, candidate=candidate),
                 )
                 self.graph.add_edge(edge, overwrite=self.overwrite)
                 created = True

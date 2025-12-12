@@ -296,12 +296,17 @@ class GraphDataset:
         admittance_id: str | None = None,
         termination: callable | None = None,
         termination_id: str | None = None,
+        decision_program: callable | None = None,
+        decision_program_id: str | None = None,
+        decision_program_output_schema: type[BaseModel] | None = None,
+        decision_program_config: object | None = None,
         node_program: callable | None = None,
         node_program_id: str | None = None,
         node_program_output_schema: type[BaseModel] | None = None,
         node_program_config: object | None = None,
         tracer: callable | None = None,
         tracer_id: str | None = None,
+        trace_run_id: str | None = None,
         trace_full_node_text: bool = False,
         trace_node_text_preview_len: int = 240,
     ):
@@ -327,6 +332,23 @@ class GraphDataset:
         )
 
         output_schema: type[BaseModel] = GraphTraversalResult
+        if decision_program is not None:
+            if decision_program_output_schema is None:
+                raise ValueError("decision_program_output_schema is required when decision_program is provided")
+
+            optional_fields: list[dict] = []
+            for field_name, field in decision_program_output_schema.model_fields.items():
+                optional_fields.append(
+                    {
+                        "name": field_name,
+                        "type": field.annotation | None,
+                        "description": field.description or f"{field_name} (from decision_program)",
+                        "default": None,
+                    }
+                )
+            optional_decision_schema = create_schema_from_fields(optional_fields)
+            output_schema = union_schemas([output_schema, optional_decision_schema])
+
         if node_program is not None:
             if node_program_output_schema is None:
                 raise ValueError("node_program_output_schema is required when node_program is provided")
@@ -363,11 +385,15 @@ class GraphDataset:
             admittance_id=admittance_id,
             termination=termination,
             termination_id=termination_id,
+            decision_program=decision_program,
+            decision_program_id=decision_program_id,
+            decision_program_config=decision_program_config,
             node_program=node_program,
             node_program_id=node_program_id,
             node_program_config=node_program_config,
             tracer=tracer,
             tracer_id=tracer_id,
+            trace_run_id=trace_run_id,
             trace_full_node_text=trace_full_node_text,
             trace_node_text_preview_len=trace_node_text_preview_len,
         )
@@ -393,29 +419,23 @@ class GraphDataset:
     ):
         """Create a PZ `Dataset` that evaluates candidate pairs and adds edges.
 
-        This is a convenience wrapper that seeds a `MemoryDataset` of candidate (src,dst)
-        pairs and applies the `InduceEdges` logical operator.
+        This is a convenience wrapper that seeds an indexable candidate-pair dataset and
+        applies the `InduceEdges` logical operator.
         """
 
         from palimpzest.core.data.dataset import Dataset
-        from palimpzest.core.data.iter_dataset import MemoryDataset
+        from palimpzest.core.data.pair_datasets import NodePairListDataset
         from palimpzest.query.operators.induce import InducedEdgeResult
         from palimpzest.query.operators.logical import InduceEdges
 
-        class _InduceSeed(BaseModel):
-            src_node_id: str
-            dst_node_id: str
-
-        vals = [{"src_node_id": s, "dst_node_id": d} for (s, d) in candidate_pairs]
-        seed = MemoryDataset(
+        seed = NodePairListDataset(
             id=f"graph-induce-seed-{self.graph_id}",
-            vals=vals,
-            schema=_InduceSeed,
+            pairs=candidate_pairs,
         )
 
         op = InduceEdges(
             graph=self,
-            input_schema=_InduceSeed,
+            input_schema=seed.schema,
             output_schema=InducedEdgeResult,
             src_field=src_field,
             dst_field=dst_field,
@@ -661,17 +681,24 @@ class GraphDataset:
                 return True
             start = idx + 1
 
-    def _generate_candidate_pairs(self, *, generator_kind: str, generator_params: dict[str, Any], impacted: set[str]) -> list[tuple[str, str]]:
+    def _candidate_pairs_dataset(self, *, spec_id: str, generator_kind: str, generator_params: dict[str, Any], impacted: set[str]):
+        """Return an indexable (scan-friendly) dataset of candidate (src,dst) node-id pairs.
+
+        This keeps candidate generation as a first-class PZ stage and avoids materializing large
+        list[dict] (or pandas DataFrames) as scan seeds.
+        """
+
+        from palimpzest.core.data.pair_datasets import AllPairsNodePairDataset, NodePairListDataset
+
         if generator_kind == "all_pairs":
             allow_self = bool(generator_params.get("allow_self_edges", False))
             node_ids = list(self._nodes_by_id.keys())
-            pairs: list[tuple[str, str]] = []
-            for src in impacted:
-                for dst in node_ids:
-                    if not allow_self and src == dst:
-                        continue
-                    pairs.append((src, dst))
-            return pairs
+            return AllPairsNodePairDataset(
+                id=f"graph-candidates-all-pairs-{self.graph_id}-{spec_id}",
+                src_ids=sorted(impacted),
+                dst_ids=node_ids,
+                allow_self_edges=allow_self,
+            )
 
         if generator_kind == "text_anchor":
             source_text_field = str(generator_params.get("source_text_field", "text"))
@@ -706,7 +733,10 @@ class GraphDataset:
                         if dst == src:
                             continue
                         pairs.add((src, dst))
-            return sorted(pairs)
+            return NodePairListDataset(
+                id=f"graph-candidates-text-anchor-{self.graph_id}-{spec_id}",
+                pairs=sorted(pairs),
+            )
 
         if generator_kind == "attr_bucket":
             attr_path = str(generator_params.get("attr_path"))
@@ -734,7 +764,10 @@ class GraphDataset:
                     if not allow_self and src == dst:
                         continue
                     pairs.add((src, dst))
-            return sorted(pairs)
+            return NodePairListDataset(
+                id=f"graph-candidates-attr-bucket-{self.graph_id}-{spec_id}",
+                pairs=sorted(pairs),
+            )
 
         raise ValueError(f"Unknown generator kind: {generator_kind}")
 
@@ -838,16 +871,28 @@ class GraphDataset:
         if not impacted:
             return []
 
-        candidate_pairs = self._generate_candidate_pairs(generator_kind=generator_kind, generator_params=generator_params, impacted=impacted)
-        if not candidate_pairs:
+        from pydantic import BaseModel
+
+        from palimpzest.core.data.dataset import Dataset
+        from palimpzest.core.data.pair_datasets import DictListDataset
+        from palimpzest.query.operators.induce import InducedEdgeResult
+        from palimpzest.query.operators.logical import InduceEdges
+
+        seed = self._candidate_pairs_dataset(
+            spec_id=spec_id,
+            generator_kind=generator_kind,
+            generator_params=generator_params,
+            impacted=impacted,
+        )
+        if len(seed) == 0:
             return []
 
-        accepted: list[tuple[str, str]] = []
-        evidence_by_pair: dict[tuple[str, str], dict[str, Any]] = {}
-
-        for src_id, dst_id in candidate_pairs:
+        def eval_predicates(row: dict[str, Any]) -> dict[str, Any]:
+            src_id = str(row.get("src_node_id"))
+            dst_id = str(row.get("dst_node_id"))
             if not entry.spec.allow_self_edges and src_id == dst_id:
-                continue
+                return {"predicate_accept": False, "predicate_evidence": None}
+
             decisions: list[tuple[bool, dict[str, Any] | None, dict[str, Any]]] = []
             for pred in predicates:
                 ok, ev = self._eval_predicate(predicate=pred, src_id=src_id, dst_id=dst_id)
@@ -859,44 +904,86 @@ class GraphDataset:
                 passed = any(ok for ok, _ev, _p in decisions)
 
             if not passed:
-                continue
+                return {"predicate_accept": False, "predicate_evidence": None}
 
-            pair = (src_id, dst_id)
-            accepted.append(pair)
-            evidence_by_pair[pair] = {
-                "mode": mode_kind,
-                "predicates": [{"kind": p.get("kind"), "params": p.get("params") or {}} for _ok, _ev, p in decisions],
-                "evidence": {p.get("kind"): ev for ok, ev, p in decisions if ok and ev is not None},
+            return {
+                "predicate_accept": True,
+                "predicate_evidence": {
+                    "mode": mode_kind,
+                    "predicates": [{"kind": p.get("kind"), "params": p.get("params") or {}} for _ok, _ev, p in decisions],
+                    "evidence": {p.get("kind"): ev for ok, ev, p in decisions if ok and ev is not None},
+                },
             }
 
-        if not accepted:
+        ds = seed.map(
+            udf=eval_predicates,
+            cols=[
+                {"name": "predicate_accept", "type": bool, "description": "Predicate compound decision", "default": False},
+                {"name": "predicate_evidence", "type": dict[str, Any] | None, "description": "Predicate evidence payload", "default": None},
+            ],
+            depends_on=["src_node_id", "dst_node_id"],
+        ).filter(
+            lambda r: bool((r or {}).get("predicate_accept", False)),
+            depends_on=["predicate_accept"],
+        )
+
+        accepted_rows = ds.run()
+        if not accepted_rows:
+            self._induction_log.upsert(InductionLogEntry(spec=entry.spec, processed_node_ids=sorted(self._nodes_by_id.keys())))
             return []
 
-        # Apply symmetry if requested.
-        if entry.spec.symmetric:
-            extra = []
-            for a, b in accepted:
-                if a == b:
-                    continue
-                extra.append((b, a))
-                if (b, a) not in evidence_by_pair:
-                    evidence_by_pair[(b, a)] = evidence_by_pair[(a, b)]
-            accepted = sorted(set(accepted + extra))
+        def get_val(row: object, key: str) -> object:
+            if isinstance(row, dict):
+                return row.get(key)
+            return getattr(row, key, None)
 
-        def edge_attrs(src: str, dst: str, edge_type_: str, score: float | None) -> dict:
-            _ = edge_type_
-            _ = score
-            return {
-                "spec_id": spec_id,
-                "method": "predicate",
-                **(evidence_by_pair.get((src, dst)) or {}),
-            }
+        expanded: list[dict[str, Any]] = []
+        for r in accepted_rows:
+            src_id = str(get_val(r, "src_node_id"))
+            dst_id = str(get_val(r, "dst_node_id"))
+            evidence = get_val(r, "predicate_evidence")
+            expanded.append({"src_node_id": src_id, "dst_node_id": dst_id, "predicate_evidence": evidence})
+            if entry.spec.symmetric and src_id != dst_id:
+                expanded.append({"src_node_id": dst_id, "dst_node_id": src_id, "predicate_evidence": evidence})
+
+        # Keep-first, no-dup semantics.
+        uniq: dict[tuple[str, str], dict[str, Any]] = {}
+        for r in expanded:
+            key = (str(r["src_node_id"]), str(r["dst_node_id"]))
+            if key not in uniq:
+                uniq[key] = r
+        expanded = list(uniq.values())
 
         def accept(_src_id: str, _src: GraphNode, _dst_id: str, _dst: GraphNode, _graph: GraphDataset) -> bool:
             return True
 
-        out = self.induce_edges(
-            candidate_pairs=accepted,
+        def edge_attrs(src: str, dst: str, edge_type_: str, score: float | None, candidate) -> dict:  # noqa: ANN001
+            _ = edge_type_
+            _ = score
+            evidence = getattr(candidate, "predicate_evidence", None)
+            return {
+                "spec_id": spec_id,
+                "method": "predicate",
+                **(dict(evidence) if isinstance(evidence, dict) else {}),
+            }
+
+        class _InduceSeed(BaseModel):
+            src_node_id: str
+            dst_node_id: str
+            predicate_evidence: dict[str, Any] | None = None
+
+        induce_seed = DictListDataset(
+            id=f"graph-predicate-induce-materialize-{self.graph_id}-{spec_id}",
+            vals=expanded,
+            schema=_InduceSeed,
+        )
+
+        op = InduceEdges(
+            graph=self,
+            input_schema=induce_seed.schema,
+            output_schema=InducedEdgeResult,
+            src_field="src_node_id",
+            dst_field="dst_node_id",
             edge_type=entry.spec.edge_type,
             include_overlay=entry.spec.include_overlay,
             decider=accept,
@@ -904,7 +991,9 @@ class GraphDataset:
             threshold=0.0,
             overwrite=False,
             edge_attrs_fn=edge_attrs,
-        ).run()
+        )
+
+        out = Dataset(sources=[induce_seed], operator=op, schema=InducedEdgeResult).run()
 
         self._induction_log.upsert(InductionLogEntry(spec=entry.spec, processed_node_ids=sorted(self._nodes_by_id.keys())))
         return out

@@ -201,7 +201,7 @@ def test_traverse_operator_tracer_emits_step_events() -> None:
     assert "top_edges" in summary
     assert isinstance(summary.get("skip_counts"), dict)
     assert isinstance(summary.get("ts_ms"), int)
-    assert isinstance(summary.get("trace_seq"), int)
+    assert isinstance(summary.get("seq"), int)
 
 
 def test_traverse_operator_tracer_includes_neighbor_scores_when_ranker_present() -> None:

@@ -4,6 +4,7 @@ import heapq
 import time
 from collections import Counter
 from dataclasses import dataclass
+from dataclasses import field as dataclass_field
 from typing import Any, Callable
 
 from pydantic import BaseModel, Field
@@ -33,6 +34,7 @@ class _PQItem:
     depth: int
     path_node_ids: list[str]
     path_edge_ids: list[str]
+    decision_data: dict[str, Any] | None = dataclass_field(default=None, compare=False)
 
 
 class TraverseOp(PhysicalOperator):
@@ -57,8 +59,12 @@ class TraverseOp(PhysicalOperator):
         node_program: Callable[..., object] | None = None,
         node_program_id: str | None = None,
         node_program_config: object | None = None,
+        decision_program: Callable[..., object] | None = None,
+        decision_program_id: str | None = None,
+        decision_program_config: object | None = None,
         tracer: Callable[[dict[str, Any]], None] | None = None,
         tracer_id: str | None = None,
+        trace_run_id: str | None = None,
         trace_full_node_text: bool = False,
         trace_node_text_preview_len: int = 240,
         *args,
@@ -82,8 +88,12 @@ class TraverseOp(PhysicalOperator):
         self.node_program = node_program
         self.node_program_id = node_program_id
         self.node_program_config = node_program_config
+        self.decision_program = decision_program
+        self.decision_program_id = decision_program_id
+        self.decision_program_config = decision_program_config
         self.tracer = tracer
         self.tracer_id = tracer_id
+        self.trace_run_id = trace_run_id
         self.trace_full_node_text = trace_full_node_text
         self.trace_node_text_preview_len = trace_node_text_preview_len
 
@@ -112,6 +122,7 @@ class TraverseOp(PhysicalOperator):
             "admittance_id": self.admittance_id,
             "termination_id": self.termination_id,
             "node_program_id": self.node_program_id,
+            "decision_program_id": self.decision_program_id,
             "tracer_id": self.tracer_id,
             **id_params,
         }
@@ -136,8 +147,12 @@ class TraverseOp(PhysicalOperator):
             "node_program": self.node_program,
             "node_program_id": self.node_program_id,
             "node_program_config": self.node_program_config,
+            "decision_program": self.decision_program,
+            "decision_program_id": self.decision_program_id,
+            "decision_program_config": self.decision_program_config,
             "tracer": self.tracer,
             "tracer_id": self.tracer_id,
+            "trace_run_id": self.trace_run_id,
             **op_params,
         }
 
@@ -146,7 +161,9 @@ class TraverseOp(PhysicalOperator):
             return
         self._trace_seq += 1
         data.setdefault("ts_ms", int(time.time() * 1000))
-        data.setdefault("trace_seq", int(self._trace_seq))
+        data.setdefault("seq", int(self._trace_seq))
+        if self.trace_run_id:
+            data.setdefault("run_id", str(self.trace_run_id))
         payload: dict[str, Any] = {"event_type": event_type, **data}
         try:
             self.tracer(payload)
@@ -202,7 +219,14 @@ class TraverseOp(PhysicalOperator):
         if isinstance(program_result, Dataset):
             if self.node_program_config is None:
                 return program_result.run()
-            return program_result.run(config=self.node_program_config)  # type: ignore[arg-type]
+            cfg = self.node_program_config
+            # QueryProcessorFactory normalization may mutate config objects; avoid cross-call reuse.
+            if hasattr(cfg, "model_copy"):
+                try:
+                    cfg = cfg.model_copy(deep=True)
+                except Exception:
+                    cfg = self.node_program_config
+            return program_result.run(config=cfg)  # type: ignore[arg-type]
 
         if isinstance(program_result, DataRecordCollection):
             return program_result
@@ -211,6 +235,100 @@ class TraverseOp(PhysicalOperator):
             "node_program must return a palimpzest Dataset (preferred) or a DataRecordCollection; "
             f"got {type(program_result)}"
         )
+
+    def _run_decision_program(
+        self,
+        *,
+        node_id: str,
+        node: GraphNode,
+        depth: int,
+        score: float,
+        path_node_ids: list[str],
+        path_edge_ids: list[str],
+    ) -> object | None:
+        if self.decision_program is None:
+            return None
+
+        program = self.decision_program
+        program_result = program(
+            node_id=node_id,
+            node=node,
+            graph=self.graph,
+            depth=depth,
+            score=score,
+            path_node_ids=path_node_ids,
+            path_edge_ids=path_edge_ids,
+        )
+
+        from palimpzest.core.data.dataset import Dataset
+        from palimpzest.core.elements.records import DataRecordCollection
+
+        if isinstance(program_result, Dataset):
+            if self.decision_program_config is None:
+                return program_result.run()
+            cfg = self.decision_program_config
+            # QueryProcessorFactory normalization may mutate config objects; avoid cross-call reuse.
+            if hasattr(cfg, "model_copy"):
+                try:
+                    cfg = cfg.model_copy(deep=True)
+                except Exception:
+                    cfg = self.decision_program_config
+            return program_result.run(config=cfg)  # type: ignore[arg-type]
+
+        if isinstance(program_result, DataRecordCollection):
+            return program_result
+
+        raise TypeError(
+            "decision_program must return a palimpzest Dataset (preferred) or a DataRecordCollection; "
+            f"got {type(program_result)}"
+        )
+
+    def _decision_for_enqueue(
+        self,
+        *,
+        node_id: str,
+        node: GraphNode,
+        depth: int,
+        score: float,
+        path_node_ids: list[str],
+        path_edge_ids: list[str],
+    ) -> tuple[bool, float, dict[str, Any]]:
+        """Compute queue score + optional gating via decision_program."""
+
+        if self.decision_program is None:
+            return True, float(score), {}
+
+        decision_result = self._run_decision_program(
+            node_id=node_id,
+            node=node,
+            depth=depth,
+            score=score,
+            path_node_ids=list(path_node_ids),
+            path_edge_ids=list(path_edge_ids),
+        )
+
+        decision_data: dict[str, Any] = {}
+        try:
+            first = next(iter(decision_result))  # type: ignore[call-overload]
+        except StopIteration:
+            # Decision program filtered everything out.
+            return False, float(score), {}
+        except Exception:
+            # Decision program failure must not break traversal; treat as neutral.
+            return True, float(score), {}
+
+        try:
+            decision_data = first.to_dict(include_bytes=False) if hasattr(first, "to_dict") else {}
+        except Exception:
+            decision_data = {}
+
+        if "admit" in decision_data and not bool(decision_data.get("admit")):
+            return False, float(score), decision_data
+
+        if isinstance(decision_data.get("rank_score"), (int, float)):
+            score = float(decision_data["rank_score"])
+
+        return True, float(score), decision_data
 
     def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         # Conservative default: one output per step, O(max_steps) work.
@@ -323,6 +441,7 @@ class TraverseOp(PhysicalOperator):
             admittance_id=self.admittance_id,
             termination_id=self.termination_id,
             node_program_id=self.node_program_id,
+            decision_program_id=self.decision_program_id,
             tracer_id=self.tracer_id,
         )
 
@@ -338,15 +457,43 @@ class TraverseOp(PhysicalOperator):
                 self._trace("seed_skip_missing_node", node_id=start_id)
                 continue
             node = self.graph.get_node(start_id)
-            score = self._score(start_id, node, None, None, [start_id], [])
+            base_score = self._score(start_id, node, None, None, [start_id], [])
+            accept, score, decision_data = self._decision_for_enqueue(
+                node_id=start_id,
+                node=node,
+                depth=0,
+                score=base_score,
+                path_node_ids=[start_id],
+                path_edge_ids=[],
+            )
+            if not accept:
+                self._trace(
+                    "seed_skip_program",
+                    node_id=start_id,
+                    depth=0,
+                    score=float(base_score),
+                    decision_program_id=self.decision_program_id,
+                )
+                continue
             self._trace(
                 "seed_node",
                 node_id=start_id,
                 depth=0,
                 score=float(score),
                 node=self._node_for_trace(node),
+                rank_meta=decision_data.get("rank_meta") if isinstance(decision_data, dict) else None,
             )
-            heapq.heappush(pq, _PQItem(neg_score=-score, node_id=start_id, depth=0, path_node_ids=[start_id], path_edge_ids=[]))
+            heapq.heappush(
+                pq,
+                _PQItem(
+                    neg_score=-score,
+                    node_id=start_id,
+                    depth=0,
+                    path_node_ids=[start_id],
+                    path_edge_ids=[],
+                    decision_data=decision_data,
+                ),
+            )
             if not self.allow_revisit:
                 seen.add(start_id)
 
@@ -368,6 +515,7 @@ class TraverseOp(PhysicalOperator):
             self._trace(
                 "step_begin",
                 step=steps,
+                node_id=node_id,
                 popped={
                     "node_id": node_id,
                     "depth": item.depth,
@@ -397,6 +545,28 @@ class TraverseOp(PhysicalOperator):
                 node=self._node_for_trace(node),
             )
 
+            # Decision program decisions are computed at enqueue time (for PQ ordering and gating).
+            decision_data: dict[str, Any] = dict(item.decision_data or {})
+            if self.decision_program is not None:
+                decision_payload = decision_data.get("decision") if isinstance(decision_data.get("decision"), dict) else None
+                why = decision_payload.get("reason") if isinstance(decision_payload, dict) else None
+                self._trace(
+                    "step_gate_program",
+                    step=steps,
+                    node_id=node_id,
+                    admitted=bool(decision_data.get("admit", True)),
+                    decision_program_id=self.decision_program_id,
+                    rank_meta=decision_data.get("rank_meta"),
+                    why=why,
+                    decision={
+                        "passed": bool(decision_data.get("admit", True)),
+                        "kind": "decision_program",
+                        "id": self.decision_program_id,
+                        "why": why,
+                        "payload": decision_payload,
+                    },
+                )
+
             # Unified gate: node must pass both visit_filter and admittance (if provided)
             # to be processed (emit + expand).
             passes_filter = self._passes_filter(node_id, node, item.depth, score, item.path_node_ids, item.path_edge_ids)
@@ -412,6 +582,7 @@ class TraverseOp(PhysicalOperator):
                     "passed": bool(passes_filter),
                     "kind": "visit_filter",
                     "id": self.visit_filter_id,
+                    "why": None,
                 },
             )
             if not passes_filter:
@@ -442,6 +613,7 @@ class TraverseOp(PhysicalOperator):
                 continue
 
             is_admitted, adm_meta = self._admittance_decision(node_id, node, item.depth, score, item.path_node_ids, item.path_edge_ids)
+            why = (adm_meta or {}).get("reason")
             self._trace(
                 "step_gate_admittance",
                 step=steps,
@@ -453,6 +625,7 @@ class TraverseOp(PhysicalOperator):
                 prompt=(adm_meta or {}).get("prompt"),
                 raw_output=(adm_meta or {}).get("raw_output"),
                 reason=(adm_meta or {}).get("reason"),
+                why=why,
                 model=(adm_meta or {}).get("model"),
                 latency_s=(adm_meta or {}).get("latency_s"),
                 cache_hit=(adm_meta or {}).get("cache_hit"),
@@ -470,6 +643,7 @@ class TraverseOp(PhysicalOperator):
                     "id": self.admittance_id,
                     "model": (adm_meta or {}).get("model"),
                     "reason": (adm_meta or {}).get("reason"),
+                    "why": why,
                     "cache_hit": (adm_meta or {}).get("cache_hit"),
                     "latency_s": (adm_meta or {}).get("latency_s"),
                     "tokens": {
@@ -519,6 +693,8 @@ class TraverseOp(PhysicalOperator):
                 "path_node_ids": list(item.path_node_ids),
                 "path_edge_ids": list(item.path_edge_ids),
             }
+            if decision_data:
+                traversal_data_item.update(decision_data)
 
             # Always materialize a traversal record to use as lineage parent.
             traversal_dr = DataRecord.from_parent(
@@ -622,6 +798,7 @@ class TraverseOp(PhysicalOperator):
                 "emitted_records": len(results),
             }
             should_term, term_meta = self._termination_decision(state)
+            why = (term_meta or {}).get("reason")
             if should_term:
                 self._trace(
                     "step_termination",
@@ -633,6 +810,7 @@ class TraverseOp(PhysicalOperator):
                     prompt=(term_meta or {}).get("prompt"),
                     raw_output=(term_meta or {}).get("raw_output"),
                     reason=(term_meta or {}).get("reason"),
+                    why=why,
                     model=(term_meta or {}).get("model"),
                     latency_s=(term_meta or {}).get("latency_s"),
                     cache_hit=(term_meta or {}).get("cache_hit"),
@@ -650,6 +828,7 @@ class TraverseOp(PhysicalOperator):
                         "id": self.termination_id,
                         "model": (term_meta or {}).get("model"),
                         "reason": (term_meta or {}).get("reason"),
+                        "why": why,
                         "cache_hit": (term_meta or {}).get("cache_hit"),
                         "latency_s": (term_meta or {}).get("latency_s"),
                         "tokens": {
@@ -684,6 +863,7 @@ class TraverseOp(PhysicalOperator):
                     prompt=(term_meta or {}).get("prompt"),
                     raw_output=(term_meta or {}).get("raw_output"),
                     reason=(term_meta or {}).get("reason"),
+                    why=why,
                     model=(term_meta or {}).get("model"),
                     latency_s=(term_meta or {}).get("latency_s"),
                     cache_hit=(term_meta or {}).get("cache_hit"),
@@ -701,6 +881,7 @@ class TraverseOp(PhysicalOperator):
                         "id": self.termination_id,
                         "model": (term_meta or {}).get("model"),
                         "reason": (term_meta or {}).get("reason"),
+                        "why": why,
                         "cache_hit": (term_meta or {}).get("cache_hit"),
                         "latency_s": (term_meta or {}).get("latency_s"),
                         "tokens": {
@@ -749,7 +930,30 @@ class TraverseOp(PhysicalOperator):
                 new_path_nodes = item.path_node_ids + [neighbor_id]
                 new_path_edges = item.path_edge_ids + [edge.id]
 
-                neighbor_score = self._score(neighbor_id, neighbor, edge, node_id, new_path_nodes, new_path_edges)
+                base_neighbor_score = self._score(neighbor_id, neighbor, edge, node_id, new_path_nodes, new_path_edges)
+                accept, neighbor_score, neighbor_decision_data = self._decision_for_enqueue(
+                    node_id=neighbor_id,
+                    node=neighbor,
+                    depth=item.depth + 1,
+                    score=base_neighbor_score,
+                    path_node_ids=new_path_nodes,
+                    path_edge_ids=new_path_edges,
+                )
+                if not accept:
+                    expansion_counts["program_rejected"] += 1
+                    neighbor_traces.append(
+                        {
+                            "edge_id": edge.id,
+                            "edge_type": edge.type,
+                            "direction": direction,
+                            "neighbor_id": neighbor_id,
+                            "enqueued": False,
+                            "skip_reason": "decision_program_rejected",
+                            "score": float(base_neighbor_score),
+                        }
+                    )
+                    continue
+
                 heapq.heappush(
                     pq,
                     _PQItem(
@@ -758,6 +962,7 @@ class TraverseOp(PhysicalOperator):
                         depth=item.depth + 1,
                         path_node_ids=new_path_nodes,
                         path_edge_ids=new_path_edges,
+                        decision_data=neighbor_decision_data,
                     ),
                 )
                 expansion_counts["enqueued"] += 1
@@ -776,6 +981,7 @@ class TraverseOp(PhysicalOperator):
                         "depth": item.depth + 1,
                         "path_node_ids": list(new_path_nodes),
                         "path_edge_ids": list(new_path_edges),
+                        "rank_meta": neighbor_decision_data.get("rank_meta") if isinstance(neighbor_decision_data, dict) else None,
                     }
                 )
 

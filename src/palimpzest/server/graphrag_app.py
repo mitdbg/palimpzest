@@ -477,8 +477,8 @@ def create_app(*, snapshot_path: Path | None = None) -> FastAPI:
         if ranking_spec.lower() in {"", "none", "off", "disabled"}:
             ranking_spec = ""
         ranker_fn = None
+        reranker = None
         if ranking_spec.lower() not in {"none", "off"}:
-            reranker = None
             if ranking_spec.startswith("hf:"):
                 hf_name = ranking_spec.split(":", 1)[1].strip() or "BAAI/bge-reranker-base"
                 try:
@@ -683,6 +683,119 @@ def create_app(*, snapshot_path: Path | None = None) -> FastAPI:
 
             termination_fn = _terminate
 
+        # Decision program (Map-first): compute rank_score + admit decision via PZ `.map`.
+        # NOTE: this runs inside TraverseOp per visited node (not as a global plan).
+        class _DecisionSeed(BaseModel):
+            node_id: str
+            node_text: str | None = None
+            query: str
+            depth: int
+            score: float
+            path_node_ids: list[str]
+
+        class _DecisionOut(BaseModel):
+            rank_score: float | None = None
+            rank_meta: dict[str, Any] | None = None
+            admit: bool | None = None
+            decision: dict[str, Any] | None = None
+
+        decision_program = None
+        decision_program_id = None
+        if reranker is not None or adm_model:
+            score_cache2: dict[str, float] = {}
+
+            def _decision_program(*, node_id, node, graph, depth, score, path_node_ids, path_edge_ids):  # noqa: ANN001
+                _ = graph
+                _ = path_edge_ids
+
+                from palimpzest.core.data.iter_dataset import MemoryDataset
+
+                doc = default_node_text(node)
+                seed = MemoryDataset(
+                    id=f"graphrag-decision-seed-{run_id}-{node_id}",
+                    vals=[
+                        {
+                            "node_id": str(node_id),
+                            "node_text": doc,
+                            "query": query_text,
+                            "depth": int(depth),
+                            "score": float(score),
+                            "path_node_ids": list(path_node_ids),
+                        }
+                    ],
+                    schema=_DecisionSeed,
+                )
+
+                def score_udf(row: dict[str, Any]) -> dict[str, Any]:
+                    nid = str(row.get("node_id"))
+                    if reranker is None:
+                        return {"rank_score": float(row.get("score") or 0.0), "rank_meta": None}
+                    if nid in score_cache2:
+                        return {"rank_score": float(score_cache2[nid]), "rank_meta": {"cache_hit": True}}
+                    txt = row.get("node_text") or ""
+                    t0 = time.time()
+                    s = float(reranker.score(query=query_text, docs=[txt])[0]) if txt else 0.0
+                    dt = time.time() - t0
+                    score_cache2[nid] = s
+                    return {"rank_score": s, "rank_meta": {"model": ranking_spec, "latency_s": dt, "cache_hit": False}}
+
+                def admit_udf(row: dict[str, Any]) -> dict[str, Any]:
+                    if not adm_model:
+                        return {"admit": True, "decision": None}
+                    nid = str(row.get("node_id"))
+                    if nid in admit_cache:
+                        return {"admit": bool(admit_cache[nid]), "decision": dict(admit_meta_cache.get(nid, {}))}
+                    try:
+                        prompt = render_admittance_decision_prompt(
+                            query=query_text,
+                            admittance_criteria=criteria,
+                            node_id=nid,
+                            depth=int(row.get("depth") or 0),
+                            score=float(row.get("rank_score") or 0.0),
+                            path_node_ids=list(row.get("path_node_ids") or []),
+                            node_text=(row.get("node_text") or "")[:2000],
+                        )
+                    except Exception:
+                        prompt = ""
+                    decision, reason, raw_output, meta = decider.decide_prompt_with_meta(prompt=prompt)
+                    out_meta = {
+                        "model": adm_model,
+                        "prompt": prompt,
+                        "raw_output": raw_output,
+                        "reason": reason,
+                        "cache_hit": False,
+                        "latency_s": float(meta.get("latency_s") or 0.0),
+                        "input_tokens": meta.get("input_tokens"),
+                        "output_tokens": meta.get("output_tokens"),
+                        "cached_tokens": meta.get("cached_tokens"),
+                        "cost_usd": meta.get("cost_usd"),
+                    }
+                    admit_cache[nid] = bool(decision)
+                    admit_meta_cache[nid] = out_meta
+                    return {"admit": bool(decision), "decision": out_meta}
+
+                ds = seed.map(
+                    udf=score_udf,
+                    cols=[
+                        {"name": "rank_score", "type": float, "description": "Rerank score", "default": None},
+                        {"name": "rank_meta", "type": dict[str, Any] | None, "description": "Rerank metadata", "default": None},
+                    ],
+                    depends_on=["node_id", "node_text"],
+                ).map(
+                    udf=admit_udf,
+                    cols=[
+                        {"name": "admit", "type": bool, "description": "Admit node", "default": None},
+                        {"name": "decision", "type": dict[str, Any] | None, "description": "Decision metadata", "default": None},
+                    ],
+                    depends_on=["node_id", "rank_score", "node_text"],
+                )
+                if adm_model:
+                    ds = ds.filter(lambda r: bool((r or {}).get("admit", False)), depends_on=["admit"])
+                return ds
+
+            decision_program = _decision_program
+            decision_program_id = f"graphrag_map_decisions:{ranking_spec}:{adm_model or 'no_adm'}"
+
         # Edge type handling: default to all edges.
         edge_type = (req.edge_type or "").strip()
         if edge_type.lower() in {"", "*", "all"}:
@@ -703,15 +816,20 @@ def create_app(*, snapshot_path: Path | None = None) -> FastAPI:
                 start_node_ids=start_nodes,
                 edge_type=edge_type,
                 max_steps=req.max_steps,
-                ranker=ranker_fn,
-                ranker_id=ranking_spec if ranker_fn is not None else None,
-                # LLM gate is admittance-only (avoid double invocation).
+                # Rank + admit handled via decision_program (PZ Map/Filter), not callbacks.
+                ranker=None if decision_program is not None else ranker_fn,
+                ranker_id=None if decision_program is not None else (ranking_spec if ranker_fn is not None else None),
                 visit_filter=None,
                 visit_filter_id=None,
-                admittance=gate_fn,
-                admittance_id=adm_model if gate_fn is not None else None,
+                admittance=None if decision_program is not None else gate_fn,
+                admittance_id=None if decision_program is not None else (adm_model if gate_fn is not None else None),
                 termination=termination_fn,
                 termination_id=term_model if termination_fn is not None else None,
+                decision_program=decision_program,
+                decision_program_id=decision_program_id,
+                decision_program_output_schema=_DecisionOut if decision_program is not None else None,
+                decision_program_config=None,
+                trace_run_id=run_id,
                 tracer=_tracer if trace_events is not None else None,
                 tracer_id="graphrag_app" if trace_events is not None else None,
                 trace_full_node_text=bool(req.debug_trace_full_text),

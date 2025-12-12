@@ -300,8 +300,12 @@ class Traverse(LogicalOperator):
         node_program: Callable | None = None,
         node_program_id: str | None = None,
         node_program_config: object | None = None,
+        decision_program: Callable | None = None,
+        decision_program_id: str | None = None,
+        decision_program_config: object | None = None,
         tracer: Callable | None = None,
         tracer_id: str | None = None,
+        trace_run_id: str | None = None,
         trace_full_node_text: bool = False,
         trace_node_text_preview_len: int = 240,
         depends_on: list[str] | None = None,
@@ -329,8 +333,12 @@ class Traverse(LogicalOperator):
         self.node_program = node_program
         self.node_program_id = node_program_id
         self.node_program_config = node_program_config
+        self.decision_program = decision_program
+        self.decision_program_id = decision_program_id
+        self.decision_program_config = decision_program_config
         self.tracer = tracer
         self.tracer_id = tracer_id
+        self.trace_run_id = trace_run_id
         self.trace_full_node_text = trace_full_node_text
         self.trace_node_text_preview_len = trace_node_text_preview_len
 
@@ -356,6 +364,7 @@ class Traverse(LogicalOperator):
             "admittance_id": self.admittance_id,
             "termination_id": self.termination_id,
             "node_program_id": self.node_program_id,
+            "decision_program_id": self.decision_program_id,
             **logical_id_params,
         }
         return logical_id_params
@@ -380,8 +389,12 @@ class Traverse(LogicalOperator):
             "node_program": self.node_program,
             "node_program_id": self.node_program_id,
             "node_program_config": self.node_program_config,
+            "decision_program": self.decision_program,
+            "decision_program_id": self.decision_program_id,
+            "decision_program_config": self.decision_program_config,
             "tracer": self.tracer,
             "tracer_id": self.tracer_id,
+            "trace_run_id": self.trace_run_id,
             "trace_full_node_text": self.trace_full_node_text,
             "trace_node_text_preview_len": self.trace_node_text_preview_len,
             **logical_op_params,
