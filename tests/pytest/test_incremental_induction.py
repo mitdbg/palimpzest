@@ -119,7 +119,7 @@ def test_incremental_induction_bidirectional() -> None:
     # Because it's bidirectional and symmetric=False (so we get directed edges)
     edges = g.run_induction(spec_id, mode="incremental")
     
-    edge_pairs = sorted([(e.src, e.dst) for e in edges])
+    edge_pairs = sorted([(e.src_node_id, e.dst_node_id) for e in edges])
     assert edge_pairs == [("a", "b"), ("b", "a")]
     
     # Verify log updated
