@@ -1,15 +1,18 @@
 from __future__ import annotations
 
 import inspect
-from typing import Any, Callable, Protocol
+from typing import Any, Callable, Protocol, TYPE_CHECKING
 
 from pydantic import BaseModel, Field
 
-from palimpzest.core.data.graph_dataset import GraphDataset, GraphEdge, GraphNode
+from palimpzest.core.data.graph_store import GraphEdge, GraphNode
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.core.models import OperatorCostEstimates, RecordOpStats
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.utils.hash_helpers import hash_for_id
+
+if TYPE_CHECKING:
+    from palimpzest.core.data.graph_dataset import GraphDataset
 
 
 class InducedEdgeResult(BaseModel):

@@ -9,7 +9,6 @@ from chromadb.api.models.Collection import Collection
 from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
 from chromadb.utils.embedding_functions.openai_embedding_function import OpenAIEmbeddingFunction
 from openai import OpenAI
-from pydantic import BaseModel
 from sentence_transformers import SentenceTransformer
 
 from palimpzest.constants import MODEL_CARDS, Model

@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import time
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from palimpzest.constants import LOCAL_SCAN_TIME_PER_KB
-from palimpzest.core.data import context
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.core.models import OperatorCostEstimates, RecordOpStats
 from palimpzest.query.operators.physical import PhysicalOperator
+
+if TYPE_CHECKING:
+    from palimpzest.core.data import context
 
 
 class ScanPhysicalOp(PhysicalOperator, ABC):
@@ -129,7 +131,7 @@ class ContextScanOp(PhysicalOperator):
     Physical operator which facillitates the loading of a Context for processing.
     """
 
-    def __init__(self, context: context.Context, *args, **kwargs):
+    def __init__(self, context: "context.Context", *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.context = context
 

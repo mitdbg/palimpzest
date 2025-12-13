@@ -2,7 +2,6 @@ import json
 import time
 
 import litellm
-
 # from colorama import Fore, Style
 from palimpzest.constants import MODEL_CARDS, Cardinality, Model, PromptStrategy
 from palimpzest.core.elements.records import DataRecord

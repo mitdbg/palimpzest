@@ -5,14 +5,17 @@ import time
 from collections import Counter
 from dataclasses import dataclass
 from dataclasses import field as dataclass_field
-from typing import Any, Callable
+from typing import Any, Callable, TYPE_CHECKING
 
 from pydantic import BaseModel, Field
 
-from palimpzest.core.data.graph_dataset import GraphDataset, GraphEdge, GraphNode
+from palimpzest.core.data.graph_store import GraphEdge, GraphNode
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.core.models import OperatorCostEstimates, RecordOpStats
 from palimpzest.query.operators.physical import PhysicalOperator
+
+if TYPE_CHECKING:
+    from palimpzest.core.data.graph_dataset import GraphDataset
 
 
 class GraphTraverseSeed(BaseModel):
