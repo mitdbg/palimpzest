@@ -51,9 +51,10 @@ class InductionSpec(BaseModel):
     schema_version: int = 1
     edge_type: str
     include_overlay: bool = True
-    symmetric: bool = True
+    symmetric: bool = False
     allow_self_edges: bool = False
     overwrite: bool = False
+    incremental_mode: str = "source"  # "source" or "bidirectional"
     generator: CandidateGeneratorSpec
     decider: DeciderSpec
 
@@ -124,6 +125,7 @@ class InductionSpec(BaseModel):
 class InductionLogEntry(BaseModel):
     spec: InductionSpec
     processed_node_ids: list[str] = Field(default_factory=list, description="Nodes covered by the last successful run.")
+    last_revision: int | None = Field(default=None, description="Graph revision at the time of the last successful run.")
 
 
 class InductionLog(BaseModel):

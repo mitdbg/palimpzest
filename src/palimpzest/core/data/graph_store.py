@@ -14,6 +14,7 @@ class GraphNode(BaseModel):
     type: str | None = None
     source: str | None = None
     level: int | None = None
+    revision: int | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
     attrs: dict[str, Any] = Field(default_factory=dict)
