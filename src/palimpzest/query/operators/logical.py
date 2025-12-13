@@ -1,17 +1,19 @@
 from __future__ import annotations
 
 import json
-from typing import Callable
+from typing import Callable, TYPE_CHECKING
 
 from pydantic import BaseModel
 
 from palimpzest.constants import AggFunc, Cardinality
-from palimpzest.core.data import context, dataset
-from palimpzest.core.data.graph_dataset import GraphDataset
 from palimpzest.core.elements.filters import Filter
 from palimpzest.core.elements.groupbysig import GroupBySig
 from palimpzest.core.lib.schemas import Average, Count, Max, Min, Sum
 from palimpzest.utils.hash_helpers import hash_for_id
+
+if TYPE_CHECKING:
+    from palimpzest.core.data import context, dataset
+    from palimpzest.core.data.graph_dataset import GraphDataset
 
 
 class LogicalOperator:

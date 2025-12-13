@@ -9,7 +9,6 @@ import pandas as pd
 from pydantic import BaseModel
 from pydantic.fields import FieldInfo
 
-from palimpzest.core.data import context
 from palimpzest.core.lib.schemas import (
     AUDIO_FIELD_TYPES,
     IMAGE_FIELD_TYPES,
@@ -276,6 +275,8 @@ class DataRecord:
 
     @staticmethod
     def to_df(records: list[DataRecord], project_cols: list[str] | None = None) -> pd.DataFrame:
+        from palimpzest.core.data import context
+
         if len(records) == 0:
             return pd.DataFrame()
 
@@ -301,6 +302,8 @@ class DataRecord:
 
     def to_dict(self, include_bytes: bool = True, bytes_to_str: bool = False, project_cols: list[str] | None = None, _sorted: bool = False, mask_filepaths: bool = False):
         """Return a dictionary representation of this DataRecord"""
+        from palimpzest.core.data import context
+
         # TODO(chjun): In case of numpy types, the json.dumps will fail. Convert to native types.
         # Better ways to handle this.
         field_values = {
