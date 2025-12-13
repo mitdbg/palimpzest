@@ -25,6 +25,7 @@ class GraphNode(BaseModel):
     type: str | None = None
     source: str | None = None
     level: int | None = None
+    revision: int | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
     attrs: dict[str, Any] = Field(default_factory=dict)
@@ -82,6 +83,7 @@ class GraphDataset:
         self._out_edges_by_src.setdefault(node.id, set())
         self._in_edges_by_dst.setdefault(node.id, set())
         self._bump_revision()
+        node.revision = self.revision
 
     def upsert_node(self, node: GraphNode) -> None:
         self.add_node(node, overwrite=True)
@@ -492,6 +494,10 @@ class GraphDataset:
         entry = self._induction_log.get(spec_id)
         if entry is None:
             return node_ids
+
+        if entry.last_revision is not None:
+            return {nid for nid, node in self._nodes_by_id.items() if (node.revision or 0) > entry.last_revision}
+
         return node_ids - set(entry.processed_node_ids)
 
     def run_knn_similarity_induction(
@@ -538,7 +544,22 @@ class GraphDataset:
         if not impacted:
             return []
 
-        node_ids = list(self._nodes_by_id.keys())
+        # Filter nodes that have the required embedding
+        def has_embedding(nid: str) -> bool:
+            node = self.get_node(nid)
+            val = node.embedding if embedding_key == "embedding" else node.attrs.get(embedding_key)
+            return isinstance(val, list) and len(val) > 0
+
+        valid_node_ids = [nid for nid in self._nodes_by_id if has_embedding(nid)]
+        valid_impacted = {nid for nid in impacted if has_embedding(nid)}
+
+        if not valid_impacted:
+             # Even if no valid impacted nodes, we might need to update log?
+             # But if we return [], we don't update log in the current implementation (it's done at end).
+             # Actually, if we skip, we should probably still mark them as processed?
+             # But if they don't have embeddings, maybe we shouldn't?
+             # Let's just return [] for now.
+             return []
 
         def embedding_for_node_id(node_id: str) -> list[float]:
             return self._node_embedding(node_id, embedding_key=embedding_key)
@@ -551,7 +572,11 @@ class GraphDataset:
             allow_self_edges=False,
         )
 
-        candidate_pairs = list(generator.generate_pairs(node_ids=node_ids, impacted_node_ids=impacted, score_pair=decider.score_pair))
+        candidate_pairs = list(generator.generate_pairs(
+            node_ids=valid_node_ids,
+            impacted_node_ids=valid_impacted,
+            score_pair=decider.score_pair
+        ))
 
         def edge_attrs(src: str, dst: str, edge_type_: str, score: float | None) -> dict:
             attrs: dict[str, Any] = {
@@ -585,7 +610,11 @@ class GraphDataset:
         out = ds.run()
 
         # Update induction log only after a successful run.
-        entry = InductionLogEntry(spec=spec, processed_node_ids=sorted(self._nodes_by_id.keys()))
+        entry = InductionLogEntry(
+            spec=spec,
+            processed_node_ids=sorted(self._nodes_by_id.keys()),
+            last_revision=self.revision,
+        )
         self._induction_log.upsert(entry)
         return out
 
@@ -874,22 +903,95 @@ class GraphDataset:
         from pydantic import BaseModel
 
         from palimpzest.core.data.dataset import Dataset
-        from palimpzest.core.data.pair_datasets import DictListDataset
+        from palimpzest.core.data.pair_datasets import DictListDataset, UnionDataset
         from palimpzest.query.operators.induce import InducedEdgeResult
         from palimpzest.query.operators.logical import InduceEdges
 
-        seed = self._candidate_pairs_dataset(
+        # Forward pass: New -> All (or All -> All if full)
+        seed_fwd = self._candidate_pairs_dataset(
             spec_id=spec_id,
             generator_kind=generator_kind,
             generator_params=generator_params,
             impacted=impacted,
         )
+
+        seeds = [seed_fwd]
+
+        # Reverse pass: Old -> New (only if incremental, bidirectional, and not symmetric)
+        # If symmetric, the forward pass (New -> All) already covers (New, Old) which implies (Old, New).
+        if mode == "incremental" and entry.spec.incremental_mode == "bidirectional" and not entry.spec.symmetric:
+            # For reverse pass, we treat "Old" nodes as sources and "New" (impacted) nodes as targets.
+            # However, _candidate_pairs_dataset is designed to iterate over 'impacted' as sources.
+            # To do Old -> New, we effectively need to run generation where sources=Old.
+            # This can be expensive (O(N) scan of old nodes).
+            
+            # We need to be careful with generator params.
+            # For 'all_pairs', we can just swap src/dst logic or use AllPairs with src=Old, dst=New.
+            # For 'text_anchor', we iterate Old sources and look up New targets.
+            
+            old_node_ids = set(self._nodes_by_id.keys()) - impacted
+            if old_node_ids:
+                # We temporarily override the 'target' set for the generator to be just the new nodes?
+                # _candidate_pairs_dataset uses self._nodes_by_id for targets (dst).
+                # We can't easily restrict dst in _candidate_pairs_dataset without changing its signature.
+                # But we can pass 'impacted' = old_node_ids.
+                # And then we rely on the generator to find targets.
+                # If the generator finds targets in 'Old', we will get Old->Old (redundant/already computed).
+                # We should filter those out.
+                
+                seed_rev = self._candidate_pairs_dataset(
+                    spec_id=f"{spec_id}_rev",
+                    generator_kind=generator_kind,
+                    generator_params=generator_params,
+                    impacted=old_node_ids,
+                )
+                
+                # We only want pairs where dst is in 'impacted' (New).
+                # Because Old->Old was already computed in previous runs.
+                # Note: This filtering happens at dataset read time or we can wrap it.
+                # For efficiency, let's filter in the UDF or use a filtered dataset wrapper?
+                # For now, let's rely on the fact that we will dedupe later, 
+                # BUT generating Old->Old candidates is wasteful.
+                
+                # Optimization for 'all_pairs':
+                if generator_kind == "all_pairs":
+                     # We can construct a specific dataset for Old -> New
+                     # Since Old and New are disjoint, we can set allow_self_edges=True to avoid
+                     # AllPairsNodePairDataset constraint that src must be in dst.
+                     from palimpzest.core.data.pair_datasets import AllPairsNodePairDataset
+                     seed_rev = AllPairsNodePairDataset(
+                        id=f"graph-candidates-all-pairs-{self.graph_id}-{spec_id}-rev",
+                        src_ids=sorted(old_node_ids),
+                        dst_ids=sorted(impacted),
+                        allow_self_edges=True,
+                     )
+                     seeds.append(seed_rev)
+                else:
+                    # For text_anchor / attr_bucket, we run with src=Old.
+                    # This will generate Old->All. We only care about Old->New.
+                    # We can filter this by wrapping the dataset?
+                    # Or just let it run and filter in the predicate evaluation?
+                    # Filtering in predicate eval is safe but we pay for candidate generation.
+                    # Given the constraints, we'll add it and filter in the UDF.
+                    seeds.append(seed_rev)
+
+        if len(seeds) == 1:
+            seed = seeds[0]
+        else:
+            seed = UnionDataset(sources=seeds, schema=seeds[0].schema)
+
         if len(seed) == 0:
             return []
 
         def eval_predicates(row: dict[str, Any]) -> dict[str, Any]:
             src_id = str(row.get("src_node_id"))
             dst_id = str(row.get("dst_node_id"))
+            
+            # Optimization: For bidirectional reverse pass, ignore Old->Old
+            if mode == "incremental" and entry.spec.incremental_mode == "bidirectional" and not entry.spec.symmetric:
+                if src_id not in impacted and dst_id not in impacted:
+                    return {"predicate_accept": False, "predicate_evidence": None}
+
             if not entry.spec.allow_self_edges and src_id == dst_id:
                 return {"predicate_accept": False, "predicate_evidence": None}
 
@@ -929,7 +1031,13 @@ class GraphDataset:
 
         accepted_rows = ds.run()
         if not accepted_rows:
-            self._induction_log.upsert(InductionLogEntry(spec=entry.spec, processed_node_ids=sorted(self._nodes_by_id.keys())))
+            self._induction_log.upsert(
+                InductionLogEntry(
+                    spec=entry.spec,
+                    processed_node_ids=sorted(self._nodes_by_id.keys()),
+                    last_revision=self.revision,
+                )
+            )
             return []
 
         def get_val(row: object, key: str) -> object:
@@ -995,7 +1103,13 @@ class GraphDataset:
 
         out = Dataset(sources=[induce_seed], operator=op, schema=InducedEdgeResult).run()
 
-        self._induction_log.upsert(InductionLogEntry(spec=entry.spec, processed_node_ids=sorted(self._nodes_by_id.keys())))
+        self._induction_log.upsert(
+            InductionLogEntry(
+                spec=entry.spec,
+                processed_node_ids=sorted(self._nodes_by_id.keys()),
+                last_revision=self.revision,
+            )
+        )
         return out
 
     def add_predicate_induction(
@@ -1008,6 +1122,8 @@ class GraphDataset:
         predicate_mode: str = "all",
         include_overlay: bool = True,
         symmetric: bool = False,
+        incremental_mode: str = "source",
+        allow_self_edges: bool = False,
     ) -> str:
         generator_params = {} if generator_params is None else generator_params
         predicates = [] if predicates is None else predicates
@@ -1017,9 +1133,10 @@ class GraphDataset:
             edge_type=edge_type,
             include_overlay=include_overlay,
             symmetric=bool(symmetric),
-            allow_self_edges=False,
+            allow_self_edges=allow_self_edges,
             overwrite=False,
-            generator={"kind": generator_kind, "params": generator_params},
+            incremental_mode=incremental_mode,
+            generator={"kind": generator_kind, "params": {**generator_params, "allow_self_edges": allow_self_edges}},
             decider={"kind": "predicate_compound", "params": {"mode": predicate_mode, "predicates": predicates}},
         )
         return self.add_induction(spec)

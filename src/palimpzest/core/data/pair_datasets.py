@@ -95,8 +95,48 @@ class AllPairsNodePairDataset(IterDataset):
             dst_id = self.dst_ids[off]
             return {"src_node_id": src_id, "dst_node_id": dst_id}
 
+        # If allow_self_edges=False, we need to skip the self-edge.
+        # We assume src_id is in dst_ids (checked in __init__).
+        # We find the index of src_id in dst_ids.
+        # If off < self_pos, we take dst_ids[off].
+        # If off >= self_pos, we take dst_ids[off + 1].
+        
+        # Optimization: self._dst_index_by_id is built in __init__.
+        # But if src_ids is NOT a subset of dst_ids, we can't rely on this logic if allow_self_edges=False.
+        # The __init__ check enforces src_ids subset of dst_ids if allow_self_edges=False.
+        
         self_pos = self._dst_index_by_id[src_id]
         dst_pos = off + 1 if off >= self_pos else off
         dst_id = self.dst_ids[dst_pos]
         return {"src_node_id": src_id, "dst_node_id": dst_id}
+
+
+class UnionDataset(IterDataset):
+    def __init__(self, *, sources: list[IterDataset], schema: Any = None) -> None:
+        if not sources:
+            raise ValueError("UnionDataset requires at least one source")
+        self.sources = sources
+        if schema is None:
+            schema = sources[0].schema
+        super().__init__(id=f"union-{sources[0].id}", schema=schema)
+
+        self._offsets = [0]
+        total = 0
+        for s in sources:
+            total += len(s)
+            self._offsets.append(total)
+        self._len = total
+
+    def __len__(self) -> int:
+        return self._len
+
+    def __getitem__(self, idx: int) -> dict[str, Any]:
+        if idx < 0 or idx >= self._len:
+            raise IndexError(idx)
+
+        for i, end in enumerate(self._offsets[1:]):
+            if idx < end:
+                start = self._offsets[i]
+                return self.sources[i][idx - start]
+        raise IndexError(idx)
 
