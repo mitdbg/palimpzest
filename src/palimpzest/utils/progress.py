@@ -33,6 +33,9 @@ class ProgressStats:
     """Statistics tracked for progress reporting"""
     start_time: float = 0.0
     total_cost: float = 0.0
+    total_input_tokens: float = 0.0
+    total_cached_tokens: float = 0.0
+    total_output_tokens: float = 0.0
     success_count: int = 0
     failure_count: int = 0
     current_operation: str = ""
@@ -73,6 +76,9 @@ class ProgressManager(ABC):
             MofNCompleteColumn(),
             TimeElapsedColumn(),
             TimeRemainingColumn(),
+            TextColumn(
+                "[magenta]tok in/cached/out: {task.fields[tok_in]:.0f}/{task.fields[tok_cached]:.0f}/{task.fields[tok_out]:.0f}"
+            ),
             #TextColumn("[green]Success: {task.fields[success]}"),
             #TextColumn("[red]Failed: {task.fields[failed]}"),
             #TextColumn("[cyan]Mem: {task.fields[memory]:.1f}MB"),
@@ -185,6 +191,9 @@ class PZProgressManager(ProgressManager):
             f"[blue]{op_str}", 
             total=total,
             cost=0.0,
+            tok_in=0.0,
+            tok_cached=0.0,
+            tok_out=0.0,
             success=0,
             failed=0,
             memory=0.0,
@@ -252,6 +261,9 @@ class PZProgressManager(ProgressManager):
             advance=num_inputs,
             description=f"[bold blue]{self.get_task_description(unique_full_op_id)}",
             cost=self.unique_full_op_id_to_stats[unique_full_op_id].total_cost,
+            tok_in=self.unique_full_op_id_to_stats[unique_full_op_id].total_input_tokens,
+            tok_cached=self.unique_full_op_id_to_stats[unique_full_op_id].total_cached_tokens,
+            tok_out=self.unique_full_op_id_to_stats[unique_full_op_id].total_output_tokens,
             success=self.unique_full_op_id_to_stats[unique_full_op_id].success_count,
             failed=self.unique_full_op_id_to_stats[unique_full_op_id].failure_count,
             memory=get_memory_usage(),
@@ -276,10 +288,14 @@ class PZProgressManager(ProgressManager):
         """Update progress statistics"""
         for key, value in kwargs.items():
             if hasattr(self.unique_full_op_id_to_stats[unique_full_op_id], key):
-                if key != "total_cost":
-                    setattr(self.unique_full_op_id_to_stats[unique_full_op_id], key, value)
+                if key in ("total_cost", "total_input_tokens", "total_cached_tokens", "total_output_tokens"):
+                    setattr(
+                        self.unique_full_op_id_to_stats[unique_full_op_id],
+                        key,
+                        getattr(self.unique_full_op_id_to_stats[unique_full_op_id], key) + value,
+                    )
                 else:
-                    self.unique_full_op_id_to_stats[unique_full_op_id].total_cost += value
+                    setattr(self.unique_full_op_id_to_stats[unique_full_op_id], key, value)
         self.unique_full_op_id_to_stats[unique_full_op_id].memory_usage_mb = get_memory_usage()
 
 class PZSentinelProgressManager(ProgressManager):

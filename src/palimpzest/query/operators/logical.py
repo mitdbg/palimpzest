@@ -303,6 +303,9 @@ class Traverse(LogicalOperator):
         decision_program: Callable | None = None,
         decision_program_id: str | None = None,
         decision_program_config: object | None = None,
+        decision_program_batch: Callable | None = None,
+        decision_program_batch_id: str | None = None,
+        decision_program_batch_config: object | None = None,
         tracer: Callable | None = None,
         tracer_id: str | None = None,
         trace_run_id: str | None = None,
@@ -336,6 +339,9 @@ class Traverse(LogicalOperator):
         self.decision_program = decision_program
         self.decision_program_id = decision_program_id
         self.decision_program_config = decision_program_config
+        self.decision_program_batch = decision_program_batch
+        self.decision_program_batch_id = decision_program_batch_id
+        self.decision_program_batch_config = decision_program_batch_config
         self.tracer = tracer
         self.tracer_id = tracer_id
         self.trace_run_id = trace_run_id
@@ -365,6 +371,7 @@ class Traverse(LogicalOperator):
             "termination_id": self.termination_id,
             "node_program_id": self.node_program_id,
             "decision_program_id": self.decision_program_id,
+            "decision_program_batch_id": self.decision_program_batch_id,
             **logical_id_params,
         }
         return logical_id_params
@@ -392,6 +399,9 @@ class Traverse(LogicalOperator):
             "decision_program": self.decision_program,
             "decision_program_id": self.decision_program_id,
             "decision_program_config": self.decision_program_config,
+            "decision_program_batch": self.decision_program_batch,
+            "decision_program_batch_id": self.decision_program_batch_id,
+            "decision_program_batch_config": self.decision_program_batch_config,
             "tracer": self.tracer,
             "tracer_id": self.tracer_id,
             "trace_run_id": self.trace_run_id,

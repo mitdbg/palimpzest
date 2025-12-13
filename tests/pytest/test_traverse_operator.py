@@ -134,6 +134,35 @@ def test_traverse_operator_admittance_gates_outputs() -> None:
     assert "c" not in node_ids
 
 
+def test_traverse_operator_expands_through_admittance_rejected_nodes() -> None:
+    """Admittance should gate outputs, not necessarily traversal connectivity."""
+
+    g = GraphDataset(graph_id="g")
+    for node_id in ["a", "hub", "leaf"]:
+        g.add_node(GraphNode(id=node_id))
+
+    g.add_edge(GraphEdge(id="e_ah", src="a", dst="hub", type="rel"))
+    g.add_edge(GraphEdge(id="e_hl", src="hub", dst="leaf", type="rel"))
+
+    def admittance(node_id, node, depth, score, path_node_ids, path_edge_ids):
+        # Reject the hub node itself, but allow traversal to reach leaf.
+        return node_id != "hub"
+
+    ds = g.traverse(
+        start_node_ids=["a"],
+        edge_type="rel",
+        max_steps=10,
+        admittance=admittance,
+        admittance_id="no-hub",
+    )
+    out = ds.run()
+    node_ids = [r.node_id for r in out]
+
+    assert "a" in node_ids
+    assert "hub" not in node_ids
+    assert "leaf" in node_ids
+
+
 def test_traverse_operator_termination_stops_early() -> None:
     g = GraphDataset(graph_id="g")
     for node_id in ["a", "b", "c", "d"]:

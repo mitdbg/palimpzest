@@ -300,6 +300,10 @@ class GraphDataset:
         decision_program_id: str | None = None,
         decision_program_output_schema: type[BaseModel] | None = None,
         decision_program_config: object | None = None,
+        decision_program_batch: callable | None = None,
+        decision_program_batch_id: str | None = None,
+        decision_program_batch_output_schema: type[BaseModel] | None = None,
+        decision_program_batch_config: object | None = None,
         node_program: callable | None = None,
         node_program_id: str | None = None,
         node_program_output_schema: type[BaseModel] | None = None,
@@ -349,6 +353,25 @@ class GraphDataset:
             optional_decision_schema = create_schema_from_fields(optional_fields)
             output_schema = union_schemas([output_schema, optional_decision_schema])
 
+        if decision_program_batch is not None:
+            if decision_program_batch_output_schema is None:
+                raise ValueError(
+                    "decision_program_batch_output_schema is required when decision_program_batch is provided"
+                )
+
+            optional_fields: list[dict] = []
+            for field_name, field in decision_program_batch_output_schema.model_fields.items():
+                optional_fields.append(
+                    {
+                        "name": field_name,
+                        "type": field.annotation | None,
+                        "description": field.description or f"{field_name} (from decision_program_batch)",
+                        "default": None,
+                    }
+                )
+            optional_decision_schema = create_schema_from_fields(optional_fields)
+            output_schema = union_schemas([output_schema, optional_decision_schema])
+
         if node_program is not None:
             if node_program_output_schema is None:
                 raise ValueError("node_program_output_schema is required when node_program is provided")
@@ -388,6 +411,9 @@ class GraphDataset:
             decision_program=decision_program,
             decision_program_id=decision_program_id,
             decision_program_config=decision_program_config,
+            decision_program_batch=decision_program_batch,
+            decision_program_batch_id=decision_program_batch_id,
+            decision_program_batch_config=decision_program_batch_config,
             node_program=node_program,
             node_program_id=node_program_id,
             node_program_config=node_program_config,

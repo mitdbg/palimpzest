@@ -378,6 +378,15 @@ class DataRecordSet:
     def get_total_cost(self) -> float:
         return sum([record_op_stats.cost_per_record for record_op_stats in self.record_op_stats])
 
+    def get_total_input_tokens(self) -> float:
+        return sum([record_op_stats.total_input_tokens for record_op_stats in self.record_op_stats])
+
+    def get_total_cached_tokens(self) -> float:
+        return sum([getattr(record_op_stats, "total_cached_tokens", 0.0) for record_op_stats in self.record_op_stats])
+
+    def get_total_output_tokens(self) -> float:
+        return sum([record_op_stats.total_output_tokens for record_op_stats in self.record_op_stats])
+
     def get_field_to_score_fn(self) -> dict[str, str | callable]:
         return self.field_to_score_fn
 

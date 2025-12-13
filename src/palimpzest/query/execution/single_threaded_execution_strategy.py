@@ -54,7 +54,15 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
                 num_outputs = sum(record._passed_operator for record in records)
 
                 # update the progress manager
-                self.progress_manager.incr(unique_full_op_id, num_inputs=1, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
+                self.progress_manager.incr(
+                    unique_full_op_id,
+                    num_inputs=1,
+                    num_outputs=num_outputs,
+                    total_cost=record_set.get_total_cost(),
+                    total_input_tokens=record_set.get_total_input_tokens(),
+                    total_cached_tokens=record_set.get_total_cached_tokens(),
+                    total_output_tokens=record_set.get_total_output_tokens(),
+                )
 
             # if this operator is a join, process all pairs of records from the two input queues
             elif isinstance(operator, JoinOp):
@@ -79,7 +87,15 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
                 num_outputs = sum(record._passed_operator for record in records)
 
                 # update the progress manager
-                self.progress_manager.incr(unique_full_op_id, num_inputs=num_inputs_processed, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
+                self.progress_manager.incr(
+                    unique_full_op_id,
+                    num_inputs=num_inputs_processed,
+                    num_outputs=num_outputs,
+                    total_cost=record_set.get_total_cost(),
+                    total_input_tokens=record_set.get_total_input_tokens(),
+                    total_cached_tokens=record_set.get_total_cached_tokens(),
+                    total_output_tokens=record_set.get_total_output_tokens(),
+                )
 
             # otherwise, process the records in the input queue for this operator one at a time
             else:
@@ -91,7 +107,15 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
                     num_outputs = sum(record._passed_operator for record in record_set.data_records)
 
                     # update the progress manager
-                    self.progress_manager.incr(unique_full_op_id, num_inputs=1, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
+                    self.progress_manager.incr(
+                        unique_full_op_id,
+                        num_inputs=1,
+                        num_outputs=num_outputs,
+                        total_cost=record_set.get_total_cost(),
+                        total_input_tokens=record_set.get_total_input_tokens(),
+                        total_cached_tokens=record_set.get_total_cached_tokens(),
+                        total_output_tokens=record_set.get_total_output_tokens(),
+                    )
 
                     # finish early if this is a limit
                     if isinstance(operator, LimitScanOp) and len(records) == operator.limit:
@@ -215,7 +239,15 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
                     num_outputs = sum(record._passed_operator for record in records)
 
                     # update the progress manager
-                    self.progress_manager.incr(unique_full_op_id, num_inputs=1, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
+                    self.progress_manager.incr(
+                        unique_full_op_id,
+                        num_inputs=1,
+                        num_outputs=num_outputs,
+                        total_cost=record_set.get_total_cost(),
+                        total_input_tokens=record_set.get_total_input_tokens(),
+                        total_cached_tokens=record_set.get_total_cached_tokens(),
+                        total_output_tokens=record_set.get_total_output_tokens(),
+                    )
 
                 # if this operator is a join, process all pairs of records from the two input queues
                 elif isinstance(operator, JoinOp):
@@ -233,7 +265,15 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
                     num_outputs = sum(record._passed_operator for record in records)
 
                     # update the progress manager
-                    self.progress_manager.incr(unique_full_op_id, num_inputs=num_inputs_processed, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
+                    self.progress_manager.incr(
+                        unique_full_op_id,
+                        num_inputs=num_inputs_processed,
+                        num_outputs=num_outputs,
+                        total_cost=record_set.get_total_cost(),
+                        total_input_tokens=record_set.get_total_input_tokens(),
+                        total_cached_tokens=record_set.get_total_cached_tokens(),
+                        total_output_tokens=record_set.get_total_output_tokens(),
+                    )
 
                 # otherwise, process the next record in the input queue for this operator
                 else:
@@ -245,7 +285,15 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
                     num_outputs = sum(record._passed_operator for record in records)
 
                     # update the progress manager
-                    self.progress_manager.incr(unique_full_op_id, num_inputs=1, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
+                    self.progress_manager.incr(
+                        unique_full_op_id,
+                        num_inputs=1,
+                        num_outputs=num_outputs,
+                        total_cost=record_set.get_total_cost(),
+                        total_input_tokens=record_set.get_total_input_tokens(),
+                        total_cached_tokens=record_set.get_total_cached_tokens(),
+                        total_output_tokens=record_set.get_total_output_tokens(),
+                    )
 
                 # if this is a join operator with no more inputs to process, then finish it
                 if isinstance(operator, JoinOp) and operator.how in ("left", "right", "outer"):

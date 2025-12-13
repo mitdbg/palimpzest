@@ -461,6 +461,8 @@ def create_app(*, snapshot_path: Path | None = None) -> FastAPI:
         start_nodes = [n for (n, _s) in start_nodes_scored]
 
         def _default_llm_model_id() -> str | None:
+            if os.getenv("OPENROUTER_API_KEY"):
+                return "openrouter/x-ai/grok-4.1-fast"
             if os.getenv("OPENAI_API_KEY"):
                 return "openai/gpt-4o-mini-2024-07-18"
             if os.getenv("ANTHROPIC_API_KEY"):
@@ -511,9 +513,9 @@ def create_app(*, snapshot_path: Path | None = None) -> FastAPI:
                 ranker_fn = _ranker
 
         # LLM meta prompts + unified gate.
-        # IMPORTANT: to avoid surprising network usage, LLM gating is only enabled when
-        # admittance_model is explicitly provided.
-        adm_model = (req.admittance_model or "").strip()
+        # Default behavior: if no model is provided, use an available provider (preferring OpenRouter)
+        # to keep the "just run it" path working out of the box.
+        adm_model = (req.admittance_model or "").strip() or (_default_llm_model_id() or "")
         gate_fn = None
         admittance_criteria: str | None = None
         termination_criteria: str | None = None

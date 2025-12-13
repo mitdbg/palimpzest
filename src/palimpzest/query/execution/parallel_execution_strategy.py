@@ -68,7 +68,11 @@ class ParallelExecutionStrategy(ExecutionStrategy):
         future_queues[unique_full_op_id] = list(not_done_futures)
 
         # add the finished futures to the input queue for this operator
-        output_records, total_inputs_processed, total_cost = [], 0, 0.0
+        output_records, total_inputs_processed = [], 0
+        total_cost = 0.0
+        total_input_tokens = 0.0
+        total_cached_tokens = 0.0
+        total_output_tokens = 0.0
         for future in done_futures:
             output = future.result()
             record_set, num_inputs_processed = output if self.is_join_op[unique_full_op_id] else (output, 1)
@@ -84,6 +88,9 @@ class ParallelExecutionStrategy(ExecutionStrategy):
             # update the inputs processed and total cost
             total_inputs_processed += num_inputs_processed
             total_cost += record_set.get_total_cost()
+            total_input_tokens += record_set.get_total_input_tokens()
+            total_cached_tokens += record_set.get_total_cached_tokens()
+            total_output_tokens += record_set.get_total_output_tokens()
 
             # update plan stats
             plan_stats.add_record_op_stats(unique_full_op_id, record_op_stats)
@@ -94,7 +101,15 @@ class ParallelExecutionStrategy(ExecutionStrategy):
         # update the progress manager
         if total_inputs_processed > 0:
             num_outputs = len(output_records)
-            self.progress_manager.incr(unique_full_op_id, num_inputs=total_inputs_processed, num_outputs=num_outputs, total_cost=total_cost)
+            self.progress_manager.incr(
+                unique_full_op_id,
+                num_inputs=total_inputs_processed,
+                num_outputs=num_outputs,
+                total_cost=total_cost,
+                total_input_tokens=total_input_tokens,
+                total_cached_tokens=total_cached_tokens,
+                total_output_tokens=total_output_tokens,
+            )
 
         return output_records
 

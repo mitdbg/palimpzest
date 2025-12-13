@@ -232,6 +232,10 @@ class RecordOpStats(BaseModel):
     # typed as a float because GenerationStats may be amortized (i.e. divided) across a number of output records
     total_output_tokens: float = 0.0
 
+    # the total number of cached input tokens processed by this operator (provider-dependent);
+    # typed as a float because stats may be amortized across a number of output records
+    total_cached_tokens: float = 0.0
+
     # the total number of input tokens processed by embedding models
     # typed as a float because GenerationStats may be amortized (i.e. divided) across a number of output records
     total_embedding_input_tokens: float = 0.0
@@ -297,6 +301,9 @@ class OperatorStats(BaseModel):
     # the total output tokens processed by this operation
     total_output_tokens: int = 0
 
+    # the total cached input tokens processed by this operation (provider-dependent)
+    total_cached_tokens: int = 0
+
     #the total embedding input tokens processed by this operation
     total_embedding_input_tokens: int = 0
 
@@ -338,6 +345,12 @@ class OperatorStats(BaseModel):
             stats.source_unique_full_op_ids = self.source_unique_full_op_ids
             stats.plan_id = self.plan_id
             self.record_op_stats_lst.append(stats)
+
+            self.total_op_time += stats.time_per_record
+            self.total_op_cost += stats.cost_per_record
+            self.total_input_tokens += int(stats.total_input_tokens)
+            self.total_output_tokens += int(stats.total_output_tokens)
+            self.total_cached_tokens += int(getattr(stats, "total_cached_tokens", 0.0))
             self.total_op_time += stats.time_per_record
             self.total_op_cost += stats.cost_per_record
             self.total_input_tokens += stats.total_input_tokens

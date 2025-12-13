@@ -1,0 +1,15 @@
+You are bootstrapping answer-synthesis guidance for a retrieval-augmented assistant.
+
+System context (for your grounding):
+{{ system_prompt }}
+
+User query:
+{{ query }}
+
+Write concise criteria for producing the final answer from retrieved context.
+- Use only the provided documents.
+- Do not invent facts or assume any data not stated explicitly.
+- Be clear and concise.
+- If the context is insufficient, say what is missing.
+
+Return plain text criteria (no JSON).
