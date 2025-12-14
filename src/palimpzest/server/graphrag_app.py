@@ -623,6 +623,9 @@ def create_app(*, snapshot_path: Path | None = None) -> FastAPI:
         gate_fn = None
         admittance_criteria: str | None = None
         termination_criteria: str | None = None
+        # Always define caches; traversal output may include `admit` even when admittance is disabled.
+        admit_cache: dict[str, bool] = {}
+        admit_meta_cache: dict[str, dict[str, Any]] = {}
         if adm_model:
             # Bootstrap query-specific admittance criteria once.
             try:
@@ -631,8 +634,6 @@ def create_app(*, snapshot_path: Path | None = None) -> FastAPI:
                 admittance_criteria = None
             decider = LLMBooleanDecider(config=LLMBooleanDeciderConfig(model=adm_model))
             criteria = admittance_criteria or build_admittance_instruction()
-            admit_cache: dict[str, bool] = {}
-            admit_meta_cache: dict[str, dict[str, Any]] = {}
 
             def _gate(node_id, node, depth, score, path_node_ids, path_edge_ids):  # noqa: ANN001
                 if node_id in admit_cache:
