@@ -197,6 +197,9 @@ class PromptStrategy(str, Enum):
     def is_no_reasoning_prompt(self):
         return "no-reasoning" in self.value
 
+    def is_audio_prompt(self):
+        return "audio" in self.value
+
 
 class Modality(str, Enum):
     TEXT = "text"

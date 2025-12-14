@@ -44,8 +44,12 @@ from palimpzest.query.operators.logical import (
     SearchOperator,
     TopKScan,
     Traverse,
+    ExplodeLineage,
+    LinkToChildren,
 )
 from palimpzest.query.operators.induce import InduceEdgesOp
+from palimpzest.query.operators.lineage import ExplodeLineageOp
+from palimpzest.query.operators.link import LinkToChildrenOp
 from palimpzest.query.operators.mixture_of_agents import MixtureOfAgentsConvert, MixtureOfAgentsFilter
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.project import ProjectOp
@@ -1078,6 +1082,8 @@ class BasicSubstitutionRule(ImplementationRule):
         GroupByAggregate: ApplyGroupByOp,
         Traverse: TraverseOp,
         InduceEdges: InduceEdgesOp,
+        ExplodeLineage: ExplodeLineageOp,
+        LinkToChildren: LinkToChildrenOp,
     }
 
     @classmethod

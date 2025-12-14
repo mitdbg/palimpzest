@@ -183,8 +183,10 @@ class DataRecord:
         copy_field_names = parent_record.get_field_names() if project_cols is None else project_cols
         copy_field_names = [field.split(".")[-1] for field in copy_field_names]
 
-        # copy fields from the parent
-        data_item.update({field_name: parent_record[field_name] for field_name in copy_field_names})
+        # copy fields from the parent, but allow data_item to override them
+        parent_data = {field_name: parent_record[field_name] for field_name in copy_field_names}
+        parent_data.update(data_item)
+        data_item = parent_data
 
         # corner-case: wrap values in lists if the new schema expects a list but the data item has a single value
         for field_name, field_info in new_schema.model_fields.items():

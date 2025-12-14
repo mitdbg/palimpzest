@@ -414,6 +414,47 @@ class Traverse(LogicalOperator):
         return logical_op_params
 
 
+class ExplodeLineage(LogicalOperator):
+    def __init__(self, input_schema: type[BaseModel], output_schema: type[BaseModel]):
+        super().__init__(input_schema=input_schema, output_schema=output_schema)
+
+    def __str__(self):
+        return "ExplodeLineage"
+
+    def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
+        return OperatorCostEstimates(
+            cardinality=source_op_cost_estimates.cardinality * 10,
+            time_per_record=0,
+            cost_per_record=0,
+            quality=1.0
+        )
+
+class LinkToChildren(LogicalOperator):
+    def __init__(self, graph: Any, edge_type: str, input_schema: type[BaseModel], output_schema: type[BaseModel], depends_on: list[str] | None = None):
+        super().__init__(input_schema=input_schema, output_schema=output_schema, depends_on=depends_on)
+        self.graph = graph
+        self.edge_type = edge_type
+
+    def __str__(self):
+        return f"LinkToChildren(edge_type={self.edge_type})"
+
+    def get_logical_op_params(self):
+        return {
+            "graph": self.graph,
+            "edge_type": self.edge_type,
+            "input_schema": self.input_schema,
+            "output_schema": self.output_schema,
+            "depends_on": self.depends_on,
+        }
+
+    def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
+        return OperatorCostEstimates(
+            cardinality=source_op_cost_estimates.cardinality,
+            time_per_record=0,
+            cost_per_record=0,
+            quality=1.0
+        )
+
 class InduceEdges(LogicalOperator):
     """Induce (and materialize) edges in a `GraphDataset`.
 

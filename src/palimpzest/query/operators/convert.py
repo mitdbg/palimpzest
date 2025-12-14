@@ -35,6 +35,11 @@ class ConvertOp(PhysicalOperator, ABC):
         self.udf = udf
         self.desc = desc
 
+        # If one-to-many, we should regenerate all fields because we are creating new records
+        # which may have different values for fields that exist in the parent (e.g. 'id').
+        if self.cardinality == Cardinality.ONE_TO_MANY:
+            self.generated_fields = sorted(list(self.output_schema.model_fields.keys()))
+
     def get_id_params(self):
         id_params = super().get_id_params()
         id_params = {
@@ -56,6 +61,14 @@ class ConvertOp(PhysicalOperator, ABC):
         }
 
         return op_params
+
+    def get_fields_to_generate(self, candidate: DataRecord) -> list[str]:
+        # If one-to-many, we should regenerate all fields because we are creating new records
+        # which may have different values for fields that exist in the parent (e.g. 'id').
+        if self.cardinality == Cardinality.ONE_TO_MANY:
+            return self.generated_fields
+        
+        return super().get_fields_to_generate(candidate)
 
     def _create_data_records_from_field_answers(
         self,
