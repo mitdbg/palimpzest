@@ -3,9 +3,17 @@ from __future__ import annotations
 import os
 import pickle
 
-import chromadb
-import chromadb.utils.embedding_functions as embedding_functions
-import tiktoken
+try:
+    import chromadb
+    import chromadb.utils.embedding_functions as embedding_functions
+except ImportError:
+    chromadb = None
+    embedding_functions = None
+
+try:
+    import tiktoken
+except ImportError:
+    tiktoken = None
 
 from palimpzest.constants import PZ_DIR
 from palimpzest.core.data import context

@@ -4,7 +4,11 @@ import warnings
 from collections.abc import Iterator
 from typing import Callable
 
-from chromadb.api.models.Collection import Collection
+try:
+    from chromadb.api.models.Collection import Collection
+except ImportError:
+    class Collection: pass
+
 from pydantic import BaseModel
 
 from palimpzest.constants import AggFunc, Cardinality

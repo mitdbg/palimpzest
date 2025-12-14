@@ -1,5 +1,7 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
+import { ZoomIn, ZoomOut, Maximize } from 'lucide-react';
+import GraphSearch from './GraphSearch';
 
 const getNodeColor = (d) => {
     if (d.isEvidence) return "#ffd700";
@@ -22,23 +24,29 @@ const getLinkColor = (d) => {
 const GraphVisualization = ({ graphData, onNodeClick, onNodeHover }) => {
     const svgRef = useRef(null);
     const gRef = useRef(null);
+    const containerRef = useRef(null);
     const simulationRef = useRef(null);
+    const zoomRef = useRef(null);
     const initializedRef = useRef(false);
 
-    // Initialize D3 once
+    // Initialize D3
     useEffect(() => {
-        if (!svgRef.current || initializedRef.current) return;
+        if (!svgRef.current || !containerRef.current || initializedRef.current) return;
         initializedRef.current = true;
 
         const svg = d3.select(svgRef.current);
         const g = d3.select(gRef.current);
-        const width = 800;
-        const height = 600;
+        
+        // Initial dimensions
+        const { width, height } = containerRef.current.getBoundingClientRect();
 
         // Zoom
-        svg.call(d3.zoom()
+        const zoom = d3.zoom()
             .scaleExtent([0.1, 4])
-            .on("zoom", (event) => g.attr("transform", event.transform)));
+            .on("zoom", (event) => g.attr("transform", event.transform));
+            
+        svg.call(zoom);
+        zoomRef.current = zoom;
 
         // Arrow marker
         svg.append("defs").append("marker")
@@ -69,17 +77,45 @@ const GraphVisualization = ({ graphData, onNodeClick, onNodeHover }) => {
                     .attr("transform", d => `translate(${d.x || 0},${d.y || 0})`);
             });
 
-        return () => {
-            if (simulationRef.current) {
-                simulationRef.current.stop();
+        // Handle Resize
+        const resizeObserver = new ResizeObserver(entries => {
+            for (let entry of entries) {
+                const { width, height } = entry.contentRect;
+                if (simulationRef.current) {
+                    simulationRef.current.force("center", d3.forceCenter(width / 2, height / 2));
+                    simulationRef.current.alpha(0.3).restart();
+                }
             }
+        });
+        
+        resizeObserver.observe(containerRef.current);
+
+        return () => {
+            if (simulationRef.current) simulationRef.current.stop();
+            resizeObserver.disconnect();
         };
     }, []);
+
+    const [adjacency, setAdjacency] = useState(new Map());
 
     // Update graph data
     useEffect(() => {
         if (!simulationRef.current || !gRef.current) return;
         if (!graphData || !graphData.nodes) return;
+
+        // Pre-calculate adjacency
+        const newAdjacency = new Map();
+        graphData.links.forEach(l => {
+            const sourceId = typeof l.source === 'object' ? l.source.id : l.source;
+            const targetId = typeof l.target === 'object' ? l.target.id : l.target;
+            
+            if (!newAdjacency.has(sourceId)) newAdjacency.set(sourceId, new Set());
+            if (!newAdjacency.has(targetId)) newAdjacency.set(targetId, new Set());
+            
+            newAdjacency.get(sourceId).add(targetId);
+            newAdjacency.get(targetId).add(sourceId);
+        });
+        setAdjacency(newAdjacency);
 
         const g = d3.select(gRef.current);
         const simulation = simulationRef.current;
@@ -97,8 +133,8 @@ const GraphVisualization = ({ graphData, onNodeClick, onNodeHover }) => {
         simulation.nodes(nodes);
         simulation.force("link").links(links);
         
-        // Only reheat if structure changed
-        if (nodes.length !== oldNodesMap.size) {
+        // Only reheat if structure changed significantly or it's the first load
+        if (nodes.length !== oldNodesMap.size || (nodes.length > 0 && simulation.alpha() < 0.05)) {
             simulation.alpha(0.3).restart();
         }
 
@@ -137,8 +173,8 @@ const GraphVisualization = ({ graphData, onNodeClick, onNodeHover }) => {
                     d.fx = null; d.fy = null;
                 }))
             .on("click", (event, d) => { event.stopPropagation(); onNodeClick?.(d); })
-            .on("mouseover", (event, d) => onNodeHover?.(event, d))
-            .on("mouseout", () => onNodeHover?.(null, null));
+            .on("mouseover", (event, d) => handleNodeMouseOver(event, d))
+            .on("mouseout", handleNodeMouseOut);
 
         nodeEnter.append("circle").attr("stroke", "#fff").attr("stroke-width", 1.5);
         nodeEnter.append("text").attr("x", 8).attr("y", 3).attr("font-size", "10px").attr("fill", "#ccc");
@@ -154,10 +190,96 @@ const GraphVisualization = ({ graphData, onNodeClick, onNodeHover }) => {
 
     }, [graphData, onNodeClick, onNodeHover]);
 
+    const handleZoom = (factor) => {
+        if (!svgRef.current || !zoomRef.current) return;
+        const svg = d3.select(svgRef.current);
+        svg.transition().duration(300).call(zoomRef.current.scaleBy, factor);
+    };
+
+    const handleReset = () => {
+        if (!svgRef.current || !zoomRef.current) return;
+        const svg = d3.select(svgRef.current);
+        svg.transition().duration(750).call(zoomRef.current.transform, d3.zoomIdentity);
+    };
+
+    const handleSearchSelect = (node) => {
+        onNodeClick?.(node);
+        // Center view on node
+        if (!svgRef.current || !zoomRef.current || !node.x) return;
+        
+        const svg = d3.select(svgRef.current);
+        const width = containerRef.current.clientWidth;
+        const height = containerRef.current.clientHeight;
+        const scale = 1.5;
+        const x = -node.x * scale + width / 2;
+        const y = -node.y * scale + height / 2;
+        
+        svg.transition().duration(750).call(
+            zoomRef.current.transform, 
+            d3.zoomIdentity.translate(x, y).scale(scale)
+        );
+    };
+
+    // Hover Effects
+    const handleNodeMouseOver = (event, d) => {
+        onNodeHover?.(event, d);
+        
+        const g = d3.select(gRef.current);
+        const neighbors = adjacency.get(d.id) || new Set();
+        
+        // Fast update using data binding or direct selection if possible
+        // But for now, let's optimize the selection filter
+        
+        g.selectAll(".link").attr("stroke-opacity", l => {
+            const sourceId = typeof l.source === 'object' ? l.source.id : l.source;
+            const targetId = typeof l.target === 'object' ? l.target.id : l.target;
+            return (sourceId === d.id || targetId === d.id) ? 1 : 0.05;
+        }).attr("stroke", l => {
+            const sourceId = typeof l.source === 'object' ? l.source.id : l.source;
+            const targetId = typeof l.target === 'object' ? l.target.id : l.target;
+            return (sourceId === d.id || targetId === d.id) ? "#fff" : getLinkColor(l);
+        });
+
+        g.selectAll(".node").attr("opacity", n => {
+            return (n.id === d.id || neighbors.has(n.id)) ? 1 : 0.1;
+        });
+    };
+
+    const handleNodeMouseOut = () => {
+        onNodeHover?.(null, null);
+        
+        const g = d3.select(gRef.current);
+        
+        // Reset styles
+        g.selectAll(".link")
+            .attr("stroke", d => getLinkColor(d))
+            .attr("stroke-opacity", d => d.isOnPath ? 1 : 0.3);
+            
+        g.selectAll(".node").attr("opacity", 1);
+    };
+
     return (
-        <svg ref={svgRef} width="100%" height="100%" style={{ background: '#111' }}>
-            <g ref={gRef}></g>
-        </svg>
+        <div ref={containerRef} className="w-full h-full bg-[#111] relative">
+            <svg ref={svgRef} width="100%" height="100%">
+                <g ref={gRef}></g>
+            </svg>
+            
+            <div className="absolute top-4 right-4 z-10">
+                <GraphSearch nodes={graphData?.nodes} onSelectNode={handleSearchSelect} />
+            </div>
+
+            <div className="absolute bottom-20 right-4 flex flex-col gap-2">
+                <button onClick={() => handleZoom(1.2)} className="p-2 bg-gray-800 text-gray-300 rounded hover:bg-gray-700 hover:text-white shadow-lg border border-gray-700">
+                    <ZoomIn size={16} />
+                </button>
+                <button onClick={() => handleZoom(0.8)} className="p-2 bg-gray-800 text-gray-300 rounded hover:bg-gray-700 hover:text-white shadow-lg border border-gray-700">
+                    <ZoomOut size={16} />
+                </button>
+                <button onClick={handleReset} className="p-2 bg-gray-800 text-gray-300 rounded hover:bg-gray-700 hover:text-white shadow-lg border border-gray-700">
+                    <Maximize size={16} />
+                </button>
+            </div>
+        </div>
     );
 };
 
