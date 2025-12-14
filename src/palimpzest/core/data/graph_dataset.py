@@ -497,19 +497,83 @@ class GraphDataset(Dataset):
         def embedding_for_node_id(node_id: str) -> list[float]:
             return self._node_embedding(node_id, embedding_key=embedding_key)
 
-        decider = CosineSimilarityDecider(embedding_for_node_id=embedding_for_node_id)
-        generator = KnnBruteForceCandidateGenerator(
-            k=k,
-            threshold=threshold,
-            symmetric=True,
-            allow_self_edges=False,
-        )
+        # Candidate generation can be extremely expensive if done with Python-level
+        # nested loops (O(N^2) cosine computations). Prefer a NumPy fast path.
+        pair_scores: dict[tuple[str, str], float] = {}
+        candidate_pairs: list[tuple[str, str]]
+        try:
+            import numpy as np
 
-        candidate_pairs = list(generator.generate_pairs(
-            node_ids=valid_node_ids,
-            impacted_node_ids=valid_impacted,
-            score_pair=decider.score_pair
-        ))
+            # Build an embedding matrix aligned to valid_node_ids.
+            embeddings: list[list[float]] = [embedding_for_node_id(nid) for nid in valid_node_ids]
+            if not embeddings:
+                candidate_pairs = []
+            else:
+                dim = len(embeddings[0])
+                if any(len(v) != dim for v in embeddings):
+                    raise ValueError("Embedding dimension mismatch across nodes")
+
+                E = np.asarray(embeddings, dtype=np.float32)
+                # Normalize to cosine space (safe even if already normalized).
+                norms = np.linalg.norm(E, axis=1, keepdims=True)
+                norms = np.maximum(norms, 1e-12)
+                E = E / norms
+
+                # Full similarity matrix is ~N^2 floats. For N~3.5k it's ~45MB float32.
+                S = E @ E.T
+
+                id_to_idx = {nid: i for i, nid in enumerate(valid_node_ids)}
+                impacted_idxs = [id_to_idx[nid] for nid in valid_impacted if nid in id_to_idx]
+
+                pairs: set[tuple[str, str]] = set()
+                for i in impacted_idxs:
+                    sims = S[i]
+                    # Exclude self-edges.
+                    sims_i = sims.copy()
+                    sims_i[i] = -np.inf
+
+                    if k is not None:
+                        kk = min(int(k), sims_i.shape[0] - 1)
+                        if kk <= 0:
+                            continue
+                        # Get top-k indices (unsorted), then sort by score desc.
+                        top_idx = np.argpartition(-sims_i, kth=kk - 1)[:kk]
+                        top_idx = top_idx[np.argsort(-sims_i[top_idx])]
+                        chosen = top_idx
+                    else:
+                        # threshold mode
+                        chosen = np.where(sims_i >= float(threshold))[0]
+                        if chosen.size == 0:
+                            continue
+
+                    src_id = valid_node_ids[i]
+                    for j in chosen.tolist():
+                        dst_id = valid_node_ids[j]
+                        score = float(sims[j])
+                        pairs.add((src_id, dst_id))
+                        pair_scores[(src_id, dst_id)] = score
+                        # symmetric edges (two directed edges)
+                        pairs.add((dst_id, src_id))
+                        pair_scores[(dst_id, src_id)] = score
+
+                candidate_pairs = sorted(pairs)
+
+        except Exception:
+            # Fallback: slow but robust brute-force generator.
+            decider = CosineSimilarityDecider(embedding_for_node_id=embedding_for_node_id)
+            generator = KnnBruteForceCandidateGenerator(
+                k=k,
+                threshold=threshold,
+                symmetric=True,
+                allow_self_edges=False,
+            )
+            candidate_pairs = list(
+                generator.generate_pairs(
+                    node_ids=valid_node_ids,
+                    impacted_node_ids=valid_impacted,
+                    score_pair=decider.score_pair,
+                )
+            )
 
         def edge_attrs(src: str, dst: str, edge_type_: str, score: float | None) -> dict:
             attrs: dict[str, Any] = {
@@ -526,6 +590,13 @@ class GraphDataset(Dataset):
             return attrs
 
         def score_decider(src_id: str, src: GraphNode, dst_id: str, dst: GraphNode, graph: GraphDataset) -> float:
+            _ = src
+            _ = dst
+            _ = graph
+            if pair_scores:
+                return float(pair_scores.get((src_id, dst_id), 0.0))
+            # Fallback path uses the brute-force decider.
+            decider = CosineSimilarityDecider(embedding_for_node_id=embedding_for_node_id)
             return decider.score_pair(src_id=src_id, dst_id=dst_id)
 
         ds = self.induce_edges(
@@ -534,8 +605,8 @@ class GraphDataset(Dataset):
             include_overlay=include_overlay,
             decider=score_decider,
             decider_id=f"cosine_similarity:{embedding_key}",
-            # threshold only matters for legacy predicate gating; candidate generation already filtered.
-            threshold=(threshold if threshold is not None else 0.0),
+            # Candidate generation already enforces top-k / threshold; always accept the scored pair.
+            threshold=-1.0,
             overwrite=False,
             edge_attrs_fn=edge_attrs,
         )
@@ -607,9 +678,28 @@ class GraphDataset(Dataset):
     def _extract_strings(cls, node: GraphNode, *, fields: list[str]) -> list[str]:
         out: list[str] = []
         for f in fields:
-            v = cls._get_string_field(node, f)
-            if isinstance(v, str) and v.strip():
-                out.append(v.strip())
+            # Known special-case fields.
+            try:
+                v = cls._get_string_field(node, f)
+                if isinstance(v, str) and v.strip():
+                    out.append(v.strip())
+                continue
+            except ValueError:
+                pass
+
+            # Generic attrs.* fields can be str or list[str].
+            if f.startswith("attrs."):
+                v = cls._extract_attr(node, path=f)
+                if isinstance(v, str) and v.strip():
+                    out.append(v.strip())
+                elif isinstance(v, list):
+                    for item in v:
+                        if isinstance(item, str) and item.strip():
+                            out.append(item.strip())
+                continue
+
+            raise ValueError(f"Unknown field: {f}")
+
         return out
 
     @staticmethod
@@ -659,6 +749,46 @@ class GraphDataset(Dataset):
                 id=f"graph-candidates-all-pairs-{self.graph_id}-{spec_id}",
                 src_ids=sorted(impacted),
                 dst_ids=node_ids,
+                allow_self_edges=allow_self,
+            )
+
+        if generator_kind == "typed_all_pairs":
+            # Bipartite all-pairs between restricted src/dst node types.
+            # This is critical for scalable mentions induction (Data -> Skeleton)
+            # without materializing O(N^2) candidate pairs.
+            # NOTE: we always allow self edges at the candidate generator level.
+            # This makes the dataset usable for bipartite sets where src_ids are
+            # not a subset of dst_ids (common for Data -> Skeleton induction).
+            # True self-edges (src==dst) are still filtered later by
+            # `entry.spec.allow_self_edges` inside predicate induction.
+            allow_self = True
+            src_types = generator_params.get("src_types")
+            dst_types = generator_params.get("dst_types")
+
+            if src_types is not None:
+                if not isinstance(src_types, list) or not all(isinstance(t, str) for t in src_types):
+                    raise ValueError("typed_all_pairs requires src_types: list[str]")
+                src_types_set = set(src_types)
+            else:
+                src_types_set = None
+
+            if dst_types is None or not isinstance(dst_types, list) or not all(isinstance(t, str) for t in dst_types):
+                raise ValueError("typed_all_pairs requires dst_types: list[str]")
+            dst_types_set = set(dst_types)
+
+            type_by_id: dict[str, str | None] = {}
+            for node in self.store.iter_nodes():
+                type_by_id[node.id] = node.type
+
+            src_ids = sorted(
+                [nid for nid in impacted if src_types_set is None or (type_by_id.get(nid) in src_types_set)]
+            )
+            dst_ids = [nid for nid in self.store.get_node_ids() if type_by_id.get(nid) in dst_types_set]
+
+            return AllPairsNodePairDataset(
+                id=f"graph-candidates-typed-all-pairs-{self.graph_id}-{spec_id}",
+                src_ids=src_ids,
+                dst_ids=dst_ids,
                 allow_self_edges=allow_self,
             )
 
