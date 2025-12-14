@@ -3,7 +3,11 @@ from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import numpy as np
-from chromadb.api.models.Collection import Collection
+try:
+    from chromadb.api.models.Collection import Collection
+except ImportError:
+    class Collection:
+        pass
 
 from palimpzest.constants import Cardinality
 from palimpzest.core.data.dataset import Dataset

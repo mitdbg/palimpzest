@@ -2,7 +2,11 @@
 import logging
 
 import numpy as np
-from chromadb.api.models.Collection import Collection
+try:
+    from chromadb.api.models.Collection import Collection
+except ImportError:
+    class Collection:
+        pass
 
 from palimpzest.core.data.dataset import Dataset
 from palimpzest.core.elements.records import DataRecord, DataRecordSet

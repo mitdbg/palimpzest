@@ -7,7 +7,10 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
-import litellm
+try:
+    import litellm
+except ImportError:
+    litellm = None
 
 from palimpzest.prompts.graphrag.library import render
 

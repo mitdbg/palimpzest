@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import time
 import uuid
@@ -8,9 +9,17 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, WebSocket
+from fastapi import FastAPI, HTTPException, WebSocket, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+
+# Configure Logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger("graphrag_app")
 
 from palimpzest.core.data.graph_dataset import GraphDataset, GraphSnapshot
 from palimpzest.graphrag.deciders import (
@@ -112,31 +121,41 @@ class GraphService:
         self._vector_index_error: str | None = None
 
     def load(self, snapshot_path: Path) -> None:
-        snapshot = GraphSnapshot.model_validate(json.loads(snapshot_path.read_text()))
-        self._graph = GraphDataset.from_snapshot(snapshot)
+        logger.info(f"Loading graph snapshot from: {snapshot_path}")
+        start_time = time.time()
+        try:
+            snapshot = GraphSnapshot.model_validate(json.loads(snapshot_path.read_text()))
+            self._graph = GraphDataset.from_snapshot(snapshot)
+            
+            label_index: list[tuple[str, str]] = []
+            root_id: str | None = None
 
-        label_index: list[tuple[str, str]] = []
-        root_id: str | None = None
+            for node in snapshot.nodes:
+                label = node.label
+                if not label:
+                    # Older snapshots sometimes stored a display name in attrs.
+                    maybe = (node.attrs or {}).get("name")
+                    if isinstance(maybe, str) and maybe.strip():
+                        label = maybe.strip()
+                if label:
+                    label_index.append((label.lower(), node.id))
 
-        for node in snapshot.nodes:
-            label = node.label
-            if not label:
-                # Older snapshots sometimes stored a display name in attrs.
-                maybe = (node.attrs or {}).get("name")
-                if isinstance(maybe, str) and maybe.strip():
-                    label = maybe.strip()
-            if label:
-                label_index.append((label.lower(), node.id))
+                # heuristic root: CMS hierarchy root has level==3
+                lvl = node.level
+                if lvl is None:
+                    lvl = (node.attrs or {}).get("level")
+                if root_id is None and lvl == 3:
+                    root_id = node.id
 
-            # heuristic root: CMS hierarchy root has level==3
-            lvl = node.level
-            if lvl is None:
-                lvl = (node.attrs or {}).get("level")
-            if root_id is None and lvl == 3:
-                root_id = node.id
-
-        self._label_index = label_index
-        self._root_node_id = root_id
+            self._label_index = label_index
+            self._root_node_id = root_id
+            
+            duration = time.time() - start_time
+            logger.info(f"Graph loaded successfully. Nodes: {len(snapshot.nodes)}, Edges: {len(snapshot.edges)}. Took {duration:.2f}s")
+            
+        except Exception as e:
+            logger.error(f"Failed to load graph snapshot: {e}", exc_info=True)
+            raise
 
     @property
     def graph(self) -> GraphDataset:
@@ -286,6 +305,7 @@ def build_events_for_traverse(
     entry_points: list[tuple[str, float]],
     trace_events: list[dict[str, Any]] | None = None,
     max_candidates_per_update: int = 50,
+    admit_meta_cache: dict[str, dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     events: list[dict[str, Any]] = []
     seq = 0
@@ -358,9 +378,25 @@ def build_events_for_traverse(
         node_id = item.get("node_id")
         if not node_id:
             continue
+        
+        # Enrich with reasoning if available
+        reasoning_data = {}
+        if admit_meta_cache and node_id in admit_meta_cache:
+            meta = admit_meta_cache[node_id]
+            reasoning_data = {
+                "reason": meta.get("reason"),
+                "decision": "admit" if meta.get("raw_output", "").lower().startswith("true") or meta.get("raw_output", "").lower().startswith("yes") else "reject", # Heuristic, better to pass actual decision
+                "score": item.get("score"),
+                "model": meta.get("model"),
+                "stats": {
+                    "cost": meta.get("cost_usd"),
+                    "latency": meta.get("latency_s"),
+                }
+            }
+
         _emit(
             "search_step",
-            data={"node_id": node_id},
+            data={"node_id": node_id, **reasoning_data},
             node_id=node_id,
             step=admitted_step_by_node_id.get(str(node_id)),
             step_idx=int(idx),
@@ -430,8 +466,52 @@ def create_app(*, snapshot_path: Path | None = None) -> FastAPI:
 
     @app.get("/api/resources")
     def get_resources() -> dict[str, Any]:
-        # Minimal shape expected by UI.
-        return {"indices": ["cms_standard"], "workloads": []}
+        # List available snapshots in CURRENT_WORKSTREAM/exports
+        exports_dir = Path("CURRENT_WORKSTREAM/exports")
+        snapshots = []
+        if exports_dir.exists():
+            snapshots = [f.name for f in exports_dir.glob("*.json")]
+        
+        # Also include the default if it exists elsewhere
+        if DEFAULT_SNAPSHOT_PATH.exists() and DEFAULT_SNAPSHOT_PATH.name not in snapshots:
+             snapshots.append(DEFAULT_SNAPSHOT_PATH.name)
+
+        return {"indices": snapshots, "workloads": []}
+
+    @app.post("/api/load_graph")
+    def load_graph(req: dict[str, str]) -> dict[str, Any]:
+        filename = req.get("index")
+        logger.info(f"API Request: load_graph index={filename}")
+
+        if not filename:
+            logger.warning("load_graph failed: Index filename required")
+            raise HTTPException(status_code=400, detail="Index filename required")
+        
+        # Security: simple check to prevent directory traversal
+        if ".." in filename or "/" in filename:
+             # Allow absolute path if it matches default
+             if filename != str(DEFAULT_SNAPSHOT_PATH):
+                logger.warning(f"load_graph failed: Invalid filename {filename}")
+                raise HTTPException(status_code=400, detail="Invalid filename")
+
+        path = Path("CURRENT_WORKSTREAM/exports") / filename
+        if not path.exists():
+             # Try default location if it matches
+             if filename == DEFAULT_SNAPSHOT_PATH.name and DEFAULT_SNAPSHOT_PATH.exists():
+                 path = DEFAULT_SNAPSHOT_PATH
+             else:
+                 logger.warning(f"load_graph failed: Snapshot not found {path}")
+                 raise HTTPException(status_code=404, detail="Graph snapshot not found")
+
+        try:
+            graphs.load(path)
+            nonlocal load_error
+            load_error = None
+            return {"ok": True, "nodes": graphs.graph.store.count_nodes()}
+        except Exception as e:
+            load_error = str(e)
+            logger.error(f"load_graph exception: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to load graph: {e}")
 
     @app.get("/api/status")
     def get_status() -> dict[str, Any]:
@@ -450,6 +530,7 @@ def create_app(*, snapshot_path: Path | None = None) -> FastAPI:
 
     @app.post("/api/run")
     def run_query(req: RunRequest) -> dict[str, Any]:
+        logger.info(f"API Request: run_query query='{req.query}' model={req.model}")
         run_id = uuid.uuid4().hex
         created_at = time.time()
 
@@ -457,8 +538,14 @@ def create_app(*, snapshot_path: Path | None = None) -> FastAPI:
 
         _require_graph()
 
-        start_nodes_scored = graphs.pick_start_nodes_scored(query=query_text, k=req.entry_points, embedding_backend=req.model)
-        start_nodes = [n for (n, _s) in start_nodes_scored]
+        try:
+            start_nodes_scored = graphs.pick_start_nodes_scored(query=query_text, k=req.entry_points, embedding_backend=req.model)
+            start_nodes = [n for (n, _s) in start_nodes_scored]
+            logger.info(f"Selected {len(start_nodes)} start nodes for query: {start_nodes}")
+        except Exception as e:
+            logger.error(f"Error picking start nodes: {e}", exc_info=True)
+            start_nodes = []
+            start_nodes_scored = []
 
         def _default_llm_model_id() -> str | None:
             if os.getenv("OPENROUTER_API_KEY"):
@@ -511,6 +598,23 @@ def create_app(*, snapshot_path: Path | None = None) -> FastAPI:
                     return s
 
                 ranker_fn = _ranker
+
+        # Metrics collection
+        run_metrics = {
+            "cost_usd": 0.0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "cached_tokens": 0,
+            "calls": 0,
+        }
+
+        def _update_metrics(meta: dict[str, Any]) -> None:
+            run_metrics["cost_usd"] += float(meta.get("cost_usd") or 0.0)
+            run_metrics["input_tokens"] += int(meta.get("input_tokens") or 0)
+            run_metrics["output_tokens"] += int(meta.get("output_tokens") or 0)
+            run_metrics["cached_tokens"] += int(meta.get("cached_tokens") or 0)
+            if not meta.get("cache_hit"):
+                run_metrics["calls"] += 1
 
         # LLM meta prompts + unified gate.
         # Default behavior: if no model is provided, use an available provider (preferring OpenRouter)
@@ -581,6 +685,7 @@ def create_app(*, snapshot_path: Path | None = None) -> FastAPI:
                     "cached_cached_tokens": 0,
                 }
                 admit_meta_cache[node_id] = meta
+                _update_metrics(meta)
                 return admit_cache[node_id], meta
 
             gate_fn = _gate
@@ -681,6 +786,7 @@ def create_app(*, snapshot_path: Path | None = None) -> FastAPI:
                 }
 
                 term_cache[cache_key] = (bool(decision), out_meta)
+                _update_metrics(out_meta)
                 return bool(decision), out_meta
 
             termination_fn = _terminate
@@ -774,6 +880,7 @@ def create_app(*, snapshot_path: Path | None = None) -> FastAPI:
                     }
                     admit_cache[nid] = bool(decision)
                     admit_meta_cache[nid] = out_meta
+                    _update_metrics(out_meta)
                     return {"admit": bool(decision), "decision": out_meta}
 
                 ds = seed.map(
@@ -837,14 +944,23 @@ def create_app(*, snapshot_path: Path | None = None) -> FastAPI:
                 trace_full_node_text=bool(req.debug_trace_full_text),
             )
             out = ds.run()
-            visited_items = [
-                {
+            visited_items = []
+            for r in out:
+                item = {
                     "node_id": r.node_id,
                     "path_node_ids": r.path_node_ids,
                     "score": getattr(r, "score", 0.0),
+                    "admit": getattr(r, "admit", False),
+                    "decision": getattr(r, "decision", None),
                 }
-                for r in out
-            ]
+                visited_items.append(item)
+                
+                # Re-populate caches from results for downstream usage
+                if item["node_id"]:
+                    if item["admit"]:
+                        admit_cache[item["node_id"]] = True
+                    if item["decision"]:
+                        admit_meta_cache[item["node_id"]] = item["decision"]
 
         events = build_events_for_traverse(
             run_id=run_id,
@@ -854,7 +970,73 @@ def create_app(*, snapshot_path: Path | None = None) -> FastAPI:
             edge_type=edge_type,
             entry_points=start_nodes_scored,
             trace_events=trace_events,
+            admit_meta_cache=admit_meta_cache if adm_model else None,
         )
+
+        # Generate final answer
+        final_answer = f"Visited {len(visited_items)} nodes."
+        if adm_model and visited_items:
+            try:
+                # Collect evidence from admitted nodes
+                evidence_texts = []
+                for item in visited_items:
+                    nid = item.get("node_id")
+                    if nid and admit_cache.get(nid):
+                        node = graphs.graph.get_node(nid)
+                        txt = default_node_text(node)
+                        if txt:
+                            evidence_texts.append(f"Node {nid}:\n{txt[:2000]}")
+                
+                if evidence_texts:
+                    from palimpzest.core.lib.schemas import TextSchema
+                    from palimpzest.core.data.iter_dataset import MemoryDataset
+                    from palimpzest.query.operators.convert import LLMConvert
+                    
+                    # Use PZ to generate answer
+                    context = "\n\n".join(evidence_texts[:10]) # Limit context
+                    prompt = f"Query: {query_text}\n\nEvidence:\n{context}\n\nBased on the evidence above, please answer the query."
+                    
+                    # Quick hack: use LLMConvert to generate answer
+                    # Ideally we'd use a dedicated AnswerOp or similar
+                    # For now, we'll just use the decider's model directly if possible, or fallback to PZ
+                    
+                    # Let's use the decider's model directly to avoid PZ overhead for this simple task
+                    # and to reuse the configured model
+                    if 'decider' in locals():
+                         ans_prompt = f"You are a helpful assistant. Answer the user's query based ONLY on the provided evidence.\n\n{prompt}"
+                         # We can reuse decide_prompt_with_meta but it expects boolean output structure usually?
+                         # No, LLMBooleanDecider is specific.
+                         # Let's use a simple generation if we can.
+                         # Actually, let's just use the PZ LLMConvert approach as it's cleaner
+                         
+                         class Answer(BaseModel):
+                             answer: str
+                             
+                         ds = MemoryDataset(id="answer-gen", vals=[{"text": prompt}], schema=TextSchema)
+                         ds = ds.convert(Answer, desc="Generate answer to query", model=LLMBooleanDeciderConfig(model=adm_model))
+                         res = ds.run()
+                         if res:
+                             final_answer = res[0].answer
+                             # Add generation cost to metrics (approximate, as PZ might not expose it easily here without digging)
+                             # For now, we skip adding generation cost to keep it simple
+            except Exception as e:
+                logger.error(f"Error generating answer: {e}")
+                final_answer += f" (Error generating detailed answer: {e})"
+
+        # Emit metrics event
+        events.append({
+            "event_type": "run_metrics",
+            "ts_ms": int(time.time() * 1000),
+            "seq": 999999,
+            "run_id": run_id,
+            "data": run_metrics
+        })
+
+        # Update result event with generated answer
+        for e in events:
+            if e["event_type"] == "result":
+                e["data"]["answer"] = final_answer
+
         runs.add_run(meta=RunMeta(run_id=run_id, index=req.index, query=query_text, created_at=created_at), events=events)
 
         return {"run_id": run_id}
@@ -871,9 +1053,15 @@ def create_app(*, snapshot_path: Path | None = None) -> FastAPI:
     @app.websocket("/ws/{run_id}")
     async def ws_run(websocket: WebSocket, run_id: str) -> None:
         await websocket.accept()
-        for e in runs.get_events(run_id):
-            await websocket.send_text(json.dumps(e))
-        await websocket.close()
+        logger.info(f"WebSocket connected: {run_id}")
+        try:
+            for e in runs.get_events(run_id):
+                await websocket.send_text(json.dumps(e))
+        except Exception as e:
+            logger.error(f"WebSocket error for {run_id}: {e}")
+        finally:
+            logger.info(f"WebSocket closed: {run_id}")
+            await websocket.close()
 
     return app
 

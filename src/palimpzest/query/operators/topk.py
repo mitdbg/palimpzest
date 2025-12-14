@@ -5,11 +5,24 @@ import threading
 import time
 from typing import Callable
 
-from chromadb.api.models.Collection import Collection
-from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
-from chromadb.utils.embedding_functions.openai_embedding_function import OpenAIEmbeddingFunction
-from openai import OpenAI
-from sentence_transformers import SentenceTransformer
+try:
+    from chromadb.api.models.Collection import Collection
+    from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
+    from chromadb.utils.embedding_functions.openai_embedding_function import OpenAIEmbeddingFunction
+except ImportError:
+    class Collection: pass
+    SentenceTransformerEmbeddingFunction = None
+    OpenAIEmbeddingFunction = None
+
+try:
+    from openai import OpenAI
+except ImportError:
+    OpenAI = None
+
+try:
+    from sentence_transformers import SentenceTransformer
+except ImportError:
+    SentenceTransformer = None
 
 from palimpzest.constants import MODEL_CARDS, Model
 from palimpzest.core.elements.records import DataRecord, DataRecordSet

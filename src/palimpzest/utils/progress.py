@@ -2,7 +2,11 @@ import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from chromadb.api.models.Collection import Collection
+try:
+    from chromadb.api.models.Collection import Collection
+except ImportError:
+    class Collection:
+        pass
 from rich.console import Console
 from rich.live import Live
 from rich.panel import Panel

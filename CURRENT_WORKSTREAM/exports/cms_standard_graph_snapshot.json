@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "graph_id": "dummy-graph-001",
+  "revision": 1,
+  "nodes": [
+    {
+      "id": "root",
+      "label": "CMS Root Node",
+      "type": "root",
+      "level": 3,
+      "attrs": {
+        "name": "CMS Root",
+        "description": "The root of the CMS hierarchy"
+      },
+      "text": "This is the root node of the CMS experiment graph."
+    },
+    {
+      "id": "child1",
+      "label": "Tier0 Operations",
+      "type": "group",
+      "level": 4,
+      "attrs": {
+        "name": "Tier0",
+        "description": "Tier0 operations group"
+      },
+      "text": "Tier0 is responsible for the creation and permanent storage of CMS RAW data."
+    },
+    {
+      "id": "child2",
+      "label": "Data Management",
+      "type": "group",
+      "level": 4,
+      "attrs": {
+        "name": "Data Management",
+        "description": "Data Management group"
+      },
+      "text": "Data Management (DM) team is responsible for data related matters such data access, data transfer, management of disk and tape storages etc."
+    },
+    {
+      "id": "child3",
+      "label": "Production & Reprocessing",
+      "type": "group",
+      "level": 4,
+      "attrs": {
+        "name": "P&R",
+        "description": "Production and Reprocessing group"
+      },
+      "text": "Production and Reprocessing (P&R) team is responsible for the central production of MC data as well as the re-processing of the detector data."
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "src": "root",
+      "dst": "child1",
+      "type": "hierarchy",
+      "directed": true
+    },
+    {
+      "id": "e2",
+      "src": "root",
+      "dst": "child2",
+      "type": "hierarchy",
+      "directed": true
+    },
+    {
+      "id": "e3",
+      "src": "root",
+      "dst": "child3",
+      "type": "hierarchy",
+      "directed": true
+    }
+  ],
+  "induction_log": {
+    "entries": []
+  }
+}

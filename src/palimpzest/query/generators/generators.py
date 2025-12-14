@@ -12,7 +12,11 @@ import warnings
 from copy import deepcopy
 from typing import Any, Generic, TypeVar
 
-import litellm
+try:
+    import litellm
+except ImportError:
+    litellm = None
+
 import regex as re  # Use regex instead of re to used variable length lookbehind
 from colorama import Fore, Style
 from pydantic.fields import FieldInfo

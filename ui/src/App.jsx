@@ -1,18 +1,27 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import Header from './components/Header';
-import Sidebar from './components/Sidebar';
 import GraphVisualization from './components/GraphVisualization';
 import ControlPanel from './components/ControlPanel';
 import LogViewer from './components/LogViewer';
 import NodeDetails from './components/NodeDetails';
-import HistoryModal from './components/HistoryModal';
 import ErrorBoundary from './components/ErrorBoundary';
+import HistorySidebar from './components/HistorySidebar';
+import ChatInput from './components/ChatInput';
+import RunDetails from './components/RunDetails';
+import SettingsModal from './components/SettingsModal';
+import ReasoningFeed from './components/ReasoningFeed';
+import Toast from './components/Toast';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8002";
 const WS_BASE = import.meta.env.VITE_WS_URL || "ws://localhost:8002";
 
-// Stable empty array to avoid re-renders
-const EMPTY_ARRAY = [];
+// Simple Logger
+const logger = {
+    info: (msg, data) => console.log(`[INFO] ${new Date().toISOString()} - ${msg}`, data || ''),
+    error: (msg, err) => console.error(`[ERROR] ${new Date().toISOString()} - ${msg}`, err || ''),
+    warn: (msg, data) => console.warn(`[WARN] ${new Date().toISOString()} - ${msg}`, data || '')
+};
 
 function App() {
   const [status, setStatus] = useState({ running: false, last_query: "" });
@@ -20,7 +29,7 @@ function App() {
   const [currentStep, setCurrentStep] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(100); // ms per step
-  const [mode, setMode] = useState('live'); // 'live' or 'file'
+  const [mode, setMode] = useState('live'); // 'live' or 'file' or 'history'
   const [currentRunId, setCurrentRunId] = useState(null);
   
   // Multi-query support
@@ -38,21 +47,48 @@ function App() {
   const [selectedNode, setSelectedNode] = useState(null);
   
   const [ws, setWs] = useState(null);
-  const fileInputRef = useRef(null);
   const [showLogs, setShowLogs] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [runHistory, setRunHistory] = useState([]);
 
   const [resources, setResources] = useState({ indices: [], workloads: [] });
   
-  const [runConfig, setRunConfig] = useState({
-      index: "data/hcg_medical.json",
-      inputType: "query", // 'query' or 'workload'
-      query: "What is the capital of France?",
-      workload: "",
-      model: "openrouter/x-ai/grok-4.1-fast",
-      entry_points: 5
+  const [runConfig, setRunConfig] = useState(() => {
+      const saved = localStorage.getItem('graphrag_runConfig');
+      return saved ? JSON.parse(saved) : {
+          index: "data/hcg_medical.json",
+          inputType: "query",
+          query: "",
+          workload: "",
+          model: "openrouter/x-ai/grok-4.1-fast",
+          entry_points: 5,
+          ranking_model: "",
+          admittance_model: "",
+          termination_model: "",
+          max_steps: 200,
+          edge_type: ""
+      };
   });
+
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [devMode, setDevMode] = useState(() => {
+      return localStorage.getItem('graphrag_devMode') === 'true';
+  });
+
+  // Persist settings
+  useEffect(() => {
+      localStorage.setItem('graphrag_runConfig', JSON.stringify(runConfig));
+  }, [runConfig]);
+
+  useEffect(() => {
+      localStorage.setItem('graphrag_devMode', devMode);
+  }, [devMode]);
+
+  const [toast, setToast] = useState(null); // { message, type }
+
+  const showToast = (message, type = 'success') => {
+      setToast({ message, type });
+  };
 
   // Full Graph Visualization
   const [showFullGraph, setShowFullGraph] = useState(false);
@@ -62,13 +98,28 @@ function App() {
   const fetchFullGraph = async (index) => {
       if (!index) return;
       setIsLoadingGraph(true);
+      logger.info(`Fetching full graph for index: ${index}`);
       try {
+          // First, tell backend to load this graph
+          const loadRes = await fetch(`${API_BASE}/api/load_graph`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ index })
+          });
+          if (!loadRes.ok) {
+              const err = await loadRes.json();
+              throw new Error(err.detail || "Failed to switch graph");
+          }
+
+          // Then fetch the payload
           const res = await fetch(`${API_BASE}/api/graph?index=${encodeURIComponent(index)}`);
-          if (!res.ok) throw new Error("Failed to load graph");
+          if (!res.ok) throw new Error("Failed to load graph payload");
           const data = await res.json();
+          logger.info(`Graph loaded. Nodes: ${data.nodes?.length}, Links: ${data.links?.length}`);
           setFullGraphData(data);
       } catch (e) {
-          console.error("Error loading full graph:", e);
+          logger.error("Error loading full graph", e);
+          showToast("Failed to load graph: " + e.message, "error");
           setFullGraphData(null);
       } finally {
           setIsLoadingGraph(false);
@@ -98,14 +149,13 @@ function App() {
           setRunHistory(data.history || []);
       } catch (e) {
           console.error("Failed to fetch history", e);
+          showToast("Failed to load history", "error");
       }
   };
 
   useEffect(() => {
-      if (showHistory) {
-          fetchHistory();
-      }
-  }, [showHistory]);
+      fetchHistory();
+  }, []);
 
   const [finalAnswer, setFinalAnswer] = useState(null);
 
@@ -113,8 +163,12 @@ function App() {
       // Validate Index
       const runMeta = runHistory.find(r => r.run_id === runId);
       if (runMeta && runMeta.index && runMeta.index !== runConfig.index) {
-          alert(`Cannot load trace. \n\nThis run used index: ${runMeta.index}\nCurrent selection: ${runConfig.index}\n\nPlease select the correct index in the sidebar.`);
-          return;
+          if (confirm(`This run used index: ${runMeta.index}\nCurrent selection: ${runConfig.index}\n\nSwitch index to load trace?`)) {
+              setRunConfig(prev => ({ ...prev, index: runMeta.index }));
+              // The useEffect for runConfig.index will trigger graph load
+          } else {
+              return;
+          }
       }
 
       if (ws) ws.close();
@@ -136,9 +190,6 @@ function App() {
               
               setAllEvents(prev => {
                   const next = [...prev, ...batch];
-                  // Auto-scroll if we were at the end or it's the start
-                  // We use a timeout to allow state to settle, or just rely on the useEffect auto-scroll logic if we enable it for history
-                  // For now, let's force scroll to end during loading
                   setCurrentStep(next.length - 1);
                   return next;
               });
@@ -156,6 +207,7 @@ function App() {
               }
           } catch (e) {
               console.error("WS Parse Error", e);
+              showToast("Error parsing history update", "error");
           }
       };
       
@@ -168,6 +220,12 @@ function App() {
 
       setWs(socket);
       setCurrentRunId(runId);
+      
+      // Sync query input
+      const run = runHistory.find(r => r.run_id === runId);
+      if (run && run.query) {
+          setRunConfig(prev => ({ ...prev, query: run.query }));
+      }
   };
 
   // Fetch resources
@@ -177,15 +235,14 @@ function App() {
             .then(res => res.json())
             .then(data => {
                 console.log("Loaded resources:", data);
-                if (data.indices && data.indices.length > 0) {
-                    console.log("First index:", data.indices[0]);
-                }
                 setResources(data);
                 if (data.indices && data.indices.length > 0) {
-                    // Prefer hcg_medical.json if available
-                    const medicalIndex = data.indices.find(i => i.includes('hcg_medical.json'));
-                    console.log("Selected medical index:", medicalIndex);
-                    setRunConfig(prev => ({ ...prev, index: medicalIndex || data.indices[0] }));
+                    // If current config index is not in list, pick first available
+                    if (!runConfig.index || !data.indices.includes(runConfig.index)) {
+                         // Prefer cms_standard if available
+                         const defaultIdx = data.indices.find(i => i.includes('cms_standard')) || data.indices[0];
+                         setRunConfig(prev => ({ ...prev, index: defaultIdx }));
+                    }
                 }
                 if (data.workloads && data.workloads.length > 0) {
                     setRunConfig(prev => ({ ...prev, workload: data.workloads[0] }));
@@ -195,7 +252,6 @@ function App() {
       };
       
       loadResources();
-      // Retry once after 1s in case server wasn't ready
       setTimeout(loadResources, 1000);
   }, []);
 
@@ -247,8 +303,6 @@ function App() {
       if (queryList.length > 0) {
           const currentExists = queryList.find(q => q.id === selectedQueryId);
           if (!selectedQueryId || mode === 'live' || !currentExists) {
-             // If live, we usually want to follow the latest query
-             // OR if the current selection is no longer valid (e.g. switched from default to real ID)
              setSelectedQueryId(queryList[queryList.length - 1].id);
           }
       }
@@ -262,7 +316,16 @@ function App() {
   }, [queries, selectedQueryId]);
 
   const logs = useMemo(() => {
-      return allEvents.filter(e => e.event_type === 'stdout' || e.event_type === 'stderr');
+      return allEvents.filter(e => 
+          e.event_type === 'stdout' || 
+          e.event_type === 'stderr' ||
+          e.event_type === 'search_step' ||
+          e.event_type === 'node_evaluation' ||
+          e.event_type === 'evidence_collected' ||
+          e.event_type === 'result' ||
+          e.event_type === 'query_start' ||
+          e.event_type === 'query_end'
+      );
   }, [allEvents]);
 
   // Playback Loop
@@ -292,14 +355,11 @@ function App() {
         
         try {
             if (activeEvents.length > 0) {
-                // Ensure step is valid for new query
                 const safeStep = Math.min(currentStep, activeEvents.length - 1);
                 processGraph(activeEvents, safeStep);
             } else if (showFullGraph && fullGraphData) {
-                // Show full graph even if no events
                 processGraph([], -1);
             } else {
-                // Clear graph if no events
                 setGraphData({ nodes: [], links: [] });
                 setMetrics({ cost: 0, calls: 0, tokens: 0, shortcuts: 0 });
                 setEvidence([]);
@@ -309,7 +369,7 @@ function App() {
         } finally {
             processingRef.current = false;
         }
-    }, 10); // Low debounce (10ms) because batching handles the flood
+    }, 10);
     return () => clearTimeout(timer);
   }, [currentStep, activeEvents, showFullGraph, fullGraphData]);
 
@@ -327,6 +387,26 @@ function App() {
       }
   }, [activeEvents.length, mode, selectedQueryId]);
 
+  // Keyboard Shortcuts
+  useEffect(() => {
+      const handleKeyDown = (e) => {
+          // Cmd+Enter to Run
+          if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+              if (!status.running && runConfig.query.trim()) {
+                  runQuery();
+              }
+          }
+          // Esc to close panels
+          if (e.key === 'Escape') {
+              if (isSettingsOpen) setIsSettingsOpen(false);
+              if (selectedNode) setSelectedNode(null);
+              if (showLogs) setShowLogs(false);
+          }
+      };
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [status.running, runConfig.query, isSettingsOpen, selectedNode, showLogs]);
+
   const fetchStatus = async () => {
     try {
       const res = await fetch(`${API_BASE}/api/status`);
@@ -335,37 +415,6 @@ function App() {
     } catch (e) {
       console.error("Status fetch failed", e);
     }
-  };
-
-  const handleFileUpload = (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        const text = e.target.result;
-        // Hack to fix Python NaN in JSON
-        const fixedText = text.replace(/: NaN/g, ': null');
-        const lines = fixedText.split('\n');
-        const events = [];
-        for (const line of lines) {
-            if (!line.trim()) continue;
-            try {
-                events.push(JSON.parse(line));
-            } catch (err) {
-                console.error("Error parsing line", err);
-            }
-        }
-        setAllEvents(events);
-        setCurrentStep(0);
-        setMode('file');
-        setIsPlaying(false);
-        if (ws) {
-            ws.close();
-            setWs(null);
-        }
-    };
-    reader.readAsText(file);
   };
 
   const runQuery = async () => {
@@ -379,7 +428,9 @@ function App() {
           ranking_model: runConfig.ranking_model || null,
           admittance_model: runConfig.admittance_model || null,
           termination_model: runConfig.termination_model || null,
-          entry_points: runConfig.entry_points
+          entry_points: runConfig.entry_points,
+          max_steps: runConfig.max_steps,
+          edge_type: runConfig.edge_type
       };
       
       if (runConfig.inputType === 'query') {
@@ -388,6 +439,11 @@ function App() {
           payload.workload_file = runConfig.workload;
       }
 
+      // Sync dev mode with debug trace
+      payload.debug_trace = devMode;
+
+      logger.info("Starting run", payload);
+
       const res = await fetch(`${API_BASE}/api/run`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -395,12 +451,11 @@ function App() {
       });
       const data = await res.json();
       
-      // Reset UI
       setAllEvents([]);
       setCurrentStep(0);
       setIsPlaying(true);
       
-      // Connect WS
+      logger.info(`Run started. ID: ${data.run_id}`);
       const socket = new WebSocket(`${WS_BASE}/ws/${data.run_id}`);
       
       let messageBuffer = [];
@@ -413,7 +468,6 @@ function App() {
               
               setAllEvents(prev => {
                   const next = [...prev, ...batch];
-                  // Always auto-scroll to latest in live run
                   setCurrentStep(next.length - 1);
                   return next;
               });
@@ -421,24 +475,29 @@ function App() {
           batchTimeout = null;
       };
 
+      socket.onopen = () => {
+          logger.info("WebSocket connected");
+      };
+
       socket.onmessage = (event) => {
-          // console.log("WS Message:", event.data); // Reduce log spam
           try {
               const newEvent = JSON.parse(event.data);
               messageBuffer.push(newEvent);
               
               if (!batchTimeout) {
-                  batchTimeout = setTimeout(processBatch, 100); // Batch updates every 100ms
+                  batchTimeout = setTimeout(processBatch, 100);
               }
           } catch (e) {
-              console.error("WS Parse Error", e);
+              logger.error("WS Parse Error", e);
+              showToast("Error parsing live update", "error");
           }
       };
 
       socket.onclose = () => {
+          logger.info("WebSocket closed");
           if (batchTimeout) {
               clearTimeout(batchTimeout);
-              processBatch(); // Flush remaining
+              processBatch();
           }
       };
 
@@ -446,8 +505,10 @@ function App() {
       setCurrentRunId(data.run_id);
       
       fetchStatus();
+      fetchHistory(); // Update history list
     } catch (e) {
-      console.error("Run failed", e);
+      logger.error("Run failed", e);
+      showToast("Run failed: " + e.message, "error");
     }
   };
 
@@ -456,40 +517,38 @@ function App() {
       if (currentRunId) {
           await fetch(`${API_BASE}/api/stop/${currentRunId}`, { method: 'POST' });
       } else {
-          // Fallback or legacy stop
           await fetch(`${API_BASE}/api/stop`, { method: 'POST' });
       }
       fetchStatus();
+      showToast("Query stopped");
     } catch (e) {
       console.error("Stop failed", e);
+      showToast("Failed to stop query", "error");
     }
   };
 
   const processGraph = (events, limitIndex) => {
     const nodes = new Map();
     const links = [];
-    const linkSet = new Set(); // Track existing links to avoid duplicates
+    const linkSet = new Set();
     const parentMap = new Map();
     let currentMetrics = { cost: 0, calls: 0, tokens: 0, shortcuts: 0 };
     let currentEvidence = [];
-    const evidenceSet = new Set(); // Track evidence to avoid duplicates
-    let currentQueue = []; // We need to track queue state
+    const evidenceSet = new Set();
+    let currentQueue = [];
     let currentAnswer = null;
     let lastAction = "Ready.";
     let lastExploredNodeId = null;
     
-    // Track active nodes to filter graph edges
     const activeNodeIds = new Set();
-    const nodeStates = new Map(); // id -> { score, visited, isEvidence, ... }
-    const rootEdges = []; // List of target IDs connected to ROOT
+    const nodeStates = new Map();
+    const rootEdges = [];
 
-    // Initialize with full graph if available
     if (showFullGraph && fullGraphData) {
         fullGraphData.nodes.forEach(n => {
             nodes.set(n.id, { ...n, visited: false, type: 'static', score: 0 });
         });
         fullGraphData.links.forEach(l => {
-            // Ensure source and target exist to prevent D3 crashes
             if (nodes.has(l.source) && nodes.has(l.target)) {
                 links.push({ ...l, isOnPath: false });
                 linkSet.add(`${l.source}-${l.target}`);
@@ -497,14 +556,11 @@ function App() {
         });
     }
 
-    // 1. Scan events to determine active nodes and their state
     for (let i = 0; i <= limitIndex && i < events.length; i++) {
         const e = events[i];
         
-        // Update Action
         if (e.event_type) lastAction = `${e.event_type}`;
 
-        // Metrics
         if (e.event_type === 'llm_score_request' || e.event_type === 'llm_interaction') {
             currentMetrics.calls++;
         }
@@ -523,7 +579,6 @@ function App() {
             state.type = 'visited';
             nodeStates.set(node_id, state);
             
-            // Remove from queue
             currentQueue = currentQueue.filter(q => q.id !== node_id);
         }
 
@@ -574,10 +629,8 @@ function App() {
         if (e.event_type === 'frontier_update') {
             let { parent_id, candidates } = e.data;
             
-            // Handle empty parent_id (Entry Points)
             if (!parent_id) {
                 parent_id = "ROOT";
-                // Capture entry points for Root Edges
                 if (candidates) candidates.forEach(c => rootEdges.push(c.id));
             }
             
@@ -591,22 +644,17 @@ function App() {
                     activeNodeIds.add(id);
                     const state = nodeStates.get(id) || {};
                     if (score !== undefined && score !== null) state.score = score;
-                    // Only set summary if we don't have graph data later
                     if (summary) state._traceSummary = summary; 
                     if (!state.visited && !state.isEvidence) state.type = 'candidate';
                     nodeStates.set(id, state);
 
-                    // Track parent for path reconstruction
                     if (parent_id) {
                         parentMap.set(id, parent_id);
                     }
 
-                    // Add to queue if not visited
-                    // Note: We use trace summary for queue for now, but could upgrade
                     if (!state.visited && !currentQueue.find(q => q.id === id)) {
                         currentQueue.push({ id, score: state.score, summary: summary || "" });
                     } else if (!state.visited) {
-                        // Update score in queue
                         const qItem = currentQueue.find(q => q.id === id);
                         if (qItem) {
                             qItem.score = state.score;
@@ -615,7 +663,6 @@ function App() {
                     }
                 });
                 
-                // Sort queue
                 currentQueue.sort((a, b) => (b.score || 0) - (a.score || 0));
             }
         }
@@ -624,7 +671,6 @@ function App() {
             const { answer, path } = e.data;
             currentAnswer = answer;
             
-            // Highlight path
             if (path && Array.isArray(path)) {
                 path.forEach((nodeId) => {
                     activeNodeIds.add(nodeId);
@@ -636,8 +682,6 @@ function App() {
         }
     }
 
-    // 2. Build Nodes (Merging Graph Data + Trace State)
-    // Always add ROOT if we have root edges
     if (rootEdges.length > 0) {
         nodes.set("ROOT", { id: "ROOT", type: 'entry', summary: "Query", visited: true });
     }
@@ -647,19 +691,15 @@ function App() {
 
         let nodeData = { id, type: 'candidate', summary: "", visited: false, score: 0 };
         
-        // Prefer Full Graph Data
         if (fullGraphData && fullGraphData.nodes) {
             const graphNode = fullGraphData.nodes.find(n => n.id === id);
             if (graphNode) {
-                // Use graph data as base
                 nodeData = { ...graphNode, ...nodeData, summary: graphNode.summary, type: 'candidate' }; 
             }
         }
 
-        // Merge Dynamic State
         const state = nodeStates.get(id);
         if (state) {
-            // If we have a trace summary and NO graph summary, use trace summary
             if (state._traceSummary && !nodeData.summary) {
                 nodeData.summary = state._traceSummary;
             }
@@ -670,8 +710,6 @@ function App() {
         nodes.set(id, nodeData);
     });
 
-    // 3. Build Links
-    // A. Graph Edges (The "All Edges" requirement)
     if (fullGraphData && fullGraphData.links) {
         fullGraphData.links.forEach(l => {
             const sourceId = typeof l.source === 'object' ? l.source.id : l.source;
@@ -687,7 +725,6 @@ function App() {
         });
     }
 
-    // B. Root Edges (The "Exception" requirement)
     rootEdges.forEach(targetId => {
         if (nodes.has(targetId)) {
              const key = `ROOT-${targetId}`;
@@ -698,9 +735,8 @@ function App() {
         }
     });
 
-    // C. Trace Edges (Fallback for missing graph data)
     parentMap.forEach((parentId, childId) => {
-        if (parentId === "ROOT") return; // Handled above
+        if (parentId === "ROOT") return;
         
         if (nodes.has(parentId) && nodes.has(childId)) {
              const key = `${parentId}-${childId}`;
@@ -713,9 +749,7 @@ function App() {
         }
     });
 
-    // Highlight path edges
     if (currentAnswer && events.length > 0) {
-        // Find result event
         const resEvent = events.find(e => e.event_type === 'result');
         if (resEvent && resEvent.data.path) {
              const path = resEvent.data.path;
@@ -734,10 +768,9 @@ function App() {
     
     setQueue(currentQueue);
 
-    // Highlight path to the last explored node if no answer yet
     if (lastExploredNodeId && !currentAnswer) {
         let curr = lastExploredNodeId;
-        const visitedPath = new Set(); // Prevent infinite loops
+        const visitedPath = new Set();
         
         while (curr && parentMap.has(curr)) {
             if (visitedPath.has(curr)) {
@@ -747,11 +780,9 @@ function App() {
             
             const parent = parentMap.get(curr);
             
-            // Mark node
             if (nodes.has(curr)) nodes.get(curr).isActivePath = true;
             if (nodes.has(parent)) nodes.get(parent).isActivePath = true;
 
-            // Mark edge
             const link = links.find(l => 
                 (l.source === parent && l.target === curr) ||
                 (l.source === curr && l.target === parent) ||
@@ -787,119 +818,217 @@ function App() {
             content: { id: node.id, score: node.score, type: node.type, summary: node.summary }
         });
     } else if (event) {
-        // Just update position if tooltip exists
         setTooltip(prev => prev ? ({ ...prev, x: event.pageX, y: event.pageY }) : null);
     }
   };
 
+  const handleNewChat = () => {
+      setAllEvents([]);
+      setCurrentStep(0);
+      setGraphData({ nodes: [], links: [] });
+      setMetrics({ cost: 0, calls: 0, tokens: 0, shortcuts: 0 });
+      setEvidence([]);
+      setQueue([]);
+      setFinalAnswer(null);
+      setSelectedQueryId(null);
+      setRunConfig(prev => ({ ...prev, query: "" }));
+      setMode('live');
+  };
+
+  const handleExport = () => {
+      if (allEvents.length === 0) return;
+      
+      const blob = new Blob([allEvents.map(e => JSON.stringify(e)).join('\n')], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `trace-${currentRunId || 'export'}.jsonl`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast("Trace exported successfully");
+  };
+
+  const suggestedQueries = [
+      "What are the main side effects of Aspirin?",
+      "Find papers about machine learning in healthcare.",
+      "Who authored the key papers on Transformers?",
+      "Explain the relationship between diabetes and heart disease."
+  ];
+
+  const hasRun = allEvents.length > 0 || showFullGraph;
+
   return (
-    <div className="min-h-screen bg-gray-900 text-white font-sans flex flex-col">
-      <Header 
-        status={status}
-        mode={mode}
-        setMode={setMode}
-        showHistory={showHistory}
-        setShowHistory={setShowHistory}
-        fileInputRef={fileInputRef}
-        handleFileUpload={handleFileUpload}
-        showLogs={showLogs}
-        setShowLogs={setShowLogs}
+    <div className="h-screen bg-black text-white font-sans flex overflow-hidden">
+      <HistorySidebar 
+        queries={queries}
+        selectedQueryId={selectedQueryId}
+        setSelectedQueryId={setSelectedQueryId}
+        onNewChat={handleNewChat}
+        onOpenSettings={() => setIsSettingsOpen(true)}
         runHistory={runHistory}
         loadRun={loadRun}
-        runConfig={runConfig}
       />
 
-      <div className="flex-1 flex overflow-hidden">
-        <Sidebar 
-            runConfig={runConfig}
-            setRunConfig={setRunConfig}
-            resources={resources}
-            availableModels={availableModels}
-            runQuery={runQuery}
-            stopQuery={stopQuery}
-            status={status}
-            queries={queries}
-            selectedQueryId={selectedQueryId}
-            setSelectedQueryId={setSelectedQueryId}
+      <div className="flex-1 flex flex-col relative">
+        {/* Main Content Area */}
+        {!hasRun ? (
+            <div className="flex-1 flex flex-col items-center justify-center p-8">
+                <div className="mb-8 text-center">
+                    <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">GraphRAG Explorer</h1>
+                    <p className="text-gray-400">Explore your knowledge graph with natural language</p>
+                </div>
+                <ChatInput 
+                    runConfig={runConfig}
+                    setRunConfig={setRunConfig}
+                    runQuery={runQuery}
+                    stopQuery={stopQuery}
+                    isRunning={status.running}
+                    onOpenSettings={() => setIsSettingsOpen(true)}
+                    mode="centered"
+                />
+                
+                <div className="mt-8 flex flex-wrap justify-center gap-2 max-w-2xl">
+                    {suggestedQueries.map((q, i) => (
+                        <button
+                            key={i}
+                            onClick={() => {
+                                setRunConfig(prev => ({ ...prev, query: q }));
+                                // Optional: Auto-run
+                                // setTimeout(runQuery, 100); 
+                            }}
+                            className="px-3 py-1.5 bg-gray-900 border border-gray-800 rounded-full text-xs text-gray-400 hover:text-white hover:border-gray-600 transition-colors"
+                        >
+                            {q}
+                        </button>
+                    ))}
+                </div>
+            </div>
+        ) : (
+            <div className="flex-1 flex flex-col h-full">
+                {/* Top Bar with Input */}
+                <div className="p-4 border-b border-gray-800 bg-gray-900/50 backdrop-blur z-10">
+                    <ChatInput 
+                        runConfig={runConfig}
+                        setRunConfig={setRunConfig}
+                        runQuery={runQuery}
+                        stopQuery={stopQuery}
+                        isRunning={status.running}
+                        onOpenSettings={() => setIsSettingsOpen(true)}
+                        mode="bottom"
+                    />
+                </div>
+
+                {/* Graph Area */}
+                <div className="flex-1 relative overflow-hidden bg-gray-950">
+                    <ReasoningFeed events={activeEvents} currentStep={currentStep} />
+                    <ErrorBoundary>
+                        <GraphVisualization 
+                            graphData={graphData}
+                            onNodeClick={setSelectedNode}
+                            onNodeHover={handleNodeHover}
+                        />
+                    </ErrorBoundary>
+
+                    {/* Overlay Stats */}
+                    <div className="absolute bottom-20 right-16 bg-gray-900/80 p-3 rounded border border-gray-700 backdrop-blur pointer-events-none">
+                        <div className="text-[10px] text-gray-400 uppercase tracking-wider">Graph Size</div>
+                        <div className="text-lg font-bold">{graphData.nodes.length} <span className="text-sm font-normal text-gray-500">nodes</span></div>
+                    </div>
+
+                    {/* Legend */}
+                    <div className="absolute bottom-24 left-4 bg-gray-900/90 p-3 rounded border border-gray-700 backdrop-blur pointer-events-none text-xs">
+                        <div className="flex items-center gap-2 mb-1">
+                            <div className="w-3 h-3 rounded-full bg-purple-500"></div> Entry Point
+                        </div>
+                        <div className="flex items-center gap-2 mb-1">
+                            <div className="w-3 h-3 rounded-full bg-blue-500"></div> Visited
+                        </div>
+                        <div className="flex items-center gap-2 mb-1">
+                            <div className="w-3 h-3 rounded-full bg-yellow-400"></div> Evidence node
+                        </div>
+                        <div className="flex items-center gap-2 mb-1">
+                            <div className="w-3 h-3 rounded-full bg-gray-400"></div> Candidate / Queue
+                        </div>
+                        <div className="flex items-center gap-2 mb-1">
+                            <div className="w-5 h-1 bg-green-400"></div> Answer Path
+                        </div>
+                        <div className="flex items-center gap-2 mb-1">
+                            <div className="w-5 h-1 bg-gray-600"></div> Traversal Edge
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <div className="w-5 h-1 border-t border-green-600 opacity-50"></div> Reference Edge
+                        </div>
+                    </div>
+
+                    {/* Final Answer Overlay */}
+                    {finalAnswer && (
+                        <div className="absolute bottom-20 left-4 right-4 md:left-10 md:right-10 bg-gray-900/95 border border-blue-500/30 p-6 rounded-xl backdrop-blur shadow-2xl max-h-[40vh] overflow-y-auto">
+                            <div className="text-xs font-bold text-blue-400 mb-2 uppercase tracking-wider">Final Answer</div>
+                            <div className="text-sm text-gray-200 leading-relaxed prose prose-invert prose-sm max-w-none">
+                                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                    {finalAnswer}
+                                </ReactMarkdown>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Playback Controls */}
+                    <div className="absolute bottom-0 left-0 right-0">
+                        <ControlPanel 
+                            isPlaying={isPlaying}
+                            setIsPlaying={setIsPlaying}
+                            currentStep={currentStep}
+                            setCurrentStep={setCurrentStep}
+                            maxStep={Math.max(0, activeEvents.length - 1)}
+                            activeEventsCount={activeEvents.length}
+                        />
+                    </div>
+                </div>
+            </div>
+        )}
+      </div>
+
+      {/* Right Sidebar (Details) */}
+      {hasRun && (
+          <RunDetails 
             metrics={metrics}
-            currentAction={currentAction}
-            finalAnswer={finalAnswer}
             evidence={evidence}
             queue={queue}
-            showFullGraph={showFullGraph}
-            setShowFullGraph={setShowFullGraph}
-            isLoadingGraph={isLoadingGraph}
-            fullGraphData={fullGraphData}
-        />
-
-        <div className="flex-1 bg-black relative flex flex-col">
-          <ControlPanel 
-            isPlaying={isPlaying}
-            setIsPlaying={setIsPlaying}
-            currentStep={currentStep}
-            setCurrentStep={setCurrentStep}
-            maxStep={Math.max(0, activeEvents.length - 1)}
-            activeEventsCount={activeEvents.length}
+            currentAction={currentAction}
+            finalAnswer={finalAnswer}
+            devMode={devMode}
+            onShowLogs={() => setShowLogs(true)}
+            onExport={handleExport}
+            onSelectNode={(node) => {
+                // Find full node data if possible
+                const fullNode = graphData.nodes.find(n => n.id === node.id) || node;
+                setSelectedNode(fullNode);
+                // Also trigger graph zoom if we can access the ref (complex, so maybe just select for now)
+            }}
           />
+      )}
 
-          <div className="flex-1 relative overflow-hidden">
-            <ErrorBoundary>
-                <GraphVisualization 
-                    graphData={graphData}
-                    onNodeClick={setSelectedNode}
-                    onNodeHover={handleNodeHover}
-                />
-            </ErrorBoundary>
-            
-            {/* Overlay Stats */}
-            <div className="absolute top-4 right-4 bg-gray-900/80 p-4 rounded border border-gray-700 backdrop-blur pointer-events-none">
-                <div className="text-xs text-gray-400">Nodes</div>
-                <div className="text-xl font-bold">{graphData.nodes.length}</div>
-            </div>
-            
-            {/* Legend */}
-            <div className="absolute top-4 left-4 bg-gray-900/90 p-3 rounded border border-gray-700 backdrop-blur pointer-events-none text-xs">
-                <div className="flex items-center gap-2 mb-1">
-                    <div className="w-3 h-3 rounded-full bg-purple-500"></div> Entry Point
-                </div>
-                <div className="flex items-center gap-2 mb-1">
-                    <div className="w-3 h-3 rounded-full bg-blue-500"></div> Visited
-                </div>
-                <div className="flex items-center gap-2 mb-1">
-                    <div className="w-3 h-3 rounded-full bg-yellow-400"></div> Evidence node
-                </div>
-                <div className="flex items-center gap-2 mb-1">
-                    <div className="w-3 h-3 rounded-full bg-gray-400"></div> Candidate / Queue
-                </div>
-                <div className="flex items-center gap-2 mb-1">
-                    <div className="w-5 h-1 bg-green-400"></div> Answer Path
-                </div>
-                <div className="flex items-center gap-2 mb-1">
-                    <div className="w-5 h-1 bg-gray-600"></div> Traversal Edge
-                </div>
-                <div className="flex items-center gap-2">
-                    <div className="w-5 h-1 border-t border-green-600 opacity-50"></div> Reference Edge
-                </div>
-            </div>
-          </div>
+      {/* Modals & Overlays */}
+      <SettingsModal 
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        runConfig={runConfig}
+        setRunConfig={setRunConfig}
+        resources={resources}
+        availableModels={availableModels}
+        devMode={devMode}
+        setDevMode={setDevMode}
+      />
 
-          {showLogs && <LogViewer logs={logs} onClose={() => setShowLogs(false)} />}
-          
-          {showHistory && (
-            <HistoryModal 
-                history={runHistory} 
-                onClose={() => setShowHistory(false)} 
-                onLoadRun={loadRun} 
-            />
-          )}
-        </div>
-      </div>
-      
-      {/* Tooltip */}
       {tooltip && (
         <div 
             className="fixed z-50 bg-gray-900 border border-gray-600 p-2 rounded shadow-lg text-xs pointer-events-none"
-            style={{ left: tooltip.x + 10, top: tooltip.y + 10 }}
+            style={{ 
+                left: Math.min(tooltip.x + 10, window.innerWidth - 220), 
+                top: Math.min(tooltip.y + 10, window.innerHeight - 100) 
+            }}
         >
             <div className="font-bold text-blue-400 mb-1">{tooltip.content.id.substring(0, 12)}...</div>
             {tooltip.content.score !== undefined && <div>Score: <span className="font-mono">{typeof tooltip.content.score === 'number' ? tooltip.content.score.toFixed(3) : 'N/A'}</span></div>}
@@ -909,7 +1038,17 @@ function App() {
       )}
 
       {selectedNode && (
-          <NodeDetails node={selectedNode} onClose={() => setSelectedNode(null)} />
+          <NodeDetails node={selectedNode} onClose={() => setSelectedNode(null)} devMode={devMode} />
+      )}
+      
+      {showLogs && <LogViewer logs={logs} onClose={() => setShowLogs(false)} />}
+      
+      {toast && (
+          <Toast 
+              message={toast.message} 
+              type={toast.type} 
+              onClose={() => setToast(null)} 
+          />
       )}
     </div>
   );
