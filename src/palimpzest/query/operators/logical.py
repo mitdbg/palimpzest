@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import Callable, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable
 
 from pydantic import BaseModel
 
@@ -9,6 +9,7 @@ from palimpzest.constants import AggFunc, Cardinality
 from palimpzest.core.elements.filters import Filter
 from palimpzest.core.elements.groupbysig import GroupBySig
 from palimpzest.core.lib.schemas import Average, Count, Max, Min, Sum
+from palimpzest.core.models import OperatorCostEstimates
 from palimpzest.utils.hash_helpers import hash_for_id
 
 if TYPE_CHECKING:
@@ -313,6 +314,7 @@ class Traverse(LogicalOperator):
         trace_run_id: str | None = None,
         trace_full_node_text: bool = False,
         trace_node_text_preview_len: int = 240,
+        expand_filtered_nodes: bool = False,
         depends_on: list[str] | None = None,
     ):
         depends_on = [start_field] if depends_on is None else depends_on
@@ -349,6 +351,7 @@ class Traverse(LogicalOperator):
         self.trace_run_id = trace_run_id
         self.trace_full_node_text = trace_full_node_text
         self.trace_node_text_preview_len = trace_node_text_preview_len
+        self.expand_filtered_nodes = expand_filtered_nodes
 
     def __str__(self) -> str:
         return (
@@ -374,6 +377,7 @@ class Traverse(LogicalOperator):
             "node_program_id": self.node_program_id,
             "decision_program_id": self.decision_program_id,
             "decision_program_batch_id": self.decision_program_batch_id,
+            "expand_filtered_nodes": self.expand_filtered_nodes,
             **logical_id_params,
         }
         return logical_id_params
@@ -409,6 +413,7 @@ class Traverse(LogicalOperator):
             "trace_run_id": self.trace_run_id,
             "trace_full_node_text": self.trace_full_node_text,
             "trace_node_text_preview_len": self.trace_node_text_preview_len,
+            "expand_filtered_nodes": self.expand_filtered_nodes,
             **logical_op_params,
         }
         return logical_op_params
@@ -453,6 +458,152 @@ class LinkToChildren(LogicalOperator):
             time_per_record=0,
             cost_per_record=0,
             quality=1.0
+        )
+
+
+class UpsertGraphNodes(LogicalOperator):
+    """Materialize each input record as a node in a GraphDataset.
+
+    This is a side-effecting operator: it returns the input records unchanged.
+    """
+
+    def __init__(
+        self,
+        graph: Any,
+        *,
+        text_field: str = "text",
+        node_type: str | None = "chunk",
+        overwrite: bool = False,
+        input_schema: type[BaseModel],
+        output_schema: type[BaseModel],
+        depends_on: list[str] | None = None,
+    ):
+        depends_on = [text_field] if depends_on is None else depends_on
+        super().__init__(input_schema=input_schema, output_schema=output_schema, depends_on=depends_on)
+        self.graph = graph
+        self.text_field = text_field
+        self.node_type = node_type
+        self.overwrite = overwrite
+
+    def __str__(self):
+        return f"UpsertGraphNodes(text_field={self.text_field}, node_type={self.node_type})"
+
+    def get_logical_op_params(self):
+        return {
+            "graph": self.graph,
+            "text_field": self.text_field,
+            "node_type": self.node_type,
+            "overwrite": self.overwrite,
+            "input_schema": self.input_schema,
+            "output_schema": self.output_schema,
+            "depends_on": self.depends_on,
+        }
+
+    def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
+        return OperatorCostEstimates(
+            cardinality=source_op_cost_estimates.cardinality,
+            time_per_record=0.0,
+            cost_per_record=0.0,
+            quality=1.0,
+        )
+
+
+class LinkFromParents(LogicalOperator):
+    """Create edges from each parent id to the current record id."""
+
+    def __init__(
+        self,
+        graph: Any,
+        edge_type: str,
+        *,
+        overwrite: bool = False,
+        input_schema: type[BaseModel],
+        output_schema: type[BaseModel],
+        depends_on: list[str] | None = None,
+    ):
+        super().__init__(input_schema=input_schema, output_schema=output_schema, depends_on=depends_on)
+        self.graph = graph
+        self.edge_type = edge_type
+        self.overwrite = overwrite
+
+    def __str__(self):
+        return f"LinkFromParents(edge_type={self.edge_type})"
+
+    def get_logical_op_params(self):
+        return {
+            "graph": self.graph,
+            "edge_type": self.edge_type,
+            "overwrite": self.overwrite,
+            "input_schema": self.input_schema,
+            "output_schema": self.output_schema,
+            "depends_on": self.depends_on,
+        }
+
+    def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
+        return OperatorCostEstimates(
+            cardinality=source_op_cost_estimates.cardinality,
+            time_per_record=0.0,
+            cost_per_record=0.0,
+            quality=1.0,
+        )
+
+
+class LinkFromField(LogicalOperator):
+    """Create edges using a src id from a record field to a dst id.
+
+    Often used for chunking: edge from prev_chunk_id -> this_record_id.
+    """
+
+    def __init__(
+        self,
+        graph: Any,
+        edge_type: str,
+        *,
+        src_field: str,
+        dst_field: str | None = None,
+        ensure_src_node: bool = False,
+        ensure_dst_node: bool = False,
+        placeholder_node_type: str | None = None,
+        overwrite: bool = False,
+        input_schema: type[BaseModel],
+        output_schema: type[BaseModel],
+        depends_on: list[str] | None = None,
+    ):
+        depends_on = [src_field] if depends_on is None else depends_on
+        super().__init__(input_schema=input_schema, output_schema=output_schema, depends_on=depends_on)
+        self.graph = graph
+        self.edge_type = edge_type
+        self.src_field = src_field
+        self.dst_field = dst_field
+        self.ensure_src_node = ensure_src_node
+        self.ensure_dst_node = ensure_dst_node
+        self.placeholder_node_type = placeholder_node_type
+        self.overwrite = overwrite
+
+    def __str__(self):
+        return f"LinkFromField(edge_type={self.edge_type}, src_field={self.src_field}, dst_field={self.dst_field})"
+
+    def get_logical_op_params(self):
+        return {
+            "graph": self.graph,
+            "edge_type": self.edge_type,
+            "src_field": self.src_field,
+            "dst_field": self.dst_field,
+            "ensure_src_node": self.ensure_src_node,
+            "ensure_dst_node": self.ensure_dst_node,
+            "placeholder_node_type": self.placeholder_node_type,
+            "overwrite": self.overwrite,
+            "input_schema": self.input_schema,
+            "output_schema": self.output_schema,
+            "depends_on": self.depends_on,
+        }
+
+    def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
+        return OperatorCostEstimates(
+            cardinality=source_op_cost_estimates.cardinality,
+            time_per_record=0.0,
+            cost_per_record=0.0,
+            quality=1.0,
         )
 
 class InduceEdges(LogicalOperator):

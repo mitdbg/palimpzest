@@ -7,7 +7,8 @@ from typing import Any, Callable
 try:
     from chromadb.api.models.Collection import Collection
 except ImportError:
-    class Collection: pass
+    class Collection:
+        pass
 
 from pydantic import BaseModel
 
@@ -668,23 +669,110 @@ class Dataset:
         operator = Project(input_schema=self.schema, output_schema=new_output_schema, project_cols=project_cols)
         return Dataset(sources=[self], operator=operator, schema=new_output_schema)
 
-    def chunk(self, input_col: str = "text", output_col: str = "text", chunk_size: int = 1000, chunk_overlap: int = 200) -> Dataset:
-        """
-        Chunks the text in `input_col` into smaller segments.
+    def chunk(
+        self,
+        input_col: str = "text",
+        output_col: str = "text",
+        chunk_size: int = 1000,
+        chunk_overlap: int = 200,
+        *,
+        chunker_kind: str = "recursive_character",
+        chunker_params: dict[str, Any] | None = None,
+        graph: Any | None = None,
+        edge_policy: str | None = None,
+        has_chunk_edge_type: str = "overlay:has_chunk",
+        next_chunk_edge_type: str = "overlay:next_chunk",
+        chunk_node_type: str | None = "chunk",
+        overwrite_nodes: bool = False,
+        overwrite_edges: bool = False,
+    ) -> Dataset:
+        """Chunks the text in `input_col` into smaller segments.
+
+        If `graph` and `edge_policy` are set, chunk nodes are upserted into the graph and
+        edges are added according to the policy.
+
+        Supported edge_policy values:
+        - None / "none": no graph side effects (default)
+        - "has_chunk": add has_chunk edges (parent -> chunk)
+        - "has_and_next": add has_chunk and next_chunk edges
         """
         from palimpzest.utils.chunkers import get_chunking_udf
+
+        udf = get_chunking_udf(
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+            input_col=input_col,
+            output_col=output_col,
+            chunker_kind=chunker_kind,
+            chunker_params=chunker_params,
+        )
         
-        udf = get_chunking_udf(chunk_size=chunk_size, chunk_overlap=chunk_overlap, input_col=input_col, output_col=output_col)
-        
+        existing_out_field = self.schema.model_fields.get(output_col)
+        out_type = existing_out_field.annotation if existing_out_field is not None else str
+
         cols = [
             {"name": "id", "type": str, "desc": "The ID of the chunk"},
-            {"name": output_col, "type": str, "desc": "The chunked text"},
+            {"name": output_col, "type": out_type, "desc": "The chunked text"},
             {"name": "chunk_index", "type": int, "desc": "Index of the chunk"},
             {"name": "source_node_id", "type": str, "desc": "ID of the source node"},
             {"name": "prev_chunk_id", "type": str | None, "desc": "ID of the previous chunk (if any)"},
         ]
         
-        return self.flat_map(udf=udf, cols=cols)
+        chunked = self.flat_map(udf=udf, cols=cols)
+        # ConvertScan's ONE_TO_MANY semantics always emit at least one output record per
+        # input record, even when the UDF returns an empty list. For chunking, those
+        # placeholder outputs will have null chunk fields; filter them out.
+        chunked = chunked.filter(lambda r: r.get("chunk_index") is not None, depends_on=["chunk_index"])
+
+        policy = (edge_policy or "none").strip().lower()
+        if policy in {"none", ""}:
+            return chunked
+
+        if graph is None:
+            raise ValueError("Must provide `graph` when `edge_policy` is set.")
+
+        from palimpzest.query.operators.logical import LinkFromField, UpsertGraphNodes
+
+        # 1) Upsert chunk nodes into the graph (must happen before adding edges).
+        upsert = UpsertGraphNodes(
+            graph=graph,
+            text_field=output_col,
+            node_type=chunk_node_type,
+            overwrite=overwrite_nodes,
+            input_schema=chunked.schema,
+            output_schema=chunked.schema,
+        )
+        chunked = Dataset(sources=[chunked], operator=upsert, schema=chunked.schema)
+
+        # 2) source_node_id -> chunk_id edges
+        if policy in {"has_chunk", "has_and_next"}:
+            link_has = LinkFromField(
+                graph=graph,
+                edge_type=has_chunk_edge_type,
+                src_field="source_node_id",
+                dst_field=None,
+                overwrite=overwrite_edges,
+                input_schema=chunked.schema,
+                output_schema=chunked.schema,
+            )
+            chunked = Dataset(sources=[chunked], operator=link_has, schema=chunked.schema)
+
+        # 3) prev_chunk_id -> this_chunk_id
+        if policy == "has_and_next":
+            link_next = LinkFromField(
+                graph=graph,
+                edge_type=next_chunk_edge_type,
+                src_field="prev_chunk_id",
+                dst_field=None,
+                ensure_src_node=True,
+                placeholder_node_type=chunk_node_type,
+                overwrite=overwrite_edges,
+                input_schema=chunked.schema,
+                output_schema=chunked.schema,
+            )
+            chunked = Dataset(sources=[chunked], operator=link_next, schema=chunked.schema)
+
+        return chunked
 
     def embed(self, input_col: str = "text", output_col: str = "embedding", model_name: str = "openai", config: Any = None) -> Dataset:
         """

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Play, Pause, ChevronLeft, ChevronRight } from 'lucide-react';
 
-const ControlPanel = ({ isPlaying, setIsPlaying, currentStep, setCurrentStep, maxStep, activeEventsCount }) => {
+const ControlPanel = ({ isPlaying, setIsPlaying, currentStep, setCurrentStep, maxStep, activeEventsCount, metrics }) => {
     return (
         <div className="h-16 bg-gray-800 border-b border-gray-700 flex items-center px-4 gap-4 z-10">
             <button 
@@ -14,7 +14,12 @@ const ControlPanel = ({ isPlaying, setIsPlaying, currentStep, setCurrentStep, ma
             <div className="flex-1 flex flex-col justify-center">
                 <div className="flex justify-between text-xs text-gray-400 mb-1">
                     <span>Step {currentStep}</span>
-                    <span>{activeEventsCount} Events</span>
+                    <div className="flex gap-3">
+                        <span>{activeEventsCount} Events</span>
+                        {metrics?.filtered > 0 && (
+                            <span className="text-red-400 font-medium">Filtered: {metrics.filtered}</span>
+                        )}
+                    </div>
                 </div>
                 <input 
                     type="range" 

@@ -1,0 +1,31 @@
+name: "cms-smoke-quick-trace"
+
+dataset:
+  snapshot: data/cms_refined_graph.json
+
+query: "What is Tier0 responsible for?"
+
+seed:
+  start_nodes:
+    - "175722842088"
+
+traversal:
+  edge_type: "all"
+  include_overlay: false
+  max_steps: 2
+  allow_revisit: false
+
+ranking:
+  model: "hf:BAAI/bge-reranker-base"
+
+admittance:
+  model: "openrouter/x-ai/grok-4.1-fast"
+
+termination:
+  model: "none"
+
+trace:
+  out_dir: CURRENT_WORKSTREAM/exports
+  full_text: false
+
+progress: false

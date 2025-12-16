@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import contextlib
 import heapq
 import time
 from collections import Counter
 from dataclasses import dataclass
 from dataclasses import field as dataclass_field
-from typing import Any, Callable, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable
 
 from pydantic import BaseModel, Field
 
@@ -73,6 +74,7 @@ class TraverseOp(PhysicalOperator):
         trace_run_id: str | None = None,
         trace_full_node_text: bool = False,
         trace_node_text_preview_len: int = 240,
+        expand_filtered_nodes: bool = False,
         *args,
         **kwargs,
     ) -> None:
@@ -105,6 +107,7 @@ class TraverseOp(PhysicalOperator):
         self.trace_run_id = trace_run_id
         self.trace_full_node_text = trace_full_node_text
         self.trace_node_text_preview_len = trace_node_text_preview_len
+        self.expand_filtered_nodes = expand_filtered_nodes
 
         self._trace_seq: int = 0
 
@@ -356,10 +359,11 @@ class TraverseOp(PhysicalOperator):
                 out[nid] = (bool(accept), float(s), dict(d or {}))
             return out
 
-        # Default: reject everything unless the program yields a row.
+        # Default: accept everything unless the program explicitly errors.
+        # Admission is an annotation (used by downstream consumers) and must not prune traversal.
         for c in candidates:
             nid = str(c.get("node_id"))
-            out[nid] = (False, float(c.get("score") or 0.0), {})
+            out[nid] = (True, float(c.get("score") or 0.0), {})
 
         decision_result = self._run_decision_program_batch(candidates=candidates)
         if decision_result is None:
@@ -377,15 +381,11 @@ class TraverseOp(PhysicalOperator):
             if not nid:
                 continue
 
-            accept = True
-            if "admit" in data and not bool(data.get("admit")):
-                accept = False
-
             score = float(out.get(nid, (True, 0.0, {}))[1])
             if isinstance(data.get("rank_score"), (int, float)):
                 score = float(data["rank_score"])
 
-            out[nid] = (accept, score, data)
+            out[nid] = (True, score, data)
 
         return out
 
@@ -417,8 +417,8 @@ class TraverseOp(PhysicalOperator):
         try:
             first = next(iter(decision_result))  # type: ignore[call-overload]
         except StopIteration:
-            # Decision program filtered everything out.
-            return False, float(score), {}
+            # Decision program returned no rows; treat as neutral.
+            return True, float(score), {}
         except Exception:
             # Decision program failure must not break traversal; treat as neutral.
             return True, float(score), {}
@@ -427,9 +427,6 @@ class TraverseOp(PhysicalOperator):
             decision_data = first.to_dict(include_bytes=False) if hasattr(first, "to_dict") else {}
         except Exception:
             decision_data = {}
-
-        if "admit" in decision_data and not bool(decision_data.get("admit")):
-            return False, float(score), decision_data
 
         if isinstance(decision_data.get("rank_score"), (int, float)):
             score = float(decision_data["rank_score"])
@@ -656,13 +653,12 @@ class TraverseOp(PhysicalOperator):
                     node_id=node_id,
                     admitted=bool(decision_data.get("admit", True)),
                     decision_program_id=self.decision_program_id,
-                    rank_meta=decision_data.get("rank_meta"),
-                    why=why,
                     decision={
                         "passed": bool(decision_data.get("admit", True)),
                         "kind": "decision_program",
                         "id": self.decision_program_id,
                         "why": why,
+                        "rank_meta": decision_data.get("rank_meta"),
                         "payload": decision_payload,
                     },
                 )
@@ -711,128 +707,149 @@ class TraverseOp(PhysicalOperator):
                     emitted_records=len(results),
                 )
                 skip_counts["visit_filter_rejected"] += 1
-                continue
-
-            is_admitted, adm_meta = self._admittance_decision(node_id, node, item.depth, score, item.path_node_ids, item.path_edge_ids)
-            why = (adm_meta or {}).get("reason")
-
-            # Track decision usage even if the node is rejected.
-            if adm_meta is not None:
-                try:
-                    total_decision_cost_usd += float((adm_meta or {}).get("cost_usd") or 0.0)
-                    total_decision_input_tokens += float((adm_meta or {}).get("input_tokens") or 0.0)
-                    total_decision_cached_tokens += float((adm_meta or {}).get("cached_tokens") or 0.0)
-                    total_decision_output_tokens += float((adm_meta or {}).get("output_tokens") or 0.0)
-                except Exception:
-                    # Never break traversal due to accounting.
-                    pass
-            self._trace(
-                "step_gate_admittance",
-                step=steps,
-                node_id=node_id,
-                admitted=bool(is_admitted),
-                admittance_id=self.admittance_id,
-                depth=item.depth,
-                score=float(score),
-                prompt=(adm_meta or {}).get("prompt"),
-                raw_output=(adm_meta or {}).get("raw_output"),
-                reason=(adm_meta or {}).get("reason"),
-                why=why,
-                model=(adm_meta or {}).get("model"),
-                latency_s=(adm_meta or {}).get("latency_s"),
-                cache_hit=(adm_meta or {}).get("cache_hit"),
-                input_tokens=(adm_meta or {}).get("input_tokens"),
-                output_tokens=(adm_meta or {}).get("output_tokens"),
-                cached_tokens=(adm_meta or {}).get("cached_tokens"),
-                cost_usd=(adm_meta or {}).get("cost_usd"),
-                cached_cost_usd=(adm_meta or {}).get("cached_cost_usd"),
-                cached_input_tokens=(adm_meta or {}).get("cached_input_tokens"),
-                cached_output_tokens=(adm_meta or {}).get("cached_output_tokens"),
-                cached_cached_tokens=(adm_meta or {}).get("cached_cached_tokens"),
-                decision={
-                    "passed": bool(is_admitted),
-                    "kind": "admittance",
-                    "id": self.admittance_id,
-                    "model": (adm_meta or {}).get("model"),
-                    "reason": (adm_meta or {}).get("reason"),
-                    "why": why,
-                    "cache_hit": (adm_meta or {}).get("cache_hit"),
-                    "latency_s": (adm_meta or {}).get("latency_s"),
-                    "tokens": {
-                        "input": (adm_meta or {}).get("input_tokens"),
-                        "output": (adm_meta or {}).get("output_tokens"),
-                        "cached": (adm_meta or {}).get("cached_tokens"),
-                    },
-                    "cost_usd": (adm_meta or {}).get("cost_usd"),
-                },
-            )
-            skip_reason = None
-            if not is_admitted:
-                skip_reason = "admittance_rejected"
-                skip_counts["admittance_rejected"] += 1
+                
+                if not self.expand_filtered_nodes:
+                    continue
+                # If expand_filtered_nodes is True, we fall through to expansion
+                # but we skip admittance, node program, and termination.
+                # We set is_admitted=False to ensure correct tracing/logic below.
+                is_admitted = False
+                adm_meta = None
+                skip_reason = "visit_filter_rejected"
             else:
-                admitted_nodes += 1
-                node_visits[str(node_id)] += 1
-                for edge_id in item.path_edge_ids:
-                    edge_traversals[str(edge_id)] += 1
+                is_admitted, adm_meta = self._admittance_decision(node_id, node, item.depth, score, item.path_node_ids, item.path_edge_ids)
+                why = (adm_meta or {}).get("reason")
 
-                traversal_data_item = {
-                    "node_id": node_id,
-                    "depth": item.depth,
-                    "score": score,
-                    "path_node_ids": list(item.path_node_ids),
-                    "path_edge_ids": list(item.path_edge_ids),
-                }
-                if decision_data:
-                    traversal_data_item.update(decision_data)
-
-                # Always materialize a traversal record to use as lineage parent.
-                traversal_dr = DataRecord.from_parent(
-                    schema=self.output_schema,
-                    data_item=dict(traversal_data_item),
-                    parent_record=candidate,
-                    cardinality_idx=len(results),
-                )
-
-                program_result = self._run_node_program(
-                    node_id=node_id,
-                    node=node,
-                    depth=item.depth,
-                    score=score,
-                    path_node_ids=list(item.path_node_ids),
-                    path_edge_ids=list(item.path_edge_ids),
-                )
-
+                # Track decision usage even if the node is rejected.
+                if adm_meta is not None:
+                    try:
+                        total_decision_cost_usd += float((adm_meta or {}).get("cost_usd") or 0.0)
+                        total_decision_input_tokens += float((adm_meta or {}).get("input_tokens") or 0.0)
+                        total_decision_cached_tokens += float((adm_meta or {}).get("cached_tokens") or 0.0)
+                        total_decision_output_tokens += float((adm_meta or {}).get("output_tokens") or 0.0)
+                    except Exception:
+                        # Never break traversal due to accounting.
+                        pass
                 self._trace(
-                    "step_node_program_done",
+                    "step_gate_admittance",
                     step=steps,
                     node_id=node_id,
-                    ran=self.node_program is not None,
-                    produced=program_result is not None,
+                    admitted=bool(is_admitted),
+                    admittance_id=self.admittance_id,
+                    depth=item.depth,
+                    score=float(score),
+                    decision={
+                        "passed": bool(is_admitted),
+                        "kind": "admittance",
+                        "id": self.admittance_id,
+                        "model": (adm_meta or {}).get("model"),
+                        "reason": (adm_meta or {}).get("reason"),
+                        "why": why,
+                        "prompt": (adm_meta or {}).get("prompt"),
+                        "raw_output": (adm_meta or {}).get("raw_output"),
+                        "cache_hit": (adm_meta or {}).get("cache_hit"),
+                        "latency_s": (adm_meta or {}).get("latency_s"),
+                        "tokens": {
+                            "input": (adm_meta or {}).get("input_tokens"),
+                            "output": (adm_meta or {}).get("output_tokens"),
+                            "cached": (adm_meta or {}).get("cached_tokens"),
+                        },
+                        "cost_usd": (adm_meta or {}).get("cost_usd"),
+                    },
                 )
+                skip_reason = None
+                if not is_admitted:
+                    skip_reason = "admittance_rejected"
+                    skip_counts["admittance_rejected"] += 1
+                else:
+                    admitted_nodes += 1
+                    node_visits[str(node_id)] += 1
+                    for edge_id in item.path_edge_ids:
+                        edge_traversals[str(edge_id)] += 1
 
-                emitted_any = False
-                if program_result is not None:
-                    # program_result is a DataRecordCollection
-                    emitted_program = 0
-                    for program_dr in program_result:  # type: ignore[union-attr]
-                        program_data = program_dr.to_dict(include_bytes=False)
-                        combined = {**traversal_data_item, **program_data}
-                        dr = DataRecord.from_parent(
-                            schema=self.output_schema,
-                            data_item=combined,
-                            parent_record=traversal_dr,
-                            project_cols=[],
-                            cardinality_idx=len(results),
+                    traversal_data_item = {
+                        "node_id": node_id,
+                        "depth": item.depth,
+                        "score": score,
+                        "path_node_ids": list(item.path_node_ids),
+                        "path_edge_ids": list(item.path_edge_ids),
+                    }
+                    if decision_data:
+                        traversal_data_item.update(decision_data)
+
+                    # Always materialize a traversal record to use as lineage parent.
+                    traversal_dr = DataRecord.from_parent(
+                        schema=self.output_schema,
+                        data_item=dict(traversal_data_item),
+                        parent_record=candidate,
+                        cardinality_idx=len(results),
+                    )
+
+                    program_result = self._run_node_program(
+                        node_id=node_id,
+                        node=node,
+                        depth=item.depth,
+                        score=score,
+                        path_node_ids=list(item.path_node_ids),
+                        path_edge_ids=list(item.path_edge_ids),
+                    )
+
+                    self._trace(
+                        "step_node_program_done",
+                        step=steps,
+                        node_id=node_id,
+                        ran=self.node_program is not None,
+                        produced=program_result is not None,
+                    )
+
+                    emitted_any = False
+                    if program_result is not None:
+                        # program_result is a DataRecordCollection
+                        emitted_program = 0
+                        for program_dr in program_result:  # type: ignore[union-attr]
+                            program_data = program_dr.to_dict(include_bytes=False)
+                            combined = {**traversal_data_item, **program_data}
+                            dr = DataRecord.from_parent(
+                                schema=self.output_schema,
+                                data_item=combined,
+                                parent_record=traversal_dr,
+                                project_cols=[],
+                                cardinality_idx=len(results),
+                            )
+                            results.append(dr)
+                            emitted_program += 1
+                            stats.append(
+                                RecordOpStats(
+                                    record_id=dr._id,
+                                    record_parent_ids=dr._parent_ids,
+                                    record_source_indices=dr._source_indices,
+                                    record_state=dr.to_dict(include_bytes=False),
+                                    full_op_id=self.get_full_op_id(),
+                                    logical_op_id=self.logical_op_id,
+                                    op_name=self.op_name(),
+                                    time_per_record=0.0,
+                                    cost_per_record=0.0,
+                                    op_details={k: str(v) for k, v in self.get_id_params().items()},
+                                )
+                            )
+                            emitted_any = True
+
+                        self._trace(
+                            "step_emit_program_records",
+                            step=steps,
+                            node_id=node_id,
+                            emitted_records=int(emitted_program),
                         )
-                        results.append(dr)
-                        emitted_program += 1
+
+                    if not emitted_any:
+                        # No per-node program, or it produced no records: emit traversal record.
+                        results.append(traversal_dr)
                         stats.append(
                             RecordOpStats(
-                                record_id=dr._id,
-                                record_parent_ids=dr._parent_ids,
-                                record_source_indices=dr._source_indices,
-                                record_state=dr.to_dict(include_bytes=False),
+                                record_id=traversal_dr._id,
+                                record_parent_ids=traversal_dr._parent_ids,
+                                record_source_indices=traversal_dr._source_indices,
+                                record_state=traversal_dr.to_dict(include_bytes=False),
                                 full_op_id=self.get_full_op_id(),
                                 logical_op_id=self.logical_op_id,
                                 op_name=self.op_name(),
@@ -841,156 +858,104 @@ class TraverseOp(PhysicalOperator):
                                 op_details={k: str(v) for k, v in self.get_id_params().items()},
                             )
                         )
-                        emitted_any = True
 
-                    self._trace(
-                        "step_emit_program_records",
-                        step=steps,
-                        node_id=node_id,
-                        emitted_records=int(emitted_program),
-                    )
-
-                if not emitted_any:
-                    # No per-node program, or it produced no records: emit traversal record.
-                    results.append(traversal_dr)
-                    stats.append(
-                        RecordOpStats(
-                            record_id=traversal_dr._id,
-                            record_parent_ids=traversal_dr._parent_ids,
-                            record_source_indices=traversal_dr._source_indices,
-                            record_state=traversal_dr.to_dict(include_bytes=False),
-                            full_op_id=self.get_full_op_id(),
-                            logical_op_id=self.logical_op_id,
-                            op_name=self.op_name(),
-                            time_per_record=0.0,
-                            cost_per_record=0.0,
-                            op_details={k: str(v) for k, v in self.get_id_params().items()},
+                        self._trace(
+                            "step_emit_traversal_record",
+                            step=steps,
+                            node_id=node_id,
                         )
-                    )
 
-                    self._trace(
-                        "step_emit_traversal_record",
-                        step=steps,
-                        node_id=node_id,
-                    )
+                    # Termination check happens after (optional) admission + node program.
+                    state = {
+                        "steps": steps,
+                        "node_id": node_id,
+                        "depth": item.depth,
+                        "score": score,
+                        "path_node_ids": list(item.path_node_ids),
+                        "path_edge_ids": list(item.path_edge_ids),
+                        "frontier_size": len(pq),
+                        "visited_count": len(visited),
+                        "admitted_nodes": admitted_nodes,
+                        "emitted_records": len(results),
+                    }
+                    should_term, term_meta = self._termination_decision(state)
+                    why = (term_meta or {}).get("reason")
 
-                # Termination check happens after (optional) admission + node program.
-                state = {
-                    "steps": steps,
-                    "node_id": node_id,
-                    "depth": item.depth,
-                    "score": score,
-                    "path_node_ids": list(item.path_node_ids),
-                    "path_edge_ids": list(item.path_edge_ids),
-                    "frontier_size": len(pq),
-                    "visited_count": len(visited),
-                    "admitted_nodes": admitted_nodes,
-                    "emitted_records": len(results),
-                }
-                should_term, term_meta = self._termination_decision(state)
-                why = (term_meta or {}).get("reason")
-
-                if term_meta is not None:
-                    try:
-                        total_decision_cost_usd += float((term_meta or {}).get("cost_usd") or 0.0)
-                        total_decision_input_tokens += float((term_meta or {}).get("input_tokens") or 0.0)
-                        total_decision_cached_tokens += float((term_meta or {}).get("cached_tokens") or 0.0)
-                        total_decision_output_tokens += float((term_meta or {}).get("output_tokens") or 0.0)
-                    except Exception:
-                        pass
-                if should_term:
-                    self._trace(
-                        "step_termination",
-                        step=steps,
-                        node_id=node_id,
-                        terminated=True,
-                        termination_id=self.termination_id,
-                        state=dict(state),
-                        prompt=(term_meta or {}).get("prompt"),
-                        raw_output=(term_meta or {}).get("raw_output"),
-                        reason=(term_meta or {}).get("reason"),
-                        why=why,
-                        model=(term_meta or {}).get("model"),
-                        latency_s=(term_meta or {}).get("latency_s"),
-                        cache_hit=(term_meta or {}).get("cache_hit"),
-                        input_tokens=(term_meta or {}).get("input_tokens"),
-                        output_tokens=(term_meta or {}).get("output_tokens"),
-                        cached_tokens=(term_meta or {}).get("cached_tokens"),
-                        cost_usd=(term_meta or {}).get("cost_usd"),
-                        cached_cost_usd=(term_meta or {}).get("cached_cost_usd"),
-                        cached_input_tokens=(term_meta or {}).get("cached_input_tokens"),
-                        cached_output_tokens=(term_meta or {}).get("cached_output_tokens"),
-                        cached_cached_tokens=(term_meta or {}).get("cached_cached_tokens"),
-                        decision={
-                            "passed": True,
-                            "kind": "termination",
-                            "id": self.termination_id,
-                            "model": (term_meta or {}).get("model"),
-                            "reason": (term_meta or {}).get("reason"),
-                            "why": why,
-                            "cache_hit": (term_meta or {}).get("cache_hit"),
-                            "latency_s": (term_meta or {}).get("latency_s"),
-                            "tokens": {
-                                "input": (term_meta or {}).get("input_tokens"),
-                                "output": (term_meta or {}).get("output_tokens"),
-                                "cached": (term_meta or {}).get("cached_tokens"),
+                    if term_meta is not None:
+                        try:
+                            total_decision_cost_usd += float((term_meta or {}).get("cost_usd") or 0.0)
+                            total_decision_input_tokens += float((term_meta or {}).get("input_tokens") or 0.0)
+                            total_decision_cached_tokens += float((term_meta or {}).get("cached_tokens") or 0.0)
+                            total_decision_output_tokens += float((term_meta or {}).get("output_tokens") or 0.0)
+                        except Exception:
+                            pass
+                    if should_term:
+                        self._trace(
+                            "step_termination",
+                            step=steps,
+                            node_id=node_id,
+                            terminated=True,
+                            termination_id=self.termination_id,
+                            state=dict(state),
+                            decision={
+                                "passed": True,
+                                "kind": "termination",
+                                "id": self.termination_id,
+                                "model": (term_meta or {}).get("model"),
+                                "reason": (term_meta or {}).get("reason"),
+                                "why": why,
+                                "prompt": (term_meta or {}).get("prompt"),
+                                "raw_output": (term_meta or {}).get("raw_output"),
+                                "cache_hit": (term_meta or {}).get("cache_hit"),
+                                "latency_s": (term_meta or {}).get("latency_s"),
+                                "tokens": {
+                                    "input": (term_meta or {}).get("input_tokens"),
+                                    "output": (term_meta or {}).get("output_tokens"),
+                                    "cached": (term_meta or {}).get("cached_tokens"),
+                                },
+                                "cost_usd": (term_meta or {}).get("cost_usd"),
                             },
-                            "cost_usd": (term_meta or {}).get("cost_usd"),
-                        },
-                    )
-                    self._trace(
-                        "step_summary",
-                        step=steps,
-                        node_id=node_id,
-                        admitted=True,
-                        skipped=False,
-                        terminated=True,
-                        frontier_size_after=len(pq),
-                        visited_count=len(visited),
-                        admitted_nodes=admitted_nodes,
-                        emitted_records=len(results),
-                    )
-                    break
-                else:
-                    self._trace(
-                        "step_termination",
-                        step=steps,
-                        node_id=node_id,
-                        terminated=False,
-                        termination_id=self.termination_id,
-                        state=dict(state),
-                        prompt=(term_meta or {}).get("prompt"),
-                        raw_output=(term_meta or {}).get("raw_output"),
-                        reason=(term_meta or {}).get("reason"),
-                        why=why,
-                        model=(term_meta or {}).get("model"),
-                        latency_s=(term_meta or {}).get("latency_s"),
-                        cache_hit=(term_meta or {}).get("cache_hit"),
-                        input_tokens=(term_meta or {}).get("input_tokens"),
-                        output_tokens=(term_meta or {}).get("output_tokens"),
-                        cached_tokens=(term_meta or {}).get("cached_tokens"),
-                        cost_usd=(term_meta or {}).get("cost_usd"),
-                        cached_cost_usd=(term_meta or {}).get("cached_cost_usd"),
-                        cached_input_tokens=(term_meta or {}).get("cached_input_tokens"),
-                        cached_output_tokens=(term_meta or {}).get("cached_output_tokens"),
-                        cached_cached_tokens=(term_meta or {}).get("cached_cached_tokens"),
-                        decision={
-                            "passed": False,
-                            "kind": "termination",
-                            "id": self.termination_id,
-                            "model": (term_meta or {}).get("model"),
-                            "reason": (term_meta or {}).get("reason"),
-                            "why": why,
-                            "cache_hit": (term_meta or {}).get("cache_hit"),
-                            "latency_s": (term_meta or {}).get("latency_s"),
-                            "tokens": {
-                                "input": (term_meta or {}).get("input_tokens"),
-                                "output": (term_meta or {}).get("output_tokens"),
-                                "cached": (term_meta or {}).get("cached_tokens"),
+                        )
+                        self._trace(
+                            "step_summary",
+                            step=steps,
+                            node_id=node_id,
+                            admitted=True,
+                            skipped=False,
+                            terminated=True,
+                            frontier_size_after=len(pq),
+                            visited_count=len(visited),
+                            admitted_nodes=admitted_nodes,
+                            emitted_records=len(results),
+                        )
+                        break
+                    else:
+                        self._trace(
+                            "step_termination",
+                            step=steps,
+                            node_id=node_id,
+                            terminated=False,
+                            termination_id=self.termination_id,
+                            state=dict(state),
+                            decision={
+                                "passed": False,
+                                "kind": "termination",
+                                "id": self.termination_id,
+                                "model": (term_meta or {}).get("model"),
+                                "reason": (term_meta or {}).get("reason"),
+                                "why": why,
+                                "prompt": (term_meta or {}).get("prompt"),
+                                "raw_output": (term_meta or {}).get("raw_output"),
+                                "cache_hit": (term_meta or {}).get("cache_hit"),
+                                "latency_s": (term_meta or {}).get("latency_s"),
+                                "tokens": {
+                                    "input": (term_meta or {}).get("input_tokens"),
+                                    "output": (term_meta or {}).get("output_tokens"),
+                                    "cached": (term_meta or {}).get("cached_tokens"),
+                                },
+                                "cost_usd": (term_meta or {}).get("cost_usd"),
                             },
-                            "cost_usd": (term_meta or {}).get("cost_usd"),
-                        },
-                    )
+                        )
 
             # Expand neighbors (both directions)
             neighbor_traces: list[dict[str, Any]] = []
@@ -1173,7 +1138,7 @@ class TraverseOp(PhysicalOperator):
         # This ensures progress rendering reflects provider-derived cost/tokens even though
         # traversal decisions aren't per-output-record generation.
         if total_decision_cost_usd or total_decision_input_tokens or total_decision_cached_tokens or total_decision_output_tokens:
-            try:
+            with contextlib.suppress(Exception):
                 stats.append(
                     RecordOpStats(
                         record_id="traverse_decisions",
@@ -1191,8 +1156,5 @@ class TraverseOp(PhysicalOperator):
                         op_details={k: str(v) for k, v in self.get_id_params().items()},
                     )
                 )
-            except Exception:
-                # Don't let stats creation break traversal.
-                pass
 
         return DataRecordSet(results, stats, input=candidate)

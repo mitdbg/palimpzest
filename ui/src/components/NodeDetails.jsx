@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ChevronRight, FileText, Code } from 'lucide-react';
 
-const NodeDetails = ({ node, onClose, devMode }) => {
+const NodeDetails = ({ node, onClose, devMode, neighbors = [], onSelectNeighbor }) => {
     const [activeTab, setActiveTab] = useState('overview');
 
     if (!node) return null;
@@ -67,6 +67,29 @@ const NodeDetails = ({ node, onClose, devMode }) => {
                                 {node.summary || node.text || "No summary available."}
                             </div>
                         </div>
+
+                        <div>
+                            <div className="text-xs text-gray-500 uppercase font-bold mb-1">Neighbors</div>
+                            <div className="text-xs text-gray-400 mb-2">{Array.isArray(neighbors) ? neighbors.length : 0} connected nodes</div>
+                            {Array.isArray(neighbors) && neighbors.length > 0 ? (
+                                <div className="bg-gray-800 rounded border border-gray-700 max-h-56 overflow-y-auto">
+                                    {neighbors.slice(0, 50).map((nid) => (
+                                        <button
+                                            key={nid}
+                                            onClick={() => onSelectNeighbor?.(nid)}
+                                            className="w-full text-left px-3 py-2 text-xs text-gray-200 hover:bg-gray-700 border-b border-gray-700 last:border-b-0 font-mono break-all"
+                                        >
+                                            {nid}
+                                        </button>
+                                    ))}
+                                    {neighbors.length > 50 && (
+                                        <div className="px-3 py-2 text-xs text-gray-400 italic">…and {neighbors.length - 50} more</div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="text-xs text-gray-500 italic">No neighbors found in the loaded graph.</div>
+                            )}
+                        </div>
                         
                         {node.metadata && (
                             <div>
@@ -96,6 +119,24 @@ const NodeDetails = ({ node, onClose, devMode }) => {
                                 <div className="text-xs text-gray-500 uppercase font-bold mb-1 mt-4">Prompt</div>
                                 <div className="text-xs bg-gray-950 p-2 rounded whitespace-pre-wrap font-mono text-green-400">
                                     {node.prompt}
+                                </div>
+                            </div>
+                        )}
+
+                        {node.raw_output && (
+                            <div>
+                                <div className="text-xs text-gray-500 uppercase font-bold mb-1 mt-4">Raw Output</div>
+                                <div className="text-xs bg-gray-950 p-2 rounded whitespace-pre-wrap font-mono text-blue-400">
+                                    {node.raw_output}
+                                </div>
+                            </div>
+                        )}
+
+                        {node.skipReason && (
+                            <div>
+                                <div className="text-xs text-gray-500 uppercase font-bold mb-1 mt-4">Skip Reason</div>
+                                <div className="text-xs bg-red-900/30 text-red-200 p-2 rounded font-mono border border-red-800">
+                                    {node.skipReason}
                                 </div>
                             </div>
                         )}

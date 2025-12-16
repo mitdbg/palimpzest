@@ -1,0 +1,34 @@
+# Minimal config to sanity-check traversal + OpenRouter LLM accounting
+
+name: "cms-quick-sanity"
+
+dataset:
+  snapshot: data/cms_refined_graph.json
+
+query: "What is Tier0 responsible for?"
+
+seed:
+  # Use explicit node ids to avoid embedding model startup.
+  start_nodes:
+    - "175722842088"
+
+traversal:
+  edge_type: "all"
+  include_overlay: false
+  max_steps: 2
+  allow_revisit: false
+
+ranking:
+  model: "hf:BAAI/bge-reranker-base"
+
+admittance:
+  model: "openrouter/x-ai/grok-4.1-fast"
+
+termination:
+  model: "none"
+
+trace:
+  out_dir: CURRENT_WORKSTREAM/exports
+  full_text: false
+
+progress: true

@@ -1,0 +1,38 @@
+# Example YAML config for scratchpad/scripts/run_traversal_experiment.py
+
+name: "cms-refined-smoke"
+
+dataset:
+  snapshot: data/cms_refined_graph.json
+
+query: "What are the most common operational challenges across all three groups (Data management, Production and Reprocessing, Tier0)?"
+
+seed:
+  entry_points: 5
+  embedding_backend: "st"   # "st" | "st:<model>" | "openai" | "openai:<model>"
+  # start_nodes: ["<node_id>"]
+  # seed_query: "<optional query for start node selection>"
+
+traversal:
+  edge_type: "all"          # "all" or a concrete edge type string
+  include_overlay: false
+  max_steps: 40
+  allow_revisit: false
+
+ranking:
+  model: "hf:BAAI/bge-reranker-base"
+
+admittance:
+  # If omitted, defaults to OpenRouter when OPENROUTER_API_KEY is set.
+  model: "openrouter/x-ai/grok-4.1-fast"
+
+termination:
+  # "none" | "auto" | "<litellm model id>"
+  # "auto" uses the admittance model.
+  model: "openrouter/x-ai/grok-4.1-fast"
+
+trace:
+  out_dir: CURRENT_WORKSTREAM/exports
+  full_text: false
+
+progress: true

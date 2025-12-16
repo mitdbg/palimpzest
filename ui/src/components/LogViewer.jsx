@@ -58,14 +58,43 @@ const LogViewer = ({ logs, onClose }) => {
                         content = log.data?.message || JSON.stringify(log.data);
                     } else if (log.event_type === 'search_step') {
                         colorClass = 'text-blue-300';
-                        content = `Exploring node: ${log.data.node_id}`;
-                        if (log.data.reason) content += ` | Reason: ${log.data.reason}`;
+                        const nodeId = log.data?.node_id;
+                        const shortId = typeof nodeId === 'string' ? `${nodeId.substring(0, 12)}...` : String(nodeId);
+                        const decision = log.data?.decision || (log.data?.admit ? 'admit' : 'reject');
+                        const score = (log.data?.score ?? log.data?.rank_score);
+                        const summary = log.data?.summary;
+                        const reason = log.data?.reason;
+                        const model = log.data?.model;
+                        const latency = log.data?.stats?.latency_s;
+                        const cost = log.data?.stats?.cost_usd;
+                        content = `Decision ${String(decision).toUpperCase()}: ${shortId}`;
+                        if (typeof score === 'number') content += ` score=${score.toFixed(3)}`;
+                        if (summary) content += ` | ${summary}`;
+                        if (reason) content += ` | ${reason}`;
+                        if (model) content += ` | model=${model}`;
+                        if (typeof latency === 'number') content += ` | ${latency.toFixed(2)}s`;
+                        if (typeof cost === 'number') content += ` | $${cost.toFixed(4)}`;
                     } else if (log.event_type === 'node_evaluation') {
                         colorClass = 'text-purple-300';
-                        content = `Evaluating ${log.data.node_id}: ${log.data.reasoning}`;
+                        const nodeId = log.data?.node_id;
+                        const shortId = typeof nodeId === 'string' ? `${nodeId.substring(0, 12)}...` : String(nodeId);
+                        const verdict = log.data?.is_relevant ? 'ADMIT' : 'REJECT';
+                        const score = log.data?.score;
+                        const summary = log.data?.metadata?.summary;
+                        const reasoning = log.data?.reasoning;
+                        content = `Eval ${verdict}: ${shortId}`;
+                        if (typeof score === 'number') content += ` score=${score.toFixed(3)}`;
+                        if (summary) content += ` | ${summary}`;
+                        if (reasoning) content += ` | ${reasoning}`;
                     } else if (log.event_type === 'evidence_collected') {
                         colorClass = 'text-yellow-300';
-                        content = `Evidence found at ${log.data.node_id}: ${log.data.content?.substring(0, 50)}...`;
+                        const nodeId = log.data?.node_id;
+                        const shortId = typeof nodeId === 'string' ? `${nodeId.substring(0, 12)}...` : String(nodeId);
+                        const contentPreview = (log.data?.content || '').toString();
+                        const reasoning = log.data?.reasoning;
+                        content = `Evidence: ${shortId}`;
+                        if (contentPreview) content += ` | ${contentPreview.substring(0, 80)}${contentPreview.length > 80 ? '...' : ''}`;
+                        if (reasoning) content += ` | ${reasoning}`;
                     } else if (log.event_type === 'result') {
                         colorClass = 'text-green-400 font-bold';
                         content = `Result: ${log.data.answer}`;

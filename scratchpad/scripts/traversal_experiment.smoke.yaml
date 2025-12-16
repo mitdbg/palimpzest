@@ -1,0 +1,36 @@
+# Slightly larger config to test batching/reranking + termination
+
+name: "cms-smoke-40"
+
+dataset:
+  snapshot: data/cms_refined_graph.json
+
+query: "What is Tier0 responsible for?"
+
+seed:
+  # Keep explicit node id seed for deterministic startup (no embedding backend).
+  start_nodes:
+    - "175722842088"
+
+traversal:
+  edge_type: "all"
+  include_overlay: false
+  max_steps: 40
+  allow_revisit: false
+
+ranking:
+  model: "hf:BAAI/bge-reranker-base"
+
+# If omitted, defaults to OpenRouter when OPENROUTER_API_KEY is set.
+admittance:
+  model: "openrouter/x-ai/grok-4.1-fast"
+
+# "auto" uses the admittance model.
+termination:
+  model: "auto"
+
+trace:
+  out_dir: CURRENT_WORKSTREAM/exports
+  full_text: false
+
+progress: true

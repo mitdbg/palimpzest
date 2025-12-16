@@ -1,0 +1,39 @@
+# Smoke config to force multiple traversal steps (termination disabled) and generate a final synthesized answer.
+
+name: "cms-smoke-12-no-term-synth"
+
+dataset:
+  snapshot: data/cms_refined_graph.json
+
+query: "What is Tier0 responsible for?"
+
+seed:
+  start_nodes:
+    - "175722842088"
+
+traversal:
+  edge_type: "all"
+  include_overlay: false
+  max_steps: 12
+  allow_revisit: false
+
+ranking:
+  model: "hf:BAAI/bge-reranker-base"
+
+admittance:
+  model: "openrouter/x-ai/grok-4.1-fast"
+
+termination:
+  model: "none"
+
+trace:
+  out_dir: CURRENT_WORKSTREAM/exports
+  full_text: false
+
+progress: true
+
+synthesis:
+  model: "auto"          # reuse admittance.model
+  max_nodes: 8
+  max_chars_per_node: 1600
+  bootstrap: true

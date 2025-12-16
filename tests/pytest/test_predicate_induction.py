@@ -25,6 +25,31 @@ def test_predicate_text_contains_with_text_anchor_generator() -> None:
     assert any(r.src_node_id == "src" and r.dst_node_id == "t2" and r.created is True for r in out)
 
 
+def test_text_anchor_generator_dst_types_filter() -> None:
+    g = GraphDataset(graph_id="g")
+    g.add_node(GraphNode(id="c1", type="concept", label="HELLO"))
+    g.add_node(GraphNode(id="p1", type="twiki_page", label="WORLD"))
+    g.add_node(GraphNode(id="src", type="chunk", text="HELLO WORLD"))
+
+    spec_id = g.add_predicate_induction(
+        edge_type="mentions",
+        generator_kind="text_anchor",
+        generator_params={
+            "source_text_field": "text",
+            "target_fields": ["label"],
+            "min_anchor_len": 1,
+            "dst_types": ["concept"],
+        },
+        predicates=[{"kind": "text_contains", "params": {"source_field": "text", "target_fields": ["label"], "boundaries": True}}],
+        predicate_mode="all",
+        symmetric=False,
+    )
+    out = g.run_induction(spec_id, mode="full")
+
+    assert any(r.src_node_id == "src" and r.dst_node_id == "c1" and r.created is True for r in out)
+    assert not any(r.src_node_id == "src" and r.dst_node_id == "p1" and r.created is True for r in out)
+
+
 def test_predicate_regex_match() -> None:
     g = GraphDataset(graph_id="g")
     g.add_node(GraphNode(id="t1", label="CMSTZ-895"))

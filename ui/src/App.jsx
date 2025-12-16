@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import GraphVisualization from './components/GraphVisualization';
+import GraphVisualization3D from './components/GraphVisualization3D';
 import ControlPanel from './components/ControlPanel';
 import LogViewer from './components/LogViewer';
 import NodeDetails from './components/NodeDetails';
@@ -8,7 +9,7 @@ import HistorySidebar from './components/HistorySidebar';
 import ChatInput from './components/ChatInput';
 import RunDetails from './components/RunDetails';
 import SettingsModal from './components/SettingsModal';
-import ReasoningFeed from './components/ReasoningFeed';
+// ReasoningFeed overlay removed to avoid UI overlap; reasoning is shown in RunDetails.
 import Toast from './components/Toast';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -38,7 +39,7 @@ function App() {
 
   // Derived state for the current point in time
   const [graphData, setGraphData] = useState({ nodes: [], links: [] });
-  const [metrics, setMetrics] = useState({ cost: 0, calls: 0, tokens: 0, shortcuts: 0 });
+  const [metrics, setMetrics] = useState({ cost: 0, calls: 0, tokens: 0, shortcuts: 0, filtered: 0 });
   const [evidence, setEvidence] = useState([]);
   const [queue, setQueue] = useState([]);
   const [currentAction, setCurrentAction] = useState("Ready.");
@@ -66,7 +67,8 @@ function App() {
           admittance_model: "",
           termination_model: "",
           max_steps: 200,
-          edge_type: ""
+          edge_type: "",
+          filters: []
       };
   });
 
@@ -74,6 +76,89 @@ function App() {
   const [devMode, setDevMode] = useState(() => {
       return localStorage.getItem('graphrag_devMode') === 'true';
   });
+
+  const defaultVizConfig = {
+      use3D: false,           // Toggle 3D mode (GPU + worker physics)
+      runLayout: true,
+      maxEdges: 10000,
+      showLabels: true,
+      hoverHighlight: true,
+      labelPolicy: 'important',
+
+      // Force Layout Config (tuned for dense graphs)
+      chargeStrength: -800,      // Stronger repulsion for better spread
+    // Use null to mean "infinite" (d3 default). JSON can't represent Infinity.
+    chargeDistanceMax: null,
+      linkDistance: 60,          // Shorter links to keep structure
+      linkStrength: 0.3,         // Weaker links to allow more movement
+      centerStrength: 0.02,      // Gentle centering
+      collisionRadius: 2,        // Prevent overlap
+      d3VelocityDecay: 0.3,      // Slightly faster settling
+
+      // Node styling (global defaults)
+      nodeRadiusScale: 1.0,
+      nodeBaseSize: 3,
+      nodeOpacity: 1.0,
+      nodeBorder: 'none',
+
+      // Edge styling (global defaults)
+      edgeWidth: 0.7,
+      edgeOpacity: 0.08,
+      dimOpacity: 0.02,
+      pathOpacity: 0.9,
+      arrowLength: 0,
+      edgeCurvature: 0,
+      edgeStyle: 'solid',
+
+      // Labels
+      labelFontSize: 10,
+      labelMaxLength: 20,
+
+      // Per-type node settings: { [type]: { color, size, opacity, visible } }
+      nodeTypeSettings: {},
+      
+      // Per-type edge settings: { [type]: { color, width, opacity, style, visible } }
+      edgeTypeSettings: {},
+
+      // State colors (for path highlighting etc.)
+      stateColors: {
+          evidence: '#f59e0b',
+          onPath: '#10b981',
+          activePath: '#06b6d4',
+          visited: '#3b82f6',
+          entry: '#ec4899',
+      },
+  };
+
+  const [vizConfig, setVizConfig] = useState(() => {
+      const saved = localStorage.getItem('graphrag_vizConfig');
+      if (saved) {
+          const parsed = JSON.parse(saved);
+          // Always start with Canvas mode - GPU mode is opt-in each session
+          return { ...parsed, use3D: false };
+      }
+      return defaultVizConfig;
+  });
+
+  const resetVizConfig = () => {
+      setVizConfig(defaultVizConfig);
+      showToast("Visualization settings reset", "success");
+  };
+
+  const [vizRefreshNonce, setVizRefreshNonce] = useState(0);
+
+  const handleRefreshViz = () => {
+      setVizRefreshNonce((n) => n + 1);
+      showToast("Visualization refreshed", "success");
+  };
+
+  const handleToggleSim = () => {
+      setVizConfig(prev => {
+          const nextRunLayout = !prev.runLayout;
+          showToast(nextRunLayout ? "Simulation running" : "Simulation paused", "success");
+          return { ...prev, runLayout: nextRunLayout };
+      });
+  };
 
   // Persist settings
   useEffect(() => {
@@ -83,6 +168,10 @@ function App() {
   useEffect(() => {
       localStorage.setItem('graphrag_devMode', devMode);
   }, [devMode]);
+
+  useEffect(() => {
+      localStorage.setItem('graphrag_vizConfig', JSON.stringify(vizConfig));
+  }, [vizConfig]);
 
   const [toast, setToast] = useState(null); // { message, type }
 
@@ -94,6 +183,47 @@ function App() {
   const [showFullGraph, setShowFullGraph] = useState(false);
   const [fullGraphData, setFullGraphData] = useState(null);
   const [isLoadingGraph, setIsLoadingGraph] = useState(false);
+
+  const isExploreOnly = showFullGraph && allEvents.length === 0;
+
+  const fullGraphNodeById = useMemo(() => {
+      const map = new Map();
+      if (fullGraphData && Array.isArray(fullGraphData.nodes)) {
+          fullGraphData.nodes.forEach(n => {
+              if (n && n.id) map.set(n.id, n);
+          });
+      }
+      return map;
+  }, [fullGraphData]);
+
+  const fullGraphAdjacency = useMemo(() => {
+      const adj = new Map();
+      const links = fullGraphData?.links;
+      if (!Array.isArray(links)) return adj;
+      links.forEach(l => {
+          const sourceId = typeof l.source === 'object' ? l.source.id : l.source;
+          const targetId = typeof l.target === 'object' ? l.target.id : l.target;
+          if (!sourceId || !targetId) return;
+          if (!adj.has(sourceId)) adj.set(sourceId, new Set());
+          if (!adj.has(targetId)) adj.set(targetId, new Set());
+          adj.get(sourceId).add(targetId);
+          adj.get(targetId).add(sourceId);
+      });
+      return adj;
+  }, [fullGraphData]);
+
+  const selectNodeById = (id) => {
+      if (!id) return;
+      const full = fullGraphNodeById.get(id);
+      const dynamic = graphData?.nodes?.find(n => n.id === id);
+      // Merge dynamic state on top of static state so we get prompt/raw_output/isThinking
+      const merged = {
+          ...(full || {}),
+          ...(dynamic || {}),
+          id 
+      };
+      setSelectedNode(merged);
+  };
 
   const fetchFullGraph = async (index) => {
       if (!index) return;
@@ -134,6 +264,24 @@ function App() {
       }
   }, [runConfig.index]);
 
+  const handleExploreGraph = () => {
+      // Enter exploration mode without running a query.
+      if (ws) ws.close();
+      setAllEvents([]);
+      setCurrentStep(0);
+      setIsPlaying(false);
+      setFinalAnswer(null);
+      setSelectedNode(null);
+      setMode('live');
+      setShowFullGraph(true);
+  };
+
+  const handleExitExplore = () => {
+      setShowFullGraph(false);
+      setSelectedNode(null);
+      // Leave run state untouched otherwise; exiting explore returns to landing if there is no trace.
+  };
+
   const availableModels = [
       "openrouter/x-ai/grok-4.1-fast",
       "openrouter/google/gemini-2.0-flash-001",
@@ -158,6 +306,38 @@ function App() {
   }, []);
 
   const [finalAnswer, setFinalAnswer] = useState(null);
+
+  const deleteRun = async (runId) => {
+      try {
+          const res = await fetch(`${API_BASE}/api/runs/${runId}`, { method: 'DELETE' });
+          const data = await res.json();
+          if (data.ok) {
+              setRunHistory(prev => prev.filter(r => r.run_id !== runId));
+              showToast("Run deleted");
+          } else {
+              showToast("Failed to delete run", "error");
+          }
+      } catch (e) {
+          console.error("Delete run failed", e);
+          showToast("Failed to delete run", "error");
+      }
+  };
+
+  const clearHistory = async () => {
+      try {
+          const res = await fetch(`${API_BASE}/api/runs`, { method: 'DELETE' });
+          const data = await res.json();
+          if (data.ok) {
+              setRunHistory([]);
+              showToast(`Cleared ${data.deleted} runs`);
+          } else {
+              showToast("Failed to clear history", "error");
+          }
+      } catch (e) {
+          console.error("Clear history failed", e);
+          showToast("Failed to clear history", "error");
+      }
+  };
 
   const loadRun = (runId) => {
       // Validate Index
@@ -315,6 +495,30 @@ function App() {
       return q ? q.events : [];
   }, [queries, selectedQueryId]);
 
+  // Playback should reflect meaningful graph updates, not every low-level trace event.
+  const playbackEvents = useMemo(() => {
+      return activeEvents.filter(e =>
+          e.event_type === 'frontier_update' ||
+          e.event_type === 'search_step' ||
+          e.event_type === 'node_evaluation' ||
+          e.event_type === 'evidence_collected' ||
+          e.event_type === 'result' ||
+          e.event_type === 'answer_update' ||
+          e.event_type === 'query_start' ||
+          e.event_type === 'query_end' ||
+          e.event_type === 'error' ||
+          e.event_type === 'traverse_trace'
+      );
+  }, [activeEvents]);
+
+  const reasoningItems = useMemo(() => {
+      const upto = Math.min(currentStep + 1, playbackEvents.length);
+      return playbackEvents
+          .slice(0, upto)
+          .filter(e => e.event_type === 'search_step' || e.event_type === 'node_evaluation' || e.event_type === 'evidence_collected')
+          .slice(-5);
+  }, [playbackEvents, currentStep]);
+
   const logs = useMemo(() => {
       return allEvents.filter(e => 
           e.event_type === 'stdout' || 
@@ -334,7 +538,7 @@ function App() {
     if (isPlaying) {
       interval = setInterval(() => {
         setCurrentStep(prev => {
-          if (prev >= activeEvents.length - 1) {
+                    if (prev >= playbackEvents.length - 1) {
             setIsPlaying(false);
             return prev;
           }
@@ -343,7 +547,7 @@ function App() {
       }, playbackSpeed);
     }
     return () => clearInterval(interval);
-  }, [isPlaying, activeEvents.length, playbackSpeed]);
+    }, [isPlaying, playbackEvents.length, playbackSpeed]);
 
   // Re-process graph when step changes
   const processingRef = useRef(false);
@@ -354,9 +558,9 @@ function App() {
         processingRef.current = true;
         
         try {
-            if (activeEvents.length > 0) {
-                const safeStep = Math.min(currentStep, activeEvents.length - 1);
-                processGraph(activeEvents, safeStep);
+            if (playbackEvents.length > 0) {
+                const safeStep = Math.min(currentStep, playbackEvents.length - 1);
+                processGraph(playbackEvents, safeStep);
             } else if (showFullGraph && fullGraphData) {
                 processGraph([], -1);
             } else {
@@ -371,7 +575,14 @@ function App() {
         }
     }, 10);
     return () => clearTimeout(timer);
-  }, [currentStep, activeEvents, showFullGraph, fullGraphData]);
+  }, [currentStep, playbackEvents, showFullGraph, fullGraphData]);
+
+  // Keep currentStep in range for the current playback event list.
+  useEffect(() => {
+      if (playbackEvents.length === 0) return;
+      const maxStep = playbackEvents.length - 1;
+      if (currentStep > maxStep) setCurrentStep(maxStep);
+  }, [playbackEvents.length, currentStep]);
 
   // Reset step when query changes (unless live)
   useEffect(() => {
@@ -382,10 +593,10 @@ function App() {
 
   // Auto-scroll in live mode
   useEffect(() => {
-      if (mode === 'live' && activeEvents.length > 0) {
-          setCurrentStep(activeEvents.length - 1);
+      if (mode === 'live' && playbackEvents.length > 0) {
+          setCurrentStep(playbackEvents.length - 1);
       }
-  }, [activeEvents.length, mode, selectedQueryId]);
+  }, [playbackEvents.length, mode, selectedQueryId]);
 
   // Keyboard Shortcuts
   useEffect(() => {
@@ -430,7 +641,10 @@ function App() {
           termination_model: runConfig.termination_model || null,
           entry_points: runConfig.entry_points,
           max_steps: runConfig.max_steps,
-          edge_type: runConfig.edge_type
+          edge_type: runConfig.edge_type,
+          filters: runConfig.filters,
+          expand_filtered_nodes: runConfig.expand_filtered_nodes,
+          admittance_instructions: runConfig.admittance_instructions
       };
       
       if (runConfig.inputType === 'query') {
@@ -499,13 +713,18 @@ function App() {
               clearTimeout(batchTimeout);
               processBatch();
           }
+          // Refresh history after run completes (WS closes when run is done)
+          fetchHistory();
+          fetchStatus();
+          
+          // Show completion status
+          setIsPlaying(false);
       };
 
       setWs(socket);
       setCurrentRunId(data.run_id);
       
       fetchStatus();
-      fetchHistory(); // Update history list
     } catch (e) {
       logger.error("Run failed", e);
       showToast("Run failed: " + e.message, "error");
@@ -532,7 +751,7 @@ function App() {
     const links = [];
     const linkSet = new Set();
     const parentMap = new Map();
-    let currentMetrics = { cost: 0, calls: 0, tokens: 0, shortcuts: 0 };
+    let currentMetrics = { cost: 0, calls: 0, tokens: 0, shortcuts: 0, filtered: 0 };
     let currentEvidence = [];
     const evidenceSet = new Set();
     let currentQueue = [];
@@ -546,20 +765,141 @@ function App() {
 
     if (showFullGraph && fullGraphData) {
         fullGraphData.nodes.forEach(n => {
-            nodes.set(n.id, { ...n, visited: false, type: 'static', score: 0 });
+            // Preserve the dataset's node type in `pz_type` so the viz/type editor
+            // can classify nodes correctly even when we use `type` for traversal state.
+            const pzType = n.pz_type || n.type;
+            nodes.set(n.id, { ...n, pz_type: pzType, visited: false, type: 'static', score: 0 });
         });
         fullGraphData.links.forEach(l => {
-            if (nodes.has(l.source) && nodes.has(l.target)) {
-                links.push({ ...l, isOnPath: false });
-                linkSet.add(`${l.source}-${l.target}`);
+            // Normalize src/dst to source/target (data may use either convention)
+            const sourceId = l.source || l.src;
+            const targetId = l.target || l.dst;
+            if (nodes.has(sourceId) && nodes.has(targetId)) {
+                links.push({ ...l, source: sourceId, target: targetId, isOnPath: false });
+                linkSet.add(`${sourceId}-${targetId}`);
             }
         });
     }
 
     for (let i = 0; i <= limitIndex && i < events.length; i++) {
-        const e = events[i];
+        let e = events[i];
+
+        // Unwrap traverse_trace events
+        if (e.event_type === 'traverse_trace' && e.data?.event_type) {
+            e = { event_type: e.data.event_type, data: e.data };
+        }
         
         if (e.event_type) lastAction = `${e.event_type}`;
+
+        if (e.event_type === 'step_summary') {
+            if (e.data?.skipped && e.data?.skip_reason === 'visit_filter_rejected') {
+                currentMetrics.filtered += 1;
+                const { node_id } = e.data;
+                activeNodeIds.add(node_id);
+                const state = nodeStates.get(node_id) || {};
+                state.isFiltered = true;
+                state.skipReason = "Skipped by Filter";
+                nodeStates.set(node_id, state);
+            }
+        }
+
+        if (e.event_type === 'step_gate_admittance') {
+            if (e.data?.cost_usd) currentMetrics.cost += e.data.cost_usd;
+            if (e.data?.tokens?.input) currentMetrics.tokens += e.data.tokens.input;
+            if (e.data?.tokens?.output) currentMetrics.tokens += e.data.tokens.output;
+            if (!e.data?.cache_hit) currentMetrics.calls += 1;
+            else currentMetrics.shortcuts += 1;
+
+            const { node_id, decision } = e.data;
+            if (node_id) {
+                activeNodeIds.add(node_id);
+                const state = nodeStates.get(node_id) || {};
+                state.isThinking = false; // Clear thinking state
+                if (e.data.prompt) state.prompt = e.data.prompt;
+                if (e.data.raw_output) state.raw_output = e.data.raw_output;
+                
+                // Capture admittance decision
+                if (decision) {
+                    state.admit = decision.passed;
+                    state.reason = decision.reason;
+                    state.model = decision.model;
+                    
+                    if (decision.passed) {
+                        state.isEvidence = true;
+                        state.type = 'evidence';
+                        if (!evidenceSet.has(node_id)) {
+                            currentEvidence.push({
+                                node_id,
+                                score: 1.0, // Admitted nodes are implicitly relevant
+                                reasoning: decision.reason,
+                                summary: state.summary || ""
+                            });
+                            evidenceSet.add(node_id);
+                        }
+                    }
+                }
+                
+                nodeStates.set(node_id, state);
+            }
+        }
+
+        if (e.event_type === 'step_node_loaded') {
+            const { node } = e.data;
+            if (node && node.id) {
+                activeNodeIds.add(node.id);
+                const state = nodeStates.get(node.id) || {};
+                state.label = node.label;
+                state.pz_type = node.type;
+                state.summary = node.summary || node.text_preview;
+                // Don't overwrite 'type' (viz state) if it's already set to 'visited'/'evidence'
+                if (!state.type) state.type = 'candidate';
+                nodeStates.set(node.id, state);
+            }
+        }
+
+        if (e.event_type === 'step_expand') {
+            const { node_id, neighbors } = e.data;
+            if (node_id && neighbors) {
+                activeNodeIds.add(node_id);
+                neighbors.forEach(nb => {
+                    const targetId = nb.neighbor_id;
+                    activeNodeIds.add(targetId);
+                    
+                    const source = nb.direction === 'in' ? targetId : node_id;
+                    const target = nb.direction === 'in' ? node_id : targetId;
+                    
+                    const key = `${source}-${target}`;
+                    if (!linkSet.has(key)) {
+                        links.push({ 
+                            source, 
+                            target, 
+                            type: nb.edge_type,
+                            id: nb.edge_id 
+                        });
+                        linkSet.add(key);
+                    }
+                });
+            }
+        }
+
+        if (e.event_type === 'step_begin') {
+            const { node_id } = e.data;
+            if (node_id) {
+                activeNodeIds.add(node_id);
+                const state = nodeStates.get(node_id) || {};
+                state.isThinking = true;
+                nodeStates.set(node_id, state);
+            }
+        }
+
+        if (e.event_type === 'step_end' || e.event_type === 'step_summary') {
+             const { node_id } = e.data;
+             if (node_id) {
+                 const state = nodeStates.get(node_id) || {};
+                 state.isThinking = false;
+                 nodeStates.set(node_id, state);
+             }
+        }
 
         if (e.event_type === 'llm_score_request' || e.event_type === 'llm_interaction') {
             currentMetrics.calls++;
@@ -577,6 +917,12 @@ function App() {
             const state = nodeStates.get(node_id) || {};
             state.visited = true;
             state.type = 'visited';
+            if (e.data?.summary) state._traceSummary = e.data.summary;
+            if (e.data?.decision) state.decision = e.data.decision;
+            if (e.data?.admit !== undefined) state.admit = e.data.admit;
+            if (e.data?.reason) state.reason = e.data.reason;
+            if (e.data?.model) state.model = e.data.model;
+            if (e.data?.raw_output) state.raw_output = e.data.raw_output;
             nodeStates.set(node_id, state);
             
             currentQueue = currentQueue.filter(q => q.id !== node_id);
@@ -680,6 +1026,18 @@ function App() {
                 });
             }
         }
+
+        // Handle streaming answer updates
+        if (e.event_type === 'answer_update') {
+            if (e.data?.answer) {
+                currentAnswer = e.data.answer;
+            }
+        }
+
+        // Handle error events
+        if (e.event_type === 'error') {
+            lastAction = `Error: ${e.data?.error || 'Unknown error'}`;
+        }
     }
 
     if (rootEdges.length > 0) {
@@ -694,7 +1052,9 @@ function App() {
         if (fullGraphData && fullGraphData.nodes) {
             const graphNode = fullGraphData.nodes.find(n => n.id === id);
             if (graphNode) {
-                nodeData = { ...graphNode, ...nodeData, summary: graphNode.summary, type: 'candidate' }; 
+                // Keep the graph's semantic type in `pz_type`.
+                const pzType = graphNode.pz_type || graphNode.type;
+                nodeData = { ...graphNode, ...nodeData, pz_type: pzType, summary: graphNode.summary, type: 'candidate' }; 
             }
         }
 
@@ -717,6 +1077,7 @@ function App() {
 
             if (nodes.has(sourceId) && nodes.has(targetId)) {
                 const key = `${sourceId}-${targetId}`;
+                // Only add if not already added by step_expand
                 if (!linkSet.has(key)) {
                     links.push({ ...l, source: sourceId, target: targetId });
                     linkSet.add(key);
@@ -815,7 +1176,18 @@ function App() {
         setTooltip({
             x: event.pageX,
             y: event.pageY,
-            content: { id: node.id, score: node.score, type: node.type, summary: node.summary }
+            content: {
+                id: node.id,
+                score: node.score,
+                type: node.type,
+                summary: node.summary,
+                decision: node.decision,
+                admit: node.admit,
+                reason: node.reason,
+                model: node.model,
+                isFiltered: node.isFiltered,
+                skipReason: node.skipReason
+            }
         });
     } else if (event) {
         setTooltip(prev => prev ? ({ ...prev, x: event.pageX, y: event.pageY }) : null);
@@ -826,13 +1198,14 @@ function App() {
       setAllEvents([]);
       setCurrentStep(0);
       setGraphData({ nodes: [], links: [] });
-      setMetrics({ cost: 0, calls: 0, tokens: 0, shortcuts: 0 });
+      setMetrics({ cost: 0, calls: 0, tokens: 0, shortcuts: 0, filtered: 0 });
       setEvidence([]);
       setQueue([]);
       setFinalAnswer(null);
       setSelectedQueryId(null);
       setRunConfig(prev => ({ ...prev, query: "" }));
       setMode('live');
+      setShowFullGraph(false);
   };
 
   const handleExport = () => {
@@ -857,7 +1230,7 @@ function App() {
       "Explain the relationship between diabetes and heart disease."
   ];
 
-  const hasRun = allEvents.length > 0 || showFullGraph;
+  const hasRun = allEvents.length > 0 || showFullGraph || status.running;
 
   return (
     <div className="h-screen bg-black text-white font-sans flex overflow-hidden">
@@ -869,6 +1242,12 @@ function App() {
         onOpenSettings={() => setIsSettingsOpen(true)}
         runHistory={runHistory}
         loadRun={loadRun}
+        onDeleteRun={deleteRun}
+        onClearHistory={clearHistory}
+        onExploreGraph={handleExploreGraph}
+        isExploring={isExploreOnly}
+        isRunning={status.running}
+        currentQuery={runConfig.query}
       />
 
       <div className="flex-1 flex flex-col relative">
@@ -888,6 +1267,85 @@ function App() {
                     onOpenSettings={() => setIsSettingsOpen(true)}
                     mode="centered"
                 />
+
+                {/* Always-visible graph selection + exploration */}
+                <div className="mt-4 w-full max-w-2xl mx-auto flex flex-col gap-2">
+                    <div className="flex items-center justify-between gap-3 bg-gray-900 border border-gray-800 rounded-lg p-3">
+                        <div className="flex flex-col gap-1 min-w-0">
+                            <div className="text-xs text-gray-500 uppercase tracking-wider">Graph</div>
+                            <select
+                                className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-xs text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                                value={runConfig.index}
+                                onChange={(e) => setRunConfig(prev => ({ ...prev, index: e.target.value }))}
+                            >
+                                {resources.indices.length === 0 && <option value="">Loading graphs...</option>}
+                                {resources.indices.map(idx => (
+                                    <option key={idx} value={idx}>{idx}</option>
+                                ))}
+                            </select>
+                            <div className="text-[11px] text-gray-500 truncate">
+                                {isLoadingGraph
+                                    ? 'Loading graph…'
+                                    : (fullGraphData
+                                        ? `Loaded: ${fullGraphData.nodes?.length || 0} nodes, ${fullGraphData.links?.length || 0} edges`
+                                        : 'No graph loaded')}
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                            <button
+                                onClick={handleExploreGraph}
+                                disabled={!runConfig.index || isLoadingGraph}
+                                className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-xs text-gray-200 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                Explore graph
+                            </button>
+                            <button
+                                onClick={() => {
+                                    // If switching to GPU mode, check WebGL first
+                                    if (!vizConfig?.use3D) {
+                                        const canvas = document.createElement('canvas');
+                                        const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+                                        if (!gl) {
+                                            showToast('WebGL not available. Close ALL browser windows and reopen, or try a different browser.', 'error');
+                                            return;
+                                        }
+                                        // Clean up test context
+                                        const ext = gl.getExtension('WEBGL_lose_context');
+                                        if (ext) ext.loseContext();
+                                    }
+                                    setVizConfig(prev => ({ ...prev, use3D: !prev.use3D }));
+                                }}
+                                className={`px-3 py-2 border rounded text-xs hover:bg-gray-700 ${
+                                    vizConfig?.use3D 
+                                        ? 'bg-cyan-900 border-cyan-600 text-cyan-200' 
+                                        : 'bg-gray-800 border-gray-700 text-gray-200'
+                                }`}
+                            >
+                                {vizConfig?.use3D ? 'GPU 🚀' : 'Canvas'}
+                            </button>
+                            <button
+                                onClick={handleToggleSim}
+                                disabled={!fullGraphData || isLoadingGraph}
+                                className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-xs text-gray-200 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {vizConfig?.runLayout ? 'Pause sim' : 'Run sim'}
+                            </button>
+                            <button
+                                onClick={handleRefreshViz}
+                                disabled={!fullGraphData || isLoadingGraph}
+                                className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-xs text-gray-200 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                Refresh viz
+                            </button>
+                            <button
+                                onClick={() => setIsSettingsOpen(true)}
+                                className="px-3 py-2 bg-blue-600 rounded text-xs text-white hover:bg-blue-500"
+                            >
+                                Settings
+                            </button>
+                        </div>
+                    </div>
+                </div>
                 
                 <div className="mt-8 flex flex-wrap justify-center gap-2 max-w-2xl">
                     {suggestedQueries.map((q, i) => (
@@ -909,6 +1367,67 @@ function App() {
             <div className="flex-1 flex flex-col h-full">
                 {/* Top Bar with Input */}
                 <div className="p-4 border-b border-gray-800 bg-gray-900/50 backdrop-blur z-10">
+                    {/* Always-visible graph selection */}
+                    <div className="w-full max-w-4xl mx-auto flex items-center gap-3 mb-3">
+                        <div className="flex-1 min-w-0">
+                            <div className="text-[11px] text-gray-500 uppercase tracking-wider">Graph</div>
+                            <div className="flex items-center gap-2">
+                                <select
+                                    className="flex-1 min-w-0 bg-gray-800 border border-gray-700 rounded p-2 text-xs text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                                    value={runConfig.index}
+                                    onChange={(e) => setRunConfig(prev => ({ ...prev, index: e.target.value }))}
+                                >
+                                    {resources.indices.length === 0 && <option value="">Loading graphs...</option>}
+                                    {resources.indices.map(idx => (
+                                        <option key={idx} value={idx}>{idx}</option>
+                                    ))}
+                                </select>
+                                {isExploreOnly ? (
+                                    <button
+                                        onClick={handleExitExplore}
+                                        className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-xs text-gray-200 hover:bg-gray-700"
+                                    >
+                                        Exit explore
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={handleExploreGraph}
+                                        disabled={isLoadingGraph}
+                                        className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-xs text-gray-200 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        Explore
+                                    </button>
+                                )}
+                                <button
+                                    onClick={handleToggleSim}
+                                    disabled={!fullGraphData || isLoadingGraph}
+                                    className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-xs text-gray-200 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {vizConfig?.runLayout ? 'Pause sim' : 'Run sim'}
+                                </button>
+                                <button
+                                    onClick={handleRefreshViz}
+                                    disabled={!fullGraphData || isLoadingGraph}
+                                    className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-xs text-gray-200 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    Refresh viz
+                                </button>
+                                <button
+                                    onClick={() => setIsSettingsOpen(true)}
+                                    className="px-3 py-2 bg-blue-600 rounded text-xs text-white hover:bg-blue-500"
+                                >
+                                    Settings
+                                </button>
+                            </div>
+                            <div className="text-[11px] text-gray-500 truncate mt-1">
+                                {isLoadingGraph
+                                    ? 'Loading graph…'
+                                    : (fullGraphData
+                                        ? `Loaded: ${fullGraphData.nodes?.length || 0} nodes, ${fullGraphData.links?.length || 0} edges`
+                                        : 'No graph loaded')}
+                            </div>
+                        </div>
+                    </div>
                     <ChatInput 
                         runConfig={runConfig}
                         setRunConfig={setRunConfig}
@@ -922,13 +1441,24 @@ function App() {
 
                 {/* Graph Area */}
                 <div className="flex-1 relative overflow-hidden bg-gray-950">
-                    <ReasoningFeed events={activeEvents} currentStep={currentStep} />
                     <ErrorBoundary>
-                        <GraphVisualization 
-                            graphData={graphData}
-                            onNodeClick={setSelectedNode}
-                            onNodeHover={handleNodeHover}
-                        />
+                        {vizConfig?.use3D ? (
+                            <GraphVisualization3D 
+                                data={graphData}
+                                onNodeClick={setSelectedNode}
+                                onNodeHover={handleNodeHover}
+                                vizConfig={vizConfig}
+                                graphId={currentRunId}
+                            />
+                        ) : (
+                            <GraphVisualization 
+                                graphData={graphData}
+                                onNodeClick={setSelectedNode}
+                                onNodeHover={handleNodeHover}
+                                vizConfig={vizConfig}
+                                refreshNonce={vizRefreshNonce}
+                            />
+                        )}
                     </ErrorBoundary>
 
                     {/* Overlay Stats */}
@@ -937,33 +1467,10 @@ function App() {
                         <div className="text-lg font-bold">{graphData.nodes.length} <span className="text-sm font-normal text-gray-500">nodes</span></div>
                     </div>
 
-                    {/* Legend */}
-                    <div className="absolute bottom-24 left-4 bg-gray-900/90 p-3 rounded border border-gray-700 backdrop-blur pointer-events-none text-xs">
-                        <div className="flex items-center gap-2 mb-1">
-                            <div className="w-3 h-3 rounded-full bg-purple-500"></div> Entry Point
-                        </div>
-                        <div className="flex items-center gap-2 mb-1">
-                            <div className="w-3 h-3 rounded-full bg-blue-500"></div> Visited
-                        </div>
-                        <div className="flex items-center gap-2 mb-1">
-                            <div className="w-3 h-3 rounded-full bg-yellow-400"></div> Evidence node
-                        </div>
-                        <div className="flex items-center gap-2 mb-1">
-                            <div className="w-3 h-3 rounded-full bg-gray-400"></div> Candidate / Queue
-                        </div>
-                        <div className="flex items-center gap-2 mb-1">
-                            <div className="w-5 h-1 bg-green-400"></div> Answer Path
-                        </div>
-                        <div className="flex items-center gap-2 mb-1">
-                            <div className="w-5 h-1 bg-gray-600"></div> Traversal Edge
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <div className="w-5 h-1 border-t border-green-600 opacity-50"></div> Reference Edge
-                        </div>
-                    </div>
+
 
                     {/* Final Answer Overlay */}
-                    {finalAnswer && (
+                    {!isExploreOnly && finalAnswer && (
                         <div className="absolute bottom-20 left-4 right-4 md:left-10 md:right-10 bg-gray-900/95 border border-blue-500/30 p-6 rounded-xl backdrop-blur shadow-2xl max-h-[40vh] overflow-y-auto">
                             <div className="text-xs font-bold text-blue-400 mb-2 uppercase tracking-wider">Final Answer</div>
                             <div className="text-sm text-gray-200 leading-relaxed prose prose-invert prose-sm max-w-none">
@@ -975,27 +1482,31 @@ function App() {
                     )}
 
                     {/* Playback Controls */}
-                    <div className="absolute bottom-0 left-0 right-0">
-                        <ControlPanel 
-                            isPlaying={isPlaying}
-                            setIsPlaying={setIsPlaying}
-                            currentStep={currentStep}
-                            setCurrentStep={setCurrentStep}
-                            maxStep={Math.max(0, activeEvents.length - 1)}
-                            activeEventsCount={activeEvents.length}
-                        />
-                    </div>
+                    {!isExploreOnly && (
+                        <div className="absolute bottom-0 left-0 right-0">
+                            <ControlPanel 
+                                isPlaying={isPlaying}
+                                setIsPlaying={setIsPlaying}
+                                currentStep={currentStep}
+                                setCurrentStep={setCurrentStep}
+                                maxStep={Math.max(0, playbackEvents.length - 1)}
+                                activeEventsCount={playbackEvents.length}
+                                metrics={metrics}
+                            />
+                        </div>
+                    )}
                 </div>
             </div>
         )}
       </div>
 
       {/* Right Sidebar (Details) */}
-      {hasRun && (
+            {hasRun && !isExploreOnly && (
           <RunDetails 
             metrics={metrics}
             evidence={evidence}
             queue={queue}
+                        reasoning={reasoningItems}
             currentAction={currentAction}
             finalAnswer={finalAnswer}
             devMode={devMode}
@@ -1020,6 +1531,10 @@ function App() {
         availableModels={availableModels}
         devMode={devMode}
         setDevMode={setDevMode}
+        vizConfig={vizConfig}
+        setVizConfig={setVizConfig}
+        onResetVizConfig={resetVizConfig}
+        graphData={fullGraphData || graphData}
       />
 
       {tooltip && (
@@ -1033,12 +1548,25 @@ function App() {
             <div className="font-bold text-blue-400 mb-1">{tooltip.content.id.substring(0, 12)}...</div>
             {tooltip.content.score !== undefined && <div>Score: <span className="font-mono">{typeof tooltip.content.score === 'number' ? tooltip.content.score.toFixed(3) : 'N/A'}</span></div>}
             {tooltip.content.type && <div>Type: {tooltip.content.type}</div>}
+            {(tooltip.content.decision || tooltip.content.admit !== undefined) && (
+                <div>
+                    Decision: <span className="font-mono">{String(tooltip.content.decision || (tooltip.content.admit ? 'admit' : 'reject'))}</span>
+                </div>
+            )}
+            {tooltip.content.model && <div>Model: <span className="font-mono">{tooltip.content.model}</span></div>}
             {tooltip.content.summary && <div className="mt-1 text-gray-400 max-w-xs">{tooltip.content.summary}</div>}
+            {tooltip.content.reason && <div className="mt-1 text-gray-300 max-w-xs">{tooltip.content.reason}</div>}
         </div>
       )}
 
       {selectedNode && (
-          <NodeDetails node={selectedNode} onClose={() => setSelectedNode(null)} devMode={devMode} />
+                    <NodeDetails
+                        node={graphData.nodes.find(n => n.id === selectedNode.id) || selectedNode}
+                        onClose={() => setSelectedNode(null)}
+                        devMode={devMode}
+                        neighbors={Array.from(fullGraphAdjacency.get(selectedNode.id) || []).sort()}
+                        onSelectNeighbor={selectNodeById}
+                    />
       )}
       
       {showLogs && <LogViewer logs={logs} onClose={() => setShowLogs(false)} />}

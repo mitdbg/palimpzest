@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Activity, Database, List, DollarSign, Zap, FileText, Terminal, Download, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Activity, Database, List, DollarSign, Zap, FileText, Terminal, Download, ChevronRight, ChevronLeft, Brain } from 'lucide-react';
 
-const RunDetails = ({ metrics, evidence, queue, currentAction, finalAnswer, devMode, onShowLogs, onExport, onSelectNode }) => {
+const RunDetails = ({ metrics, evidence, queue, reasoning = [], currentAction, finalAnswer, devMode, onShowLogs, onExport, onSelectNode }) => {
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [width, setWidth] = useState(320);
     const [isResizing, setIsResizing] = useState(false);
@@ -125,6 +125,45 @@ const RunDetails = ({ metrics, evidence, queue, currentAction, finalAnswer, devM
 
                     {/* Evidence */}
                     <div className="flex-1 overflow-y-auto p-4 min-h-0 scrollbar-thin scrollbar-thumb-gray-800">
+                        {/* Reasoning (always visible; avoids overlapping the graph canvas) */}
+                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2 sticky top-0 bg-gray-900 py-2 z-10">
+                            <Brain size={12} /> Reasoning ({reasoning.length})
+                        </h3>
+                        <div className="space-y-2 mb-6">
+                            {reasoning.length === 0 && <div className="text-xs text-gray-600 italic">No reasoning events yet.</div>}
+                            {reasoning.map((ev, i) => {
+                                const nodeId = ev?.data?.node_id;
+                                const summary = ev?.data?.summary || ev?.data?.metadata?.summary || ev?.data?.content;
+                                const reason = ev?.data?.reason || ev?.data?.reasoning;
+                                const decision = ev?.data?.decision || (ev?.data?.is_relevant ? 'admit' : (ev?.data?.is_relevant === false ? 'reject' : null));
+                                const label = ev.event_type === 'evidence_collected'
+                                    ? 'EVIDENCE'
+                                    : (decision ? String(decision).toUpperCase() : ev.event_type);
+
+                                return (
+                                    <div
+                                        key={ev.seq || i}
+                                        onClick={() => (nodeId ? onSelectNode?.({ id: nodeId }) : null)}
+                                        className="text-xs bg-gray-800/50 p-3 rounded border border-gray-700/50 hover:border-blue-500/40 transition-colors cursor-pointer hover:bg-gray-800"
+                                        title={nodeId || ''}
+                                    >
+                                        <div className="flex justify-between items-start gap-2 mb-1">
+                                            <div className="font-bold text-blue-300">{label}</div>
+                                            {nodeId ? (
+                                                <div className="text-gray-500 font-mono">{String(nodeId).substring(0, 8)}</div>
+                                            ) : null}
+                                        </div>
+                                        {summary ? (
+                                            <div className="text-gray-200 line-clamp-3" title={String(summary)}>{summary}</div>
+                                        ) : null}
+                                        {reason ? (
+                                            <div className="text-gray-400 mt-1 max-h-24 overflow-y-auto whitespace-pre-wrap" title={String(reason)}>{reason}</div>
+                                        ) : null}
+                                    </div>
+                                );
+                            })}
+                        </div>
+
                         <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2 sticky top-0 bg-gray-900 py-2 z-10">
                             <Database size={12} /> Evidence ({evidence.length})
                         </h3>

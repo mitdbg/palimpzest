@@ -1,5 +1,19 @@
 import React, { useState } from 'react';
-import { MessageSquare, Clock, Settings, Plus, ChevronLeft, ChevronRight, PanelLeft } from 'lucide-react';
+import { MessageSquare, Clock, Settings, Plus, ChevronLeft, ChevronRight, Compass, Trash2, X, Loader2 } from 'lucide-react';
+
+const formatRelativeTime = (timestamp) => {
+    if (!timestamp) return '';
+    const now = Date.now() / 1000;
+    const diff = now - timestamp;
+    
+    if (diff < 60) return 'just now';
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
+    
+    const date = new Date(timestamp * 1000);
+    return date.toLocaleDateString();
+};
 
 const HistorySidebar = ({ 
     queries, 
@@ -8,11 +22,19 @@ const HistorySidebar = ({
     onNewChat, 
     onOpenSettings,
     runHistory,
-    loadRun
+    loadRun,
+    onDeleteRun,
+    onClearHistory,
+    onExploreGraph,
+    isExploring,
+    isRunning,
+    currentQuery
 }) => {
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [width, setWidth] = useState(256);
     const [isResizing, setIsResizing] = useState(false);
+    const [hoveredRunId, setHoveredRunId] = useState(null);
+    const [showClearConfirm, setShowClearConfirm] = useState(false);
 
     const startResizing = (e) => {
         setIsResizing(true);
@@ -69,6 +91,15 @@ const HistorySidebar = ({
                     <Plus size={18} /> 
                     {!isCollapsed && <span>New Chat</span>}
                 </button>
+
+                <button
+                    onClick={onExploreGraph}
+                    className={`mt-2 w-full flex items-center gap-2 p-2 rounded-lg border transition-colors text-sm font-medium ${isCollapsed ? 'justify-center' : ''} ${isExploring ? 'bg-blue-600 border-blue-500 text-white' : 'bg-gray-900 hover:bg-gray-800 border-gray-700 text-gray-200'}`}
+                    title="Explore Graph"
+                >
+                    <Compass size={18} />
+                    {!isCollapsed && <span>Explore Graph</span>}
+                </button>
             </div>
 
             {/* History List */}
@@ -95,19 +126,81 @@ const HistorySidebar = ({
                     </>
                 )}
 
+                {/* Currently Running Indicator */}
+                {!isCollapsed && isRunning && currentQuery && (
+                    <div className="px-2 mb-4">
+                        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Running</div>
+                        <div className="p-2 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                            <div className="flex items-center gap-2 text-sm text-blue-400">
+                                <Loader2 size={14} className="shrink-0 animate-spin" />
+                                <span className="truncate">{currentQuery}</span>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {!isCollapsed && runHistory.length > 0 && (
                     <>
-                        <div className="text-xs font-semibold text-gray-500 px-2 mb-2 uppercase tracking-wider">History</div>
+                        <div className="flex items-center justify-between px-2 mb-2">
+                            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">History</div>
+                            {runHistory.length > 0 && (
+                                showClearConfirm ? (
+                                    <div className="flex items-center gap-1">
+                                        <span className="text-xs text-gray-500">Clear all?</span>
+                                        <button
+                                            onClick={() => { onClearHistory?.(); setShowClearConfirm(false); }}
+                                            className="text-xs text-red-400 hover:text-red-300 px-1"
+                                        >
+                                            Yes
+                                        </button>
+                                        <button
+                                            onClick={() => setShowClearConfirm(false)}
+                                            className="text-xs text-gray-500 hover:text-gray-300 px-1"
+                                        >
+                                            No
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={() => setShowClearConfirm(true)}
+                                        className="text-xs text-gray-600 hover:text-gray-400 transition-colors"
+                                        title="Clear all history"
+                                    >
+                                        Clear
+                                    </button>
+                                )
+                            )}
+                        </div>
                         <div className="space-y-1">
-                            {runHistory.slice(0, 20).map(run => (
-                                <button
+                            {runHistory.slice(0, 30).map(run => (
+                                <div
                                     key={run.run_id}
-                                    onClick={() => loadRun(run.run_id)}
-                                    className="w-full text-left p-2 rounded-lg text-sm truncate flex items-center gap-2 text-gray-400 hover:bg-gray-900 hover:text-gray-200 transition-colors"
+                                    className="relative group/item"
+                                    onMouseEnter={() => setHoveredRunId(run.run_id)}
+                                    onMouseLeave={() => setHoveredRunId(null)}
                                 >
-                                    <Clock size={14} className="shrink-0" />
-                                    <span className="truncate">{run.query || "Untitled Run"}</span>
-                                </button>
+                                    <button
+                                        onClick={() => loadRun(run.run_id)}
+                                        className="w-full text-left p-2 rounded-lg text-sm flex flex-col gap-0.5 text-gray-400 hover:bg-gray-900 hover:text-gray-200 transition-colors pr-8"
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            <Clock size={14} className="shrink-0" />
+                                            <span className="truncate flex-1">{run.query || "Untitled Run"}</span>
+                                        </div>
+                                        <div className="text-xs text-gray-600 ml-6">
+                                            {formatRelativeTime(run.created_at)}
+                                        </div>
+                                    </button>
+                                    {hoveredRunId === run.run_id && onDeleteRun && (
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); onDeleteRun(run.run_id); }}
+                                            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-600 hover:text-red-400 transition-colors"
+                                            title="Delete run"
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    )}
+                                </div>
                             ))}
                         </div>
                     </>

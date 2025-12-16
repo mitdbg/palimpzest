@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Send, Square, Paperclip, ChevronDown } from 'lucide-react';
+import { Send, Square, Paperclip, ChevronDown, Filter, X } from 'lucide-react';
 
 const ChatInput = ({ 
     runConfig, 
@@ -12,6 +12,7 @@ const ChatInput = ({
 }) => {
     const [localQuery, setLocalQuery] = useState(runConfig.query);
     const [showModelMenu, setShowModelMenu] = useState(false);
+    const [showFilterMenu, setShowFilterMenu] = useState(false);
 
     useEffect(() => {
         setLocalQuery(runConfig.query);
@@ -31,6 +32,20 @@ const ChatInput = ({
         setRunConfig(prev => ({ ...prev, query: e.target.value }));
     };
 
+    const removeFilter = (index) => {
+        const newFilters = [...(runConfig.filters || [])];
+        newFilters.splice(index, 1);
+        setRunConfig(prev => ({ ...prev, filters: newFilters }));
+    };
+
+    const addQuickFilter = (field, op, val) => {
+        setRunConfig(prev => ({
+            ...prev,
+            filters: [...(prev.filters || []), { field, operator: op, value: val }]
+        }));
+        setShowFilterMenu(false);
+    };
+
     const containerClasses = mode === 'centered' 
         ? "w-full max-w-2xl mx-auto" 
         : "w-full max-w-4xl mx-auto";
@@ -44,6 +59,22 @@ const ChatInput = ({
 
     return (
         <div className={containerClasses}>
+            {/* Active Filter Chips */}
+            {runConfig.filters && runConfig.filters.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-2 px-1">
+                    {runConfig.filters.map((f, i) => (
+                        <div key={i} className="flex items-center gap-1 bg-blue-900/40 border border-blue-700/50 rounded-full px-3 py-1 text-xs text-blue-200">
+                            <span className="font-mono opacity-70">{f.field}</span>
+                            <span className="text-blue-400">{f.operator}</span>
+                            <span className="font-semibold">{f.value}</span>
+                            <button onClick={() => removeFilter(i)} className="ml-1 hover:text-white">
+                                <X size={12} />
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            )}
+
             <div className="relative bg-gray-800 border border-gray-700 rounded-xl shadow-lg focus-within:ring-2 focus-within:ring-blue-500/50 transition-all">
                 <textarea
                     value={localQuery}
@@ -57,41 +88,52 @@ const ChatInput = ({
                 
                 {/* Bottom Bar inside Input */}
                 <div className="absolute bottom-2 left-2 right-2 flex justify-between items-center">
-                    <div className="relative">
-                        <button 
-                            onClick={() => setShowModelMenu(!showModelMenu)}
-                            className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-200 px-2 py-1 rounded hover:bg-gray-700 transition-colors"
-                        >
-                            {runConfig.model.split('/').pop()} <ChevronDown size={12} />
-                        </button>
-                        
-                        {showModelMenu && (
-                            <div className="absolute top-full left-0 mt-1 w-48 bg-gray-900 border border-gray-700 rounded-lg shadow-xl z-20 overflow-hidden">
-                                {quickModels.map(m => (
-                                    <button
-                                        key={m}
-                                        onClick={() => {
-                                            setRunConfig(prev => ({ ...prev, model: m }));
-                                            setShowModelMenu(false);
-                                        }}
-                                        className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-800 ${runConfig.model === m ? 'text-blue-400' : 'text-gray-300'}`}
-                                    >
-                                        {m.split('/').pop()}
-                                    </button>
-                                ))}
-                                <div className="border-t border-gray-800 mt-1 pt-1">
-                                    <button 
-                                        onClick={() => {
-                                            onOpenSettings();
-                                            setShowModelMenu(false);
-                                        }}
-                                        className="w-full text-left px-3 py-2 text-xs text-gray-500 hover:text-gray-300 hover:bg-gray-800"
-                                    >
-                                        More options...
-                                    </button>
+                    <div className="flex items-center gap-2">
+                        <div className="relative">
+                            <button 
+                                onClick={() => setShowModelMenu(!showModelMenu)}
+                                className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-200 px-2 py-1 rounded hover:bg-gray-700 transition-colors"
+                            >
+                                {runConfig.model.split('/').pop()} <ChevronDown size={12} />
+                            </button>
+                            
+                            {showModelMenu && (
+                                <div className="absolute top-full left-0 mt-1 w-48 bg-gray-900 border border-gray-700 rounded-lg shadow-xl z-20 overflow-hidden">
+                                    {quickModels.map(m => (
+                                        <button
+                                            key={m}
+                                            onClick={() => {
+                                                setRunConfig(prev => ({ ...prev, model: m }));
+                                                setShowModelMenu(false);
+                                            }}
+                                            className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-800 ${runConfig.model === m ? 'text-blue-400' : 'text-gray-300'}`}
+                                        >
+                                            {m.split('/').pop()}
+                                        </button>
+                                    ))}
+                                    <div className="border-t border-gray-800 mt-1 pt-1">
+                                        <button 
+                                            onClick={() => {
+                                                onOpenSettings();
+                                                setShowModelMenu(false);
+                                            }}
+                                            className="w-full text-left px-3 py-2 text-xs text-gray-500 hover:text-gray-300 hover:bg-gray-800"
+                                        >
+                                            More options...
+                                        </button>
+                                    </div>
                                 </div>
-                            </div>
-                        )}
+                            )}
+                        </div>
+
+                        <button 
+                            onClick={() => onOpenSettings()}
+                            className="flex items-center gap-1 text-xs text-gray-400 hover:text-blue-300 px-2 py-1 rounded hover:bg-gray-700 transition-colors"
+                            title="Add Filter"
+                        >
+                            <Filter size={12} />
+                            <span>Filter</span>
+                        </button>
                     </div>
 
                     <div className="flex items-center gap-2">

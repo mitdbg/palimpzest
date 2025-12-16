@@ -73,6 +73,20 @@ class GraphDataset(Dataset):
     def upsert_node(self, node: GraphNode) -> None:
         self.add_node(node, overwrite=True)
 
+    def upsert_nodes(self, nodes: Iterable[GraphNode], *, overwrite: bool = True) -> None:
+        nodes_list = list(nodes)
+        if not nodes_list:
+            return
+
+        self.store.add_nodes(nodes_list, overwrite=overwrite)
+        self._bump_revision()
+        for n in nodes_list:
+            try:
+                self.store.get_node(n.id).revision = self.revision
+            except Exception:
+                # Best effort: store may not surface the node back.
+                pass
+
     def remove_node(self, node_id: str, *, cascade: bool = True) -> None:
         self.store.remove_node(node_id, cascade=cascade)
         self._bump_revision()
@@ -83,6 +97,13 @@ class GraphDataset(Dataset):
 
     def upsert_edge(self, edge: GraphEdge) -> None:
         self.add_edge(edge, overwrite=True)
+
+    def add_edges(self, edges: Iterable[GraphEdge], *, overwrite: bool = False) -> None:
+        edges_list = list(edges)
+        if not edges_list:
+            return
+        self.store.add_edges(edges_list, overwrite=overwrite)
+        self._bump_revision()
 
     def remove_edge(self, edge_id: str) -> None:
         self.store.remove_edge(edge_id)
@@ -181,6 +202,126 @@ class GraphDataset(Dataset):
         snapshot = GraphSnapshot.model_validate(payload)
         return cls.from_snapshot(snapshot, name=name)
 
+    # -----------------
+    # Embeddings (built-in helpers)
+    # -----------------
+    def ensure_sentence_transformer_embeddings(
+        self,
+        *,
+        model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
+        device: str | None = None,
+        normalize: bool = True,
+        embedding_key: str = "embedding",
+        overwrite: bool = False,
+        batch_size: int = 128,
+    ) -> dict[str, int]:
+        """Ensure nodes have embeddings computed from their text.
+
+        Uses the same `SentenceTransformerEmbeddingModel` wrapper as the GraphRAG server.
+        Embeddings are stored on `GraphNode.embedding` when `embedding_key=='embedding'`,
+        otherwise in `GraphNode.attrs[embedding_key]`.
+        """
+
+        if batch_size <= 0:
+            raise ValueError("batch_size must be > 0")
+
+        from palimpzest.graphrag.retrieval import (
+            SentenceTransformerEmbeddingConfig,
+            SentenceTransformerEmbeddingModel,
+            default_node_text,
+        )
+
+        emb_model = SentenceTransformerEmbeddingModel(
+            config=SentenceTransformerEmbeddingConfig(model_name=model_name, device=device, normalize=normalize)
+        )
+
+        already_embedded = 0
+        skipped_no_text = 0
+        node_ids: list[str] = []
+        texts: list[str] = []
+
+        for node in self.store.iter_nodes():
+            if not overwrite:
+                existing = node.embedding if embedding_key == "embedding" else (node.attrs or {}).get(embedding_key)
+                if isinstance(existing, list) and len(existing) > 0:
+                    already_embedded += 1
+                    continue
+
+            txt = default_node_text(node)
+            if not txt:
+                skipped_no_text += 1
+                continue
+
+            node_ids.append(node.id)
+            texts.append(txt)
+
+        updated_nodes: list[GraphNode] = []
+
+        for start in range(0, len(node_ids), batch_size):
+            batch_ids = node_ids[start : start + batch_size]
+            batch_texts = texts[start : start + batch_size]
+            arr = emb_model.embed_texts(batch_texts)
+            # Convert to plain lists for snapshot serialization.
+            vectors = arr.tolist()
+
+            for nid, vec in zip(batch_ids, vectors, strict=True):
+                cur = self.get_node(nid)
+                updated = cur.model_copy(deep=True)
+                if embedding_key == "embedding":
+                    updated.embedding = [float(x) for x in vec]
+                else:
+                    updated.attrs = dict(updated.attrs or {})
+                    updated.attrs[embedding_key] = [float(x) for x in vec]
+                updated_nodes.append(updated)
+
+        self.upsert_nodes(updated_nodes, overwrite=True)
+        return {
+            "embedded": len(updated_nodes),
+            "already_embedded": already_embedded,
+            "skipped_no_text": skipped_no_text,
+        }
+
+    def run_knn_similarity_sentence_transformer_topk(
+        self,
+        *,
+        edge_type: str = "sim:knn",
+        k: int = 10,
+        model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
+        device: str | None = None,
+        normalize: bool = True,
+        embedding_key: str = "embedding",
+        include_overlay: bool = True,
+        mode: str = "full",
+        overwrite_embeddings: bool = False,
+        batch_size: int = 128,
+    ):
+        """Embed node text with sentence-transformers and induce kNN similarity edges.
+
+        This is a convenience wrapper that:
+        1) populates embeddings on nodes (from best-effort node text)
+        2) runs the built-in kNN induction with top-k (defaults to k=10)
+
+        For larger graphs, the kNN induction prefers a Chroma/HNSW ANN path
+        to avoid materializing an O(N^2) similarity matrix.
+        """
+
+        _ = self.ensure_sentence_transformer_embeddings(
+            model_name=model_name,
+            device=device,
+            normalize=normalize,
+            embedding_key=embedding_key,
+            overwrite=overwrite_embeddings,
+            batch_size=batch_size,
+        )
+
+        spec_id = self.add_knn_similarity_topk(
+            edge_type=edge_type,
+            embedding_key=embedding_key,
+            k=int(k),
+            include_overlay=include_overlay,
+        )
+        return self.run_induction(spec_id, mode=mode)
+
     def traverse(
         self,
         *,
@@ -214,6 +355,7 @@ class GraphDataset(Dataset):
         trace_run_id: str | None = None,
         trace_full_node_text: bool = False,
         trace_node_text_preview_len: int = 240,
+        expand_filtered_nodes: bool = False,
     ):
         """Create a PZ `Dataset` that traverses this graph using beam search.
 
@@ -323,6 +465,7 @@ class GraphDataset(Dataset):
             trace_run_id=trace_run_id,
             trace_full_node_text=trace_full_node_text,
             trace_node_text_preview_len=trace_node_text_preview_len,
+            expand_filtered_nodes=expand_filtered_nodes,
         )
 
         return Dataset(sources=[seed], operator=operator, schema=output_schema)
@@ -519,44 +662,105 @@ class GraphDataset(Dataset):
                 norms = np.maximum(norms, 1e-12)
                 E = E / norms
 
-                # Full similarity matrix is ~N^2 floats. For N~3.5k it's ~45MB float32.
-                S = E @ E.T
-
                 id_to_idx = {nid: i for i, nid in enumerate(valid_node_ids)}
                 impacted_idxs = [id_to_idx[nid] for nid in valid_impacted if nid in id_to_idx]
 
                 pairs: set[tuple[str, str]] = set()
-                for i in impacted_idxs:
-                    sims = S[i]
-                    # Exclude self-edges.
-                    sims_i = sims.copy()
-                    sims_i[i] = -np.inf
 
-                    if k is not None:
-                        kk = min(int(k), sims_i.shape[0] - 1)
+                # For large graphs, avoid materializing the full similarity matrix (O(N^2) memory).
+                # Use an ANN index (Chroma/HNSW) when k-topk mode is requested.
+                if k is not None and threshold is None and len(valid_node_ids) >= 5000:
+                    try:
+                        import chromadb
+
+                        try:
+                            from chromadb import EphemeralClient  # type: ignore
+
+                            client = EphemeralClient()
+                        except Exception:
+                            client = chromadb.Client()
+
+                        # Cosine space matches normalized embeddings.
+                        collection = client.create_collection(
+                            name=f"pz_knn_{self.graph_id}_{spec_id}",
+                            metadata={"hnsw:space": "cosine"},
+                        )
+
+                        # Add embeddings in batches to keep peak memory modest.
+                        for start in range(0, len(valid_node_ids), 2048):
+                            batch_ids = valid_node_ids[start : start + 2048]
+                            idxs = [id_to_idx[nid] for nid in batch_ids]
+                            batch_embs = E[idxs].tolist()
+                            collection.add(ids=batch_ids, embeddings=batch_embs)
+
+                        query_ids = [valid_node_ids[i] for i in impacted_idxs]
+                        kk = int(k)
                         if kk <= 0:
-                            continue
-                        # Get top-k indices (unsorted), then sort by score desc.
-                        top_idx = np.argpartition(-sims_i, kth=kk - 1)[:kk]
-                        top_idx = top_idx[np.argsort(-sims_i[top_idx])]
-                        chosen = top_idx
-                    else:
-                        # threshold mode
-                        chosen = np.where(sims_i >= float(threshold))[0]
-                        if chosen.size == 0:
-                            continue
+                            candidate_pairs = []
+                        else:
+                            # Query in batches; Chroma returns distance (cosine: 1 - cosine_similarity).
+                            for start in range(0, len(query_ids), 256):
+                                q_ids = query_ids[start : start + 256]
+                                q_idxs = [id_to_idx[nid] for nid in q_ids]
+                                q_embs = E[q_idxs].tolist()
 
-                    src_id = valid_node_ids[i]
-                    for j in chosen.tolist():
-                        dst_id = valid_node_ids[j]
-                        score = float(sims[j])
-                        pairs.add((src_id, dst_id))
-                        pair_scores[(src_id, dst_id)] = score
-                        # symmetric edges (two directed edges)
-                        pairs.add((dst_id, src_id))
-                        pair_scores[(dst_id, src_id)] = score
+                                res = collection.query(
+                                    query_embeddings=q_embs,
+                                    n_results=min(kk + 1, len(valid_node_ids)),
+                                    include=["distances", "ids"],
+                                )
 
-                candidate_pairs = sorted(pairs)
+                                ids_per_q = res.get("ids") or []
+                                dists_per_q = res.get("distances") or []
+                                for src_id, nbr_ids, nbr_dists in zip(q_ids, ids_per_q, dists_per_q, strict=True):
+                                    for dst_id, dist in zip(nbr_ids, nbr_dists, strict=True):
+                                        if dst_id == src_id:
+                                            continue
+                                        score = 1.0 - float(dist)
+                                        pairs.add((src_id, dst_id))
+                                        pair_scores[(src_id, dst_id)] = score
+                                        pairs.add((dst_id, src_id))
+                                        pair_scores[(dst_id, src_id)] = score
+
+                            candidate_pairs = sorted(pairs)
+
+                    except Exception:
+                        # Fall back to full-matrix method below.
+                        pass
+
+                if not pairs:
+                    # Small/medium graphs (or threshold mode): compute full similarity matrix.
+                    # NOTE: for N ~ 30k this is ~3.6GB float32, so it's intentionally gated above.
+                    S = E @ E.T
+
+                    for i in impacted_idxs:
+                        sims = S[i]
+                        # Exclude self-edges.
+                        sims_i = sims.copy()
+                        sims_i[i] = -np.inf
+
+                        if k is not None:
+                            kk = min(int(k), sims_i.shape[0] - 1)
+                            if kk <= 0:
+                                continue
+                            top_idx = np.argpartition(-sims_i, kth=kk - 1)[:kk]
+                            top_idx = top_idx[np.argsort(-sims_i[top_idx])]
+                            chosen = top_idx
+                        else:
+                            chosen = np.where(sims_i >= float(threshold))[0]
+                            if chosen.size == 0:
+                                continue
+
+                        src_id = valid_node_ids[i]
+                        for j in chosen.tolist():
+                            dst_id = valid_node_ids[j]
+                            score = float(sims[j])
+                            pairs.add((src_id, dst_id))
+                            pair_scores[(src_id, dst_id)] = score
+                            pairs.add((dst_id, src_id))
+                            pair_scores[(dst_id, src_id)] = score
+
+                    candidate_pairs = sorted(pairs)
 
         except Exception:
             # Fallback: slow but robust brute-force generator.
@@ -799,9 +1003,19 @@ class GraphDataset(Dataset):
                 raise ValueError("text_anchor requires target_fields: list[str]")
             min_anchor_len = int(generator_params.get("min_anchor_len", 5))
 
+            dst_types = generator_params.get("dst_types")
+            if dst_types is not None:
+                if not isinstance(dst_types, list) or not all(isinstance(t, str) for t in dst_types):
+                    raise ValueError("text_anchor requires dst_types: list[str]")
+                dst_types_set = set(dst_types)
+            else:
+                dst_types_set = None
+
             anchor_to_targets: dict[str, list[str]] = {}
             target_strings_by_id: dict[str, list[str]] = {}
             for node in self.store.iter_nodes():
+                if dst_types_set is not None and node.type not in dst_types_set:
+                    continue
                 node_id = node.id
                 strings = self._extract_strings(node, fields=target_fields)
                 if strings:

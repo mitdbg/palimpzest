@@ -1,19 +1,18 @@
-import pytest
-import pandas as pd
-import numpy as np
 from unittest.mock import MagicMock
 
-from palimpzest.core.data.dataset import Dataset
-from palimpzest.core.data.iter_dataset import MemoryDataset
-from palimpzest.core.data.graph_dataset import GraphDataset, GraphNode, GraphEdge
-from palimpzest.query.operators.convert import LLMConvertBonded
-from palimpzest.query.operators.aggregate import SemanticAggregate
-from palimpzest.query.processor.config import QueryProcessorConfig
-from palimpzest.query.processor.query_processor_factory import QueryProcessorFactory
-from palimpzest.policy import MaxQuality
-from palimpzest.core.models import GenerationStats
+import pandas as pd
+import pytest
 
 from palimpzest.constants import Model
+from palimpzest.core.data.graph_dataset import GraphDataset, GraphEdge, GraphNode
+from palimpzest.core.data.iter_dataset import MemoryDataset
+from palimpzest.core.models import GenerationStats
+from palimpzest.policy import MaxQuality
+from palimpzest.query.operators.aggregate import SemanticAggregate
+from palimpzest.query.operators.convert import LLMConvertBonded
+from palimpzest.query.processor.config import QueryProcessorConfig
+from palimpzest.utils.hash_helpers import hash_for_id
+
 
 # Mock Data
 @pytest.fixture
@@ -89,7 +88,7 @@ def test_chunk_operator(memory_dataset, config):
             by_source[sid] = []
         by_source[sid].append(r)
         
-    for sid, chunks in by_source.items():
+    for _sid, chunks in by_source.items():
         chunks.sort(key=lambda x: x.chunk_index)
         for i, chunk in enumerate(chunks):
             assert chunk.chunk_index == i
@@ -97,6 +96,67 @@ def test_chunk_operator(memory_dataset, config):
                 assert chunk.prev_chunk_id == chunks[i-1].id
             else:
                 assert chunk.prev_chunk_id is None
+
+
+def test_chunk_operator_with_graph_edge_policy(config):
+    """Chunk a GraphDataset and materialize has_chunk + next_chunk overlay edges."""
+    graph = GraphDataset(graph_id="g")
+    graph.add_node(
+        GraphNode(
+            id="n1",
+            type="twiki_page",
+            label="Doc",
+            text="abcdefghij" * 3,  # 30 chars
+            attrs={},
+        )
+    )
+
+    # GraphDataset is a Dataset yielding GraphNode records
+    chunked = graph.chunk(
+        input_col="text",
+        output_col="text",
+        chunk_size=10,
+        chunk_overlap=0,
+        graph=graph,
+        edge_policy="has_and_next",
+        has_chunk_edge_type="overlay:has_chunk",
+        next_chunk_edge_type="overlay:next_chunk",
+        chunk_node_type="chunk",
+    )
+
+    out = chunked.run(config)
+    chunk_records = list(out)
+    assert len(chunk_records) == 3
+    chunk_records.sort(key=lambda r: r.chunk_index)
+    chunk_ids = [r.id for r in chunk_records]
+
+    # Nodes materialized
+    for cid in chunk_ids:
+        assert graph.has_node(cid)
+        node = graph.get_node(cid)
+        assert node.type == "chunk"
+        assert isinstance(node.text, str)
+        assert node.attrs.get("chunk", {}).get("source_node_id") == "n1"
+
+    # has_chunk edges: n1 -> chunk
+    for cid in chunk_ids:
+        eid = hash_for_id(f"link:overlay:has_chunk:n1->{cid}")
+        assert graph.has_edge(eid)
+        e = graph.get_edge(eid)
+        assert e.src == "n1"
+        assert e.dst == cid
+        assert e.type == "overlay:has_chunk"
+
+    # next_chunk edges: chunk0 -> chunk1 -> chunk2
+    for i in range(1, len(chunk_ids)):
+        src = chunk_ids[i - 1]
+        dst = chunk_ids[i]
+        eid = hash_for_id(f"link:overlay:next_chunk:{src}->{dst}")
+        assert graph.has_edge(eid)
+        e = graph.get_edge(eid)
+        assert e.src == src
+        assert e.dst == dst
+        assert e.type == "overlay:next_chunk"
 
 def test_embed_operator(memory_dataset, mocker, config):
     """Test the .embed() operator."""

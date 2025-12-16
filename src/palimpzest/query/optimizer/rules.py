@@ -26,8 +26,16 @@ from palimpzest.query.operators.convert import LLMConvertBonded, NonLLMConvert
 from palimpzest.query.operators.critique_and_refine import CritiqueAndRefineConvert, CritiqueAndRefineFilter
 from palimpzest.query.operators.distinct import DistinctOp
 from palimpzest.query.operators.filter import LLMFilter, NonLLMFilter
+from palimpzest.query.operators.induce import InduceEdgesOp
 from palimpzest.query.operators.join import EmbeddingJoin, NestedLoopsJoin, RelationalJoin
 from palimpzest.query.operators.limit import LimitScanOp
+from palimpzest.query.operators.lineage import ExplodeLineageOp
+from palimpzest.query.operators.link import (
+    LinkFromFieldOp,
+    LinkFromParentsOp,
+    LinkToChildrenOp,
+    UpsertGraphNodesOp,
+)
 from palimpzest.query.operators.logical import (
     Aggregate,
     BaseScan,
@@ -35,21 +43,21 @@ from palimpzest.query.operators.logical import (
     ContextScan,
     ConvertScan,
     Distinct,
+    ExplodeLineage,
     FilteredScan,
     GroupByAggregate,
     InduceEdges,
     JoinOp,
     LimitScan,
+    LinkFromField,
+    LinkFromParents,
+    LinkToChildren,
     Project,
     SearchOperator,
     TopKScan,
     Traverse,
-    ExplodeLineage,
-    LinkToChildren,
+    UpsertGraphNodes,
 )
-from palimpzest.query.operators.induce import InduceEdgesOp
-from palimpzest.query.operators.lineage import ExplodeLineageOp
-from palimpzest.query.operators.link import LinkToChildrenOp
 from palimpzest.query.operators.mixture_of_agents import MixtureOfAgentsConvert, MixtureOfAgentsFilter
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.project import ProjectOp
@@ -1084,6 +1092,9 @@ class BasicSubstitutionRule(ImplementationRule):
         InduceEdges: InduceEdgesOp,
         ExplodeLineage: ExplodeLineageOp,
         LinkToChildren: LinkToChildrenOp,
+        LinkFromParents: LinkFromParentsOp,
+        LinkFromField: LinkFromFieldOp,
+        UpsertGraphNodes: UpsertGraphNodesOp,
     }
 
     @classmethod

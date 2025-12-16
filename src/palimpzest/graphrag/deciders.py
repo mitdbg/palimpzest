@@ -7,6 +7,8 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
+from pydantic import BaseModel, Field
+
 try:
     import litellm
 except ImportError:
@@ -426,3 +428,46 @@ def build_termination_instruction() -> str:
         "Terminate when the visited/admitted nodes are sufficient to answer the query, or if continuing is unlikely "
         "to add value."  # noqa: E501
     )
+
+
+class FilterCondition(BaseModel):
+    field: str = Field(description="The attribute field name (e.g. 'created', 'priority', 'status', 'project')")
+    operator: str = Field(description="Operator: ==, !=, >, <, >=, <=, contains")
+    value: Any = Field(description="The value to compare against. For dates use ISO string YYYY-MM-DD.")
+
+
+class FilterExtraction(BaseModel):
+    conditions: list[FilterCondition] = Field(default_factory=list)
+
+
+class LLMFilterExtractor:
+    def __init__(self, *, config: LLMBooleanDeciderConfig) -> None:
+        self.config = config
+
+    def extract(self, query: str) -> list[FilterCondition]:
+        prompt = (
+            f"Extract deterministic filters from the following query: \"{query}\"\n"
+            "Return a JSON object with a list of conditions.\n"
+            "Fields are typically: 'created', 'updated', 'priority', 'status', 'project', 'assignee', 'reporter'.\n"
+            "For date ranges, generate two conditions (>= and <=).\n"
+            "If no deterministic filters are present, return an empty list."
+        )
+        
+        try:
+            resp = litellm.completion(
+                model=self.config.model,
+                messages=[
+                    {"role": "system", "content": "You are a precise query analyzer. Extract structured filters from natural language."},
+                    {"role": "user", "content": prompt}
+                ],
+                response_format=FilterExtraction,
+                temperature=0.0,
+                max_tokens=self.config.max_tokens,
+            )
+            content = resp.choices[0].message.content
+            extraction = FilterExtraction.model_validate_json(content)
+            return extraction.conditions
+        except Exception:
+            # Fallback or error logging
+            return []
+
