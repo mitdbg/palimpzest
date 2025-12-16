@@ -28,7 +28,8 @@ const HistorySidebar = ({
     onExploreGraph,
     isExploring,
     isRunning,
-    currentQuery
+    currentQuery,
+    currentRunId
 }) => {
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [width, setWidth] = useState(256);
@@ -126,11 +127,15 @@ const HistorySidebar = ({
                     </>
                 )}
 
-                {/* Currently Running Indicator */}
-                {!isCollapsed && isRunning && currentQuery && (
+                {/* Currently Running Indicator - CLICKABLE to attach */}
+                {!isCollapsed && isRunning && currentQuery && currentRunId && (
                     <div className="px-2 mb-4">
                         <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Running</div>
-                        <div className="p-2 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                        <div 
+                            className="p-2 bg-blue-500/10 border border-blue-500/30 rounded-lg cursor-pointer hover:bg-blue-500/20 transition-colors"
+                            onClick={() => loadRun?.(currentRunId)}
+                            title="Click to view live trace"
+                        >
                             <div className="flex items-center gap-2 text-sm text-blue-400">
                                 <Loader2 size={14} className="shrink-0 animate-spin" />
                                 <span className="truncate">{currentQuery}</span>

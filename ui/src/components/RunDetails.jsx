@@ -1,6 +1,87 @@
 import React, { useState } from 'react';
 import { Activity, Database, List, DollarSign, Zap, FileText, Terminal, Download, ChevronRight, ChevronLeft, Brain } from 'lucide-react';
 
+// Separate component for reasoning items to properly handle useState
+const ReasoningItem = ({ ev, index, onSelectNode }) => {
+    const [showPrompt, setShowPrompt] = useState(false);
+    
+    const nodeId = ev?.data?.node_id;
+    const summary = ev?.data?.summary || ev?.data?.metadata?.summary || ev?.data?.content;
+    const reason = ev?.data?.reason || ev?.data?.reasoning || ev?.data?.decision?.reason;
+    const prompt = ev?.data?.prompt;
+    const rawOutput = ev?.data?.raw_output;
+    const model = ev?.data?.model || ev?.data?.decision?.model;
+    
+    // Handle step_gate_admittance with nested decision
+    const decisionObj = ev?.data?.decision;
+    const passed = decisionObj?.passed ?? ev?.data?.admit ?? ev?.data?.is_relevant;
+    const decision = passed === true ? 'admit' : (passed === false ? 'reject' : null);
+    
+    const label = ev.event_type === 'evidence_collected'
+        ? 'EVIDENCE'
+        : ev.event_type === 'step_gate_admittance'
+        ? (decision ? decision.toUpperCase() : 'ADMITTANCE')
+        : (decision ? String(decision).toUpperCase() : ev.event_type);
+
+    return (
+        <div
+            onClick={(e) => {
+                // Don't navigate if clicking show prompt button
+                if (e.target.closest('.prompt-toggle')) return;
+                nodeId && onSelectNode?.({ id: nodeId });
+            }}
+            className="text-xs bg-gray-800/50 p-3 rounded border border-gray-700/50 hover:border-blue-500/40 transition-colors cursor-pointer hover:bg-gray-800"
+            title={nodeId || ''}
+        >
+            <div className="flex justify-between items-start gap-2 mb-1">
+                <div className={`font-bold ${passed === true ? 'text-green-400' : passed === false ? 'text-red-400' : 'text-blue-300'}`}>{label}</div>
+                <div className="flex items-center gap-2">
+                    {model && <span className="text-purple-400 font-mono text-[10px]">{model}</span>}
+                    {nodeId ? (
+                        <span className="text-gray-500 font-mono">{String(nodeId).substring(0, 8)}</span>
+                    ) : null}
+                </div>
+            </div>
+            {summary ? (
+                <div className="text-gray-200 line-clamp-3" title={String(summary)}>{summary}</div>
+            ) : null}
+            {reason ? (
+                <div className="text-gray-400 mt-1 max-h-24 overflow-y-auto whitespace-pre-wrap" title={String(reason)}>{reason}</div>
+            ) : null}
+            {/* Prompt toggle */}
+            {(prompt || rawOutput) && (
+                <div className="mt-2 prompt-toggle">
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setShowPrompt(!showPrompt);
+                        }}
+                        className="text-[10px] text-purple-400 hover:text-purple-300 flex items-center gap-1"
+                    >
+                        {showPrompt ? '▼' : '▶'} Show LLM Prompt/Output
+                    </button>
+                    {showPrompt && (
+                        <div className="mt-2 space-y-2">
+                            {prompt && (
+                                <div className="bg-gray-900 p-2 rounded border border-purple-800/30">
+                                    <div className="text-[10px] text-purple-400 mb-1">PROMPT:</div>
+                                    <pre className="text-[10px] text-gray-300 whitespace-pre-wrap max-h-48 overflow-y-auto">{prompt}</pre>
+                                </div>
+                            )}
+                            {rawOutput && (
+                                <div className="bg-gray-900 p-2 rounded border border-green-800/30">
+                                    <div className="text-[10px] text-green-400 mb-1">OUTPUT:</div>
+                                    <pre className="text-[10px] text-gray-300 whitespace-pre-wrap max-h-32 overflow-y-auto">{rawOutput}</pre>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+};
+
 const RunDetails = ({ metrics, evidence, queue, reasoning = [], currentAction, finalAnswer, devMode, onShowLogs, onExport, onSelectNode }) => {
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [width, setWidth] = useState(320);
@@ -108,8 +189,8 @@ const RunDetails = ({ metrics, evidence, queue, reasoning = [], currentAction, f
                                     <div className="font-mono font-medium text-sm text-white">{(metrics.tokens / 1000).toFixed(1)}k</div>
                                 </div>
                                 <div className="bg-gray-800/50 p-2 rounded border border-gray-800">
-                                    <div className="text-[10px] text-gray-400 mb-1">Shortcuts</div>
-                                    <div className="font-mono font-medium text-sm text-white">{metrics.shortcuts}</div>
+                                    <div className="text-[10px] text-gray-400 mb-1">Runtime</div>
+                                    <div className="font-mono font-medium text-sm text-white">{metrics.runtime ? `${(metrics.runtime / 1000).toFixed(1)}s` : '-'}</div>
                                 </div>
                             </div>
                         </div>
@@ -131,37 +212,14 @@ const RunDetails = ({ metrics, evidence, queue, reasoning = [], currentAction, f
                         </h3>
                         <div className="space-y-2 mb-6">
                             {reasoning.length === 0 && <div className="text-xs text-gray-600 italic">No reasoning events yet.</div>}
-                            {reasoning.map((ev, i) => {
-                                const nodeId = ev?.data?.node_id;
-                                const summary = ev?.data?.summary || ev?.data?.metadata?.summary || ev?.data?.content;
-                                const reason = ev?.data?.reason || ev?.data?.reasoning;
-                                const decision = ev?.data?.decision || (ev?.data?.is_relevant ? 'admit' : (ev?.data?.is_relevant === false ? 'reject' : null));
-                                const label = ev.event_type === 'evidence_collected'
-                                    ? 'EVIDENCE'
-                                    : (decision ? String(decision).toUpperCase() : ev.event_type);
-
-                                return (
-                                    <div
-                                        key={ev.seq || i}
-                                        onClick={() => (nodeId ? onSelectNode?.({ id: nodeId }) : null)}
-                                        className="text-xs bg-gray-800/50 p-3 rounded border border-gray-700/50 hover:border-blue-500/40 transition-colors cursor-pointer hover:bg-gray-800"
-                                        title={nodeId || ''}
-                                    >
-                                        <div className="flex justify-between items-start gap-2 mb-1">
-                                            <div className="font-bold text-blue-300">{label}</div>
-                                            {nodeId ? (
-                                                <div className="text-gray-500 font-mono">{String(nodeId).substring(0, 8)}</div>
-                                            ) : null}
-                                        </div>
-                                        {summary ? (
-                                            <div className="text-gray-200 line-clamp-3" title={String(summary)}>{summary}</div>
-                                        ) : null}
-                                        {reason ? (
-                                            <div className="text-gray-400 mt-1 max-h-24 overflow-y-auto whitespace-pre-wrap" title={String(reason)}>{reason}</div>
-                                        ) : null}
-                                    </div>
-                                );
-                            })}
+                            {reasoning.map((ev, i) => (
+                                <ReasoningItem
+                                    key={ev.seq || i}
+                                    ev={ev}
+                                    index={i}
+                                    onSelectNode={onSelectNode}
+                                />
+                            ))}
                         </div>
 
                         <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2 sticky top-0 bg-gray-900 py-2 z-10">

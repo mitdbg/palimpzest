@@ -4,7 +4,14 @@ Query:
 {{ query }}
 
 Write concise criteria for deciding when traversal should stop.
-- Stop when the collected evidence is sufficient to answer the query.
-- Stop when continuing is unlikely to add new, non-redundant evidence.
+Be CONSERVATIVE about stopping - prefer more exploration over early termination.
+
+Only recommend stopping when:
+- Evidence is CLEARLY sufficient and comprehensive to fully answer the query
+- Multiple redundant nodes have been seen (5+ nodes with same information)
+- All major aspects of the query have been addressed with supporting evidence
+
+Do NOT stop early just because some evidence was found.
+Each admitted evidence node provides unique perspective - synthesis benefits from diverse sources.
 
 Return plain text criteria (no JSON).

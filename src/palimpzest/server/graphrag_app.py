@@ -16,9 +16,12 @@ from pydantic import BaseModel
 
 from palimpzest.core.data.graph_dataset import GraphDataset, GraphSnapshot
 from palimpzest.graphrag.deciders import (
+    CMS_COMP_OPS_SYSTEM_PROMPT,
     LLMBooleanDecider,
     LLMBooleanDeciderConfig,
     LLMFilterExtractor,
+    LLMTextGenerator,
+    LLMTextGeneratorConfig,
     FilterCondition,
     bootstrap_admittance_criteria,
     bootstrap_termination_criteria,
@@ -59,6 +62,7 @@ class RunRequest(BaseModel):
     ranking_model: str | None = None
     admittance_model: str | None = None
     termination_model: str | None = None
+    synthesis_model: str | None = None  # Model for final answer synthesis (defaults to admittance_model)
 
     entry_points: int = 5
     max_steps: int = 200
@@ -77,6 +81,9 @@ class RunRequest(BaseModel):
 
     # Custom admittance instructions to override the default/bootstrapped ones
     admittance_instructions: str | None = None
+
+    # Maximum number of evidence nodes to include in synthesis context
+    synthesis_max_nodes: int | None = 15
 
 
 @dataclass
@@ -332,7 +339,11 @@ class RunStore:
         }
 
     def status_payload(self) -> dict[str, Any]:
-        return {"running": self._running_run_id is not None, "last_query": self._last_query}
+        return {
+            "running": self._running_run_id is not None,
+            "run_id": self._running_run_id,
+            "last_query": self._last_query
+        }
 
 
 class GraphService:
@@ -1384,17 +1395,25 @@ def create_app(*, snapshot_path: Path | None = None) -> FastAPI:
             trace_events = [] if bool(req.debug_trace) else None
 
             def _tracer(ev: dict[str, Any]) -> None:
+                logger.info(f"_tracer called: event_type={ev.get('event_type')}, node_id={ev.get('node_id')}")
                 if trace_events is not None:
                     trace_events.append(ev)
                 
                 # Emit live event for UI feedback
-                live_ev = ev.copy()
-                if "ts_ms" not in live_ev:
-                    live_ev["ts_ms"] = int(time.time() * 1000)
-                if "run_id" not in live_ev:
-                    live_ev["run_id"] = run_id
+                # Wrap the traverse operator event into the standard format expected by the UI
+                # The traverse operator emits: {"event_type": "step_expand", "node_id": "x", ...}
+                # The UI expects: {"event_type": "step_expand", "data": {"node_id": "x", ...}}
+                event_type = ev.get("event_type")
+                live_ev = {
+                    "event_type": event_type,
+                    "ts_ms": ev.get("ts_ms") or int(time.time() * 1000),
+                    "run_id": ev.get("run_id") or run_id,
+                    "data": {k: v for k, v in ev.items() if k not in ("event_type", "ts_ms", "run_id", "seq")},
+                }
+                logger.info(f"_tracer emitting: {event_type}")
                 emit_event(live_ev)
 
+            logger.info(f"Starting traverse with {len(start_nodes)} start nodes, max_steps={req.max_steps}")
             ds = graphs.graph.traverse(
                 start_node_ids=start_nodes,
                 edge_type=edge_type,
@@ -1413,8 +1432,8 @@ def create_app(*, snapshot_path: Path | None = None) -> FastAPI:
                 decision_program_output_schema=_DecisionOut if decision_program is not None else None,
                 decision_program_config=None,
                 trace_run_id=run_id,
-                tracer=_tracer if trace_events is not None else None,
-                tracer_id="graphrag_app" if trace_events is not None else None,
+                tracer=_tracer,  # ALWAYS pass tracer for live UI events
+                tracer_id="graphrag_app",
                 trace_full_node_text=bool(req.debug_trace_full_text),
                 expand_filtered_nodes=bool(req.expand_filtered_nodes),
             )
@@ -1451,9 +1470,10 @@ def create_app(*, snapshot_path: Path | None = None) -> FastAPI:
             on_event=emit_event,
         )
 
-        # Generate final answer
+        # Generate final answer using LLMTextGenerator with CMS system prompt
         final_answer = f"Visited {len(visited_items)} nodes."
-        if adm_model and visited_items:
+        synthesis_model = (req.synthesis_model or "").strip() or adm_model
+        if synthesis_model and visited_items:
             try:
                 # Collect evidence from admitted nodes
                 evidence_texts = []
@@ -1463,41 +1483,49 @@ def create_app(*, snapshot_path: Path | None = None) -> FastAPI:
                         node = graphs.graph.get_node(nid)
                         txt = default_node_text(node)
                         if txt:
-                            evidence_texts.append(f"Node {nid}:\n{txt[:2000]}")
+                            # Include node label if available - use full text up to 8k chars
+                            label = node.label if node else nid
+                            evidence_texts.append(f"[{label}]\n{txt[:8000]}")
                 
                 if evidence_texts:
-                    from palimpzest.core.data.iter_dataset import MemoryDataset
-                    from palimpzest.core.lib.schemas import TextSchema
+                    # Build synthesis prompt
+                    max_evidence_nodes = req.synthesis_max_nodes or 15
+                    context = "\n\n---\n\n".join(evidence_texts[:max_evidence_nodes])
+                    user_prompt = f"""Query: {query_text}
+
+Retrieved Evidence ({len(evidence_texts)} nodes):
+
+{context}
+
+Based on the evidence above, please answer the query. Cite specific evidence nodes when possible."""
+
+                    # Use LLMTextGenerator for proper text generation
+                    generator = LLMTextGenerator(
+                        config=LLMTextGeneratorConfig(
+                            model=synthesis_model,
+                            temperature=0.0,
+                            max_tokens=1500,
+                            timeout_s=120.0,
+                        )
+                    )
                     
-                    # Use PZ to generate answer
-                    context = "\n\n".join(evidence_texts[:10]) # Limit context
-                    prompt = f"Query: {query_text}\n\nEvidence:\n{context}\n\nBased on the evidence above, please answer the query."
+                    answer_text, gen_meta = generator.generate_with_meta(
+                        system_prompt=CMS_COMP_OPS_SYSTEM_PROMPT,
+                        prompt=user_prompt,
+                    )
                     
-                    # Quick hack: use LLMConvert to generate answer
-                    # Ideally we'd use a dedicated AnswerOp or similar
-                    # For now, we'll just use the decider's model directly if possible, or fallback to PZ
-                    
-                    # Let's use the decider's model directly to avoid PZ overhead for this simple task
-                    # and to reuse the configured model
-                    if 'decider' in locals():
-                         ans_prompt = f"You are a helpful assistant. Answer the user's query based ONLY on the provided evidence.\n\n{prompt}"
-                         # We can reuse decide_prompt_with_meta but it expects boolean output structure usually?
-                         # No, LLMBooleanDecider is specific.
-                         # Let's use a simple generation if we can.
-                         # Actually, let's just use the PZ LLMConvert approach as it's cleaner
-                         
-                         class Answer(BaseModel):
-                             answer: str
-                             
-                         ds = MemoryDataset(id="answer-gen", vals=[{"text": prompt}], schema=TextSchema)
-                         ds = ds.convert(Answer, desc="Generate answer to query", model=LLMBooleanDeciderConfig(model=adm_model))
-                         res = ds.run()
-                         if res:
-                             final_answer = res[0].answer
-                             # Add generation cost to metrics (approximate, as PZ might not expose it easily here without digging)
-                             # For now, we skip adding generation cost to keep it simple
+                    if answer_text:
+                        final_answer = answer_text
+                        # Add synthesis cost to metrics
+                        if gen_meta:
+                            run_metrics["cost_usd"] += float(gen_meta.get("cost_usd") or 0.0)
+                            run_metrics["input_tokens"] += int(gen_meta.get("input_tokens") or 0)
+                            run_metrics["output_tokens"] += int(gen_meta.get("output_tokens") or 0)
+                            run_metrics["calls"] += 1
+                else:
+                    final_answer = "No evidence nodes were admitted during traversal. Try adjusting the query or admittance criteria."
             except Exception as e:
-                logger.error(f"Error generating answer: {e}")
+                logger.error(f"Error generating answer: {e}", exc_info=True)
                 final_answer += f" (Error generating detailed answer: {e})"
 
         # Emit metrics event
@@ -1505,6 +1533,7 @@ def create_app(*, snapshot_path: Path | None = None) -> FastAPI:
             "event_type": "run_metrics",
             "ts_ms": int(time.time() * 1000),
             "seq": 999999,
+            "query_id": run_id,  # For UI query matching
             "run_id": run_id,
             "data": run_metrics
         }
@@ -1516,6 +1545,7 @@ def create_app(*, snapshot_path: Path | None = None) -> FastAPI:
                 "event_type": "answer_update",
                 "ts_ms": int(time.time() * 1000),
                 "seq": 999998,
+                "query_id": run_id,  # For UI query matching
                 "run_id": run_id,
                 "data": {"answer": final_answer}
             }

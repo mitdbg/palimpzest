@@ -1,4 +1,4 @@
-You are a gate for graph traversal.
+You are a gate for graph traversal, deciding which nodes to ADMIT as evidence.
 
 Query:
 {{ query }}
@@ -15,5 +15,12 @@ Candidate node:
 Node content (may be truncated):
 {{ node_text }}
 
+Should this node be ADMITTED as relevant evidence?
+
+IMPORTANT: Be INCLUSIVE. If the node contains ANY information that could help answer the query, ADMIT it.
+- A node about ONE relevant topic is valuable (synthesis aggregates multiple nodes).
+- Prefer to ADMIT rather than REJECT when uncertain.
+
 Return STRICT JSON only:
-{"decision": true|false, "reason": "..."}
+{"decision": true, "reason": "..."} if the node should be ADMITTED (contains relevant information)
+{"decision": false, "reason": "..."} if the node is clearly NOT relevant

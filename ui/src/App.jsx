@@ -39,7 +39,8 @@ function App() {
 
   // Derived state for the current point in time
   const [graphData, setGraphData] = useState({ nodes: [], links: [] });
-  const [metrics, setMetrics] = useState({ cost: 0, calls: 0, tokens: 0, shortcuts: 0, filtered: 0 });
+  const [metrics, setMetrics] = useState({ cost: 0, calls: 0, tokens: 0, shortcuts: 0, filtered: 0, runtime: 0 });
+  const [showLegend, setShowLegend] = useState(true);
   const [evidence, setEvidence] = useState([]);
   const [queue, setQueue] = useState([]);
   const [currentAction, setCurrentAction] = useState("Ready.");
@@ -184,7 +185,7 @@ function App() {
   const [fullGraphData, setFullGraphData] = useState(null);
   const [isLoadingGraph, setIsLoadingGraph] = useState(false);
 
-  const isExploreOnly = showFullGraph && allEvents.length === 0;
+  const [activeTab, setActiveTab] = useState('explore'); // 'explore' | 'trace'
 
   const fullGraphNodeById = useMemo(() => {
       const map = new Map();
@@ -267,20 +268,17 @@ function App() {
   const handleExploreGraph = () => {
       // Enter exploration mode without running a query.
       if (ws) ws.close();
-      setAllEvents([]);
-      setCurrentStep(0);
+      // setAllEvents([]); // Don't clear events, just switch view
+      // setCurrentStep(0);
       setIsPlaying(false);
-      setFinalAnswer(null);
+      // setFinalAnswer(null);
       setSelectedNode(null);
-      setMode('live');
+      // setMode('live');
       setShowFullGraph(true);
+      setActiveTab('explore');
   };
 
-  const handleExitExplore = () => {
-      setShowFullGraph(false);
-      setSelectedNode(null);
-      // Leave run state untouched otherwise; exiting explore returns to landing if there is no trace.
-  };
+
 
   const availableModels = [
       "openrouter/x-ai/grok-4.1-fast",
@@ -340,6 +338,7 @@ function App() {
   };
 
   const loadRun = (runId) => {
+      logger.info(`loadRun called with runId: ${runId}`);
       // Validate Index
       const runMeta = runHistory.find(r => r.run_id === runId);
       if (runMeta && runMeta.index && runMeta.index !== runConfig.index) {
@@ -352,13 +351,23 @@ function App() {
       }
 
       if (ws) ws.close();
+      setActiveTab('trace');
       setAllEvents([]);
       setCurrentStep(0);
       setMode('history');
       setShowHistory(false);
       setSelectedQueryId(null);
       
+      logger.info(`Opening WebSocket to ${WS_BASE}/ws/${runId}`);
       const socket = new WebSocket(`${WS_BASE}/ws/${runId}`);
+      
+      socket.onopen = () => {
+          logger.info(`WebSocket opened for ${runId}`);
+      };
+      
+      socket.onerror = (err) => {
+          logger.error(`WebSocket error for ${runId}`, err);
+      };
       
       let messageBuffer = [];
       let batchTimeout = null;
@@ -380,6 +389,7 @@ function App() {
       socket.onmessage = (event) => {
           try {
               const newEvent = JSON.parse(event.data);
+              logger.info(`WS message: ${newEvent.event_type}`, newEvent.data?.node_id || '');
               messageBuffer.push(newEvent);
               
               if (!batchTimeout) {
@@ -391,7 +401,8 @@ function App() {
           }
       };
       
-      socket.onclose = () => {
+      socket.onclose = (e) => {
+          logger.info(`WebSocket closed for ${runId}, code=${e.code}, reason=${e.reason}`);
           if (batchTimeout) {
               clearTimeout(batchTimeout);
               processBatch(); // Flush remaining
@@ -457,6 +468,7 @@ function App() {
               queryMap.set(e.query_id, {
                   id: e.query_id,
                   text: e.query_text || e.data?.query || "Unknown Query",
+                  run_id: e.run_id,  // Track run_id for matching
                   events: []
               });
           }
@@ -467,10 +479,19 @@ function App() {
           queryMap.set("default", { id: "default", text: "Single Query", events: [] });
       }
 
+      // Build a run_id -> query_id mapping for events that only have run_id
+      const runToQuery = new Map();
+      queryMap.forEach((q, qid) => {
+          if (q.run_id) runToQuery.set(q.run_id, qid);
+      });
+
       // Second pass: assign events
       allEvents.forEach(e => {
           if (e.query_id && queryMap.has(e.query_id)) {
               queryMap.get(e.query_id).events.push(e);
+          } else if (e.run_id && runToQuery.has(e.run_id)) {
+              // Match by run_id if no query_id (for answer_update, run_metrics, etc.)
+              queryMap.get(runToQuery.get(e.run_id)).events.push(e);
           } else if (queryMap.has("default")) {
               queryMap.get("default").events.push(e);
           }
@@ -507,7 +528,15 @@ function App() {
           e.event_type === 'query_start' ||
           e.event_type === 'query_end' ||
           e.event_type === 'error' ||
-          e.event_type === 'traverse_trace'
+          e.event_type === 'traverse_trace' ||
+          // Include step events for live traversal updates
+          e.event_type === 'step_summary' ||
+          e.event_type === 'step_begin' ||
+          e.event_type === 'step_end' ||
+          e.event_type === 'step_gate_admittance' ||
+          e.event_type === 'step_node_loaded' ||
+          e.event_type === 'step_expand' ||
+          e.event_type === 'run_metrics'
       );
   }, [activeEvents]);
 
@@ -515,8 +544,13 @@ function App() {
       const upto = Math.min(currentStep + 1, playbackEvents.length);
       return playbackEvents
           .slice(0, upto)
-          .filter(e => e.event_type === 'search_step' || e.event_type === 'node_evaluation' || e.event_type === 'evidence_collected')
-          .slice(-5);
+          .filter(e => 
+              e.event_type === 'search_step' || 
+              e.event_type === 'node_evaluation' || 
+              e.event_type === 'evidence_collected' ||
+              e.event_type === 'step_gate_admittance'  // Include admittance decisions with prompts
+          )
+          .slice(-8);  // Show more items
   }, [playbackEvents, currentStep]);
 
   const logs = useMemo(() => {
@@ -565,7 +599,7 @@ function App() {
                 processGraph([], -1);
             } else {
                 setGraphData({ nodes: [], links: [] });
-                setMetrics({ cost: 0, calls: 0, tokens: 0, shortcuts: 0 });
+                setMetrics({ cost: 0, calls: 0, tokens: 0, shortcuts: 0, runtime: 0 });
                 setEvidence([]);
             }
         } catch (e) {
@@ -622,6 +656,7 @@ function App() {
     try {
       const res = await fetch(`${API_BASE}/api/status`);
       const data = await res.json();
+      console.log('[DEBUG] fetchStatus:', data);
       setStatus(data);
     } catch (e) {
       console.error("Status fetch failed", e);
@@ -631,6 +666,7 @@ function App() {
   const runQuery = async () => {
     try {
       setMode('live');
+      setActiveTab('trace');
       if (ws) ws.close();
       
       const payload = {
@@ -751,7 +787,9 @@ function App() {
     const links = [];
     const linkSet = new Set();
     const parentMap = new Map();
-    let currentMetrics = { cost: 0, calls: 0, tokens: 0, shortcuts: 0, filtered: 0 };
+    let currentMetrics = { cost: 0, calls: 0, tokens: 0, shortcuts: 0, filtered: 0, runtime: 0 };
+    let startTime = null;
+    let endTime = null;
     let currentEvidence = [];
     const evidenceSet = new Set();
     let currentQueue = [];
@@ -791,55 +829,95 @@ function App() {
         
         if (e.event_type) lastAction = `${e.event_type}`;
 
+        // Track timestamps for runtime calculation
+        if (e.ts_ms) {
+            if (!startTime) startTime = e.ts_ms;
+            endTime = e.ts_ms;
+        }
+
+        // step_summary marks a node as visited (this is the main traversal step event)
         if (e.event_type === 'step_summary') {
-            if (e.data?.skipped && e.data?.skip_reason === 'visit_filter_rejected') {
-                currentMetrics.filtered += 1;
-                const { node_id } = e.data;
+            const { node_id, admitted, skipped, skip_reason } = e.data;
+            if (node_id) {
                 activeNodeIds.add(node_id);
+                lastExploredNodeId = node_id;
                 const state = nodeStates.get(node_id) || {};
-                state.isFiltered = true;
-                state.skipReason = "Skipped by Filter";
+                
+                // Mark as visited unless it was skipped by filter
+                if (skipped && skip_reason === 'visit_filter_rejected') {
+                    currentMetrics.filtered += 1;
+                    state.isFiltered = true;
+                    state.skipReason = "Skipped by Filter";
+                } else {
+                    state.visited = true;
+                    // Set type based on admittance decision
+                    if (admitted) {
+                        state.type = 'evidence';
+                        state.isEvidence = true;
+                    } else if (!state.type || state.type === 'candidate') {
+                        state.type = 'visited';
+                    }
+                }
                 nodeStates.set(node_id, state);
+                currentQueue = currentQueue.filter(q => q.id !== node_id);
             }
         }
 
         if (e.event_type === 'step_gate_admittance') {
-            if (e.data?.cost_usd) currentMetrics.cost += e.data.cost_usd;
-            if (e.data?.tokens?.input) currentMetrics.tokens += e.data.tokens.input;
-            if (e.data?.tokens?.output) currentMetrics.tokens += e.data.tokens.output;
-            if (!e.data?.cache_hit) currentMetrics.calls += 1;
+            // Cost/tokens can be at top level or inside decision object
+            const decisionData = e.data?.decision || {};
+            const cost = e.data?.cost_usd ?? decisionData.cost_usd ?? 0;
+            const tokensIn = e.data?.tokens?.input ?? decisionData.tokens?.input ?? 0;
+            const tokensOut = e.data?.tokens?.output ?? decisionData.tokens?.output ?? 0;
+            const cacheHit = e.data?.cache_hit ?? decisionData.cache_hit ?? false;
+            
+            if (cost) currentMetrics.cost += cost;
+            if (tokensIn) currentMetrics.tokens += tokensIn;
+            if (tokensOut) currentMetrics.tokens += tokensOut;
+            if (!cacheHit) currentMetrics.calls += 1;
             else currentMetrics.shortcuts += 1;
 
-            const { node_id, decision } = e.data;
+            const { node_id } = e.data;
             if (node_id) {
                 activeNodeIds.add(node_id);
                 const state = nodeStates.get(node_id) || {};
-                state.isThinking = false; // Clear thinking state
+                state.isThinking = false;
+                state.visited = true;  // Mark as visited when we get admittance decision
                 if (e.data.prompt) state.prompt = e.data.prompt;
                 if (e.data.raw_output) state.raw_output = e.data.raw_output;
                 
-                // Capture admittance decision
-                if (decision) {
-                    state.admit = decision.passed;
-                    state.reason = decision.reason;
-                    state.model = decision.model;
-                    
-                    if (decision.passed) {
-                        state.isEvidence = true;
-                        state.type = 'evidence';
-                        if (!evidenceSet.has(node_id)) {
-                            currentEvidence.push({
-                                node_id,
-                                score: 1.0, // Admitted nodes are implicitly relevant
-                                reasoning: decision.reason,
-                                summary: state.summary || ""
-                            });
-                            evidenceSet.add(node_id);
-                        }
+                // Handle both server formats:
+                // 1. Direct: e.data.admit (boolean), e.data.reason
+                // 2. Nested: e.data.decision.passed, e.data.decision.reason
+                const admitted = e.data.admit ?? e.data.decision?.passed;
+                const reason = e.data.reason ?? e.data.decision?.reason;
+                const model = e.data.model ?? e.data.decision?.model;
+                
+                state.admit = admitted;
+                state.reason = reason;
+                state.model = model;
+                
+                if (admitted) {
+                    state.isEvidence = true;
+                    state.type = 'evidence';
+                    if (!evidenceSet.has(node_id)) {
+                        currentEvidence.push({
+                            node_id,
+                            score: 1.0,
+                            reasoning: reason,
+                            summary: state.summary || ""
+                        });
+                        evidenceSet.add(node_id);
+                    }
+                } else {
+                    // Rejected but still visited
+                    if (!state.type || state.type === 'candidate') {
+                        state.type = 'visited';
                     }
                 }
                 
                 nodeStates.set(node_id, state);
+                currentQueue = currentQueue.filter(q => q.id !== node_id);
             }
         }
 
@@ -911,6 +989,7 @@ function App() {
 
         if (e.event_type === 'search_step') {
             const { node_id } = e.data;
+            console.log(`[App] search_step: marking node ${node_id} as visited`);
             lastExploredNodeId = node_id;
             activeNodeIds.add(node_id);
             
@@ -1034,6 +1113,16 @@ function App() {
             }
         }
 
+        // Handle final run metrics (contains synthesis costs too)
+        if (e.event_type === 'run_metrics') {
+            if (e.data) {
+                // Use server-side totals as authoritative source
+                if (e.data.cost_usd !== undefined) currentMetrics.cost = e.data.cost_usd;
+                if (e.data.input_tokens !== undefined) currentMetrics.tokens = (e.data.input_tokens || 0) + (e.data.output_tokens || 0);
+                if (e.data.calls !== undefined) currentMetrics.calls = e.data.calls;
+            }
+        }
+
         // Handle error events
         if (e.event_type === 'error') {
             lastAction = `Error: ${e.data?.error || 'Unknown error'}`;
@@ -1069,6 +1158,13 @@ function App() {
         
         nodes.set(id, nodeData);
     });
+    
+    // Debug: count visited nodes before setting graphData
+    const visitedNodes = Array.from(nodes.values()).filter(n => n.visited);
+    console.log(`[App] processEvents: ${visitedNodes.length} visited nodes out of ${nodes.size} total`);
+    if (visitedNodes.length > 0) {
+        console.log(`[App] Sample visited nodes: ${visitedNodes.slice(0, 3).map(n => n.id).join(', ')}`);
+    }
 
     if (fullGraphData && fullGraphData.links) {
         fullGraphData.links.forEach(l => {
@@ -1156,6 +1252,11 @@ function App() {
         }
     }
 
+    // Calculate runtime from timestamps
+    if (startTime && endTime) {
+        currentMetrics.runtime = endTime - startTime;
+    }
+
     setMetrics(currentMetrics);
     setEvidence(currentEvidence);
     setCurrentAction(lastAction);
@@ -1198,7 +1299,7 @@ function App() {
       setAllEvents([]);
       setCurrentStep(0);
       setGraphData({ nodes: [], links: [] });
-      setMetrics({ cost: 0, calls: 0, tokens: 0, shortcuts: 0, filtered: 0 });
+      setMetrics({ cost: 0, calls: 0, tokens: 0, shortcuts: 0, filtered: 0, runtime: 0 });
       setEvidence([]);
       setQueue([]);
       setFinalAnswer(null);
@@ -1245,189 +1346,193 @@ function App() {
         onDeleteRun={deleteRun}
         onClearHistory={clearHistory}
         onExploreGraph={handleExploreGraph}
-        isExploring={isExploreOnly}
+        isExploring={activeTab === 'explore'}
         isRunning={status.running}
-        currentQuery={runConfig.query}
+        currentQuery={status.last_query || runConfig.query}
+        currentRunId={currentRunId || status.run_id}
       />
 
-      <div className="flex-1 flex flex-col relative">
-        {/* Main Content Area */}
-        {!hasRun ? (
-            <div className="flex-1 flex flex-col items-center justify-center p-8">
-                <div className="mb-8 text-center">
-                    <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">GraphRAG Explorer</h1>
-                    <p className="text-gray-400">Explore your knowledge graph with natural language</p>
-                </div>
-                <ChatInput 
-                    runConfig={runConfig}
-                    setRunConfig={setRunConfig}
-                    runQuery={runQuery}
-                    stopQuery={stopQuery}
-                    isRunning={status.running}
-                    onOpenSettings={() => setIsSettingsOpen(true)}
-                    mode="centered"
-                />
-
-                {/* Always-visible graph selection + exploration */}
-                <div className="mt-4 w-full max-w-2xl mx-auto flex flex-col gap-2">
-                    <div className="flex items-center justify-between gap-3 bg-gray-900 border border-gray-800 rounded-lg p-3">
-                        <div className="flex flex-col gap-1 min-w-0">
-                            <div className="text-xs text-gray-500 uppercase tracking-wider">Graph</div>
-                            <select
-                                className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-xs text-white focus:ring-2 focus:ring-blue-500 outline-none"
-                                value={runConfig.index}
-                                onChange={(e) => setRunConfig(prev => ({ ...prev, index: e.target.value }))}
-                            >
-                                {resources.indices.length === 0 && <option value="">Loading graphs...</option>}
-                                {resources.indices.map(idx => (
-                                    <option key={idx} value={idx}>{idx}</option>
-                                ))}
-                            </select>
-                            <div className="text-[11px] text-gray-500 truncate">
-                                {isLoadingGraph
-                                    ? 'Loading graph…'
-                                    : (fullGraphData
-                                        ? `Loaded: ${fullGraphData.nodes?.length || 0} nodes, ${fullGraphData.links?.length || 0} edges`
-                                        : 'No graph loaded')}
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                            <button
-                                onClick={handleExploreGraph}
-                                disabled={!runConfig.index || isLoadingGraph}
-                                className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-xs text-gray-200 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                Explore graph
-                            </button>
-                            <button
-                                onClick={() => {
-                                    // If switching to GPU mode, check WebGL first
-                                    if (!vizConfig?.use3D) {
-                                        const canvas = document.createElement('canvas');
-                                        const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
-                                        if (!gl) {
-                                            showToast('WebGL not available. Close ALL browser windows and reopen, or try a different browser.', 'error');
-                                            return;
-                                        }
-                                        // Clean up test context
-                                        const ext = gl.getExtension('WEBGL_lose_context');
-                                        if (ext) ext.loseContext();
-                                    }
-                                    setVizConfig(prev => ({ ...prev, use3D: !prev.use3D }));
-                                }}
-                                className={`px-3 py-2 border rounded text-xs hover:bg-gray-700 ${
-                                    vizConfig?.use3D 
-                                        ? 'bg-cyan-900 border-cyan-600 text-cyan-200' 
-                                        : 'bg-gray-800 border-gray-700 text-gray-200'
-                                }`}
-                            >
-                                {vizConfig?.use3D ? 'GPU 🚀' : 'Canvas'}
-                            </button>
-                            <button
-                                onClick={handleToggleSim}
-                                disabled={!fullGraphData || isLoadingGraph}
-                                className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-xs text-gray-200 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                {vizConfig?.runLayout ? 'Pause sim' : 'Run sim'}
-                            </button>
-                            <button
-                                onClick={handleRefreshViz}
-                                disabled={!fullGraphData || isLoadingGraph}
-                                className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-xs text-gray-200 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                Refresh viz
-                            </button>
-                            <button
-                                onClick={() => setIsSettingsOpen(true)}
-                                className="px-3 py-2 bg-blue-600 rounded text-xs text-white hover:bg-blue-500"
-                            >
-                                Settings
-                            </button>
-                        </div>
-                    </div>
+      <div className="flex-1 flex flex-col relative h-full overflow-hidden">
+        {/* Top Navigation Bar */}
+        <div className="bg-gray-900 border-b border-gray-800 p-2 flex items-center justify-between shrink-0 z-20">
+            <div className="flex items-center gap-4">
+                <div className="flex bg-gray-800 rounded p-1">
+                    <button 
+                        onClick={() => setActiveTab('explore')}
+                        className={`px-4 py-1.5 rounded text-xs font-medium transition-colors ${activeTab === 'explore' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}
+                    >
+                        Graph Explorer
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('trace')}
+                        className={`px-4 py-1.5 rounded text-xs font-medium transition-colors ${activeTab === 'trace' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}
+                    >
+                        Query Trace
+                    </button>
                 </div>
                 
-                <div className="mt-8 flex flex-wrap justify-center gap-2 max-w-2xl">
-                    {suggestedQueries.map((q, i) => (
-                        <button
-                            key={i}
-                            onClick={() => {
-                                setRunConfig(prev => ({ ...prev, query: q }));
-                                // Optional: Auto-run
-                                // setTimeout(runQuery, 100); 
-                            }}
-                            className="px-3 py-1.5 bg-gray-900 border border-gray-800 rounded-full text-xs text-gray-400 hover:text-white hover:border-gray-600 transition-colors"
-                        >
-                            {q}
-                        </button>
-                    ))}
+                <div className="h-4 w-px bg-gray-700 mx-2"></div>
+
+                <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-gray-500 uppercase tracking-wider">Graph</span>
+                    <select
+                        className="bg-gray-800 border border-gray-700 rounded p-1 text-xs text-white focus:ring-2 focus:ring-blue-500 outline-none max-w-[200px]"
+                        value={runConfig.index}
+                        onChange={(e) => setRunConfig(prev => ({ ...prev, index: e.target.value }))}
+                    >
+                        {resources.indices.length === 0 && <option value="">Loading...</option>}
+                        {resources.indices.map(idx => (
+                            <option key={idx} value={idx}>{idx}</option>
+                        ))}
+                    </select>
+                    <div className="text-[10px] text-gray-500 truncate ml-2">
+                        {isLoadingGraph
+                            ? 'Loading…'
+                            : (fullGraphData
+                                ? `${fullGraphData.nodes?.length || 0} nodes`
+                                : '')}
+                    </div>
                 </div>
             </div>
-        ) : (
-            <div className="flex-1 flex flex-col h-full">
-                {/* Top Bar with Input */}
-                <div className="p-4 border-b border-gray-800 bg-gray-900/50 backdrop-blur z-10">
-                    {/* Always-visible graph selection */}
-                    <div className="w-full max-w-4xl mx-auto flex items-center gap-3 mb-3">
-                        <div className="flex-1 min-w-0">
-                            <div className="text-[11px] text-gray-500 uppercase tracking-wider">Graph</div>
-                            <div className="flex items-center gap-2">
-                                <select
-                                    className="flex-1 min-w-0 bg-gray-800 border border-gray-700 rounded p-2 text-xs text-white focus:ring-2 focus:ring-blue-500 outline-none"
-                                    value={runConfig.index}
-                                    onChange={(e) => setRunConfig(prev => ({ ...prev, index: e.target.value }))}
-                                >
-                                    {resources.indices.length === 0 && <option value="">Loading graphs...</option>}
-                                    {resources.indices.map(idx => (
-                                        <option key={idx} value={idx}>{idx}</option>
-                                    ))}
-                                </select>
-                                {isExploreOnly ? (
+
+            <div className="flex items-center gap-2">
+                <button
+                    onClick={() => {
+                        if (!vizConfig?.use3D) {
+                            const canvas = document.createElement('canvas');
+                            const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+                            if (!gl) {
+                                showToast('WebGL not available.', 'error');
+                                return;
+                            }
+                            const ext = gl.getExtension('WEBGL_lose_context');
+                            if (ext) ext.loseContext();
+                        }
+                        setVizConfig(prev => ({ ...prev, use3D: !prev.use3D }));
+                    }}
+                    className={`px-3 py-1.5 border rounded text-xs hover:bg-gray-700 ${
+                        vizConfig?.use3D 
+                            ? 'bg-cyan-900 border-cyan-600 text-cyan-200' 
+                            : 'bg-gray-800 border-gray-700 text-gray-200'
+                    }`}
+                >
+                    {vizConfig?.use3D ? '3D' : '2D'}
+                </button>
+                <button
+                    onClick={handleToggleSim}
+                    disabled={(!fullGraphData && activeTab === 'explore') || (activeTab === 'trace' && !hasRun) || isLoadingGraph}
+                    className="px-3 py-1.5 bg-gray-800 border border-gray-700 rounded text-xs text-gray-200 hover:bg-gray-700 disabled:opacity-50"
+                >
+                    {vizConfig?.runLayout ? 'Pause' : 'Sim'}
+                </button>
+                <button
+                    onClick={handleRefreshViz}
+                    className="px-3 py-1.5 bg-gray-800 border border-gray-700 rounded text-xs text-gray-200 hover:bg-gray-700"
+                >
+                    Refresh
+                </button>
+                <button
+                    onClick={() => setIsSettingsOpen(true)}
+                    className="px-3 py-1.5 bg-blue-600 rounded text-xs text-white hover:bg-blue-500"
+                >
+                    Settings
+                </button>
+            </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="flex-1 flex overflow-hidden">
+            {/* Graph Area (Left/Center) */}
+            <div className="flex-1 flex flex-col relative bg-gray-950">
+                
+                {/* Empty State for Trace Mode */}
+                {activeTab === 'trace' && !hasRun && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center z-10 pointer-events-none">
+                        <div className="pointer-events-auto bg-gray-900/80 p-8 rounded-xl border border-gray-800 backdrop-blur text-center max-w-2xl">
+                            <h2 className="text-2xl font-bold mb-4 text-blue-400">Start a Query Trace</h2>
+                            <p className="text-gray-400 mb-6">Select a graph and enter a query below to visualize the execution trace.</p>
+                            <div className="flex flex-wrap justify-center gap-2">
+                                {suggestedQueries.map((q, i) => (
                                     <button
-                                        onClick={handleExitExplore}
-                                        className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-xs text-gray-200 hover:bg-gray-700"
+                                        key={i}
+                                        onClick={() => {
+                                            setRunConfig(prev => ({ ...prev, query: q }));
+                                        }}
+                                        className="px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-full text-xs text-gray-300 hover:text-white hover:border-gray-500 transition-colors"
                                     >
-                                        Exit explore
+                                        {q}
                                     </button>
-                                ) : (
-                                    <button
-                                        onClick={handleExploreGraph}
-                                        disabled={isLoadingGraph}
-                                        className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-xs text-gray-200 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        Explore
-                                    </button>
-                                )}
-                                <button
-                                    onClick={handleToggleSim}
-                                    disabled={!fullGraphData || isLoadingGraph}
-                                    className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-xs text-gray-200 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    {vizConfig?.runLayout ? 'Pause sim' : 'Run sim'}
-                                </button>
-                                <button
-                                    onClick={handleRefreshViz}
-                                    disabled={!fullGraphData || isLoadingGraph}
-                                    className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-xs text-gray-200 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    Refresh viz
-                                </button>
-                                <button
-                                    onClick={() => setIsSettingsOpen(true)}
-                                    className="px-3 py-2 bg-blue-600 rounded text-xs text-white hover:bg-blue-500"
-                                >
-                                    Settings
-                                </button>
-                            </div>
-                            <div className="text-[11px] text-gray-500 truncate mt-1">
-                                {isLoadingGraph
-                                    ? 'Loading graph…'
-                                    : (fullGraphData
-                                        ? `Loaded: ${fullGraphData.nodes?.length || 0} nodes, ${fullGraphData.links?.length || 0} edges`
-                                        : 'No graph loaded')}
+                                ))}
                             </div>
                         </div>
                     </div>
+                )}
+
+                {/* Graph Visualization */}
+                <div className="flex-1 relative overflow-hidden">
+                    <ErrorBoundary>
+                        {vizConfig?.use3D ? (
+                            <GraphVisualization3D 
+                                data={activeTab === 'explore' ? (fullGraphData || {nodes:[], links:[]}) : graphData}
+                                onNodeClick={setSelectedNode}
+                                onNodeHover={handleNodeHover}
+                                vizConfig={vizConfig}
+                                graphId={activeTab === 'explore' ? 'explore' : currentRunId}
+                                showLegend={showLegend}
+                                onToggleLegend={() => setShowLegend(prev => !prev)}
+                            />
+                        ) : (
+                            <GraphVisualization 
+                                graphData={activeTab === 'explore' ? (fullGraphData || {nodes:[], links:[]}) : graphData}
+                                onNodeClick={setSelectedNode}
+                                onNodeHover={handleNodeHover}
+                                vizConfig={vizConfig}
+                                refreshNonce={vizRefreshNonce}
+                            />
+                        )}
+                    </ErrorBoundary>
+
+                    {/* Trace Mode Overlays */}
+                    {activeTab === 'trace' && (
+                        <>
+                            {/* Final Answer */}
+                            {finalAnswer && (
+                                <div className="absolute bottom-20 left-4 right-4 md:left-10 md:right-10 bg-gray-900/95 border border-blue-500/30 p-6 rounded-xl backdrop-blur shadow-2xl max-h-[40vh] overflow-y-auto">
+                                    <div className="text-xs font-bold text-blue-400 mb-2 uppercase tracking-wider">Final Answer</div>
+                                    <div className="text-sm text-gray-200 leading-relaxed prose prose-invert prose-sm max-w-none">
+                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                            {finalAnswer}
+                                        </ReactMarkdown>
+                                    </div>
+                                </div>
+                            )}
+                            
+                            {/* Playback Controls */}
+                            <div className="absolute bottom-0 left-0 right-0">
+                                <ControlPanel 
+                                    isPlaying={isPlaying}
+                                    setIsPlaying={setIsPlaying}
+                                    currentStep={currentStep}
+                                    setCurrentStep={setCurrentStep}
+                                    maxStep={Math.max(0, playbackEvents.length - 1)}
+                                    activeEventsCount={playbackEvents.length}
+                                    metrics={metrics}
+                                />
+                            </div>
+                        </>
+                    )}
+                    
+                    {/* Common Overlays - Node count moved to top-right to avoid overlap */}
+                    <div className="absolute top-16 right-4 bg-gray-900/80 p-2 rounded border border-gray-700 backdrop-blur pointer-events-none z-10">
+                        <div className="text-[10px] text-gray-400 uppercase tracking-wider">Nodes</div>
+                        <div className="text-lg font-bold">
+                            {activeTab === 'explore' ? (fullGraphData?.nodes?.length || 0) : graphData.nodes.length}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Chat Input Area */}
+                <div className="p-4 border-t border-gray-800 bg-gray-900/50 backdrop-blur z-10">
                     <ChatInput 
                         runConfig={runConfig}
                         setRunConfig={setRunConfig}
@@ -1438,88 +1543,28 @@ function App() {
                         mode="bottom"
                     />
                 </div>
-
-                {/* Graph Area */}
-                <div className="flex-1 relative overflow-hidden bg-gray-950">
-                    <ErrorBoundary>
-                        {vizConfig?.use3D ? (
-                            <GraphVisualization3D 
-                                data={graphData}
-                                onNodeClick={setSelectedNode}
-                                onNodeHover={handleNodeHover}
-                                vizConfig={vizConfig}
-                                graphId={currentRunId}
-                            />
-                        ) : (
-                            <GraphVisualization 
-                                graphData={graphData}
-                                onNodeClick={setSelectedNode}
-                                onNodeHover={handleNodeHover}
-                                vizConfig={vizConfig}
-                                refreshNonce={vizRefreshNonce}
-                            />
-                        )}
-                    </ErrorBoundary>
-
-                    {/* Overlay Stats */}
-                    <div className="absolute bottom-20 right-16 bg-gray-900/80 p-3 rounded border border-gray-700 backdrop-blur pointer-events-none">
-                        <div className="text-[10px] text-gray-400 uppercase tracking-wider">Graph Size</div>
-                        <div className="text-lg font-bold">{graphData.nodes.length} <span className="text-sm font-normal text-gray-500">nodes</span></div>
-                    </div>
-
-
-
-                    {/* Final Answer Overlay */}
-                    {!isExploreOnly && finalAnswer && (
-                        <div className="absolute bottom-20 left-4 right-4 md:left-10 md:right-10 bg-gray-900/95 border border-blue-500/30 p-6 rounded-xl backdrop-blur shadow-2xl max-h-[40vh] overflow-y-auto">
-                            <div className="text-xs font-bold text-blue-400 mb-2 uppercase tracking-wider">Final Answer</div>
-                            <div className="text-sm text-gray-200 leading-relaxed prose prose-invert prose-sm max-w-none">
-                                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                    {finalAnswer}
-                                </ReactMarkdown>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Playback Controls */}
-                    {!isExploreOnly && (
-                        <div className="absolute bottom-0 left-0 right-0">
-                            <ControlPanel 
-                                isPlaying={isPlaying}
-                                setIsPlaying={setIsPlaying}
-                                currentStep={currentStep}
-                                setCurrentStep={setCurrentStep}
-                                maxStep={Math.max(0, playbackEvents.length - 1)}
-                                activeEventsCount={playbackEvents.length}
-                                metrics={metrics}
-                            />
-                        </div>
-                    )}
-                </div>
             </div>
-        )}
-      </div>
 
-      {/* Right Sidebar (Details) */}
-            {hasRun && !isExploreOnly && (
-          <RunDetails 
-            metrics={metrics}
-            evidence={evidence}
-            queue={queue}
-                        reasoning={reasoningItems}
-            currentAction={currentAction}
-            finalAnswer={finalAnswer}
-            devMode={devMode}
-            onShowLogs={() => setShowLogs(true)}
-            onExport={handleExport}
-            onSelectNode={(node) => {
-                // Find full node data if possible
-                const fullNode = graphData.nodes.find(n => n.id === node.id) || node;
-                setSelectedNode(fullNode);
-                // Also trigger graph zoom if we can access the ref (complex, so maybe just select for now)
-            }}
-          />
-      )}
+            {/* Right Sidebar (RunDetails) - Only in Trace Mode */}
+            {activeTab === 'trace' && hasRun && (
+                <RunDetails 
+                    metrics={metrics}
+                    evidence={evidence}
+                    queue={queue}
+                    reasoning={reasoningItems}
+                    currentAction={currentAction}
+                    finalAnswer={finalAnswer}
+                    devMode={devMode}
+                    onShowLogs={() => setShowLogs(true)}
+                    onExport={handleExport}
+                    onSelectNode={(node) => {
+                        const fullNode = graphData.nodes.find(n => n.id === node.id) || node;
+                        setSelectedNode(fullNode);
+                    }}
+                />
+            )}
+        </div>
+      </div>
 
       {/* Modals & Overlays */}
       <SettingsModal 

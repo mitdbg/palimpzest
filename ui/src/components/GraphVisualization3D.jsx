@@ -74,15 +74,21 @@ const getEdgeTypeSettings = (edgeType, vizConfig) => {
         color: userSettings.color ?? defaults.color ?? DEFAULT_EDGE_FALLBACK.color,
         width: userSettings.width ?? defaults.width ?? DEFAULT_EDGE_FALLBACK.width,
         visible: userSettings.visible ?? true,
+        strength: userSettings.strength ?? defaults.strength ?? DEFAULT_EDGE_FALLBACK.strength ?? 1.0,
+        distance: userSettings.distance ?? defaults.distance ?? DEFAULT_EDGE_FALLBACK.distance ?? 100,
     };
 };
 
 const getNodeColor = (node, vizConfig) => {
     const stateColors = vizConfig?.stateColors || DEFAULT_STATE_COLORS;
-    if (node.isEvidence) return stateColors.evidence;
-    if (node.isOnPath) return stateColors.onPath;
+    // Evidence nodes: yellow highlight (highest priority)
+    if (node.isEvidence) return '#eab308';  // Yellow - evidence found
+    // Active path nodes: current step highlight
     if (node.isActivePath) return stateColors.activePath;
-    if (node.visited) return stateColors.visited;
+    // On path nodes: part of trace path
+    if (node.isOnPath) return stateColors.onPath;
+    // Visited nodes: green highlight (query traversal visited this node)
+    if (node.visited) return '#22c55e';  // Green - visited
     const nodeType = node.pz_type || node.type;
     if (nodeType === 'entry') return stateColors.entry;
     return getNodeTypeSettings(nodeType, vizConfig).color;
@@ -97,8 +103,6 @@ const getEdgeColor = (edge, vizConfig) => {
 };
 
 const getNodeRadius = (node, vizConfig) => {
-    if (node.isEvidence) return 8 * (vizConfig?.nodeRadiusScale ?? 1.0);
-    if (node.isOnPath || node.isActivePath) return 6 * (vizConfig?.nodeRadiusScale ?? 1.0);
     const nodeType = node.pz_type || node.type;
     const settings = getNodeTypeSettings(nodeType, vizConfig);
     const baseSize = settings.size || vizConfig?.nodeBaseSize || 3;
@@ -106,7 +110,7 @@ const getNodeRadius = (node, vizConfig) => {
 };
 
 // ==================== LEGEND ====================
-function DynamicLegend({ data, vizConfig }) {
+function DynamicLegend({ data, vizConfig, show, onToggle }) {
     const nodeTypes = useMemo(() => {
         const types = new Set();
         data.nodes?.forEach(n => {
@@ -119,19 +123,40 @@ function DynamicLegend({ data, vizConfig }) {
     if (nodeTypes.length === 0) return null;
 
     return (
-        <div className="absolute bottom-4 left-4 bg-slate-900/90 p-3 rounded border border-slate-700 z-10 max-h-48 overflow-y-auto">
-            <div className="text-xs text-slate-400 mb-2 uppercase tracking-wider">Node Types</div>
-            <div className="space-y-1">
-                {nodeTypes.map(type => {
-                    const settings = getNodeTypeSettings(type, vizConfig);
-                    return (
-                        <div key={type} className="flex items-center gap-2">
-                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: settings.color }} />
-                            <span className="text-xs text-slate-300">{type}</span>
-                        </div>
-                    );
-                })}
-            </div>
+        <div className="absolute bottom-24 left-4 z-10">
+            {show ? (
+                <div className="bg-slate-900/90 p-3 rounded border border-slate-700 max-h-48 overflow-y-auto">
+                    <div className="flex items-center justify-between mb-2">
+                        <div className="text-xs text-slate-400 uppercase tracking-wider">Node Types</div>
+                        <button 
+                            onClick={onToggle}
+                            className="text-xs text-slate-500 hover:text-slate-300 ml-2"
+                            title="Hide legend"
+                        >
+                            ✕
+                        </button>
+                    </div>
+                    <div className="space-y-1">
+                        {nodeTypes.map(type => {
+                            const settings = getNodeTypeSettings(type, vizConfig);
+                            return (
+                                <div key={type} className="flex items-center gap-2">
+                                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: settings.color }} />
+                                    <span className="text-xs text-slate-300">{type}</span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            ) : (
+                <button 
+                    onClick={onToggle}
+                    className="bg-slate-900/90 px-2 py-1 rounded border border-slate-700 text-xs text-slate-400 hover:text-slate-200"
+                    title="Show legend"
+                >
+                    Legend
+                </button>
+            )}
         </div>
     );
 }
@@ -143,13 +168,14 @@ function GraphVisualization3D({
     onNodeHover,
     vizConfig = {},
     graphId,
+    showLegend = true,
+    onToggleLegend,
 }) {
     const fgRef = useRef();
     const containerRef = useRef();
     
     const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
     const [hoveredNode, setHoveredNode] = useState(null);
-    const [isReady, setIsReady] = useState(false);
     const [webglStatus, setWebglStatus] = useState({ supported: true, checked: false });
     const [perfStats, setPerfStats] = useState(null);
     
@@ -320,84 +346,147 @@ function GraphVisualization3D({
     }, []);
 
     // ==================== GRAPH DATA ====================
-    // Keep track of node positions to prevent reset on data updates
-    const nodePositionsRef = useRef(new Map());
+    // STABLE node storage - maintains object identity across renders to preserve simulation positions
+    const stableNodeMapRef = useRef(new Map());  // id -> stable node object (positions preserved)
+    const stableLinkMapRef = useRef(new Map());  // "source->target" -> stable link object
+    const lastGraphIdRef = useRef(graphId);
 
-    // Update positions ref periodically to capture simulation state
+    // Clear stable maps when switching to a different graph
     useEffect(() => {
-        const interval = setInterval(() => {
-            const fg = fgRef.current;
-            if (fg) {
-                // Access internal graph data safely
-                // Note: fg.graphData() might fail if component is not ready, so we wrap in try/catch
-                try {
-                    const gData = fg.graphData();
-                    if (gData && gData.nodes) {
-                        gData.nodes.forEach(n => {
-                            if (n.id && (n.x !== undefined || n.vx !== undefined)) {
-                                nodePositionsRef.current.set(n.id, {
-                                    x: n.x, y: n.y, z: n.z,
-                                    vx: n.vx, vy: n.vy, vz: n.vz,
-                                    fx: n.fx, fy: n.fy, fz: n.fz
-                                });
-                            }
-                        });
-                    }
-                } catch (e) {
-                    // Ignore errors during initialization
-                }
-            }
-        }, 1000); // Save every second
-        return () => clearInterval(interval);
-    }, []);
+        if (graphId !== lastGraphIdRef.current) {
+            stableNodeMapRef.current.clear();
+            stableLinkMapRef.current.clear();
+            lastGraphIdRef.current = graphId;
+        }
+    }, [graphId]);
 
+    // Compute a hash of node states (visited, isEvidence, isOnPath, isActivePath) to detect changes
+    // This is needed because stable node objects don't trigger React change detection
+    const nodeStateHash = useMemo(() => {
+        if (!data.nodes?.length) return '';
+        const parts = data.nodes.map(n => 
+            `${n.id}:${n.visited ? 1 : 0}${n.isEvidence ? 1 : 0}${n.isOnPath ? 1 : 0}${n.isActivePath ? 1 : 0}`
+        );
+        return parts.join(',');
+    }, [data.nodes]);
+
+    // Hash of visibility settings only - changing colors shouldn't reset the simulation
+    const visibilityHash = useMemo(() => {
+        const nodeTypes = vizConfig?.nodeTypeSettings || {};
+        const edgeTypes = vizConfig?.edgeTypeSettings || {};
+        const nodeParts = Object.entries(nodeTypes).map(([k, v]) => `${k}:${v?.visible ?? true}`);
+        const edgeParts = Object.entries(edgeTypes).map(([k, v]) => `${k}:${v?.visible ?? true}`);
+        return [...nodeParts, ...edgeParts].join('|');
+    }, [vizConfig?.nodeTypeSettings, vizConfig?.edgeTypeSettings]);
+
+    // Build stable graph data - reuses same node/link objects across renders
+    // The simulation mutates node.x, node.y, node.z directly on these objects
     const graphDataMemo = useMemo(() => {
         if (!data.nodes?.length) return { nodes: [], links: [] };
 
-        // Filter visible nodes
+        const stableNodeMap = stableNodeMapRef.current;
+        const stableLinkMap = stableLinkMapRef.current;
+
+        // Build set of current node IDs
+        const currentNodeIds = new Set();
         const visibleNodeIds = new Set();
-        const nodes = data.nodes
-            .filter(n => getNodeTypeSettings(n.pz_type || n.type, vizConfig).visible !== false)
-            .map(n => {
-                visibleNodeIds.add(n.id);
-                // Restore position if available
-                const pos = nodePositionsRef.current.get(n.id);
-                return {
-                    id: n.id,
-                    label: n.label,
-                    pz_type: n.pz_type,
-                    type: n.type,
-                    isEvidence: n.isEvidence,
-                    isOnPath: n.isOnPath,
-                    isActivePath: n.isActivePath,
-                    visited: n.visited,
-                    // Convert linear radius to cubic volume for ForceGraph (radius = cbrt(val) * nodeRelSize)
-                    // nodeRelSize defaults to 4
-                    val: Math.pow(getNodeRadius(n, vizConfig) / 4, 3),
-                    // Spread restored positions
-                    ...(pos || {})
+
+        // Process nodes - reuse existing objects, create new ones only for new nodes
+        for (const rawNode of data.nodes) {
+            const id = rawNode.id;
+            currentNodeIds.add(id);
+            
+            const settings = getNodeTypeSettings(rawNode.pz_type || rawNode.type, vizConfig);
+            if (settings.visible === false) continue;
+            
+            visibleNodeIds.add(id);
+            
+            let stableNode = stableNodeMap.get(id);
+            if (stableNode) {
+                // UPDATE existing node in-place - preserve x, y, z, vx, vy, vz!
+                stableNode.label = rawNode.label;
+                stableNode.pz_type = rawNode.pz_type;
+                stableNode.type = rawNode.type;
+                stableNode.isEvidence = rawNode.isEvidence;
+                stableNode.isOnPath = rawNode.isOnPath;
+                stableNode.isActivePath = rawNode.isActivePath;
+                stableNode.visited = rawNode.visited;
+                stableNode.val = Math.pow(getNodeRadius(rawNode, vizConfig) / 4, 3);
+                // Don't touch x, y, z, vx, vy, vz - let simulation manage them
+            } else {
+                // CREATE new node
+                stableNode = {
+                    id,
+                    label: rawNode.label,
+                    pz_type: rawNode.pz_type,
+                    type: rawNode.type,
+                    isEvidence: rawNode.isEvidence,
+                    isOnPath: rawNode.isOnPath,
+                    isActivePath: rawNode.isActivePath,
+                    visited: rawNode.visited,
+                    val: Math.pow(getNodeRadius(rawNode, vizConfig) / 4, 3),
+                    // New nodes start without positions - simulation will initialize them
                 };
-            });
+                stableNodeMap.set(id, stableNode);
+            }
+        }
 
-        // Filter visible links
+        // Build nodes array - create NEW array but with STABLE node objects inside
+        // This way ForceGraph detects the data change, but node positions are preserved
+        const nodes = [];
+        for (const id of visibleNodeIds) {
+            const node = stableNodeMap.get(id);
+            if (node) nodes.push(node);
+        }
+
+        // Process links
         const allLinks = data.allLinks || data.links || [];
-        const links = allLinks
-            .filter(l => {
-                // Don't filter by visibility here - keep them for physics!
-                // Just check if endpoints exist
-                const sid = l.source?.id ?? l.source;
-                const tid = l.target?.id ?? l.target;
-                return visibleNodeIds.has(sid) && visibleNodeIds.has(tid);
-            })
-            .map(l => ({
-                source: l.source?.id ?? l.source,
-                target: l.target?.id ?? l.target,
-                type: l.pz_type || l.type,
-                visible: getEdgeTypeSettings(l.pz_type || l.type, vizConfig).visible !== false
-            }));
+        const currentLinkKeys = new Set();
 
+        for (const rawLink of allLinks) {
+            const sid = rawLink.source?.id ?? rawLink.source;
+            const tid = rawLink.target?.id ?? rawLink.target;
+            
+            // Skip links with missing endpoints
+            if (!visibleNodeIds.has(sid) || !visibleNodeIds.has(tid)) continue;
+            
+            const linkKey = `${sid}->${tid}`;
+            currentLinkKeys.add(linkKey);
+            
+            const linkType = rawLink.pz_type || rawLink.type;
+            const settings = getEdgeTypeSettings(linkType, vizConfig);
+            
+            let stableLink = stableLinkMap.get(linkKey);
+            if (stableLink) {
+                // UPDATE existing link in-place
+                stableLink.type = linkType;
+                stableLink.visible = settings.visible !== false;
+                stableLink.isOnPath = rawLink.isOnPath;
+                stableLink.isActivePath = rawLink.isActivePath;
+            } else {
+                // CREATE new link
+                stableLink = {
+                    source: sid,
+                    target: tid,
+                    type: linkType,
+                    visible: settings.visible !== false,
+                    isOnPath: rawLink.isOnPath,
+                    isActivePath: rawLink.isActivePath,
+                };
+                stableLinkMap.set(linkKey, stableLink);
+            }
+        }
+
+        // Build links array - NEW array with STABLE link objects
+        const links = [];
+        for (const key of currentLinkKeys) {
+            const link = stableLinkMap.get(key);
+            if (link) links.push(link);
+        }
+
+        // Return NEW object so ForceGraph detects change, but node/link objects are stable
         return { nodes, links };
-    }, [data, vizConfig]);
+    }, [data, visibilityHash]);  // Only depend on data and visibility, not colors/forces
 
     // ==================== CAMERA SETUP (top-down 2D view) ====================
     useEffect(() => {
@@ -421,8 +510,6 @@ function GraphVisualization3D({
                     RIGHT: THREE.MOUSE.PAN,
                 };
             }
-            
-            setIsReady(true);
         }, 100);
         
         return () => clearTimeout(timer);
@@ -442,12 +529,24 @@ function GraphVisualization3D({
             }
         }
 
-        // Link force
+        // Link force - use per-link strength based on edge type
         const link = fg.d3Force('link');
         if (link) {
-            link.distance(vizConfig?.linkDistance ?? 60);
+            // Distance can vary per link type
+            link.distance((l) => {
+                const linkType = l.type || '';
+                const settings = getEdgeTypeSettings(linkType, vizConfig);
+                const baseDistance = vizConfig?.linkDistance ?? 60;
+                return baseDistance * (settings.distance / 100);  // distance is stored as 0-200 scale
+            });
+            // Strength varies per link type
             if (typeof link.strength === 'function') {
-                link.strength(vizConfig?.linkStrength ?? 0.5);
+                link.strength((l) => {
+                    const linkType = l.type || '';
+                    const settings = getEdgeTypeSettings(linkType, vizConfig);
+                    const baseStrength = vizConfig?.linkStrength ?? 0.5;
+                    return baseStrength * settings.strength;  // strength is 0-2 multiplier
+                });
             }
         }
 
@@ -459,19 +558,66 @@ function GraphVisualization3D({
         // No collision for performance on large graphs
         fg.d3Force('collide', null);
 
-    }, [vizConfig?.chargeStrength, vizConfig?.chargeDistanceMax, vizConfig?.linkDistance, vizConfig?.linkStrength, vizConfig?.centerStrength]);
+        // Only reheat if charge/center settings changed (not link settings)
+        // Link strength/distance apply immediately without reheat
+    }, [vizConfig?.chargeStrength, vizConfig?.chargeDistanceMax, vizConfig?.linkDistance, vizConfig?.linkStrength, vizConfig?.centerStrength, vizConfig?.edgeTypeSettings]);
 
     // ==================== PAUSE/RESUME ====================
+    // Only resume animation - don't reheat on every toggle (causes jitter)
     useEffect(() => {
         const fg = fgRef.current;
         if (!fg) return;
         
         if (vizConfig?.runLayout) {
-            fg.d3ReheatSimulation();
+            fg.resumeAnimation?.();
+            // Don't call d3ReheatSimulation() - let the existing simulation continue
+        } else {
+            fg.pauseAnimation?.();
         }
     }, [vizConfig?.runLayout]);
 
+    // ==================== UPDATE NODE COLORS ON STATE CHANGE ====================
+    // When node states (visited, isEvidence, etc.) change, update their mesh colors directly
+    // Use nodeStateHash to detect changes in stable node objects
+    useEffect(() => {
+        // Count visited nodes from RAW input data for debugging
+        const rawVisitedCount = data.nodes?.filter(n => n.visited).length || 0;
+        const rawEvidenceCount = data.nodes?.filter(n => n.isEvidence).length || 0;
+        // Also count from stable nodes (these are what we render)
+        const stableVisitedCount = graphDataMemo.nodes?.filter(n => n.visited).length || 0;
+        const stableEvidenceCount = graphDataMemo.nodes?.filter(n => n.isEvidence).length || 0;
+        console.log(`[3D] Node state update - raw: visited=${rawVisitedCount}, evidence=${rawEvidenceCount} | stable: visited=${stableVisitedCount}, evidence=${stableEvidenceCount}`);
+        
+        const timer = setTimeout(() => {
+            const fg = fgRef.current;
+            if (!fg || typeof fg.graphData !== 'function') return;
+            
+            // Get the current graph data from the scene
+            let gData;
+            try {
+                gData = fg.graphData();
+            } catch (e) {
+                return; // Graph not ready yet
+            }
+            if (!gData?.nodes) return;
+            
+            let updatedCount = 0;
+            // Update each node's mesh color
+            for (const node of gData.nodes) {
+                if (node.__threeObj && node.__threeObj.material) {
+                    const newColor = getNodeColor(node, vizConfig);
+                    node.__threeObj.material.color.set(newColor);
+                    if (node.visited || node.isEvidence) updatedCount++;
+                }
+            }
+            console.log(`[3D] Updated ${updatedCount} special nodes, total with __threeObj: ${gData.nodes.filter(n => n.__threeObj).length}`);
+        }, 100);  // Delay to let ForceGraph create the objects first
+        
+        return () => clearTimeout(timer);
+    }, [nodeStateHash, vizConfig, data.nodes, graphDataMemo.nodes]);  // Use nodeStateHash to trigger on state changes
+
     // ==================== NODE RENDERING ====================
+    // Color callback for default sphere rendering (when nodeThreeObject returns undefined)
     const nodeColor = useCallback((node) => {
         return getNodeColor(node, vizConfig);
     }, [vizConfig]);
@@ -480,31 +626,51 @@ function GraphVisualization3D({
     const isLargeGraph = graphDataMemo.nodes.length > 1000;
     const useBatchedLinks = graphDataMemo.links.length > 5000;  // Use batched rendering for many links
     
-    // Shared geometries for node shapes
-    const geometries = useMemo(() => ({
-        circle: new THREE.SphereGeometry(1, 8, 8), // Low poly sphere
-        square: new THREE.BoxGeometry(1.5, 1.5, 1.5),
-        triangle: new THREE.TetrahedronGeometry(1.5),
-        diamond: new THREE.OctahedronGeometry(1.5),
-        hexagon: new THREE.CylinderGeometry(1, 1, 1, 6),
-    }), []);
+    // Shared geometries for node shapes - disposed on unmount
+    const geometriesRef = useRef(null);
+    const geometries = useMemo(() => {
+        // Dispose old geometries if they exist
+        if (geometriesRef.current) {
+            Object.values(geometriesRef.current).forEach(g => g.dispose());
+        }
+        const geos = {
+            circle: new THREE.SphereGeometry(1, 8, 8), // Low poly sphere
+            square: new THREE.BoxGeometry(1.5, 1.5, 1.5),
+            triangle: new THREE.TetrahedronGeometry(1.5),
+            diamond: new THREE.OctahedronGeometry(1.5),
+            hexagon: new THREE.CylinderGeometry(1, 1, 1, 6),
+        };
+        geometriesRef.current = geos;
+        return geos;
+    }, []);
+    
+    // Cleanup geometries on unmount
+    useEffect(() => {
+        return () => {
+            if (geometriesRef.current) {
+                Object.values(geometriesRef.current).forEach(g => g.dispose());
+            }
+        };
+    }, []);
 
-    // Custom node renderer to support shapes
+    // Custom node renderer to support shapes AND ensure colors update on state changes
     const nodeThreeObject = useCallback((node) => {
         const settings = getNodeTypeSettings(node.pz_type || node.type, vizConfig);
         const shape = settings.shape || 'circle';
-        
-        // If circle, return undefined to use default optimized sphere (unless we really want custom material)
-        // Actually, default sphere is better optimized by the library (instancing support maybe?)
-        // But if we want mixed shapes, we might need to provide objects for all.
-        // However, for 9k nodes, creating 9k meshes is heavy.
-        // Let's try to use default for circles and custom for others.
-        if (shape === 'circle') return undefined;
-        
-        const geometry = geometries[shape] || geometries.circle;
         const color = getNodeColor(node, vizConfig);
         
-        // Use MeshLambertMaterial to match default look
+        // Check if we already have a mesh and just need to update the color
+        if (node.__threeObj && node.__threeObj.material) {
+            const currentColor = node.__threeObj.material.color.getHexString();
+            const newColor = color.replace('#', '');
+            if (currentColor !== newColor) {
+                node.__threeObj.material.color.set(color);
+            }
+            return node.__threeObj;
+        }
+        
+        // Create new mesh
+        const geometry = geometries[shape] || geometries.circle;
         const material = new THREE.MeshLambertMaterial({ 
             color, 
             transparent: true, 
@@ -512,19 +678,11 @@ function GraphVisualization3D({
         });
         
         const mesh = new THREE.Mesh(geometry, material);
-        // Scale is handled by the library if we don't set it? No, we return the object.
-        // The library scales the object by `val` if we don't set scale?
-        // Actually, the library applies `val` to the default sphere radius.
-        // If we provide an object, we should probably scale it ourselves or let the library scale it?
-        // The library does: `obj.scale.multiplyScalar(val)` if `nodeThreeObjectExtend` is true?
-        // We set `nodeThreeObjectExtend={false}`.
-        // So we must scale it.
-        
         const size = getNodeRadius(node, vizConfig);
         mesh.scale.set(size, size, size);
         
         return mesh;
-    }, [vizConfig, geometries]);
+    }, [vizConfig, geometries]);  // Don't include graphDataMemo - color updates handled by separate effect
 
     // ==================== BATCHED LINK RENDERING ====================
     // For large graphs, we bypass the library's per-link rendering and use
@@ -678,6 +836,12 @@ function GraphVisualization3D({
         return settings.color;
     }, [vizConfig]);
 
+    // Link visibility function - checks edge type settings
+    const linkVisibility = useCallback((link) => {
+        const settings = getEdgeTypeSettings(link.type || '', vizConfig);
+        return settings.visible !== false;
+    }, [vizConfig]);
+
     // ==================== INTERACTION ====================
     const handleNodeClick = useCallback((node, event) => {
         if (onNodeClick) onNodeClick(node, event);
@@ -779,8 +943,8 @@ function GraphVisualization3D({
                     nodeOpacity={0.9}
                     nodeResolution={isLargeGraph ? 4 : 8}
                     
-                    // Link appearance - DISABLED when using batched rendering
-                    linkVisibility={!useBatchedLinks}
+                    // Link appearance - use per-link visibility check when not batched
+                    linkVisibility={useBatchedLinks ? false : linkVisibility}
                     linkColor={useBatchedLinks ? () => 'transparent' : linkColor}
                     linkWidth={useBatchedLinks ? 0 : (vizConfig?.edgeWidth ?? 0.3)}
                     linkOpacity={useBatchedLinks ? 0 : (vizConfig?.edgeOpacity ?? 0.4)}
@@ -788,7 +952,7 @@ function GraphVisualization3D({
                     
                     // Physics
                     d3VelocityDecay={vizConfig?.d3VelocityDecay ?? 0.3}
-                    warmupTicks={50}
+                    warmupTicks={0}
                     cooldownTicks={vizConfig?.runLayout ? Infinity : 0}
                     
                     // Interaction - disable for large graphs (>5k nodes)
@@ -813,10 +977,10 @@ function GraphVisualization3D({
             </div>
 
             {/* Legend */}
-            <DynamicLegend data={data} vizConfig={vizConfig} />
+            <DynamicLegend data={data} vizConfig={vizConfig} show={showLegend} onToggle={onToggleLegend} />
 
             {/* Zoom Controls */}
-            <div className="absolute bottom-20 right-4 flex flex-col gap-2 z-10">
+            <div className="absolute bottom-4 right-4 flex flex-col gap-2 z-10">
                 <button onClick={() => handleZoom(1.3)} className="p-2 bg-slate-800 text-slate-300 rounded hover:bg-slate-700 shadow-lg border border-slate-700">
                     <ZoomIn size={16} />
                 </button>
@@ -830,7 +994,7 @@ function GraphVisualization3D({
 
             {/* Hover Info */}
             {hoveredNode && (
-                <div className="absolute bottom-4 right-4 bg-slate-900/95 p-3 rounded border border-slate-700 z-10 max-w-sm">
+                <div className="absolute bottom-24 right-4 bg-slate-900/95 p-3 rounded border border-slate-700 z-10 max-w-sm">
                     <div className="text-sm font-medium text-white">{hoveredNode.label || hoveredNode.id}</div>
                     <div className="text-xs text-slate-400 mt-1">{hoveredNode.pz_type || hoveredNode.type}</div>
                 </div>

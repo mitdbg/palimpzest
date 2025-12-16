@@ -12,5 +12,14 @@ Traversal state (JSON):
 Current node content (may be truncated):
 {{ node_text }}
 
+Should traversal STOP now?
+
+IMPORTANT: Be CONSERVATIVE about stopping.
+- More evidence is generally better - synthesis benefits from diverse sources
+- Only stop if evidence is CLEARLY comprehensive (not just "some" evidence)
+- Prefer to continue exploring unless frontier is exhausted or heavily redundant
+- If admitted_nodes < 5, almost always continue (need more evidence)
+
 Return STRICT JSON only:
-{"decision": true|false, "reason": "..."}
+{"decision": true, "reason": "..."} ONLY if evidence is truly comprehensive
+{"decision": false, "reason": "..."} to continue exploring (preferred when uncertain)

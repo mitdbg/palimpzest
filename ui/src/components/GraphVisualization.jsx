@@ -76,12 +76,9 @@ const getEdgeColor = (edge, vizConfig) => {
     return settings.color;
 };
 
-// Node sizing based on type and importance
+// Node sizing based on type
 const getNodeRadius = (node, vizConfig) => {
-    if (node.isEvidence) return 8;
     const nodeType = node.pz_type || node.type;
-    if (nodeType === 'entry') return 5;
-    
     const baseSize = vizConfig?.nodeBaseSize ?? 3;
     const settings = getNodeTypeSettings(nodeType, vizConfig);
     return baseSize * settings.size;
@@ -217,7 +214,7 @@ const DynamicLegend = ({ data, vizConfig }) => {
     if (nodeTypes.length === 0) return null;
 
     return (
-        <div className="absolute bottom-24 left-4 z-10 bg-slate-900/90 backdrop-blur-sm rounded-lg p-3 border border-slate-700/50 text-xs max-w-48">
+        <div className="absolute bottom-20 left-4 z-10 bg-slate-900/90 backdrop-blur-sm rounded-lg p-3 border border-slate-700/50 text-xs max-w-48 max-h-[40vh] overflow-y-auto">
             <div className="text-slate-400 font-medium mb-2">Legend</div>
             
             {/* Node types */}
@@ -269,10 +266,45 @@ const DynamicLegend = ({ data, vizConfig }) => {
     );
 };
 
+// Global position cache - persists across component remounts and data changes
+const globalPositionCache = new Map();
+
+// Global stable node/link storage - maintains object identity across renders
+const stableNodeMap = new Map();  // id -> node object (SAME reference across renders)
+const stableLinkMap = new Map();  // "source->target" -> link object
+let stableNodesArray = [];        // STABLE array reference - mutated in place
+let stableLinksArray = [];        // STABLE array reference - mutated in place
+
+// Stable array for filtered/render links
+let stableRenderLinksArray = [];
+
+// THE KEY: A stable object that ForceGraph2D will always see as the same reference
+// We'll mutate its .nodes and .links properties to point to our stable arrays
+const stableForceGraphData = { nodes: [], links: [] };
+
+// Helper to clear stable maps (call when switching contexts)
+const clearStableMaps = () => {
+    // Save positions before clearing
+    for (const [id, node] of stableNodeMap) {
+        if (typeof node.x === 'number' && typeof node.y === 'number' && !isNaN(node.x) && !isNaN(node.y)) {
+            globalPositionCache.set(id, { x: node.x, y: node.y, vx: node.vx || 0, vy: node.vy || 0 });
+        }
+    }
+    stableNodeMap.clear();
+    stableLinkMap.clear();
+    stableNodesArray = [];
+    stableLinksArray = [];
+    stableRenderLinksArray = [];
+    stableForceGraphData.nodes = [];
+    stableForceGraphData.links = [];
+};
+
 function GraphVisualization({ graphData, onNodeClick, onNodeHover, vizConfig, refreshNonce }) {
     const containerRef = useRef(null);
     const fgRef = useRef();
-    const positionCacheRef = useRef(new Map()); // Cache node positions to preserve across config changes
+    const positionCacheRef = useRef(globalPositionCache); // Use global cache for persistence
+    const hasInitializedRef = useRef(false);  // Track if simulation has been initialized
+    const hasAutoFitRef = useRef(false);      // Track if auto-fit has been done
     const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
     const [hoveredNode, setHoveredNode] = useState(null);
     const hoveredNodeRef = useRef(null);
@@ -375,15 +407,15 @@ function GraphVisualization({ graphData, onNodeClick, onNodeHover, vizConfig, re
         return () => ro.disconnect();
     }, []);
 
-    // Save current positions before data recalculation
-    useEffect(() => {
+    // Continuously save positions to cache (runs on every render for maximum smoothness)
+    const savePositionsToCache = useCallback(() => {
         const fg = fgRef.current;
         if (!fg || typeof fg.graphData !== 'function') return;
         try {
             const currentData = fg.graphData();
             if (currentData?.nodes) {
                 currentData.nodes.forEach(n => {
-                    if (typeof n.x === 'number' && typeof n.y === 'number') {
+                    if (typeof n.x === 'number' && typeof n.y === 'number' && !isNaN(n.x) && !isNaN(n.y)) {
                         positionCacheRef.current.set(n.id, { x: n.x, y: n.y, vx: n.vx || 0, vy: n.vy || 0 });
                     }
                 });
@@ -391,19 +423,49 @@ function GraphVisualization({ graphData, onNodeClick, onNodeHover, vizConfig, re
         } catch (e) {
             // Ignore errors during initialization
         }
-    }, [graphData, vizConfig?.maxEdges]);
+    }, []);
 
-    // Prepare STRUCTURAL data — only recompute when graphData or maxEdges changes.
-    // This ensures hiding/unhiding types doesn't create new node/link arrays (which would restart the sim).
+    // Save positions whenever graphData changes (before new data is processed)
+    useEffect(() => {
+        savePositionsToCache();
+    }, [graphData, savePositionsToCache]);
+
+    // Detect when graph fundamentally changes (e.g., switching from explore to trace)
+    // by looking at node overlap. If <20% overlap, clear stable maps.
+    useEffect(() => {
+        const rawNodes = Array.isArray(graphData?.nodes) ? graphData.nodes : [];
+        if (rawNodes.length === 0) return;
+        
+        const newIds = new Set(rawNodes.map(n => n.id));
+        const existingIds = new Set(stableNodeMap.keys());
+        
+        // Calculate overlap
+        let overlapCount = 0;
+        for (const id of newIds) {
+            if (existingIds.has(id)) overlapCount++;
+        }
+        
+        const maxSize = Math.max(newIds.size, existingIds.size);
+        const overlapRatio = maxSize > 0 ? overlapCount / maxSize : 1;
+        
+        // If very low overlap and we have existing data, this is a context switch
+        if (existingIds.size > 10 && newIds.size > 10 && overlapRatio < 0.2) {
+            console.log('[GraphViz] Detected context switch, clearing stable maps. Overlap:', overlapRatio);
+            clearStableMaps();
+            hasInitializedRef.current = false;
+            hasAutoFitRef.current = false;
+        }
+    }, [graphData]);
+
+    // Prepare STRUCTURAL data with STABLE node references.
+    // KEY INSIGHT: We reuse the SAME node objects across renders to prevent simulation restarts.
+    // Only create new node objects for genuinely new nodes.
     const structuralData = useMemo(() => {
         const rawNodes = Array.isArray(graphData?.nodes) ? graphData.nodes : [];
         const rawLinks = Array.isArray(graphData?.links)
             ? graphData.links
             : (Array.isArray(graphData?.edges) ? graphData.edges : []);
 
-        // Build node map for quick lookup
-        const nodeMap = new Map(rawNodes.map(n => [n.id, n]));
-        
         // Compute hierarchy depth via BFS from root documents
         const depthMap = new Map();
         const hierarchyLinks = rawLinks.filter(l => {
@@ -443,19 +505,75 @@ function GraphVisualization({ graphData, onNodeClick, onNodeHover, vizConfig, re
             }
         }
 
-        // Create nodes (all of them — visibility is handled at render time)
-        const nodes = rawNodes.map(n => {
-            const depth = depthMap.get(n.id) ?? 0;
-            const cachedPos = positionCacheRef.current.get(n.id);
-            return {
-                ...n,
-                _depth: depth,
-                label: n.summary || n.label || n.id,
-                ...(cachedPos && { x: cachedPos.x, y: cachedPos.y, vx: cachedPos.vx, vy: cachedPos.vy })
-            };
-        });
+        // Update or create nodes with STABLE references
+        // This is critical: we MUST reuse the same object reference for existing nodes
+        // or d3-force will lose all position/velocity state
+        const nodes = [];
+        for (const rawNode of rawNodes) {
+            const id = rawNode.id;
+            const depth = depthMap.get(id) ?? 0;
+            
+            let stableNode = stableNodeMap.get(id);
+            if (stableNode) {
+                // UPDATE existing node in-place - preserve x, y, vx, vy!
+                // Only update non-simulation properties
+                stableNode._depth = depth;
+                stableNode.label = rawNode.summary || rawNode.label || rawNode.id;
+                stableNode.pz_type = rawNode.pz_type || rawNode.type;
+                stableNode.type = rawNode.type;
+                stableNode.summary = rawNode.summary;
+                stableNode.isEvidence = rawNode.isEvidence;
+                stableNode.isOnPath = rawNode.isOnPath;
+                stableNode.isActivePath = rawNode.isActivePath;
+                stableNode.isThinking = rawNode.isThinking;
+                stableNode.isFiltered = rawNode.isFiltered;
+                stableNode.visited = rawNode.visited;
+                stableNode.score = rawNode.score;
+                stableNode.admit = rawNode.admit;
+                stableNode.reason = rawNode.reason;
+                stableNode.decision = rawNode.decision;
+                stableNode.model = rawNode.model;
+                // Don't touch x, y, vx, vy - let simulation manage them
+            } else {
+                // CREATE new node - try to restore position from cache
+                const cachedPos = positionCacheRef.current.get(id);
+                stableNode = {
+                    ...rawNode,
+                    id,
+                    _depth: depth,
+                    label: rawNode.summary || rawNode.label || rawNode.id,
+                    ...(cachedPos && { x: cachedPos.x, y: cachedPos.y, vx: cachedPos.vx, vy: cachedPos.vy })
+                };
+                stableNodeMap.set(id, stableNode);
+            }
+        }
+        
+        // Build nodes array from stableNodeMap, keeping only nodes in current dataset
+        // IMPORTANT: Only modify if the set of nodes actually changed
+        const currentIds = new Set(rawNodes.map(n => n.id));
+        const existingNodesInArray = new Set(stableNodesArray.map(n => n.id));
+        
+        // Check if we need to rebuild the array
+        let needsRebuild = stableNodesArray.length !== currentIds.size;
+        if (!needsRebuild) {
+            for (const id of currentIds) {
+                if (!existingNodesInArray.has(id)) {
+                    needsRebuild = true;
+                    break;
+                }
+            }
+        }
+        
+        if (needsRebuild) {
+            stableNodesArray.length = 0; // Clear but keep same array reference
+            for (const [id, node] of stableNodeMap) {
+                if (currentIds.has(id)) {
+                    stableNodesArray.push(node);
+                }
+            }
+        }
 
-        const nodeIds = new Set(nodes.map(n => n.id));
+        const nodeIds = currentIds;
 
         // Filter links to those with valid endpoints, then apply maxEdges
         const filteredLinks = rawLinks.filter(l => {
@@ -471,24 +589,57 @@ function GraphVisualization({ graphData, onNodeClick, onNodeHover, vizConfig, re
             ? filteredLinks.slice(0, maxEdges)
             : filteredLinks;
 
-        // Normalize source/target
-        const links = limitedLinks.map(l => {
+        // Build link keys for current dataset
+        const currentLinkKeys = new Set();
+        for (const l of limitedLinks) {
             const s = l.source || l.src;
             const t = l.target || l.dst;
             const sid = typeof s === 'object' && s !== null ? s.id : s;
             const tid = typeof t === 'object' && t !== null ? t.id : t;
-            return {
-                ...l,
-                // Canonicalize endpoints to node IDs so the force engine and renderer
-                // never see stale/foreign node objects.
-                source: sid,
-                target: tid,
-                _sid: sid,
-                _tid: tid,
-            };
-        });
+            const linkKey = `${sid}->${tid}`;
+            currentLinkKeys.add(linkKey);
+            
+            let stableLink = stableLinkMap.get(linkKey);
+            if (stableLink) {
+                // Update in place
+                stableLink.isOnPath = l.isOnPath;
+                stableLink.isActivePath = l.isActivePath;
+                stableLink.type = l.type;
+                stableLink.pz_type = l.pz_type;
+            } else {
+                stableLink = {
+                    ...l,
+                    source: sid,
+                    target: tid,
+                    _sid: sid,
+                    _tid: tid,
+                };
+                stableLinkMap.set(linkKey, stableLink);
+            }
+        }
+        
+        // Only rebuild links array if the set of links actually changed
+        const existingLinksInArray = new Set(stableLinksArray.map(l => `${l._sid}->${l._tid}`));
+        let linksNeedRebuild = stableLinksArray.length !== currentLinkKeys.size;
+        if (!linksNeedRebuild) {
+            for (const key of currentLinkKeys) {
+                if (!existingLinksInArray.has(key)) {
+                    linksNeedRebuild = true;
+                    break;
+                }
+            }
+        }
+        
+        if (linksNeedRebuild) {
+            stableLinksArray.length = 0;
+            for (const [key, link] of stableLinkMap) {
+                if (currentLinkKeys.has(key)) {
+                    stableLinksArray.push(link);
+                }
+            }
+        }
 
-        return { nodes, links, depthMap };
+        return { nodes: stableNodesArray, links: stableLinksArray, depthMap };
     }, [graphData, vizConfig?.maxEdges]);
 
     // Compute RENDER properties — updates in-place on the existing nodes/links when vizConfig changes.
@@ -554,14 +705,20 @@ function GraphVisualization({ graphData, onNodeClick, onNodeHover, vizConfig, re
             l._arrowLen = isPath ? 4 : (isLowQuality ? 0 : (l._isReference ? 3 : 0));
         }
 
-        // Rendering should only receive visible links.
-        // This avoids expensive per-frame work inside react-force-graph on huge graphs
-        // (it checks link arrays for particles/needsRedraw even when links are hidden).
-        const renderLinks = links.filter(l => l?._visibleDraw !== false);
+        // Build render links array - use stable array, clear and repopulate
+        const prevRenderLength = stableRenderLinksArray.length;
+        stableRenderLinksArray.length = 0;
+        for (const l of links) {
+            if (l?._visibleDraw !== false) {
+                stableRenderLinksArray.push(l);
+            }
+        }
+        if (prevRenderLength !== stableRenderLinksArray.length) {
+            console.log('[GraphViz] Render links count changed:', prevRenderLength, '->', stableRenderLinksArray.length);
+        }
 
-        // Return SAME nodes array, but a filtered render link array.
-        // Keep `allLinks` for force simulation / counters.
-        return { nodes, links: renderLinks, allLinks: links };
+        // Return SAME arrays. Keep `allLinks` for force simulation / counters.
+        return { nodes, links: stableRenderLinksArray, allLinks: links };
     }, [
         structuralData,
         vizConfig?.nodeTypeSettings,
@@ -601,64 +758,92 @@ function GraphVisualization({ graphData, onNodeClick, onNodeHover, vizConfig, re
         return edges >= 100000;
     }, [data.allLinks?.length, data.links?.length]);
 
-    // Data to pass to ForceGraph2D: for huge graphs, pass empty links array
-    // to eliminate all internal link processing overhead (we draw links ourselves).
-    // Note: The threshold here matches useCustomLinkRender (20k edges) so we only
-    // strip links when we have a custom renderer to draw them.
+    // Data to pass to ForceGraph2D: Use the STABLE object reference.
+    // CRITICAL: react-force-graph-2d will restart the simulation if it sees a NEW object.
+    // By always returning the SAME object reference, we prevent simulation restarts.
+    // We just mutate .nodes and .links to point to our stable arrays.
     const forceGraphData = useMemo(() => {
         const edges = data.allLinks?.length || data.links?.length || 0;
         const willUseCustomRender = edges >= 20000;
-        if (hugeGraph && willUseCustomRender) {
-            // Pass nodes + empty links to the library; we draw all links in onRenderFramePre
-            return { nodes: data.nodes, links: [] };
+        
+        // Check if arrays are already correctly assigned (same reference)
+        const nodesAlreadySet = stableForceGraphData.nodes === data.nodes;
+        const targetLinks = (hugeGraph && willUseCustomRender) ? [] : data.links;
+        const linksAlreadySet = stableForceGraphData.links === targetLinks || 
+                               (Array.isArray(stableForceGraphData.links) && 
+                                Array.isArray(targetLinks) && 
+                                stableForceGraphData.links.length === 0 && 
+                                targetLinks.length === 0);
+        
+        // Only update if something actually changed
+        if (!nodesAlreadySet || !linksAlreadySet) {
+            // DEBUG logging
+            if (!nodesAlreadySet) {
+                console.log('[GraphViz] Updating nodes reference:', 
+                    stableForceGraphData.nodes?.length, '->', data.nodes?.length);
+            }
+            if (!linksAlreadySet) {
+                console.log('[GraphViz] Updating links reference:', 
+                    stableForceGraphData.links?.length, '->', targetLinks?.length);
+            }
+            
+            stableForceGraphData.nodes = data.nodes;
+            stableForceGraphData.links = targetLinks;
         }
-        return data;
+        
+        // Return the SAME object reference every time
+        return stableForceGraphData;
     }, [data, hugeGraph]);
 
-    // Ensure simulation starts when component mounts with data
-    // This effect handles the initial load case
+    // Ensure simulation starts when component FIRST mounts with data
+    // This effect handles ONLY the initial load - never on step changes
     useEffect(() => {
         const fg = fgRef.current;
         if (!fg || !data.nodes?.length) return;
+        
+        // Only initialize ONCE per component lifecycle
+        if (hasInitializedRef.current) return;
+        hasInitializedRef.current = true;
         
         // Small delay to ensure ForceGraph2D has fully initialized
         const timer = setTimeout(() => {
             fg.d3ReheatSimulation();
         }, 100);
-        
         return () => clearTimeout(timer);
-    }, [data.nodes?.length]); // Only re-run when node count changes
+    }, [data.nodes?.length]);
 
-    // Break the default grid initialization on graph load.
-    // react-force-graph initializes nodes in a grid if x/y are missing.
-    // For dense graphs, that symmetry + centering yields the "solid disk" look.
-    // We use a deterministic, size-aware initializer so large graphs start spread out.
-    //
-    // IMPORTANT: Only depend on STRUCTURAL data changes and layout-relevant config,
-    // NOT color/style settings. Otherwise changing colors restarts the simulation.
+    // Initialize positions for nodes that don't have them yet
+    // This runs only when there are genuinely new nodes without positions
     useEffect(() => {
         const fg = fgRef.current;
         if (!fg) return;
         const { nodes } = data;
         if (!nodes?.length) return;
 
-        const hasAnyPosition = nodes.some(n => typeof n.x === 'number' && typeof n.y === 'number');
-        if (hasAnyPosition) return;
-
+        // Find nodes without valid positions
+        const nodesNeedingInit = nodes.filter(n => 
+            typeof n.x !== 'number' || typeof n.y !== 'number' || isNaN(n.x) || isNaN(n.y)
+        );
+        
+        // If no nodes need initialization, do nothing
+        if (nodesNeedingInit.length === 0) return;
+        
+        // If most nodes already have positions, only init the new ones (no reheat)
+        const positionRatio = (nodes.length - nodesNeedingInit.length) / nodes.length;
+        
         initializeNodePositions({
-            nodes,
+            nodes: nodesNeedingInit,
             width: dimensions.width,
             height: dimensions.height,
             vizConfig,
         });
 
-        if (vizConfig?.runLayout) {
+        // Only reheat if this is a major change (>50% new nodes)
+        if (positionRatio < 0.5 && vizConfig?.runLayout) {
             fg.d3ReheatSimulation();
-        } else {
-            fg.refresh?.();
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [data.nodes?.length, vizConfig?.runLayout, dimensions.width, dimensions.height]);
+    }, [data.nodes?.length, dimensions.width, dimensions.height]);
 
     // Layout configuration
     // Removed dagMode/dagLevelDistance as we are focusing on pure force layout per user request.
@@ -784,10 +969,13 @@ function GraphVisualization({ graphData, onNodeClick, onNodeHover, vizConfig, re
         // Note: d3VelocityDecay is handled via prop
     ]);
 
-    // Auto-fit on graph load (only when layout is running)
+    // Auto-fit on initial load only (not on every step change!)
     useEffect(() => {
         const fg = fgRef.current;
-        if (!fg || !vizConfig?.runLayout) return;
+        if (!fg || !vizConfig?.runLayout || !data.nodes?.length) return;
+        if (hasAutoFitRef.current) return; // Only auto-fit once
+        hasAutoFitRef.current = true;
+        
         // Let a few frames render before fitting
         const t = setTimeout(() => {
             try {
@@ -795,9 +983,9 @@ function GraphVisualization({ graphData, onNodeClick, onNodeHover, vizConfig, re
             } catch (_) {
                 // ignore
             }
-        }, 200);
+        }, 500);
         return () => clearTimeout(t);
-    }, [data, vizConfig?.runLayout]);
+    }, [vizConfig?.runLayout, data.nodes?.length]);
 
     useEffect(() => {
         const fg = fgRef.current;
@@ -805,7 +993,7 @@ function GraphVisualization({ graphData, onNodeClick, onNodeHover, vizConfig, re
 
         if (vizConfig?.runLayout) {
             fg.resumeAnimation?.();
-            fg.d3ReheatSimulation();
+            // Don't reheat on every runLayout toggle - let it continue from current state
         } else {
             fg.pauseAnimation?.();
         }
@@ -853,11 +1041,23 @@ function GraphVisualization({ graphData, onNodeClick, onNodeHover, vizConfig, re
         // Skip hidden nodes
         if (node._visibleDraw === false) return;
 
-        // Viewport culling - skip nodes outside visible area (uses pre-computed bounds)
-        const vp = viewportRef.current;
-        if (vp.valid && (node.x < vp.minX || node.x > vp.maxX || node.y < vp.minY || node.y > vp.maxY)) {
-            return; // Skip off-screen nodes
+        // Skip nodes without valid positions (not yet laid out)
+        if (typeof node.x !== 'number' || typeof node.y !== 'number' || isNaN(node.x) || isNaN(node.y)) {
+            return;
         }
+
+        // TEMPORARILY DISABLED viewport culling - debugging missing nodes
+        // Viewport culling - skip nodes outside visible area (uses pre-computed bounds)
+        // Only cull if we have a valid viewport AND node has settled position
+        // const vp = viewportRef.current;
+        // if (vp.valid) {
+        //     // Add generous padding for nodes near edges
+        //     const nodeRadius = (node.val || 5) * 3;
+        //     if (node.x < vp.minX - nodeRadius || node.x > vp.maxX + nodeRadius || 
+        //         node.y < vp.minY - nodeRadius || node.y > vp.maxY + nodeRadius) {
+        //         return; // Skip off-screen nodes
+        //     }
+        // }
 
         const perfEnabled = perfRef.current.enabled;
         const sampleStride = perfRef.current.nodeSampleStride || 10;
@@ -1053,6 +1253,23 @@ function GraphVisualization({ graphData, onNodeClick, onNodeHover, vizConfig, re
     const viewportRef = useRef({ minX: -Infinity, minY: -Infinity, maxX: Infinity, maxY: Infinity, valid: false });
 
     const onRenderFramePre = useCallback((ctx, globalScale) => {
+        // Save positions continuously for smooth transitions
+        const fg = fgRef.current;
+        if (fg && typeof fg.graphData === 'function') {
+            try {
+                const currentData = fg.graphData();
+                if (currentData?.nodes) {
+                    currentData.nodes.forEach(n => {
+                        if (typeof n.x === 'number' && typeof n.y === 'number' && !isNaN(n.x) && !isNaN(n.y)) {
+                            positionCacheRef.current.set(n.id, { x: n.x, y: n.y, vx: n.vx || 0, vy: n.vy || 0 });
+                        }
+                    });
+                }
+            } catch (e) {
+                // Ignore
+            }
+        }
+
         const vpStart = performance.now();
         // Compute viewport bounds ONCE per frame for culling (not per-node!)
         try {
@@ -1060,7 +1277,8 @@ function GraphVisualization({ graphData, onNodeClick, onNodeHover, vizConfig, re
             const invScale = 1 / Math.max(transform.a, 0.001);
             const canvasW = ctx.canvas.width / (window.devicePixelRatio || 1);
             const canvasH = ctx.canvas.height / (window.devicePixelRatio || 1);
-            const pad = 50 * invScale;
+            // Generous padding to avoid edge clipping
+            const pad = 150 * invScale;
             viewportRef.current = {
                 minX: -transform.e * invScale - pad,
                 minY: -transform.f * invScale - pad,
