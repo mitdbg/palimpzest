@@ -180,7 +180,7 @@ LOG_LLM_OUTPUT = False
 
 # Previously Model
 # ENUMS
-class ConfiguredModel(str, Enum):
+class CuratedModel(str, Enum):
     """
     Model describes the underlying LLM which should be used to perform some operation
     which requires invoking an LLM. It does NOT specify whether the model need be executed
@@ -234,10 +234,10 @@ class ConfiguredModel(str, Enum):
         return "text-embedding" in self.value.lower()
 
     def is_o_model(self):
-        return self in [ConfiguredModel.o4_MINI]
+        return self in [CuratedModel.o4_MINI]
 
     def is_gpt_5_model(self):
-        return self in [ConfiguredModel.GPT_5, ConfiguredModel.GPT_5_MINI, ConfiguredModel.GPT_5_NANO]
+        return self in [CuratedModel.GPT_5, CuratedModel.GPT_5_MINI, CuratedModel.GPT_5_NANO]
 
     def is_openai_model(self):
         return "openai" in self.value.lower() or self.is_text_embedding_model()
@@ -256,55 +256,55 @@ class ConfiguredModel(str, Enum):
 
     def is_reasoning_model(self):
         reasoning_models = [
-            ConfiguredModel.GPT_5,
-            ConfiguredModel.GPT_5_MINI, ConfiguredModel.GPT_5_NANO, ConfiguredModel.o4_MINI,
-            ConfiguredModel.GEMINI_2_5_PRO, ConfiguredModel.GEMINI_2_5_FLASH,
-            ConfiguredModel.GOOGLE_GEMINI_2_5_PRO, ConfiguredModel.GOOGLE_GEMINI_2_5_FLASH, ConfiguredModel.GOOGLE_GEMINI_2_5_FLASH_LITE,
-            ConfiguredModel.CLAUDE_3_7_SONNET,
+            CuratedModel.GPT_5,
+            CuratedModel.GPT_5_MINI, CuratedModel.GPT_5_NANO, CuratedModel.o4_MINI,
+            CuratedModel.GEMINI_2_5_PRO, CuratedModel.GEMINI_2_5_FLASH,
+            CuratedModel.GOOGLE_GEMINI_2_5_PRO, CuratedModel.GOOGLE_GEMINI_2_5_FLASH, CuratedModel.GOOGLE_GEMINI_2_5_FLASH_LITE,
+            CuratedModel.CLAUDE_3_7_SONNET,
         ]
         return self in reasoning_models
 
     def is_text_model(self):
         non_text_models = [
-            ConfiguredModel.LLAMA3_2_90B_V,
-            ConfiguredModel.CLIP_VIT_B_32, ConfiguredModel.TEXT_EMBEDDING_3_SMALL,
-            ConfiguredModel.GPT_4o_AUDIO_PREVIEW, ConfiguredModel.GPT_4o_MINI_AUDIO_PREVIEW,
+            CuratedModel.LLAMA3_2_90B_V,
+            CuratedModel.CLIP_VIT_B_32, CuratedModel.TEXT_EMBEDDING_3_SMALL,
+            CuratedModel.GPT_4o_AUDIO_PREVIEW, CuratedModel.GPT_4o_MINI_AUDIO_PREVIEW,
         ]
         return self not in non_text_models
 
     # TODO: I think SONNET and HAIKU are vision-capable too
     def is_vision_model(self):
         return self in [
-            ConfiguredModel.LLAMA3_2_90B_V, ConfiguredModel.LLAMA_4_MAVERICK,
-            ConfiguredModel.GPT_4o, ConfiguredModel.GPT_4o_MINI, ConfiguredModel.GPT_4_1, ConfiguredModel.GPT_4_1_MINI, ConfiguredModel.GPT_4_1_NANO, ConfiguredModel.o4_MINI, ConfiguredModel.GPT_5, ConfiguredModel.GPT_5_MINI, ConfiguredModel.GPT_5_NANO,
-            ConfiguredModel.GEMINI_2_0_FLASH, ConfiguredModel.GEMINI_2_5_FLASH, ConfiguredModel.GEMINI_2_5_PRO,
-            ConfiguredModel.GOOGLE_GEMINI_2_5_PRO, ConfiguredModel.GOOGLE_GEMINI_2_5_FLASH, ConfiguredModel.GOOGLE_GEMINI_2_5_FLASH_LITE,
+            CuratedModel.LLAMA3_2_90B_V, CuratedModel.LLAMA_4_MAVERICK,
+            CuratedModel.GPT_4o, CuratedModel.GPT_4o_MINI, CuratedModel.GPT_4_1, CuratedModel.GPT_4_1_MINI, CuratedModel.GPT_4_1_NANO, CuratedModel.o4_MINI, CuratedModel.GPT_5, CuratedModel.GPT_5_MINI, CuratedModel.GPT_5_NANO,
+            CuratedModel.GEMINI_2_0_FLASH, CuratedModel.GEMINI_2_5_FLASH, CuratedModel.GEMINI_2_5_PRO,
+            CuratedModel.GOOGLE_GEMINI_2_5_PRO, CuratedModel.GOOGLE_GEMINI_2_5_FLASH, CuratedModel.GOOGLE_GEMINI_2_5_FLASH_LITE,
         ]
 
     def is_audio_model(self):
         return self in [
-            ConfiguredModel.GPT_4o_AUDIO_PREVIEW, ConfiguredModel.GPT_4o_MINI_AUDIO_PREVIEW,
-            ConfiguredModel.GEMINI_2_0_FLASH, ConfiguredModel.GEMINI_2_5_FLASH, ConfiguredModel.GEMINI_2_5_PRO,
-            ConfiguredModel.GOOGLE_GEMINI_2_5_PRO, ConfiguredModel.GOOGLE_GEMINI_2_5_FLASH, ConfiguredModel.GOOGLE_GEMINI_2_5_FLASH_LITE,
+            CuratedModel.GPT_4o_AUDIO_PREVIEW, CuratedModel.GPT_4o_MINI_AUDIO_PREVIEW,
+            CuratedModel.GEMINI_2_0_FLASH, CuratedModel.GEMINI_2_5_FLASH, CuratedModel.GEMINI_2_5_PRO,
+            CuratedModel.GOOGLE_GEMINI_2_5_PRO, CuratedModel.GOOGLE_GEMINI_2_5_FLASH, CuratedModel.GOOGLE_GEMINI_2_5_FLASH_LITE,
         ]
 
     def is_text_image_multimodal_model(self):
         return self in [
-            ConfiguredModel.LLAMA_4_MAVERICK,
-            ConfiguredModel.GPT_4o, ConfiguredModel.GPT_4o_MINI, ConfiguredModel.GPT_4_1, ConfiguredModel.GPT_4_1_MINI, ConfiguredModel.GPT_4_1_NANO, ConfiguredModel.o4_MINI, ConfiguredModel.GPT_5, ConfiguredModel.GPT_5_MINI, ConfiguredModel.GPT_5_NANO,
-            ConfiguredModel.GEMINI_2_0_FLASH, ConfiguredModel.GEMINI_2_5_FLASH, ConfiguredModel.GEMINI_2_5_PRO,
-            ConfiguredModel.GOOGLE_GEMINI_2_5_PRO, ConfiguredModel.GOOGLE_GEMINI_2_5_FLASH, ConfiguredModel.GOOGLE_GEMINI_2_5_FLASH_LITE,
+            CuratedModel.LLAMA_4_MAVERICK,
+            CuratedModel.GPT_4o, CuratedModel.GPT_4o_MINI, CuratedModel.GPT_4_1, CuratedModel.GPT_4_1_MINI, CuratedModel.GPT_4_1_NANO, CuratedModel.o4_MINI, CuratedModel.GPT_5, CuratedModel.GPT_5_MINI, CuratedModel.GPT_5_NANO,
+            CuratedModel.GEMINI_2_0_FLASH, CuratedModel.GEMINI_2_5_FLASH, CuratedModel.GEMINI_2_5_PRO,
+            CuratedModel.GOOGLE_GEMINI_2_5_PRO, CuratedModel.GOOGLE_GEMINI_2_5_FLASH, CuratedModel.GOOGLE_GEMINI_2_5_FLASH_LITE,
         ]
 
     def is_text_audio_multimodal_model(self):
         return self in [
-            ConfiguredModel.GPT_4o_AUDIO_PREVIEW, ConfiguredModel.GPT_4o_MINI_AUDIO_PREVIEW,
-            ConfiguredModel.GEMINI_2_0_FLASH, ConfiguredModel.GEMINI_2_5_FLASH, ConfiguredModel.GEMINI_2_5_PRO,
-            ConfiguredModel.GOOGLE_GEMINI_2_5_PRO, ConfiguredModel.GOOGLE_GEMINI_2_5_FLASH, ConfiguredModel.GOOGLE_GEMINI_2_5_FLASH_LITE,
+            CuratedModel.GPT_4o_AUDIO_PREVIEW, CuratedModel.GPT_4o_MINI_AUDIO_PREVIEW,
+            CuratedModel.GEMINI_2_0_FLASH, CuratedModel.GEMINI_2_5_FLASH, CuratedModel.GEMINI_2_5_PRO,
+            CuratedModel.GOOGLE_GEMINI_2_5_PRO, CuratedModel.GOOGLE_GEMINI_2_5_FLASH, CuratedModel.GOOGLE_GEMINI_2_5_FLASH_LITE,
         ]
 
     def is_embedding_model(self):
-        return self in [ConfiguredModel.CLIP_VIT_B_32, ConfiguredModel.TEXT_EMBEDDING_3_SMALL]
+        return self in [CuratedModel.CLIP_VIT_B_32, CuratedModel.TEXT_EMBEDDING_3_SMALL]
 
 
 
@@ -324,7 +324,7 @@ class ConfiguredModel(str, Enum):
 # - https://artificialanalysis.ai/models/llama-3-1-instruct-8b
 #
 LLAMA3_2_3B_INSTRUCT_MODEL_CARD = {
-    ##### Cost in USD #####
+    ##### Cost in USD ##### 
     "usd_per_input_token": 0.06 / 1e6,
     "usd_per_output_token": 0.06 / 1e6,
     ##### Time #####
@@ -602,35 +602,35 @@ VLLM_QWEN_1_5_0_5B_CHAT_MODEL_CARD = {
 }
 
 MODEL_CARDS = {
-    ConfiguredModel.LLAMA3_2_3B.value: LLAMA3_2_3B_INSTRUCT_MODEL_CARD,
-    ConfiguredModel.LLAMA3_1_8B.value: LLAMA3_1_8B_INSTRUCT_MODEL_CARD,
-    ConfiguredModel.LLAMA3_3_70B.value: LLAMA3_3_70B_INSTRUCT_MODEL_CARD,
-    ConfiguredModel.LLAMA3_2_90B_V.value: LLAMA3_2_90B_V_MODEL_CARD,
-    ConfiguredModel.DEEPSEEK_V3.value: DEEPSEEK_V3_MODEL_CARD,
-    ConfiguredModel.DEEPSEEK_R1_DISTILL_QWEN_1_5B.value: DEEPSEEK_R1_DISTILL_QWEN_1_5B_MODEL_CARD,
-    ConfiguredModel.GPT_4o.value: GPT_4o_MODEL_CARD,
-    ConfiguredModel.GPT_4o_MINI.value: GPT_4o_MINI_MODEL_CARD,
-    ConfiguredModel.GPT_4o_AUDIO_PREVIEW.value: GPT_4o_AUDIO_PREVIEW_MODEL_CARD,
-    ConfiguredModel.GPT_4o_MINI_AUDIO_PREVIEW.value: GPT_4o_MINI_AUDIO_PREVIEW_MODEL_CARD,
-    ConfiguredModel.GPT_4_1.value: GPT_4_1_MODEL_CARD,
-    ConfiguredModel.GPT_4_1_MINI.value: GPT_4_1_MINI_MODEL_CARD,
-    ConfiguredModel.GPT_4_1_NANO.value: GPT_4_1_NANO_MODEL_CARD,
-    ConfiguredModel.GPT_5.value: GPT_5_MODEL_CARD,
-    ConfiguredModel.GPT_5_MINI.value: GPT_5_MINI_MODEL_CARD,
-    ConfiguredModel.GPT_5_NANO.value: GPT_5_NANO_MODEL_CARD,
-    ConfiguredModel.o4_MINI.value: o4_MINI_MODEL_CARD,
-    # ConfiguredModels.o1.value: o1_MODEL_CARD,
-    ConfiguredModel.TEXT_EMBEDDING_3_SMALL.value: TEXT_EMBEDDING_3_SMALL_MODEL_CARD,
-    ConfiguredModel.CLIP_VIT_B_32.value: CLIP_VIT_B_32_MODEL_CARD,
-    ConfiguredModel.CLAUDE_3_5_SONNET.value: CLAUDE_3_5_SONNET_MODEL_CARD,
-    ConfiguredModel.CLAUDE_3_7_SONNET.value: CLAUDE_3_7_SONNET_MODEL_CARD,
-    ConfiguredModel.CLAUDE_3_5_HAIKU.value: CLAUDE_3_5_HAIKU_MODEL_CARD,
-    ConfiguredModel.GEMINI_2_0_FLASH.value: GEMINI_2_0_FLASH_MODEL_CARD,
-    ConfiguredModel.GEMINI_2_5_FLASH.value: GEMINI_2_5_FLASH_MODEL_CARD,
-    ConfiguredModel.GEMINI_2_5_PRO.value: GEMINI_2_5_PRO_MODEL_CARD,
-    ConfiguredModel.GOOGLE_GEMINI_2_5_FLASH.value: GEMINI_2_5_FLASH_MODEL_CARD,
-    ConfiguredModel.GOOGLE_GEMINI_2_5_FLASH_LITE.value: GEMINI_2_5_FLASH_LITE_MODEL_CARD,
-    ConfiguredModel.GOOGLE_GEMINI_2_5_PRO.value: GEMINI_2_5_PRO_MODEL_CARD,
-    ConfiguredModel.LLAMA_4_MAVERICK.value: LLAMA_4_MAVERICK_MODEL_CARD,
-    ConfiguredModel.VLLM_QWEN_1_5_0_5B_CHAT.value: VLLM_QWEN_1_5_0_5B_CHAT_MODEL_CARD,
+    CuratedModel.LLAMA3_2_3B.value: LLAMA3_2_3B_INSTRUCT_MODEL_CARD,
+    CuratedModel.LLAMA3_1_8B.value: LLAMA3_1_8B_INSTRUCT_MODEL_CARD,
+    CuratedModel.LLAMA3_3_70B.value: LLAMA3_3_70B_INSTRUCT_MODEL_CARD,
+    CuratedModel.LLAMA3_2_90B_V.value: LLAMA3_2_90B_V_MODEL_CARD,
+    CuratedModel.DEEPSEEK_V3.value: DEEPSEEK_V3_MODEL_CARD,
+    CuratedModel.DEEPSEEK_R1_DISTILL_QWEN_1_5B.value: DEEPSEEK_R1_DISTILL_QWEN_1_5B_MODEL_CARD,
+    CuratedModel.GPT_4o.value: GPT_4o_MODEL_CARD,
+    CuratedModel.GPT_4o_MINI.value: GPT_4o_MINI_MODEL_CARD,
+    CuratedModel.GPT_4o_AUDIO_PREVIEW.value: GPT_4o_AUDIO_PREVIEW_MODEL_CARD,
+    CuratedModel.GPT_4o_MINI_AUDIO_PREVIEW.value: GPT_4o_MINI_AUDIO_PREVIEW_MODEL_CARD,
+    CuratedModel.GPT_4_1.value: GPT_4_1_MODEL_CARD,
+    CuratedModel.GPT_4_1_MINI.value: GPT_4_1_MINI_MODEL_CARD,
+    CuratedModel.GPT_4_1_NANO.value: GPT_4_1_NANO_MODEL_CARD,
+    CuratedModel.GPT_5.value: GPT_5_MODEL_CARD,
+    CuratedModel.GPT_5_MINI.value: GPT_5_MINI_MODEL_CARD,
+    CuratedModel.GPT_5_NANO.value: GPT_5_NANO_MODEL_CARD,
+    CuratedModel.o4_MINI.value: o4_MINI_MODEL_CARD,
+    # CuratedModels.o1.value: o1_MODEL_CARD,
+    CuratedModel.TEXT_EMBEDDING_3_SMALL.value: TEXT_EMBEDDING_3_SMALL_MODEL_CARD,
+    CuratedModel.CLIP_VIT_B_32.value: CLIP_VIT_B_32_MODEL_CARD,
+    CuratedModel.CLAUDE_3_5_SONNET.value: CLAUDE_3_5_SONNET_MODEL_CARD,
+    CuratedModel.CLAUDE_3_7_SONNET.value: CLAUDE_3_7_SONNET_MODEL_CARD,
+    CuratedModel.CLAUDE_3_5_HAIKU.value: CLAUDE_3_5_HAIKU_MODEL_CARD,
+    CuratedModel.GEMINI_2_0_FLASH.value: GEMINI_2_0_FLASH_MODEL_CARD,
+    CuratedModel.GEMINI_2_5_FLASH.value: GEMINI_2_5_FLASH_MODEL_CARD,
+    CuratedModel.GEMINI_2_5_PRO.value: GEMINI_2_5_PRO_MODEL_CARD,
+    CuratedModel.GOOGLE_GEMINI_2_5_FLASH.value: GEMINI_2_5_FLASH_MODEL_CARD,
+    CuratedModel.GOOGLE_GEMINI_2_5_FLASH_LITE.value: GEMINI_2_5_FLASH_LITE_MODEL_CARD,
+    CuratedModel.GOOGLE_GEMINI_2_5_PRO.value: GEMINI_2_5_PRO_MODEL_CARD,
+    CuratedModel.LLAMA_4_MAVERICK.value: LLAMA_4_MAVERICK_MODEL_CARD,
+    CuratedModel.VLLM_QWEN_1_5_0_5B_CHAT.value: VLLM_QWEN_1_5_0_5B_CHAT_MODEL_CARD,
 }

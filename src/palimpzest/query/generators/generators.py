@@ -20,12 +20,13 @@ from pydantic.fields import FieldInfo
 from palimpzest.constants import (
     MODEL_CARDS,
     Cardinality,
-    Model,
+    CuratedModel,
     PromptStrategy,
 )
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.models import GenerationStats
 from palimpzest.prompts import PromptFactory
+from palimpzest.utils.model_info import Model
 
 # DEFINITIONS
 GenerationOutput = tuple[dict, str | None, GenerationStats, list[dict]]
@@ -366,9 +367,9 @@ class Generator(Generic[ContextType, InputType]):
             usage = completion.usage.model_dump()
 
             # get cost per input/output token for the model
-            usd_per_input_token = MODEL_CARDS[self.model_name].get("usd_per_input_token", 0.0)
-            usd_per_audio_input_token = MODEL_CARDS[self.model_name].get("usd_per_audio_input_token", 0.0)
-            usd_per_output_token = MODEL_CARDS[self.model_name]["usd_per_output_token"]
+            usd_per_input_token = self.model.get_usd_per_input_token()
+            usd_per_audio_input_token = self.model.get_usd_per_audio_input_token()
+            usd_per_output_token = self.model.get_usd_per_output_token()
 
             # TODO: for some models (e.g. GPT-5) we cannot separate text from image prompt tokens yet;
             #       for now, we only use tokens from prompt_token_details if it's an audio prompt

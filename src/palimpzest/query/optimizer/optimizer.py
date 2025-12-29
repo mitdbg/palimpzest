@@ -73,7 +73,7 @@ class Optimizer:
         self,
         policy: Policy,
         cost_model: BaseCostModel,
-        available_models: list[Model],
+        available_models: list[str],
         join_parallelism: int = 64,
         reasoning_effort: str | None = None,
         api_base: str | None = None,

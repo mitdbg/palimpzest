@@ -17,7 +17,7 @@ from palimpzest.constants import (
     NAIVE_EST_JOIN_SELECTIVITY,
     NAIVE_EST_NUM_INPUT_TOKENS,
     Cardinality,
-    Model,
+    CuratedModel,
     PromptStrategy,
 )
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
@@ -25,6 +25,7 @@ from palimpzest.core.lib.schemas import AUDIO_FIELD_TYPES, IMAGE_FIELD_TYPES, Im
 from palimpzest.core.models import GenerationStats, OperatorCostEstimates, RecordOpStats
 from palimpzest.query.generators.generators import Generator
 from palimpzest.query.operators.physical import PhysicalOperator
+from palimpzest.utils.model_info import Model
 
 
 class Singleton:
@@ -407,18 +408,19 @@ class NestedLoopsJoin(LLMJoin):
 
         # get est. of conversion time per record from model card;
         model_conversion_time_per_record = (
-            MODEL_CARDS[self.model.value]["seconds_per_output_token"] * est_num_output_tokens
+            self.model.get_seconds_per_output_token() * est_num_output_tokens
         )
 
         # get est. of conversion cost (in USD) per record from model card
         usd_per_input_token = (
-            MODEL_CARDS[self.model.value]["usd_per_audio_input_token"]
+            self.model.get_usd_per_audio_input_token()
             if self.is_audio_op()
-            else MODEL_CARDS[self.model.value]["usd_per_input_token"]
+            else self.model.get_usd_per_input_token()
         )
+
         model_conversion_usd_per_record = (
             usd_per_input_token * est_num_input_tokens
-            + MODEL_CARDS[self.model.value]["usd_per_output_token"] * est_num_output_tokens
+            + self.model.get_usd_per_output_token * est_num_output_tokens
         )
 
         # estimate output cardinality using a constant assumption of the filter selectivity
@@ -426,7 +428,7 @@ class NestedLoopsJoin(LLMJoin):
         cardinality = selectivity * (left_source_op_cost_estimates.cardinality * right_source_op_cost_estimates.cardinality)
 
         # estimate quality of output based on the strength of the model being used
-        quality = (MODEL_CARDS[self.model.value]["overall"] / 100.0)
+        quality = (self.model.get_overall_score() / 100.0)
 
         return OperatorCostEstimates(
             cardinality=cardinality,
@@ -507,7 +509,7 @@ class EmbeddingJoin(LLMJoin):
             for field_name, field in self.input_schema.model_fields.items()
             if field_name.split(".")[-1] in self.get_input_fields()
         ])
-        self.embedding_model = Model.TEXT_EMBEDDING_3_SMALL if self.text_only else Model.CLIP_VIT_B_32
+        self.embedding_model = Model(CuratedModel.TEXT_EMBEDDING_3_SMALL.value) if self.text_only else Model(CuratedModel.CLIP_VIT_B_32)
         self.locks = Locks()
 
         # keep track of embedding costs that could not be amortized if no output records were produced
@@ -560,7 +562,7 @@ class EmbeddingJoin(LLMJoin):
 
         # get est. of conversion time per record from model card;
         model_conversion_time_per_record = (
-            MODEL_CARDS[self.embedding_model.value]["seconds_per_output_token"] * est_num_output_tokens
+            self.embedding_model.get_seconds_per_output_token() * est_num_output_tokens
         )
 
         # get est. of conversion cost (in USD) per record from model card
@@ -617,8 +619,7 @@ class EmbeddingJoin(LLMJoin):
             embeddings /= num_input_fields_present
 
         # compute cost of embedding(s)
-        model_card = MODEL_CARDS[self.embedding_model.value]
-        total_embedding_cost = model_card["usd_per_input_token"] * total_embedding_input_tokens
+        total_embedding_cost = self.model.get_usd_per_input_token() * total_embedding_input_tokens
         embedding_gen_stats = GenerationStats(
             model_name=self.embedding_model.value,
             total_input_tokens=0.0,

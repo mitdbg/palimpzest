@@ -1,6 +1,7 @@
 import yaml, time, requests, subprocess
 
-from palimpzest.constants import MODEL_CARDS, ConfiguredModel
+from palimpzest.constants import MODEL_CARDS, CuratedModel
+from palimpzest.utils.model_helpers import predict_model_specs
 
 CONFIG_FILENAME = "litellm_config.yaml"
 PROXY_PORT = 4000
@@ -26,7 +27,7 @@ def _get_model_provider(model_name: str):
     # default
     return "unknown" # TODO: throw exception
 
-# TODO: consider making model provider names into an enum
+# TODO: consider making model provider names into a dictionary
 def _infer_api_key(model_name):
     model_provider = _get_model_provider(model_name)
     if model_provider == "openai": return "os.environ/OPENAI_API_KEY"
@@ -34,7 +35,8 @@ def _infer_api_key(model_name):
     elif model_provider == "gemini": return "os.environ/GEMINI_API_KEY"
     elif model_provider == "together_ai": return "os.environ/TOGETHER_API_KEY"
     elif model_provider == "vertex_ai": return "os.environ/GOOGLE_APPLICATION_CREDENTIALS"
-    elif model_provider == "unknonw": return "" # TODO: exception
+    # Expand the list of API keys
+    return ""
 
 def _generate_config_yaml(available_models, filename):
     config_list = []
@@ -103,6 +105,17 @@ class Model(str):
     def __new__(cls, value):
         return super(Model, cls).__new__(cls, value)
     
+    def __init__(self, value, prediction=None):
+        self.prediction = predict_model_specs(str)
+        # prediction = {
+        #     "usd_per_1m_input": 0.50,
+        #     "usd_per_1m_output": 1.50,
+        #     "usd_per_1m_audio_input": None, # Only set for multimodal
+        #     "seconds_per_output_token": 0.02, # ~50 tokens/sec
+        #     "mmlu_pro_score": 40.0,
+        #     "tier": "Standard"
+        # }
+    
     @property
     def value(self):
         return self
@@ -131,24 +144,20 @@ class Model(str):
     def is_google_ai_studio_model(self):
         return _get_model_provider() == "gemini"
 
-    # unchanged
     def is_text_embedding_model(self):
         return "text-embedding" in self.lower()
     
-    # unchanged
     def is_vllm_model(self):
         return "hosted_vllm" in self.lower()
 
-    # unchanged
     def is_o_model(self):
-        return self in {ConfiguredModel.o4_MINI.value}
+        return self in {CuratedModel.o4_MINI.value}
     
-    # unchanged
     def is_gpt_5_model(self):
         gpt_5_models = {
-            ConfiguredModel.GPT_5.value,
-            ConfiguredModel.GPT_5_MINI.value,
-            ConfiguredModel.GPT_5_NANO.value
+            CuratedModel.GPT_5.value,
+            CuratedModel.GPT_5_MINI.value,
+            CuratedModel.GPT_5_NANO.value
         }
         return self.value in gpt_5_models
 
@@ -158,16 +167,16 @@ class Model(str):
             return info["supports_reasoning"]
         # configured list
         known_reasoning_models = {
-            ConfiguredModel.GPT_5.value,
-            ConfiguredModel.GPT_5_MINI.value,
-            ConfiguredModel.GPT_5_NANO.value,
-            ConfiguredModel.o4_MINI.value,
-            ConfiguredModel.GEMINI_2_5_PRO.value,
-            ConfiguredModel.GEMINI_2_5_FLASH.value,
-            ConfiguredModel.GOOGLE_GEMINI_2_5_PRO.value,
-            ConfiguredModel.GOOGLE_GEMINI_2_5_FLASH.value,
-            ConfiguredModel.GOOGLE_GEMINI_2_5_FLASH_LITE.value,
-            ConfiguredModel.CLAUDE_3_7_SONNET.value,
+            CuratedModel.GPT_5.value,
+            CuratedModel.GPT_5_MINI.value,
+            CuratedModel.GPT_5_NANO.value,
+            CuratedModel.o4_MINI.value,
+            CuratedModel.GEMINI_2_5_PRO.value,
+            CuratedModel.GEMINI_2_5_FLASH.value,
+            CuratedModel.GOOGLE_GEMINI_2_5_PRO.value,
+            CuratedModel.GOOGLE_GEMINI_2_5_FLASH.value,
+            CuratedModel.GOOGLE_GEMINI_2_5_FLASH_LITE.value,
+            CuratedModel.CLAUDE_3_7_SONNET.value,
         }
         return self.value in known_reasoning_models
     
@@ -178,7 +187,7 @@ class Model(str):
             return info["supports_vision"]
         # configured list
         try:
-            configured_model = ConfiguredModel(self.value)
+            configured_model = CuratedModel(self.value)
             return configured_model.is_vision_model()
         except Exception:
             return False
@@ -189,7 +198,7 @@ class Model(str):
             return info["supports_audio_input"]
         # configured list
         try:
-            configured_model = ConfiguredModel(self.value)
+            configured_model = CuratedModel(self.value)
             return configured_model.is_audio_model()
         except Exception:
             return False # default
@@ -200,7 +209,7 @@ class Model(str):
             return info["mode"] in ["chat", "completion"]
         # configured list
         try:
-            configured_model = ConfiguredModel(self.value)
+            configured_model = CuratedModel(self.value)
             return configured_model.is_text_model(self)
         except Exception:
             return False # default
@@ -210,7 +219,7 @@ class Model(str):
         if "mode" in info:
             return info["mode"] == "embedding"
         try:
-            configured_model = ConfiguredModel(self.value)
+            configured_model = CuratedModel(self.value)
             return configured_model.is_embedding_model(self)
         except Exception:
             return False # default
@@ -227,7 +236,7 @@ class Model(str):
             return info["input_cost_per_token"]
         if self.value in MODEL_CARDS:
             return MODEL_CARDS[self]["usd_per_input_token"]
-        return 0.0 # TODO: Fill in with estimate
+        return self.prediction["usd_per_1m_input"]/1e6
     
     def get_usd_per_output_token(self):
         info = DYNAMIC_MODEL_INFO(self)
@@ -235,13 +244,13 @@ class Model(str):
             return info["output_cost_per_token"]
         if self.value in MODEL_CARDS:
             return MODEL_CARDS[self]["usd_per_output_token"]
-        return 0.0 # TODO: Fill in with estimate
+        return self.prediction["usd_per_1m_input"]/1e6
     
     def get_seconds_per_output_token(self):
         # LiteLLM endpoint doesn't provide information on the latency
         if self.value in MODEL_CARDS:
             return MODEL_CARDS[self]["seconds_per_output_token"]
-        return 0.00 # TODO: Fill in with estimate
+        return self.prediction["seconds_per_output_token"]
 
     def get_usd_per_audio_input_token(self):
         assert self.is_audio_model(), "model must be an audio model to retrieve audio input token cost"
@@ -250,4 +259,10 @@ class Model(str):
             return info["input_cost_per_audio_token"]
         if self.value in MODEL_CARDS:
             return MODEL_CARDS[self]["usd_per_audio_input_token"]
-        return 0.00 # TODO: Fill in with estimate
+        if self.prediction["usd_per_1m_audio_input"] is not None:
+            return self.prediction["usd_per_1m_audio_input"]/1e6
+    
+    def get_overall_score(self):
+        if self.value in MODEL_CARDS:
+            return MODEL_CARDS[self]["overall"]
+        return self.prediction["mmlu_pro_score"]

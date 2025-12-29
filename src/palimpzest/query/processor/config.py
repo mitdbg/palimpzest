@@ -1,6 +1,6 @@
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from palimpzest.constants import Model
+from palimpzest.utils.model_info import Model, fetch_dynamic_model_info
 from palimpzest.policy import MaxQuality, Policy
 
 
@@ -53,3 +53,31 @@ class QueryProcessorConfig(BaseModel):
     def to_dict(self) -> dict:
         """Convert the config to a dict representation."""
         return self.model_dump()
+
+    @field_validator("available_models", mode="before")
+    @classmethod
+    def convert_available_models(cls, model_list):
+        if model_list is None:
+            # TODO: logic for when the list is None for available models
+            return None
+
+        if not isinstance(model_list, list):
+            raise TypeError("Expected a list of strings")
+
+        if not all(isinstance(model, str) for model in model_list):
+            raise TypeError("Pass in models as strings")
+
+        fetch_dynamic_model_info(model_list)
+        return [Model(model) for model in model_list]
+    
+    # TODO: figure out what remove models parameter is
+    @field_validator("remove_models", mode="before")
+    @classmethod
+    def convert_remove_models(cls, model_list):
+        if not isinstance(model_list, list):
+            raise TypeError("Expected a list of strings")
+
+        if not all(isinstance(model, str) for model in model_list):
+            raise TypeError("Pass in models as strings")
+        
+        return [Model(model) for model in model_list]
