@@ -71,10 +71,9 @@ def predict_model_specs(full_model_id: str) -> Dict[str, Any]:
     """
     
     # 1. Normalize: Remove provider prefix to focus on the model name
-    # e.g., "together_ai/meta-llama/Llama-4-Maverick" -> "llama-4-maverick"
     model_slug = full_model_id.split('/')[-1].lower()
     
-    # Defaults (Baseline: ~GPT-3.5 level)
+    # Defaults (Baseline: approx. GPT-3.5 level)
     prediction = {
         "usd_per_1m_input": 0.50,
         "usd_per_1m_output": 1.50,

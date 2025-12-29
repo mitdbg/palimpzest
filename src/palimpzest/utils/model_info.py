@@ -8,34 +8,88 @@ PROXY_PORT = 4000
 PROXY_URL = f"http://0.0.0.0:{PROXY_PORT}"
 DYNAMIC_MODEL_INFO = {}
 
-def _get_model_provider(model_name: str):
-    model_name = model_name.lower().strip()
-    if "/" in model_name:
-        provider = model_name.split("/", 1)[0]
-        return provider
-    # fallback logic
-    if model_name.startswith(("gpt-", "o1-", "dall-e", "text-embedding")):
-        return "openai"
-    if model_name.startswith("claude"):
-        return "anthropic"
-    # existing logic
-    if "openai" in model_name.lower(): return "openai"
-    if "anthropic" in model_name.lower(): return "anthropic"
-    if "vertex_ai" in model_name.lower(): return "vertex_ai"
-    if "gemini/" in model_name.lower(): return "gemini" # Google AI studio
-    if "together_ai" in model_name.lower(): return "together_ai"
-    # default
-    return "unknown" # TODO: throw exception
+def _get_model_provider(model_name: str) -> str:
+    """
+    Determines the model provider based on the model name string.
+    
+    Resolution Order:
+    1. Explicit 'provider/model' syntax (e.g., 'anthropic/claude-3')
+    2. Known model family prefixes (e.g., 'gpt-4' -> openai)
+    3. Provider substring markers (e.g., 'vertex_ai')
+    """
+    if not model_name:
+        return "unknown"
+    name_clean = model_name.lower().strip()
+    # 1. Handle explicit namespace (e.g., 'openai/gpt-4', 'aws/titan')
+    # This is the standard convention for LangChain, LiteLLM, etc.
+    if "/" in name_clean:
+        return name_clean.split("/", 1)[0]
+    # 2. Map known model families (prefixes) to providers
+    # (Order doesn't strictly matter here as keys are unique enough, but specific > generic)
+    family_map = {
+        ("gpt-", "o1-", "dall-e", "text-embedding", "whisper"): "openai",
+        ("claude",): "anthropic",
+        ("gemini", "gemma", "palm"): "gemini", # Mapped to gemini (or google)
+        ("llama",): "meta", 
+        ("mistral", "mixtral"): "mistral",
+        ("command",): "cohere",
+    }
+    for prefixes, provider in family_map.items():
+        if name_clean.startswith(prefixes):
+            return provider
 
-# TODO: consider making model provider names into a dictionary
-def _infer_api_key(model_name):
+    # 3. Fallback: Check for specific provider markers anywhere in the string
+    # Useful for non-standard names like "hosted_vllm_llama_3"
+    provider_markers = {
+        "openai": "openai",
+        "anthropic": "anthropic",
+        "vertex_ai": "vertex_ai",
+        "together_ai": "together_ai",
+        "gemini": "gemini", 
+        "azure": "azure",
+        "aws": "aws",
+    }
+
+    for marker, provider in provider_markers.items():
+        if marker in name_clean:
+            return provider
+
+    return "unknown"
+
+import os
+
+def _infer_api_key(model_name: str) -> str:
     model_provider = _get_model_provider(model_name)
-    if model_provider == "openai": return "os.environ/OPENAI_API_KEY"
-    elif model_provider == "anthropic": return "os.environ/ANTHROPIC_API_KEY"
-    elif model_provider == "gemini": return "os.environ/GEMINI_API_KEY"
-    elif model_provider == "together_ai": return "os.environ/TOGETHER_API_KEY"
-    elif model_provider == "vertex_ai": return "os.environ/GOOGLE_APPLICATION_CREDENTIALS"
-    # Expand the list of API keys
+    
+    # Special handling for Google/Vertex: Check multiple candidates
+    if model_provider in ["gemini", "vertex_ai"]:
+        # 1. Check if the legacy/specific GEMINI key exists
+        if os.getenv("GEMINI_API_KEY"):
+            return "os.environ/GEMINI_API_KEY"
+        # 2. Check if the standard GOOGLE key exists
+        if os.getenv("GOOGLE_API_KEY"):
+            return "os.environ/GOOGLE_API_KEY"
+        # 3. Default fallback (standardize on GOOGLE_API_KEY)
+        return "os.environ/GOOGLE_API_KEY"
+
+    # Standard 1-to-1 mapping for other providers
+    provider_to_env_var = {
+        "openai": "OPENAI_API_KEY",
+        "anthropic": "ANTHROPIC_API_KEY",
+        "together_ai": "TOGETHER_API_KEY",
+        "azure": "AZURE_OPENAI_API_KEY",
+        "mistral": "MISTRAL_API_KEY",
+        "cohere": "CO_API_KEY",
+        "groq": "GROQ_API_KEY",
+        "huggingface": "HF_TOKEN",
+        "deepseek": "DEEPSEEK_API_KEY",
+        "fireworks": "FIREWORKS_API_KEY"
+    }
+    
+    env_var = provider_to_env_var.get(model_provider)
+    if env_var:
+        return f"os.environ/{env_var}"
+    
     return ""
 
 def _generate_config_yaml(available_models, filename):
@@ -105,16 +159,8 @@ class Model(str):
     def __new__(cls, value):
         return super(Model, cls).__new__(cls, value)
     
-    def __init__(self, value, prediction=None):
+    def __init__(self):
         self.prediction = predict_model_specs(str)
-        # prediction = {
-        #     "usd_per_1m_input": 0.50,
-        #     "usd_per_1m_output": 1.50,
-        #     "usd_per_1m_audio_input": None, # Only set for multimodal
-        #     "seconds_per_output_token": 0.02, # ~50 tokens/sec
-        #     "mmlu_pro_score": 40.0,
-        #     "tier": "Standard"
-        # }
     
     @property
     def value(self):
