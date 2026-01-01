@@ -160,7 +160,7 @@ class Model(str):
         return super(Model, cls).__new__(cls, value)
     
     def __init__(self):
-        self.prediction = predict_model_specs(str)
+        self.prediction = predict_model_specs(self)
     
     @property
     def value(self):
@@ -217,8 +217,12 @@ class Model(str):
             CuratedModel.GPT_5_MINI.value,
             CuratedModel.GPT_5_NANO.value,
             CuratedModel.o4_MINI.value,
+            CuratedModel.GEMINI_3_0_PRO.value,
+            CuratedModel.GEMINI_3_0_FLASH.value,
             CuratedModel.GEMINI_2_5_PRO.value,
             CuratedModel.GEMINI_2_5_FLASH.value,
+            CuratedModel.GEMINI_3_0_FLASH.value,
+            CuratedModel.GEMINI_3_0_PRO.value,
             CuratedModel.GOOGLE_GEMINI_2_5_PRO.value,
             CuratedModel.GOOGLE_GEMINI_2_5_FLASH.value,
             CuratedModel.GOOGLE_GEMINI_2_5_FLASH_LITE.value,

@@ -10,7 +10,7 @@ import datasets
 
 # from ragatouille import RAGPretrainedModel
 import palimpzest as pz
-from palimpzest.constants import Model
+from palimpzest.constants import CuratedModel
 
 biodex_entry_cols = [
     {"name": "pmid", "type": str, "desc": "The PubMed ID of the medical paper"},
@@ -170,14 +170,14 @@ if __name__ == "__main__":
         verbose=verbose,
         available_models=[ # NOTE: unique to cascades run
             # Model.GPT_4o,
-            Model.GPT_4o_MINI,
-            Model.LLAMA3_2_3B,
-            Model.LLAMA3_1_8B,
-            Model.LLAMA3_3_70B,
-            Model.LLAMA3_2_90B_V,
+            CuratedModel.GPT_4o_MINI,
+            CuratedModel.LLAMA3_2_3B,
+            CuratedModel.LLAMA3_1_8B,
+            CuratedModel.LLAMA3_3_70B,
+            CuratedModel.LLAMA3_2_90B_V,
             # Model.MIXTRAL, # NOTE: only available in tag `abacus-paper-experiments`
             # Model.DEEPSEEK_V3,
-            Model.DEEPSEEK_R1_DISTILL_QWEN_1_5B,
+            CuratedModel.DEEPSEEK_R1_DISTILL_QWEN_1_5B,
         ],
         allow_bonded_query=True,
         allow_critic=True,

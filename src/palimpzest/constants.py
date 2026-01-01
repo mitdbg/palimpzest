@@ -200,13 +200,18 @@ class CuratedModel(str, Enum):
     GPT_5 = "openai/gpt-5-2025-08-07"
     GPT_5_MINI = "openai/gpt-5-mini-2025-08-07"
     GPT_5_NANO = "openai/gpt-5-nano-2025-08-07"
+    GPT_5_2 = "openai/gpt-5.2-2025-12-11"
     o4_MINI = "openai/o4-mini-2025-04-16"  # noqa: N815
     CLAUDE_3_5_SONNET = "anthropic/claude-3-5-sonnet-20241022"
     CLAUDE_3_7_SONNET = "anthropic/claude-3-7-sonnet-20250219"
     CLAUDE_3_5_HAIKU = "anthropic/claude-3-5-haiku-20241022"
+    GEMINI_3_0_PRO = "vertex_ai/gemini-3-pro-preview" # image
+    GEMINI_3_0_FLASH = "vertex_ai/gemini-3-flash-12-25" # Text, Image, Video, Audio, and PDF
     GEMINI_2_0_FLASH = "vertex_ai/gemini-2.0-flash"
     GEMINI_2_5_FLASH = "vertex_ai/gemini-2.5-flash"
     GEMINI_2_5_PRO = "vertex_ai/gemini-2.5-pro"
+    GOOGLE_GEMINI_3_0_PRO = "gemini/gemini-3-pro-preview"
+    GOOGLE_GEMINI_3_0_FLASH = "gemini/gemini-3-flash-12-25"
     GOOGLE_GEMINI_2_5_FLASH = "gemini/gemini-2.5-flash"
     GOOGLE_GEMINI_2_5_FLASH_LITE = "gemini/gemini-2.5-flash-lite"
     GOOGLE_GEMINI_2_5_PRO = "gemini/gemini-2.5-pro"
@@ -256,10 +261,11 @@ class CuratedModel(str, Enum):
 
     def is_reasoning_model(self):
         reasoning_models = [
-            CuratedModel.GPT_5,
+            CuratedModel.GPT_5, CuratedModel.GPT_5_2,
             CuratedModel.GPT_5_MINI, CuratedModel.GPT_5_NANO, CuratedModel.o4_MINI,
-            CuratedModel.GEMINI_2_5_PRO, CuratedModel.GEMINI_2_5_FLASH,
+            CuratedModel.GEMINI_2_5_PRO, CuratedModel.GEMINI_2_5_FLASH, CuratedModel.GEMINI_3_0_PRO, CuratedModel.GEMINI_3_0_FLASH,
             CuratedModel.GOOGLE_GEMINI_2_5_PRO, CuratedModel.GOOGLE_GEMINI_2_5_FLASH, CuratedModel.GOOGLE_GEMINI_2_5_FLASH_LITE,
+            CuratedModel.GOOGLE_GEMINI_3_0_PRO, CuratedModel.GOOGLE_GEMINI_3_0_FLASH,
             CuratedModel.CLAUDE_3_7_SONNET,
         ]
         return self in reasoning_models
@@ -275,10 +281,12 @@ class CuratedModel(str, Enum):
     # TODO: I think SONNET and HAIKU are vision-capable too
     def is_vision_model(self):
         return self in [
-            CuratedModel.LLAMA3_2_90B_V, CuratedModel.LLAMA_4_MAVERICK,
+            CuratedModel.LLAMA3_2_90B_V, CuratedModel.LLAMA_4_MAVERICK, CuratedModel.GPT_5_2,
             CuratedModel.GPT_4o, CuratedModel.GPT_4o_MINI, CuratedModel.GPT_4_1, CuratedModel.GPT_4_1_MINI, CuratedModel.GPT_4_1_NANO, CuratedModel.o4_MINI, CuratedModel.GPT_5, CuratedModel.GPT_5_MINI, CuratedModel.GPT_5_NANO,
             CuratedModel.GEMINI_2_0_FLASH, CuratedModel.GEMINI_2_5_FLASH, CuratedModel.GEMINI_2_5_PRO,
             CuratedModel.GOOGLE_GEMINI_2_5_PRO, CuratedModel.GOOGLE_GEMINI_2_5_FLASH, CuratedModel.GOOGLE_GEMINI_2_5_FLASH_LITE,
+            CuratedModel.GEMINI_3_0_FLASH, CuratedModel.GEMINI_3_0_PRO,
+            CuratedModel.GOOGLE_GEMINI_3_0_FLASH, CuratedModel.GOOGLE_GEMINI_3_0_PRO,
         ]
 
     def is_audio_model(self):
@@ -286,21 +294,22 @@ class CuratedModel(str, Enum):
             CuratedModel.GPT_4o_AUDIO_PREVIEW, CuratedModel.GPT_4o_MINI_AUDIO_PREVIEW,
             CuratedModel.GEMINI_2_0_FLASH, CuratedModel.GEMINI_2_5_FLASH, CuratedModel.GEMINI_2_5_PRO,
             CuratedModel.GOOGLE_GEMINI_2_5_PRO, CuratedModel.GOOGLE_GEMINI_2_5_FLASH, CuratedModel.GOOGLE_GEMINI_2_5_FLASH_LITE,
+            CuratedModel.GEMINI_3_0_FLASH, CuratedModel.GOOGLE_GEMINI_3_0_FLASH,
         ]
 
     def is_text_image_multimodal_model(self):
         return self in [
             CuratedModel.LLAMA_4_MAVERICK,
-            CuratedModel.GPT_4o, CuratedModel.GPT_4o_MINI, CuratedModel.GPT_4_1, CuratedModel.GPT_4_1_MINI, CuratedModel.GPT_4_1_NANO, CuratedModel.o4_MINI, CuratedModel.GPT_5, CuratedModel.GPT_5_MINI, CuratedModel.GPT_5_NANO,
-            CuratedModel.GEMINI_2_0_FLASH, CuratedModel.GEMINI_2_5_FLASH, CuratedModel.GEMINI_2_5_PRO,
-            CuratedModel.GOOGLE_GEMINI_2_5_PRO, CuratedModel.GOOGLE_GEMINI_2_5_FLASH, CuratedModel.GOOGLE_GEMINI_2_5_FLASH_LITE,
+            CuratedModel.GPT_4o, CuratedModel.GPT_4o_MINI, CuratedModel.GPT_4_1, CuratedModel.GPT_4_1_MINI, CuratedModel.GPT_4_1_NANO, CuratedModel.o4_MINI, CuratedModel.GPT_5, CuratedModel.GPT_5_MINI, CuratedModel.GPT_5_NANO, CuratedModel.GPT_5_2,
+            CuratedModel.GEMINI_2_0_FLASH, CuratedModel.GEMINI_2_5_FLASH, CuratedModel.GEMINI_2_5_PRO, CuratedModel.GEMINI_3_0_FLASH, CuratedModel.GEMINI_3_0_PRO,
+            CuratedModel.GOOGLE_GEMINI_2_5_PRO, CuratedModel.GOOGLE_GEMINI_2_5_FLASH, CuratedModel.GOOGLE_GEMINI_2_5_FLASH_LITE, CuratedModel.GOOGLE_GEMINI_3_0_FLASH, CuratedModel.GOOGLE_GEMINI_3_0_PRO,
         ]
 
     def is_text_audio_multimodal_model(self):
         return self in [
             CuratedModel.GPT_4o_AUDIO_PREVIEW, CuratedModel.GPT_4o_MINI_AUDIO_PREVIEW,
-            CuratedModel.GEMINI_2_0_FLASH, CuratedModel.GEMINI_2_5_FLASH, CuratedModel.GEMINI_2_5_PRO,
-            CuratedModel.GOOGLE_GEMINI_2_5_PRO, CuratedModel.GOOGLE_GEMINI_2_5_FLASH, CuratedModel.GOOGLE_GEMINI_2_5_FLASH_LITE,
+            CuratedModel.GEMINI_2_0_FLASH, CuratedModel.GEMINI_2_5_FLASH, CuratedModel.GEMINI_2_5_PRO, CuratedModel.GEMINI_3_0_FLASH,
+            CuratedModel.GOOGLE_GEMINI_2_5_PRO, CuratedModel.GOOGLE_GEMINI_2_5_FLASH, CuratedModel.GOOGLE_GEMINI_2_5_FLASH_LITE, CuratedModel.GOOGLE_GEMINI_3_0_FLASH,
         ]
 
     def is_embedding_model(self):
@@ -477,6 +486,17 @@ GPT_5_NANO_MODEL_CARD = {
     ##### Agg. Benchmark #####
     "overall": 77.9,
 }
+GPT_5_2_MODEL_CARD = {
+    # NOTE: it is unclear if the same ($ / token) costs can be applied for vision, or if we have to calculate this ourselves
+    # TODO: needs to add values!
+    ##### Cost in USD #####
+    "usd_per_input_token": 1.75/1e6,
+    "usd_per_output_token": 14/1e6,
+    ##### Time #####
+    "seconds_per_output_token": 0.00,
+    ##### Agg. Benchmark #####
+    "overall": 86.23,
+}
 o4_MINI_MODEL_CARD = {  # noqa: N816
     # NOTE: it is unclear if the same ($ / token) costs can be applied for vision, or if we have to calculate this ourselves
     ##### Cost in USD #####
@@ -582,6 +602,27 @@ GEMINI_2_5_PRO_MODEL_CARD = {
     ##### Agg. Benchmark #####
     "overall": 84.10,
 }
+# TODO: needs to fill in values!
+GEMINI_3_0_FLASH_MODEL_CARD = {
+    ##### Cost in USD #####
+    "usd_per_input_token": 0.5/1e6,
+    "usd_per_output_token": 3/1e6,
+    "usd_per_audio_input_token": 1.0/1e6,
+    ##### Time #####
+    "seconds_per_output_token": 0.00457247,
+    ##### Agg. Benchmark #####
+    "overall": 87.63,
+}
+# TODO: needs to fill in values!
+GEMINI_3_0_PRO_MODEL_CARD = {
+    ##### Cost in USD #####
+    "usd_per_input_token": 2.0/1e6,
+    "usd_per_output_token": 12.0/1e6,
+    ##### Time #####
+    "seconds_per_output_token": 0.0075758,
+    ##### Agg. Benchmark #####
+    "overall": 90.10,
+}
 LLAMA_4_MAVERICK_MODEL_CARD = {
     ##### Cost in USD #####
     "usd_per_input_token": 0.35 / 1e6,
@@ -618,6 +659,7 @@ MODEL_CARDS = {
     CuratedModel.GPT_5.value: GPT_5_MODEL_CARD,
     CuratedModel.GPT_5_MINI.value: GPT_5_MINI_MODEL_CARD,
     CuratedModel.GPT_5_NANO.value: GPT_5_NANO_MODEL_CARD,
+    CuratedModel.GPT_5_2.value: GPT_5_2_MODEL_CARD,
     CuratedModel.o4_MINI.value: o4_MINI_MODEL_CARD,
     # CuratedModels.o1.value: o1_MODEL_CARD,
     CuratedModel.TEXT_EMBEDDING_3_SMALL.value: TEXT_EMBEDDING_3_SMALL_MODEL_CARD,
@@ -628,9 +670,13 @@ MODEL_CARDS = {
     CuratedModel.GEMINI_2_0_FLASH.value: GEMINI_2_0_FLASH_MODEL_CARD,
     CuratedModel.GEMINI_2_5_FLASH.value: GEMINI_2_5_FLASH_MODEL_CARD,
     CuratedModel.GEMINI_2_5_PRO.value: GEMINI_2_5_PRO_MODEL_CARD,
+    CuratedModel.GEMINI_3_0_FLASH.value: GEMINI_3_0_FLASH_MODEL_CARD,
+    CuratedModel.GEMINI_3_0_PRO.value: GEMINI_3_0_PRO_MODEL_CARD,
     CuratedModel.GOOGLE_GEMINI_2_5_FLASH.value: GEMINI_2_5_FLASH_MODEL_CARD,
     CuratedModel.GOOGLE_GEMINI_2_5_FLASH_LITE.value: GEMINI_2_5_FLASH_LITE_MODEL_CARD,
     CuratedModel.GOOGLE_GEMINI_2_5_PRO.value: GEMINI_2_5_PRO_MODEL_CARD,
+    CuratedModel.GOOGLE_GEMINI_3_0_FLASH.value: GEMINI_3_0_FLASH_MODEL_CARD,
+    CuratedModel.GOOGLE_GEMINI_3_0_PRO.value: GEMINI_3_0_PRO_MODEL_CARD,
     CuratedModel.LLAMA_4_MAVERICK.value: LLAMA_4_MAVERICK_MODEL_CARD,
     CuratedModel.VLLM_QWEN_1_5_0_5B_CHAT.value: VLLM_QWEN_1_5_0_5B_CHAT_MODEL_CARD,
 }
