@@ -1,6 +1,7 @@
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, ValidationInfo
 
 from palimpzest.utils.model_info import Model, fetch_dynamic_model_info
+from palimpzest.utils.model_helpers import get_optimal_models
 from palimpzest.policy import MaxQuality, Policy
 
 
@@ -56,10 +57,12 @@ class QueryProcessorConfig(BaseModel):
 
     @field_validator("available_models", mode="before")
     @classmethod
-    def convert_available_models(cls, model_list):
+    def convert_available_models(cls, model_list, info: ValidationInfo):
         if model_list is None:
-            # TODO: logic for when the list is None for available models
-            return None
+            policy = info.data.get("policy")
+            if not isinstance(policy, Policy):
+                policy = MaxQuality()
+            return get_optimal_models(policy)
 
         if not isinstance(model_list, list):
             raise TypeError("Expected a list of strings")

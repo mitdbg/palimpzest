@@ -1,105 +1,23 @@
-import yaml, time, requests, subprocess
+import yaml, time, requests, subprocess, os
 
 from palimpzest.constants import MODEL_CARDS, CuratedModel
-from palimpzest.utils.model_helpers import predict_model_specs
+from palimpzest.utils.model_helpers import predict_model_specs, get_model_provider, get_api_key_env_var
 
 CONFIG_FILENAME = "litellm_config.yaml"
 PROXY_PORT = 4000
 PROXY_URL = f"http://0.0.0.0:{PROXY_PORT}"
 DYNAMIC_MODEL_INFO = {}
 
-def _get_model_provider(model_name: str) -> str:
-    """
-    Determines the model provider based on the model name string.
-    
-    Resolution Order:
-    1. Explicit 'provider/model' syntax (e.g., 'anthropic/claude-3')
-    2. Known model family prefixes (e.g., 'gpt-4' -> openai)
-    3. Provider substring markers (e.g., 'vertex_ai')
-    """
-    if not model_name:
-        return "unknown"
-    name_clean = model_name.lower().strip()
-    # 1. Handle explicit namespace (e.g., 'openai/gpt-4', 'aws/titan')
-    # This is the standard convention for LangChain, LiteLLM, etc.
-    if "/" in name_clean:
-        return name_clean.split("/", 1)[0]
-    # 2. Map known model families (prefixes) to providers
-    # (Order doesn't strictly matter here as keys are unique enough, but specific > generic)
-    family_map = {
-        ("gpt-", "o1-", "dall-e", "text-embedding", "whisper"): "openai",
-        ("claude",): "anthropic",
-        ("gemini", "gemma", "palm"): "gemini", # Mapped to gemini (or google)
-        ("llama",): "meta", 
-        ("mistral", "mixtral"): "mistral",
-        ("command",): "cohere",
-    }
-    for prefixes, provider in family_map.items():
-        if name_clean.startswith(prefixes):
-            return provider
-
-    # 3. Fallback: Check for specific provider markers anywhere in the string
-    # Useful for non-standard names like "hosted_vllm_llama_3"
-    provider_markers = {
-        "openai": "openai",
-        "anthropic": "anthropic",
-        "vertex_ai": "vertex_ai",
-        "together_ai": "together_ai",
-        "gemini": "gemini", 
-        "azure": "azure",
-        "aws": "aws",
-    }
-
-    for marker, provider in provider_markers.items():
-        if marker in name_clean:
-            return provider
-
-    return "unknown"
-
-import os
-
-def _infer_api_key(model_name: str) -> str:
-    model_provider = _get_model_provider(model_name)
-    
-    # Special handling for Google/Vertex: Check multiple candidates
-    if model_provider in ["gemini", "vertex_ai"]:
-        # 1. Check if the legacy/specific GEMINI key exists
-        if os.getenv("GEMINI_API_KEY"):
-            return "os.environ/GEMINI_API_KEY"
-        # 2. Check if the standard GOOGLE key exists
-        if os.getenv("GOOGLE_API_KEY"):
-            return "os.environ/GOOGLE_API_KEY"
-        # 3. Default fallback (standardize on GOOGLE_API_KEY)
-        return "os.environ/GOOGLE_API_KEY"
-
-    # Standard 1-to-1 mapping for other providers
-    provider_to_env_var = {
-        "openai": "OPENAI_API_KEY",
-        "anthropic": "ANTHROPIC_API_KEY",
-        "together_ai": "TOGETHER_API_KEY",
-        "azure": "AZURE_OPENAI_API_KEY",
-        "mistral": "MISTRAL_API_KEY",
-        "cohere": "CO_API_KEY",
-        "groq": "GROQ_API_KEY",
-        "huggingface": "HF_TOKEN",
-        "deepseek": "DEEPSEEK_API_KEY",
-        "fireworks": "FIREWORKS_API_KEY"
-    }
-    
-    env_var = provider_to_env_var.get(model_provider)
-    if env_var:
-        return f"os.environ/{env_var}"
-    
-    return ""
-
 def _generate_config_yaml(available_models, filename):
     config_list = []
     for model_str in available_models:
+        env_var_name = get_api_key_env_var(model_str)
+        api_key_val = f"os.environ/{env_var_name}" if env_var_name else None
         entry = {
             "model_name": model_str,
             "litellm_params": {
                 "model": model_str,
-                "api_key": _infer_api_key(model_str)
+                "api_key": api_key_val
             }
         }
         config_list.append(entry)
@@ -176,19 +94,19 @@ class Model(str):
         return "clip" in self.lower()
 
     def is_together_model(self):
-         return _get_model_provider() == "together_ai"
+         return get_model_provider() == "together_ai"
     
     def is_anthropic_model(self):
-        return _get_model_provider() == "anthropic"
+        return get_model_provider() == "anthropic"
     
     def is_openai_model(self):
-        return _get_model_provider() == "openai" or self.is_text_embedding_model()
+        return get_model_provider() == "openai" or self.is_text_embedding_model()
 
     def is_vertex_model(self):
-        return _get_model_provider() == "vertex_ai"
+        return get_model_provider() == "vertex_ai"
 
     def is_google_ai_studio_model(self):
-        return _get_model_provider() == "gemini"
+        return get_model_provider() == "gemini"
 
     def is_text_embedding_model(self):
         return "text-embedding" in self.lower()

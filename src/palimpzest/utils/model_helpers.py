@@ -1,6 +1,6 @@
 import os, re
 from typing import Dict, Any
-from palimpzest.constants import CuratedModel
+from palimpzest.constants import CuratedModel, MODEL_CARDS
 from palimpzest.utils.model_info import Model
 from palimpzest.core.models import PlanCost
 from palimpzest.policy import Policy
@@ -61,6 +61,197 @@ def get_models(include_embedding: bool = False, use_vertex: bool = False, gemini
 
     return models
 
+def get_model_provider(model_name: str) -> str:
+    """
+    Determines the model provider based on the model name string.
+    
+    Resolution Order:
+    1. Explicit 'provider/model' syntax (e.g., 'anthropic/claude-3')
+    2. Known model family prefixes (e.g., 'gpt-4' -> openai)
+    3. Provider substring markers (e.g., 'vertex_ai')
+    """
+    if not model_name:
+        return "unknown"
+    name_clean = model_name.lower().strip()
+    # explicit namespace
+    if "/" in name_clean:
+        return name_clean.split("/", 1)[0]
+    # map model family to providers
+    family_map = {
+        ("gpt-", "o1-", "dall-e", "text-embedding", "whisper"): "openai",
+        ("claude",): "anthropic",
+        ("gemini", "gemma", "palm"): "gemini",
+        ("llama",): "meta", 
+        ("mistral", "mixtral"): "mistral",
+        ("command",): "cohere",
+    }
+    for prefixes, provider in family_map.items():
+        if name_clean.startswith(prefixes):
+            return provider
+
+    # check for specific provider marker
+    provider_markers = ["openai", "anthropic", "vertex_ai", "together_ai", "gemini", "hosted_vllm"]
+
+    for marker in provider_markers:
+        if marker in name_clean:
+            return marker
+    
+    return "unknown"
+
+
+def get_api_key_env_var(model_name: str):
+    model_provider = get_model_provider(model_name)
+    
+    # Special handling for Google/Vertex: Check multiple candidates
+    if model_provider in ["gemini", "vertex_ai"]:
+        # 1. Check if the legacy/specific GEMINI key exists
+        if os.getenv("GEMINI_API_KEY"):
+            return "os.environ/GEMINI_API_KEY"
+        # 2. Check if the standard GOOGLE key exists
+        if os.getenv("GOOGLE_API_KEY"):
+            return "os.environ/GOOGLE_API_KEY"
+        # 3. Default fallback (standardize on GOOGLE_API_KEY)
+        return "os.environ/GOOGLE_API_KEY"
+
+    # Standard 1-to-1 mapping for other providers
+    provider_to_env_var = {
+        "openai": "OPENAI_API_KEY",
+        "anthropic": "ANTHROPIC_API_KEY",
+        "together_ai": "TOGETHER_API_KEY",
+        "azure": "AZURE_OPENAI_API_KEY",
+        "mistral": "MISTRAL_API_KEY",
+        "cohere": "CO_API_KEY",
+        "groq": "GROQ_API_KEY",
+        "huggingface": "HF_TOKEN",
+        "deepseek": "DEEPSEEK_API_KEY",
+        "fireworks": "FIREWORKS_API_KEY"
+    }
+    
+    return provider_to_env_var.get(model_provider)
+
+# helper function to select the list of available models based on the 
+def get_available_model_from_env(include_embedding: bool = False):
+    available_models = []
+    # Check for Vertex default credentials path if env var is missing
+    default_gcloud_creds = os.path.join(os.path.expanduser("~"), ".config", "gcloud", "application_default_credentials.json")
+    has_vertex_file_creds = os.path.exists(default_gcloud_creds)
+
+    for model in CuratedModel:
+        model_id = model.value
+        if not include_embedding and model.is_embedding_model():
+            continue
+        env_var_name = get_api_key_env_var(model_id)
+        is_available = False
+        if env_var_name and os.getenv(env_var_name):
+            is_available = True
+        elif get_model_provider(model_id) == "vertex_ai" and has_vertex_file_creds:
+            is_available = True
+        if is_available:
+            available_models.append(model_id)
+    return available_models
+
+def get_optimal_models(policy: Policy) -> list[Model]:
+    """
+    Selects the top models from the available list based on the user's policy.
+    
+    This function:
+    1. Filters models that violate policy constraints (e.g. min quality).
+    2. Calculates a weighted score for each model using the policy's weights 
+       (Quality, Cost, Time).
+    3. Returns the top 5 models with the highest score.
+    """
+    model_ids = get_available_model_from_env()
+
+    if not model_ids:
+        return []
+
+    # 1. Gather Metrics and Apply Constraints
+    candidates = []
+    for mid in model_ids:
+        # Retrieve or predict metrics
+        card = MODEL_CARDS.get(mid)
+        if not card: 
+            specs = predict_model_specs(mid)
+            quality_score = specs.get("mmlu_pro_score", 0)
+            cost = specs.get("usd_per_1m_output", float("inf")) / 1e6
+            time_val = specs.get("seconds_per_output_token", float("inf"))
+        else:
+            quality_score = card.get("overall", 0)
+            cost = card.get("usd_per_output_token", float("inf"))
+            time_val = card.get("seconds_per_output_token", float("inf"))
+        
+        if quality_score is None: quality_score = 0
+        if cost is None: cost = float("inf")
+        if time_val is None: time_val = float("inf")
+
+        # Create proxy plan for constraint checking
+        # (Cost/Time set to 0.0 as we only check unit-invariant constraints like Quality here)
+        normalized_quality = quality_score / 100.0
+        proxy_plan = PlanCost(cost=0.0, time=0.0, quality=normalized_quality)
+        
+        if not policy.constraint(proxy_plan):
+            continue
+
+        candidates.append({
+            "id": mid, 
+            "quality": quality_score, 
+            "cost": cost, 
+            "time": time_val
+        })
+
+    if not candidates:
+        return []
+
+    # 2. Normalize Metrics (Min-Max Normalization)
+    # We want to map everything to [0, 1] to apply weights fairly.
+    
+    # Extract ranges
+    quals = [c["quality"] for c in candidates]
+    costs = [c["cost"] for c in candidates]
+    times = [c["time"] for c in candidates]
+    
+    min_q, max_q = min(quals), max(quals)
+    min_c, max_c = min(costs), max(costs)
+    min_t, max_t = min(times), max(times)
+    
+    # Helper for safe normalization
+    def normalize(val, min_v, max_v, invert=False):
+        if max_v == min_v:
+            return 1.0 # If all values are same, treat as 'best'
+        norm = (val - min_v) / (max_v - min_v)
+        return (1.0 - norm) if invert else norm
+
+    # 3. Calculate Scores
+    # Weights from policy (e.g., {'cost': 1.0, 'time': 0.0, 'quality': 0.0})
+    weights = policy.get_dict()
+    w_q = weights.get("quality", 0.0)
+    w_c = weights.get("cost", 0.0)
+    w_t = weights.get("time", 0.0)
+    
+    scored_candidates = []
+    for cand in candidates:
+        # Quality is Benefit (Higher is Better)
+        n_q = normalize(cand["quality"], min_q, max_q, invert=False)
+        
+        # Cost and Time are Costs (Lower is Better), so we invert the normalization
+        # so that 1.0 represents the cheapest/fastest (best) option.
+        n_c = normalize(cand["cost"], min_c, max_c, invert=True)
+        n_t = normalize(cand["time"], min_t, max_t, invert=True)
+        
+        # Weighted Score (Simple Additive Weighting)
+        score = (w_q * n_q) + (w_c * n_c) + (w_t * n_t)
+        
+        scored_candidates.append((score, cand["id"]))
+
+    # 4. Select Top 5
+    scored_candidates.sort(key=lambda x: x[0], reverse=True)
+    top_models_ids = [mid for score, mid in scored_candidates[:5]]
+    top_models = [Model(id) in top_models_ids]
+    
+    return top_models
+
+# helper function to predict the pricing, latency, and overall benchmark score when data
+# is not available through endpoint / constants.py
 def predict_model_specs(full_model_id: str) -> Dict[str, Any]:
     """
     Predicts pricing (USD/1M tokens), latency (sec/token), and MMLU-Pro score
