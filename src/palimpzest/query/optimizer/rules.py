@@ -1086,3 +1086,33 @@ class BasicSubstitutionRule(ImplementationRule):
         logger.debug(f"Substituting BasicSubstitutionRule for {logical_expression}")
         physical_op_class = cls.LOGICAL_OP_CLASS_TO_PHYSICAL_OP_CLASS_MAP[logical_expression.operator.__class__]
         return cls._perform_substitution(logical_expression, physical_op_class, runtime_kwargs)
+
+
+class SemanticGroupBy(ImplementationRule):
+    """
+    Substitute a logical expression for a GroupBy with an llm physical implementation.
+    """
+
+    @classmethod
+    def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
+        is_match = isinstance(logical_expression.operator, GroupByAggregate) and logical_expression.operator.group_by_fn is None
+        logger.debug(f"SemanticGroupBy matches_pattern: {is_match} for {logical_expression}")
+        return is_match
+
+    @classmethod
+    def substitute(cls, logical_expression: LogicalExpression, **runtime_kwargs) -> set[PhysicalExpression]:
+        logger.debug(f"Substituting SemanticGroupBy for {logical_expression}")
+
+        # create variable physical operator kwargs for each model which can implement this logical_expression
+        models = [model for model in runtime_kwargs["available_models"] if cls._model_matches_input(model, logical_expression)]
+        no_reasoning = runtime_kwargs["reasoning_effort"] in [None, "minimal", "low"]
+        variable_op_kwargs = [
+            {
+                "model": model,
+                "prompt_strategy": PromptStrategy.GROUP_BY_NO_REASONING if model.is_reasoning_model() and no_reasoning else PromptStrategy.GROUP_BY,
+                "reasoning_effort": runtime_kwargs["reasoning_effort"]
+            }
+            for model in models
+        ]
+
+        return cls._perform_substitution(logical_expression, SemanticGroupByOp, runtime_kwargs, variable_op_kwargs)
