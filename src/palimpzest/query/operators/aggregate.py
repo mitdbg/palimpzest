@@ -149,8 +149,8 @@ class ApplyGroupByOp(AggregateOp):
         for candidate in candidates:
             group = ()
             for f in self.gby_fields:
-                # if not hasattr(candidate, f):
-                #     raise TypeError(f"ApplyGroupByOp record missing expected field {f}")
+                if not hasattr(candidate, f):
+                    raise TypeError(f"ApplyGroupByOp record missing expected field {f}")
                 group = group + (getattr(candidate, f),)
             if group in agg_state:
                 state = agg_state[group]
@@ -160,8 +160,8 @@ class ApplyGroupByOp(AggregateOp):
                     state.append(ApplyGroupByOp.agg_init(fun))
             for i in range(0, len(self.agg_funcs)):
                 fun = self.agg_funcs[i]
-                # if not hasattr(candidate, self.agg_fields[i]):
-                #     raise TypeError(f"ApplyGroupByOp record missing expected field {self.agg_fields[i]}")
+                if not hasattr(candidate, self.agg_fields[i]):
+                    raise TypeError(f"ApplyGroupByOp record missing expected field {self.agg_fields[i]}")
                 field = getattr(candidate, self.agg_fields[i])
                 state[i] = ApplyGroupByOp.agg_merge(fun, state[i], field)
             agg_state[group] = state
