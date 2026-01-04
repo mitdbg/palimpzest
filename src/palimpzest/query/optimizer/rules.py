@@ -1095,7 +1095,7 @@ class SemanticGroupBy(ImplementationRule):
 
     @classmethod
     def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
-        is_match = isinstance(logical_expression.operator, GroupByAggregate) and logical_expression.operator.group_by_fn is None
+        is_match = isinstance(logical_expression.operator, GroupByAggregate) and logical_expression.operator.is_semantic == True
         logger.debug(f"SemanticGroupBy matches_pattern: {is_match} for {logical_expression}")
         return is_match
 

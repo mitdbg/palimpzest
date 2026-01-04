@@ -628,6 +628,7 @@ class Dataset:
         # Create logical operator with direct parameters (no GroupBySig)
         operator = GroupByAggregate(
             input_schema=self.schema,
+            is_semantic=True,
             output_schema=output_schema,
             gby_fields=gby_fields,
             agg_fields=agg_fields,

@@ -380,6 +380,7 @@ class FilteredScan(LogicalOperator):
 class GroupByAggregate(LogicalOperator):
     def __init__(
         self,
+        is_semantic: bool = False,
         gby_fields: list[str] | None = None,
         agg_fields: list[str] | None = None,
         agg_funcs: list[str] | None = None,
