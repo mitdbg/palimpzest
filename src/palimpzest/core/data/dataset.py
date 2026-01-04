@@ -9,7 +9,6 @@ from pydantic import BaseModel
 
 from palimpzest.constants import AggFunc, Cardinality
 from palimpzest.core.elements.filters import Filter
-from palimpzest.core.elements.groupbysig import GroupBySig
 from palimpzest.core.lib.schemas import create_schema_from_fields, project, relax_schema, union_schemas
 from palimpzest.policy import construct_policy_from_kwargs
 from palimpzest.query.operators.logical import (
@@ -572,10 +571,26 @@ class Dataset:
         operator = Aggregate(input_schema=self.schema, agg_func=AggFunc.MAX)
         return Dataset(sources=[self], operator=operator, schema=operator.output_schema)
 
-    def groupby(self, groupby: GroupBySig) -> Dataset:
-        # update this!!
-        output_schema = groupby.output_schema()
-        operator = GroupByAggregate(input_schema=self.schema, output_schema=output_schema, group_by_sig=groupby)
+    def groupby(self, gby_fields, agg_fields, agg_funcs) -> Dataset:
+        """Apply a group by operation to this dataset."""
+        from typing import Any
+        
+        # Construct the output schema dynamically based on gby_fields and agg_funcs
+        fields = []
+        
+        # Add group by fields to output schema
+        for g in gby_fields:
+            f = {"name": g, "type": Any, "desc": f"Group by field: {g}"}
+            fields.append(f)
+        
+        # Add aggregation fields to output schema
+        for i, agg_func in enumerate(agg_funcs):
+            agg_field_name = f"{agg_func}({agg_fields[i]})"
+            f = {"name": agg_field_name, "type": Any, "desc": f"Aggregate field: {agg_field_name}"}
+            fields.append(f)
+        
+        output_schema = create_schema_from_fields(fields)
+        operator = GroupByAggregate(input_schema=self.schema, gby_fields=gby_fields, agg_fields=agg_fields, agg_funcs=agg_funcs)
         return Dataset(sources=[self], operator=operator, schema=output_schema)
 
     def sem_groupby(self, gby_fields: list[str], agg_fields: list[str], agg_funcs: list[str]) -> Dataset:

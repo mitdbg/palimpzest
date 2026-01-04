@@ -8,7 +8,6 @@ from pydantic import BaseModel
 from palimpzest.constants import AggFunc, Cardinality
 from palimpzest.core.data import context, dataset
 from palimpzest.core.elements.filters import Filter
-from palimpzest.core.elements.groupbysig import GroupBySig
 from palimpzest.core.lib.schemas import Average, Count, Max, Min, Sum
 from palimpzest.utils.hash_helpers import hash_for_id
 
@@ -381,7 +380,6 @@ class FilteredScan(LogicalOperator):
 class GroupByAggregate(LogicalOperator):
     def __init__(
         self,
-        group_by_sig: GroupBySig | None = None,
         gby_fields: list[str] | None = None,
         agg_fields: list[str] | None = None,
         agg_funcs: list[str] | None = None,
@@ -392,68 +390,40 @@ class GroupByAggregate(LogicalOperator):
         if not self.input_schema:
             raise ValueError("GroupByAggregate requires an input schema")
         
-        # Support both old GroupBySig and new direct parameters
-        if group_by_sig is not None:
-            # Old API: using GroupBySig
-            (valid, error) = group_by_sig.validate_schema(self.input_schema)
-            if not valid:
-                raise TypeError(error)
-            self.group_by_sig = group_by_sig
-            self.gby_fields = group_by_sig.group_by_fields
-            self.agg_fields = group_by_sig.agg_fields
-            self.agg_funcs = group_by_sig.agg_funcs
-        else:
-            # New API: using direct parameters
-            if gby_fields is None or agg_fields is None or agg_funcs is None:
-                raise ValueError("Must provide either group_by_sig or all of (gby_fields, agg_fields, agg_funcs)")
-            
-            # Validate fields exist in input schema
-            for f in gby_fields:
-                if f not in self.input_schema.model_fields:
-                    raise TypeError(f"Supplied schema has no field {f}")
-            for f in agg_fields:
-                if f not in self.input_schema.model_fields:
-                    raise TypeError(f"Supplied schema has no field {f}")
-            
-            self.group_by_sig = None
-            self.gby_fields = gby_fields
-            self.agg_fields = agg_fields
-            self.agg_funcs = agg_funcs
+        # Validate that all required parameters are provided
+        if gby_fields is None or agg_fields is None or agg_funcs is None:
+            raise ValueError("Must provide all of (gby_fields, agg_fields, agg_funcs)")
+        
+        for f in agg_fields:
+            if f not in self.input_schema.model_fields:
+                raise TypeError(f"Supplied schema has no field {f}")
+        
+        self.gby_fields = gby_fields
+        self.agg_fields = agg_fields
+        self.agg_funcs = agg_funcs
 
     def __str__(self):
-        if self.group_by_sig is not None:
-            return f"GroupBy({self.group_by_sig.serialize()})"
-        else:
-            return f"GroupBy(gby_fields={self.gby_fields}, agg_fields={self.agg_fields}, agg_funcs={self.agg_funcs})"
+        return f"GroupBy(gby_fields={self.gby_fields}, agg_fields={self.agg_fields}, agg_funcs={self.agg_funcs})"
 
     def get_logical_id_params(self) -> dict:
         logical_id_params = super().get_logical_id_params()
-        if self.group_by_sig is not None:
-            logical_id_params = {"group_by_sig": self.group_by_sig, **logical_id_params}
-        else:
-            logical_id_params = {
-                "gby_fields": self.gby_fields,
-                "agg_fields": self.agg_fields,
-                "agg_funcs": self.agg_funcs,
-                **logical_id_params
-            }
+        logical_id_params = {
+            "gby_fields": self.gby_fields,
+            "agg_fields": self.agg_fields,
+            "agg_funcs": self.agg_funcs,
+            **logical_id_params,
+        }
 
         return logical_id_params
 
     def get_logical_op_params(self) -> dict:
         logical_op_params = super().get_logical_op_params()
-        if self.group_by_sig is not None:
-            logical_op_params = {
-                "group_by_sig": self.group_by_sig,
-                **logical_op_params,
-            }
-        else:
-            logical_op_params = {
-                "gby_fields": self.gby_fields,
-                "agg_fields": self.agg_fields,
-                "agg_funcs": self.agg_funcs,
-                **logical_op_params,
-            }
+        logical_op_params = {
+            "gby_fields": self.gby_fields,
+            "agg_fields": self.agg_fields,
+            "agg_funcs": self.agg_funcs,
+            **logical_op_params,
+        }
 
         return logical_op_params
 

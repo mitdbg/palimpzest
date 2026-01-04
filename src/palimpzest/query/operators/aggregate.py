@@ -13,7 +13,6 @@ from palimpzest.constants import (
     Model,
     PromptStrategy,
 )
-from palimpzest.core.elements.groupbysig import GroupBySig
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.core.lib.schemas import Average, Count, Max, Min, Sum
 from palimpzest.core.models import OperatorCostEstimates, RecordOpStats
@@ -40,44 +39,39 @@ class ApplyGroupByOp(AggregateOp):
     1. Legacy: group_by_sig parameter containing fields and functions
     2. New: gby_fields, agg_fields, agg_funcs parameters directly
     """
-    def __init__(self, group_by_sig: GroupBySig = None, gby_fields: list[str] = None, 
+    def __init__(self, gby_fields: list[str] = None, 
                  agg_fields: list[str] = None, agg_funcs: list[str] = None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
-        # Support both old API (group_by_sig) and new API (individual fields)
-        if group_by_sig is not None:
-            # Legacy API: use group_by_sig
-            self.group_by_sig = group_by_sig
-            self.gby_fields = group_by_sig.group_by_fields
-            self.agg_fields = group_by_sig.agg_fields
-            self.agg_funcs = group_by_sig.agg_funcs
-        elif gby_fields is not None and agg_fields is not None and agg_funcs is not None:
-            # New API: construct group_by_sig from individual fields
-            self.gby_fields = gby_fields
-            self.agg_fields = agg_fields
-            self.agg_funcs = agg_funcs
-            # Create a GroupBySig for backwards compatibility with existing code
-            from palimpzest.core.elements.groupbysig import GroupBySig
-            self.group_by_sig = GroupBySig(
-                group_by_fields=gby_fields,
-                agg_fields=agg_fields,
-                agg_funcs=agg_funcs
-            )
-        else:
-            raise ValueError("Either group_by_sig or (gby_fields, agg_fields, agg_funcs) must be provided")
+        # New API: construct group_by_sig from individual fields
+        self.gby_fields = gby_fields
+        self.agg_fields = agg_fields
+        self.agg_funcs = agg_funcs
 
     def __str__(self):
         op = super().__str__()
-        op += f"    Group-by Signature: {str(self.group_by_sig)}\n"
+        op += f"    Group-by Fields: {self.gby_fields}\n"
+        op += f"    Agg. Fields: {self.agg_fields}\n"
+        op += f"    Agg. Funcs: {self.agg_funcs}\n"
         return op
 
     def get_id_params(self):
         id_params = super().get_id_params()
-        return {"group_by_sig": str(self.group_by_sig.serialize()), **id_params}
+        return {
+            "gby_fields": self.gby_fields, 
+            "agg_fields": self.agg_fields, 
+            "agg_funcs": self.agg_funcs,
+            **id_params
+        }
 
     def get_op_params(self):
         op_params = super().get_op_params()
-        return {"group_by_sig": self.group_by_sig, **op_params}
+        return {
+            "gby_fields": self.gby_fields, 
+            "agg_fields": self.agg_fields, 
+            "agg_funcs": self.agg_funcs,
+            **op_params
+        }
 
     def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         # for now, assume applying the groupby takes negligible additional time (and no cost in USD)
@@ -154,28 +148,29 @@ class ApplyGroupByOp(AggregateOp):
         agg_state = {}
         for candidate in candidates:
             group = ()
-            for f in self.group_by_sig.group_by_fields:
-                if not hasattr(candidate, f):
-                    raise TypeError(f"ApplyGroupByOp record missing expected field {f}")
+            for f in self.gby_fields:
+                # if not hasattr(candidate, f):
+                #     raise TypeError(f"ApplyGroupByOp record missing expected field {f}")
                 group = group + (getattr(candidate, f),)
             if group in agg_state:
                 state = agg_state[group]
             else:
                 state = []
-                for fun in self.group_by_sig.agg_funcs:
+                for fun in self.agg_funcs:
                     state.append(ApplyGroupByOp.agg_init(fun))
-            for i in range(0, len(self.group_by_sig.agg_funcs)):
-                fun = self.group_by_sig.agg_funcs[i]
-                if not hasattr(candidate, self.group_by_sig.agg_fields[i]):
-                    raise TypeError(f"ApplyGroupByOp record missing expected field {self.group_by_sig.agg_fields[i]}")
-                field = getattr(candidate, self.group_by_sig.agg_fields[i])
+            for i in range(0, len(self.agg_funcs)):
+                fun = self.agg_funcs[i]
+                # if not hasattr(candidate, self.agg_fields[i]):
+                #     raise TypeError(f"ApplyGroupByOp record missing expected field {self.agg_fields[i]}")
+                field = getattr(candidate, self.agg_fields[i])
                 state[i] = ApplyGroupByOp.agg_merge(fun, state[i], field)
             agg_state[group] = state
 
         # return list of data records (one per group)
         drs: list[DataRecord] = []
-        group_by_fields = self.group_by_sig.group_by_fields
-        agg_fields = self.group_by_sig.get_agg_field_names()
+        group_by_fields = self.gby_fields
+        # Construct aggregation field names: "func(field)"
+        agg_field_names = [f"{func}({field})" for func, field in zip(self.agg_funcs, self.agg_fields)]
         for g in agg_state:
             # build up data item
             data_item = {}
@@ -184,11 +179,11 @@ class ApplyGroupByOp(AggregateOp):
                 data_item[group_by_fields[i]] = k
             vals = agg_state[g]
             for i in range(0, len(vals)):
-                v = ApplyGroupByOp.agg_final(self.group_by_sig.agg_funcs[i], vals[i])
-                data_item[agg_fields[i]] = v
+                v = ApplyGroupByOp.agg_final(self.agg_funcs[i], vals[i])
+                data_item[agg_field_names[i]] = v
 
             # create new DataRecord
-            schema = self.group_by_sig.output_schema()
+            schema = self.output_schema
             data_item = schema(**data_item)
             dr = DataRecord.from_agg_parents(data_item, parent_records=candidates)
             drs.append(dr)
