@@ -1,65 +1,7 @@
 import os, re
 from typing import Dict, Any
-from palimpzest.constants import CuratedModel, MODEL_CARDS
-from palimpzest.utils.model_info import Model
-from palimpzest.core.models import PlanCost
-from palimpzest.policy import Policy
+from palimpzest.constants import CuratedModel
 
-def get_models(include_embedding: bool = False, use_vertex: bool = False, gemini_credentials_path: str | None = None, api_base: str | None = None) -> list[Model]:
-    """
-    Return the set of models which the system has access to based on the set environment variables.
-    """
-    models = []
-    if os.getenv("OPENAI_API_KEY") not in [None, ""]:
-        openai_models = [model for model in CuratedModel if model.is_openai_model()]
-        if not include_embedding:
-            openai_models = [
-                model for model in openai_models if not model.is_embedding_model()
-            ]
-        models.extend(openai_models)
-
-    if os.getenv("TOGETHER_API_KEY") not in [None, ""]:
-        together_models = [model for model in CuratedModel if model.is_together_model()]
-        if not include_embedding:
-            together_models = [
-                model for model in together_models if not model.is_embedding_model()
-            ]
-        models.extend(together_models)
-
-    if os.getenv("ANTHROPIC_API_KEY") not in [None, ""]:
-        anthropic_models = [model for model in CuratedModel if model.is_anthropic_model()]
-        if not include_embedding:
-            anthropic_models = [
-                model for model in anthropic_models if not model.is_embedding_model()
-            ]
-        models.extend(anthropic_models)
-
-    gemini_credentials_path = (
-        os.path.join(os.path.expanduser("~"), ".config", "gcloud", "application_default_credentials.json")
-        if gemini_credentials_path is None
-        else gemini_credentials_path
-    )
-    if os.getenv("GEMINI_API_KEY") not in [None, ""] or (use_vertex and os.path.exists(gemini_credentials_path)):
-        vertex_models = [model for model in CuratedModel if model.is_vertex_model()]
-        google_ai_studio_models = [model for model in CuratedModel if model.is_google_ai_studio_model()]
-        if not include_embedding:
-            vertex_models = [
-                model for model in vertex_models if not model.is_embedding_model()
-            ]
-        if use_vertex:
-            models.extend(vertex_models)
-        else:
-            models.extend(google_ai_studio_models)
-
-    if api_base is not None:
-        vllm_models = [model for model in Model if model.is_vllm_model()]
-        if not include_embedding:
-            vllm_models = [
-                model for model in vllm_models if not model.is_embedding_model()
-            ]
-        models.extend(vllm_models)
-
-    return models
 
 def get_model_provider(model_name: str) -> str:
     """
@@ -129,126 +71,6 @@ def get_api_key_env_var(model_name: str):
     
     return provider_to_env_var.get(model_provider)
 
-# helper function to select the list of available models based on the 
-def get_available_model_from_env(include_embedding: bool = False):
-    available_models = []
-    # Check for Vertex default credentials path if env var is missing
-    default_gcloud_creds = os.path.join(os.path.expanduser("~"), ".config", "gcloud", "application_default_credentials.json")
-    has_vertex_file_creds = os.path.exists(default_gcloud_creds)
-
-    for model in CuratedModel:
-        model_id = model.value
-        if not include_embedding and model.is_embedding_model():
-            continue
-        env_var_name = get_api_key_env_var(model_id)
-        is_available = False
-        if env_var_name and os.getenv(env_var_name):
-            is_available = True
-        elif get_model_provider(model_id) == "vertex_ai" and has_vertex_file_creds:
-            is_available = True
-        if is_available:
-            available_models.append(model_id)
-    return available_models
-
-def get_optimal_models(policy: Policy) -> list[Model]:
-    """
-    Selects the top models from the available list based on the user's policy.
-    
-    This function:
-    1. Filters models that violate policy constraints (e.g. min quality).
-    2. Calculates a weighted score for each model using the policy's weights 
-       (Quality, Cost, Time).
-    3. Returns the top 5 models with the highest score.
-    """
-    model_ids = get_available_model_from_env()
-
-    if not model_ids:
-        return []
-
-    # 1. Gather Metrics and Apply Constraints
-    candidates = []
-    for mid in model_ids:
-        # Retrieve or predict metrics
-        card = MODEL_CARDS.get(mid)
-        if not card: 
-            specs = predict_model_specs(mid)
-            quality_score = specs.get("mmlu_pro_score", 0)
-            cost = specs.get("usd_per_1m_output", float("inf")) / 1e6
-            time_val = specs.get("seconds_per_output_token", float("inf"))
-        else:
-            quality_score = card.get("overall", 0)
-            cost = card.get("usd_per_output_token", float("inf"))
-            time_val = card.get("seconds_per_output_token", float("inf"))
-        
-        if quality_score is None: quality_score = 0
-        if cost is None: cost = float("inf")
-        if time_val is None: time_val = float("inf")
-
-        # Create proxy plan for constraint checking
-        # (Cost/Time set to 0.0 as we only check unit-invariant constraints like Quality here)
-        normalized_quality = quality_score / 100.0
-        proxy_plan = PlanCost(cost=0.0, time=0.0, quality=normalized_quality)
-        
-        if not policy.constraint(proxy_plan):
-            continue
-
-        candidates.append({
-            "id": mid, 
-            "quality": quality_score, 
-            "cost": cost, 
-            "time": time_val
-        })
-
-    if not candidates:
-        return []
-
-    # 2. Normalize Metrics (Min-Max Normalization)
-    # We want to map everything to [0, 1] to apply weights fairly.
-    
-    # Extract ranges
-    quals = [c["quality"] for c in candidates]
-    costs = [c["cost"] for c in candidates]
-    times = [c["time"] for c in candidates]
-    
-    min_q, max_q = min(quals), max(quals)
-    min_c, max_c = min(costs), max(costs)
-    min_t, max_t = min(times), max(times)
-    
-    # Helper for safe normalization
-    def normalize(val, min_v, max_v, invert=False):
-        if max_v == min_v:
-            return 1.0 # If all values are same, treat as 'best'
-        norm = (val - min_v) / (max_v - min_v)
-        return (1.0 - norm) if invert else norm
-
-    # 3. Calculate Scores
-    # Weights from policy (e.g., {'cost': 1.0, 'time': 0.0, 'quality': 0.0})
-    weights = policy.get_dict()
-    w_q = weights.get("quality", 0.0)
-    w_c = weights.get("cost", 0.0)
-    w_t = weights.get("time", 0.0)
-    
-    scored_candidates = []
-    for cand in candidates:
-        # Quality is Benefit (Higher is Better)
-        n_q = normalize(cand["quality"], min_q, max_q, invert=False)
-        
-        # Cost and Time are Costs (Lower is Better), so we invert the normalization
-        # so that 1.0 represents the cheapest/fastest (best) option.
-        n_c = normalize(cand["cost"], min_c, max_c, invert=True)
-        n_t = normalize(cand["time"], min_t, max_t, invert=True)
-        
-        # Weighted Score (Simple Additive Weighting)
-        score = (w_q * n_q) + (w_c * n_c) + (w_t * n_t)
-        
-        scored_candidates.append((score, cand["id"]))
-
-    # 4. Select Top 5
-    scored_candidates.sort(key=lambda x: x[0], reverse=True)
-    top_models_ids = [mid for score, mid in scored_candidates[:5]]
-    top_models = [Model(id) in top_models_ids]
-    
-    return top_models
 
 # helper function to predict the pricing, latency, and overall benchmark score when data
 # is not available through endpoint / constants.py
@@ -362,3 +184,80 @@ def predict_model_specs(full_model_id: str) -> Dict[str, Any]:
         prediction["usd_per_1m_audio_input"] = prediction["usd_per_1m_input"] * 4.0
 
     return prediction
+
+# helper function to select the list of available models based on the 
+def get_available_model_from_env(include_embedding: bool = False):
+    available_models = []
+    # Check for Vertex default credentials path if env var is missing
+    default_gcloud_creds = os.path.join(os.path.expanduser("~"), ".config", "gcloud", "application_default_credentials.json")
+    has_vertex_file_creds = os.path.exists(default_gcloud_creds)
+
+    for model in CuratedModel:
+        model_id = model.value
+        if not include_embedding and model.is_embedding_model():
+            continue
+        env_var_name = get_api_key_env_var(model_id)
+        is_available = False
+        if env_var_name and os.getenv(env_var_name):
+            is_available = True
+        elif get_model_provider(model_id) == "vertex_ai" and has_vertex_file_creds:
+            is_available = True
+        if is_available:
+            available_models.append(model_id)
+    return available_models
+
+def get_models(include_embedding: bool = False, use_vertex: bool = False, gemini_credentials_path: str | None = None, api_base: str | None = None) -> list[CuratedModel]:
+    """
+    Return the set of models which the system has access to based on the set environment variables.
+    """
+    models = []
+    if os.getenv("OPENAI_API_KEY") not in [None, ""]:
+        openai_models = [model for model in CuratedModel if model.is_openai_model()]
+        if not include_embedding:
+            openai_models = [
+                model for model in openai_models if not model.is_embedding_model()
+            ]
+        models.extend(openai_models)
+
+    if os.getenv("TOGETHER_API_KEY") not in [None, ""]:
+        together_models = [model for model in CuratedModel if model.is_together_model()]
+        if not include_embedding:
+            together_models = [
+                model for model in together_models if not model.is_embedding_model()
+            ]
+        models.extend(together_models)
+
+    if os.getenv("ANTHROPIC_API_KEY") not in [None, ""]:
+        anthropic_models = [model for model in CuratedModel if model.is_anthropic_model()]
+        if not include_embedding:
+            anthropic_models = [
+                model for model in anthropic_models if not model.is_embedding_model()
+            ]
+        models.extend(anthropic_models)
+
+    gemini_credentials_path = (
+        os.path.join(os.path.expanduser("~"), ".config", "gcloud", "application_default_credentials.json")
+        if gemini_credentials_path is None
+        else gemini_credentials_path
+    )
+    if os.getenv("GEMINI_API_KEY") not in [None, ""] or (use_vertex and os.path.exists(gemini_credentials_path)):
+        vertex_models = [model for model in CuratedModel if model.is_vertex_model()]
+        google_ai_studio_models = [model for model in CuratedModel if model.is_google_ai_studio_model()]
+        if not include_embedding:
+            vertex_models = [
+                model for model in vertex_models if not model.is_embedding_model()
+            ]
+        if use_vertex:
+            models.extend(vertex_models)
+        else:
+            models.extend(google_ai_studio_models)
+
+    if api_base is not None:
+        vllm_models = [model for model in CuratedModel if model.is_vllm_model()]
+        if not include_embedding:
+            vllm_models = [
+                model for model in vllm_models if not model.is_embedding_model()
+            ]
+        models.extend(vllm_models)
+
+    return models

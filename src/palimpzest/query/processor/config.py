@@ -1,7 +1,6 @@
 from pydantic import BaseModel, ConfigDict, Field, field_validator, ValidationInfo
 
-from palimpzest.utils.model_info import Model, fetch_dynamic_model_info
-from palimpzest.utils.model_helpers import get_optimal_models
+from palimpzest.utils.model_info import Model, fetch_dynamic_model_info, get_optimal_models
 from palimpzest.policy import MaxQuality, Policy
 
 

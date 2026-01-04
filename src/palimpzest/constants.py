@@ -315,7 +315,7 @@ class CuratedModel(str, Enum):
     def is_embedding_model(self):
         return self in [CuratedModel.CLIP_VIT_B_32, CuratedModel.TEXT_EMBEDDING_3_SMALL]
 
-
+Model = CuratedModel # for backward compatibility purposesq
 
 #### MODEL PERFORMANCE & COST METRICS ####
 # Overall model quality is computed using MMLU-Pro; multi-modal models currently use the same score for vision
@@ -488,12 +488,11 @@ GPT_5_NANO_MODEL_CARD = {
 }
 GPT_5_2_MODEL_CARD = {
     # NOTE: it is unclear if the same ($ / token) costs can be applied for vision, or if we have to calculate this ourselves
-    # TODO: needs to add values!
     ##### Cost in USD #####
     "usd_per_input_token": 1.75/1e6,
     "usd_per_output_token": 14/1e6,
     ##### Time #####
-    "seconds_per_output_token": 0.00,
+    "seconds_per_output_token": 0.01471,
     ##### Agg. Benchmark #####
     "overall": 86.23,
 }
@@ -602,7 +601,6 @@ GEMINI_2_5_PRO_MODEL_CARD = {
     ##### Agg. Benchmark #####
     "overall": 84.10,
 }
-# TODO: needs to fill in values!
 GEMINI_3_0_FLASH_MODEL_CARD = {
     ##### Cost in USD #####
     "usd_per_input_token": 0.5/1e6,
@@ -613,7 +611,6 @@ GEMINI_3_0_FLASH_MODEL_CARD = {
     ##### Agg. Benchmark #####
     "overall": 87.63,
 }
-# TODO: needs to fill in values!
 GEMINI_3_0_PRO_MODEL_CARD = {
     ##### Cost in USD #####
     "usd_per_input_token": 2.0/1e6,

@@ -1,5 +1,6 @@
 import yaml, time, requests, subprocess, os
-
+from palimpzest.core.models import PlanCost
+from palimpzest.policy import Policy
 from palimpzest.constants import MODEL_CARDS, CuratedModel
 from palimpzest.utils.model_helpers import predict_model_specs, get_model_provider, get_api_key_env_var
 
@@ -58,7 +59,6 @@ def fetch_dynamic_model_info(available_models):
             for item in data["data"]:
                 model_name = item.get("model_name")
                 dynamic_model_info[model_name] = item.get("model_info", {})
-    # TODO: exception logic
     finally:
         process.terminate()
         try:
@@ -148,7 +148,6 @@ class Model(str):
         }
         return self.value in known_reasoning_models
     
-    # TODO: I think SONNET and HAIKU are vision-capable too
     def is_vision_model(self):
         info = DYNAMIC_MODEL_INFO[self.value]
         if "supports_vision" in info and info["supports_vision"] is not None:
@@ -234,3 +233,104 @@ class Model(str):
         if self.value in MODEL_CARDS:
             return MODEL_CARDS[self]["overall"]
         return self.prediction["mmlu_pro_score"]
+    
+
+def get_optimal_models(policy: Policy) -> list[Model]:
+    """
+    Selects the top models from the available list based on the user's policy.
+    
+    This function:
+    1. Filters models that violate policy constraints (e.g. min quality).
+    2. Calculates a weighted score for each model using the policy's weights 
+       (Quality, Cost, Time).
+    3. Returns the top 5 models with the highest score.
+    """
+    model_ids = get_available_model_from_env()
+
+    if not model_ids:
+        return []
+
+    # 1. Gather Metrics and Apply Constraints
+    candidates = []
+    for mid in model_ids:
+        # Retrieve or predict metrics
+        card = MODEL_CARDS.get(mid)
+        if not card: 
+            specs = predict_model_specs(mid)
+            quality_score = specs.get("mmlu_pro_score", 0)
+            cost = specs.get("usd_per_1m_output", float("inf")) / 1e6
+            time_val = specs.get("seconds_per_output_token", float("inf"))
+        else:
+            quality_score = card.get("overall", 0)
+            cost = card.get("usd_per_output_token", float("inf"))
+            time_val = card.get("seconds_per_output_token", float("inf"))
+        
+        if quality_score is None: quality_score = 0
+        if cost is None: cost = float("inf")
+        if time_val is None: time_val = float("inf")
+
+        # Create proxy plan for constraint checking
+        # (Cost/Time set to 0.0 as we only check unit-invariant constraints like Quality here)
+        normalized_quality = quality_score / 100.0
+        proxy_plan = PlanCost(cost=0.0, time=0.0, quality=normalized_quality)
+        
+        if not policy.constraint(proxy_plan):
+            continue
+
+        candidates.append({
+            "id": mid, 
+            "quality": quality_score, 
+            "cost": cost, 
+            "time": time_val
+        })
+
+    if not candidates:
+        return []
+
+    # 2. Normalize Metrics (Min-Max Normalization)
+    # We want to map everything to [0, 1] to apply weights fairly.
+    
+    # Extract ranges
+    quals = [c["quality"] for c in candidates]
+    costs = [c["cost"] for c in candidates]
+    times = [c["time"] for c in candidates]
+    
+    min_q, max_q = min(quals), max(quals)
+    min_c, max_c = min(costs), max(costs)
+    min_t, max_t = min(times), max(times)
+    
+    # Helper for safe normalization
+    def normalize(val, min_v, max_v, invert=False):
+        if max_v == min_v:
+            return 1.0 # If all values are same, treat as 'best'
+        norm = (val - min_v) / (max_v - min_v)
+        return (1.0 - norm) if invert else norm
+
+    # 3. Calculate Scores
+    # Weights from policy (e.g., {'cost': 1.0, 'time': 0.0, 'quality': 0.0})
+    weights = policy.get_dict()
+    w_q = weights.get("quality", 0.0)
+    w_c = weights.get("cost", 0.0)
+    w_t = weights.get("time", 0.0)
+    
+    scored_candidates = []
+    for cand in candidates:
+        # Quality is Benefit (Higher is Better)
+        n_q = normalize(cand["quality"], min_q, max_q, invert=False)
+        
+        # Cost and Time are Costs (Lower is Better), so we invert the normalization
+        # so that 1.0 represents the cheapest/fastest (best) option.
+        n_c = normalize(cand["cost"], min_c, max_c, invert=True)
+        n_t = normalize(cand["time"], min_t, max_t, invert=True)
+        
+        # Weighted Score (Simple Additive Weighting)
+        score = (w_q * n_q) + (w_c * n_c) + (w_t * n_t)
+        
+        scored_candidates.append((score, cand["id"]))
+
+    # 4. Select Top 5
+    scored_candidates.sort(key=lambda x: x[0], reverse=True)
+    top_models_ids = [mid for score, mid in scored_candidates[:5]]
+    top_models = [Model(id) in top_models_ids]
+    
+    return top_models
