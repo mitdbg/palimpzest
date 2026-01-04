@@ -15,7 +15,7 @@ from palimpzest.constants import (
 )
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.core.lib.schemas import Average, Count, Max, Min, Sum
-from palimpzest.core.models import OperatorCostEstimates, RecordOpStats
+from palimpzest.core.models import OperatorCostEstimates, RecordOpStats, GenerationStats
 from palimpzest.query.generators.generators import Generator
 from palimpzest.query.operators.physical import PhysicalOperator
 
@@ -633,7 +633,6 @@ class SemanticAggregate(AggregateOp):
     def __call__(self, candidates: list[DataRecord]) -> DataRecordSet:
         start_time = time.time()
 
-        # TODO: if candidates is an empty list, return an empty DataRecordSet
         if len(candidates) == 0:
             return DataRecordSet([], [])
 
@@ -697,7 +696,7 @@ class SemanticGroupByOp(AggregateOp):
         self.gby_fields = gby_fields
         self.agg_fields = agg_fields
         self.agg_funcs = agg_funcs
-        self.model = model if model is not None else Model.GPT_4O_MINI
+        self.model = model
         self.prompt_strategy = prompt_strategy
         self.reasoning_effort = reasoning_effort
         
@@ -795,57 +794,59 @@ class SemanticGroupByOp(AggregateOp):
             return DataRecordSet([], [])
         
         # Use LLM to assign each record to a semantic group
-        group_assignments, phase1_stats = self._assign_groups_llm(candidates)
+        group_assignments, gen_stats = self._assign_groups_llm(candidates)
         
-        # Group candidates by their assigned group labels
-        groups = {}
+        # Group candidates by their assigned group labels and compute aggregations
+        # Using the same approach as ApplyGroupByOp but with LLM-determined groups
+        agg_state = {}
         for candidate, group_label in zip(candidates, group_assignments):
-            if group_label not in groups:
-                groups[group_label] = []
-            groups[group_label].append(candidate)
+            # Use group_label as the group key (tuple with single element)
+            group = (group_label,)
+            
+            # Initialize aggregation state for new groups
+            if group not in agg_state:
+                state = []
+                for fun in self.agg_funcs:
+                    state.append(ApplyGroupByOp.agg_init(fun))
+            else:
+                state = agg_state[group]
+            
+            # Merge values from this candidate into the aggregation state
+            for i in range(0, len(self.agg_funcs)):
+                fun = self.agg_funcs[i]
+                if not hasattr(candidate, self.agg_fields[i]):
+                    raise TypeError(f"SemanticGroupByOp record missing expected field {self.agg_fields[i]}")
+                field = getattr(candidate, self.agg_fields[i])
+                state[i] = ApplyGroupByOp.agg_merge(fun, state[i], field)
+            
+            agg_state[group] = state
         
-        # Apply aggregation functions to each group
+        # Create output DataRecords (one per group)
         drs = []
         record_op_stats_lst = []
-        total_cost = phase1_stats.cost_per_record * len(candidates)
         
-        for group_label, group_members in groups.items():
+        for group_key in agg_state:
             # Build aggregated data item for this group
             data_item = {}
             
-            # Add group-by field value
-            data_item[self.gby_fields[0]] = group_label
+            # Add group-by field value (extract from tuple)
+            data_item[self.gby_fields[0]] = group_key[0]
             
-            # Use LLM to compute aggregations for this group
-            # Use LLM to compute aggregations for this group
-            fields_to_generate = [agg_func.lower() for agg_func in self.agg_funcs]
-            fields = {field: self.output_schema.model_fields[field].annotation for field in fields_to_generate}
-            
-            # Construct generation kwargs
-            gen_kwargs = {
-                "project_cols": self.get_input_fields(),
-                "output_schema": self.output_schema,
-                "agg_instruction": f"Compute the following aggregations for group '{group_label}': {', '.join([f'{func}({field})' for func, field in zip(self.agg_funcs, self.agg_fields)])}"
-            }
-            
-            # Generate aggregation results
-            field_answers, _, agg_stats, _ = self.generator(group_members, fields, **gen_kwargs)
-            agg_results = {field: field_answers[field][0] for field in fields_to_generate}
-            
-            # Add aggregation results to data_item
-            for agg_field, agg_func in zip(self.agg_fields, self.agg_funcs):
+            # Add aggregation results (using agg_final to compute final values)
+            vals = agg_state[group_key]
+            for i in range(0, len(vals)):
+                agg_func = self.agg_funcs[i]
                 output_field_name = agg_func.lower()
-                data_item[output_field_name] = agg_results.get(output_field_name)
-            
-            # Accumulate aggregation costs
-            total_cost += agg_stats.cost_per_record * len(group_members)
+                v = ApplyGroupByOp.agg_final(agg_func, vals[i])
+                data_item[output_field_name] = v
             
             # Create the DataRecord for this group
             data_item_obj = self.output_schema(**data_item)
-            dr = DataRecord.from_agg_parents(data_item_obj, parent_records=group_members)
+            dr = DataRecord.from_agg_parents(data_item_obj, parent_records=candidates)
             drs.append(dr)
             
             # Create RecordOpStats for this group
+            # Cost is from LLM group assignment only (aggregation is free)
             record_op_stats = RecordOpStats(
                 record_id=dr._id,
                 record_parent_ids=dr._parent_ids,
@@ -854,18 +855,18 @@ class SemanticGroupByOp(AggregateOp):
                 full_op_id=self.get_full_op_id(),
                 logical_op_id=self.logical_op_id or "semantic-groupby",
                 op_name=self.op_name(),
-                time_per_record=(time.time() - start_time) / len(groups),
-                cost_per_record=total_cost / len(groups),
+                time_per_record=(time.time() - start_time) / len(agg_state),
+                cost_per_record=gen_stats.total_output_cost / len(agg_state),
                 model_name=self.get_model_name(),
                 input_fields=self.get_input_fields(),
                 generated_fields=list(self.output_schema.model_fields.keys()),
-                total_input_tokens=phase1_stats.total_input_tokens,
-                total_output_tokens=phase1_stats.total_output_tokens,
-                total_input_cost=phase1_stats.total_input_cost,
-                total_output_cost=phase1_stats.total_output_cost,
-                llm_call_duration_secs=phase1_stats.llm_call_duration_secs,
-                fn_call_duration_secs=phase1_stats.fn_call_duration_secs,
-                total_llm_calls=phase1_stats.total_llm_calls,
+                total_input_tokens=gen_stats.total_input_tokens,
+                total_output_tokens=gen_stats.total_output_tokens,
+                total_input_cost=gen_stats.total_input_cost,
+                total_output_cost=gen_stats.total_output_cost,
+                llm_call_duration_secs=gen_stats.llm_call_duration_secs,
+                fn_call_duration_secs=gen_stats.fn_call_duration_secs,
+                total_llm_calls=gen_stats.total_llm_calls,
                 op_details={k: str(v) for k, v in self.get_id_params().items()},
             )
             record_op_stats_lst.append(record_op_stats)
@@ -890,7 +891,7 @@ class SemanticGroupByOp(AggregateOp):
         
         # Process candidates to extract group labels
         group_labels = []
-        total_stats = None
+        total_stats = GenerationStats()
         
         # Get input fields once
         input_fields = self.get_input_fields()
@@ -914,15 +915,6 @@ class SemanticGroupByOp(AggregateOp):
             group_labels.append(group_label)
             
             # Accumulate stats
-            if total_stats is None:
-                total_stats = gen_stats
-            else:
-                # Sum up the stats
-                total_stats.total_input_tokens += gen_stats.total_input_tokens
-                total_stats.total_output_tokens += gen_stats.total_output_tokens
-                total_stats.total_input_cost += gen_stats.total_input_cost
-                total_stats.total_output_cost += gen_stats.total_output_cost
-                total_stats.llm_call_duration_secs += gen_stats.llm_call_duration_secs
-                total_stats.total_llm_calls += gen_stats.total_llm_calls
+            total_stats += gen_stats
         
         return group_labels, total_stats
