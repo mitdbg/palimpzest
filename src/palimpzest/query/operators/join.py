@@ -566,14 +566,14 @@ class EmbeddingJoin(LLMJoin):
         )
 
         # get est. of conversion cost (in USD) per record from model card
-        model_conversion_usd_per_record = MODEL_CARDS[self.embedding_model.value]["usd_per_input_token"] * est_num_input_tokens
+        model_conversion_usd_per_record = self.embedding_model.get_usd_per_input_token() * est_num_input_tokens
 
         # estimate output cardinality using a constant assumption of the filter selectivity
         selectivity = NAIVE_EST_JOIN_SELECTIVITY
         cardinality = selectivity * (left_source_op_cost_estimates.cardinality * right_source_op_cost_estimates.cardinality)
 
         # estimate quality of output based on the strength of the model being used
-        quality = (MODEL_CARDS[self.model.value]["overall"] / 100.0) * self.naive_quality_adjustment
+        quality = (self.model.get_overall_score() / 100.0) * self.naive_quality_adjustment
 
         return OperatorCostEstimates(
             cardinality=cardinality,

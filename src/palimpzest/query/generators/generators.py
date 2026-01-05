@@ -20,8 +20,8 @@ from pydantic.fields import FieldInfo
 from palimpzest.constants import (
     MODEL_CARDS,
     Cardinality,
-    CuratedModel,
     PromptStrategy,
+    CuratedModel
 )
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.models import GenerationStats
@@ -328,7 +328,7 @@ class Generator(Generic[ContextType, InputType]):
             if self.model.is_reasoning_model():
                 if self.model.is_vertex_model():
                     reasoning_effort = self.reasoning_effort
-                    if self.reasoning_effort is None and self.model == Model.GEMINI_2_5_PRO:
+                    if self.reasoning_effort is None and self.model.value == CuratedModel.GEMINI_2_5_PRO.value:
                         reasoning_effort = "low"
                     elif self.reasoning_effort is None:
                         reasoning_effort = "disable"

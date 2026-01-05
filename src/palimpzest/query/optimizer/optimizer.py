@@ -5,7 +5,7 @@ from copy import deepcopy
 
 from pydantic.fields import FieldInfo
 
-from palimpzest.constants import Model
+from palimpzest.utils.model_info import Model
 from palimpzest.core.data.dataset import Dataset
 from palimpzest.core.lib.schemas import get_schema_field_names
 from palimpzest.policy import Policy

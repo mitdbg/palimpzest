@@ -2,7 +2,7 @@ import yaml, time, requests, subprocess, os
 from palimpzest.core.models import PlanCost
 from palimpzest.policy import Policy
 from palimpzest.constants import MODEL_CARDS, CuratedModel
-from palimpzest.utils.model_helpers import predict_model_specs, get_model_provider, get_api_key_env_var
+from palimpzest.utils.model_helpers import predict_model_specs, get_model_provider, get_api_key_env_var, get_available_model_from_env
 
 CONFIG_FILENAME = "litellm_config.yaml"
 PROXY_PORT = 4000
@@ -47,7 +47,7 @@ def fetch_dynamic_model_info(available_models):
     )
     dynamic_model_info = {}
     try:
-        if not _wait_for_server(PROXY_PORT):
+        if not _wait_for_server(PROXY_URL):
             raise Exception("Sever failed to start")
         response = requests.get(
             f"{PROXY_URL}/model/info", 
@@ -65,19 +65,21 @@ def fetch_dynamic_model_info(available_models):
             process.wait(timeout=5)
         except subprocess.TimeoutExpired:
             process.kill()
+        # cleanup: remove the generated config file
+        if os.path.exists(CONFIG_FILENAME):
+            os.remove(CONFIG_FILENAME)
+
     DYNAMIC_MODEL_INFO = dynamic_model_info
     return dynamic_model_info
 
 class Model(str):
     """
-    Model describes the underlying LLM which should be used to perform some operation
-    which requires invoking an LLM. It does NOT specify whether the model need be executed
-    remotely or locally (if applicable).
+    Supports any model id. Returns information about the model previously in MODEL_CARDS
     """
     def __new__(cls, value):
         return super(Model, cls).__new__(cls, value)
     
-    def __init__(self):
+    def __init__(self, value):
         self.prediction = predict_model_specs(self)
     
     @property
@@ -94,19 +96,19 @@ class Model(str):
         return "clip" in self.lower()
 
     def is_together_model(self):
-         return get_model_provider() == "together_ai"
+         return get_model_provider(self.value) == "together_ai"
     
     def is_anthropic_model(self):
-        return get_model_provider() == "anthropic"
+        return get_model_provider(self.value) == "anthropic"
     
     def is_openai_model(self):
-        return get_model_provider() == "openai" or self.is_text_embedding_model()
+        return get_model_provider(self.value) == "openai" or self.is_text_embedding_model()
 
     def is_vertex_model(self):
-        return get_model_provider() == "vertex_ai"
+        return get_model_provider(self.value) == "vertex_ai"
 
     def is_google_ai_studio_model(self):
-        return get_model_provider() == "gemini"
+        return get_model_provider(self.value) == "gemini"
 
     def is_text_embedding_model(self):
         return "text-embedding" in self.lower()
@@ -126,7 +128,7 @@ class Model(str):
         return self.value in gpt_5_models
 
     def is_reasoning_model(self):
-        info = DYNAMIC_MODEL_INFO(self.value)
+        info = DYNAMIC_MODEL_INFO.get(self.value, {})
         if "supports_reasoning" in info and info["supports_reasoning"] is not None:
             return info["supports_reasoning"]
         # configured list
@@ -149,7 +151,7 @@ class Model(str):
         return self.value in known_reasoning_models
     
     def is_vision_model(self):
-        info = DYNAMIC_MODEL_INFO[self.value]
+        info = DYNAMIC_MODEL_INFO.get(self.value, {})
         if "supports_vision" in info and info["supports_vision"] is not None:
             return info["supports_vision"]
         # configured list
@@ -160,7 +162,7 @@ class Model(str):
             return False
     
     def is_audio_model(self):
-        info = DYNAMIC_MODEL_INFO[self.value]
+        info = DYNAMIC_MODEL_INFO.get(self.value, {})
         if "supports_audio_input" in info and info["supports_audio_input"] is not None:
             return info["supports_audio_input"]
         # configured list
@@ -171,7 +173,7 @@ class Model(str):
             return False # default
     
     def is_text_model(self):
-        info = DYNAMIC_MODEL_INFO[self.value]
+        info = DYNAMIC_MODEL_INFO.get(self.value, {})
         if "mode" in info:
             return info["mode"] in ["chat", "completion"]
         # configured list
@@ -182,7 +184,7 @@ class Model(str):
             return False # default
     
     def is_embedding_model(self):
-        info = DYNAMIC_MODEL_INFO(self)
+        info = DYNAMIC_MODEL_INFO.get(self.vaue, {})
         if "mode" in info:
             return info["mode"] == "embedding"
         try:
@@ -198,7 +200,7 @@ class Model(str):
         return self.is_audio_model() and self.is_text_model()
     
     def get_usd_per_input_token(self):
-        info = DYNAMIC_MODEL_INFO(self)
+        info = DYNAMIC_MODEL_INFO.get(self.value, {})
         if "input_cost_per_token" in info and info["input_cost_per_token"] is not None:
             return info["input_cost_per_token"]
         if self.value in MODEL_CARDS:
@@ -206,7 +208,7 @@ class Model(str):
         return self.prediction["usd_per_1m_input"]/1e6
     
     def get_usd_per_output_token(self):
-        info = DYNAMIC_MODEL_INFO(self)
+        info = DYNAMIC_MODEL_INFO.get(self.value, {})
         if "output_cost_per_token" in info and info["output_cost_per_token"] is not None:
             return info["output_cost_per_token"]
         if self.value in MODEL_CARDS:
@@ -221,7 +223,7 @@ class Model(str):
 
     def get_usd_per_audio_input_token(self):
         assert self.is_audio_model(), "model must be an audio model to retrieve audio input token cost"
-        info = DYNAMIC_MODEL_INFO(self)
+        info = DYNAMIC_MODEL_INFO.get(self.value, {})
         if "input_cost_per_audio_token" in info and info["input_cost_per_audio_token"] is not None:
             return info["input_cost_per_audio_token"]
         if self.value in MODEL_CARDS:
@@ -331,6 +333,6 @@ def get_optimal_models(policy: Policy) -> list[Model]:
     # 4. Select Top 5
     scored_candidates.sort(key=lambda x: x[0], reverse=True)
     top_models_ids = [mid for score, mid in scored_candidates[:5]]
-    top_models = [Model(id) in top_models_ids]
+    top_models = [Model(mid) for mid in top_models_ids]
     
     return top_models

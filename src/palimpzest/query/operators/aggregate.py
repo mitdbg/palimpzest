@@ -10,7 +10,7 @@ from palimpzest.constants import (
     NAIVE_EST_NUM_INPUT_TOKENS,
     NAIVE_EST_NUM_OUTPUT_TOKENS,
     AggFunc,
-    Model,
+    CuratedModel,
     PromptStrategy,
 )
 from palimpzest.core.elements.groupbysig import GroupBySig
@@ -19,6 +19,7 @@ from palimpzest.core.lib.schemas import Average, Count, Max, Min, Sum
 from palimpzest.core.models import OperatorCostEstimates, RecordOpStats
 from palimpzest.query.generators.generators import Generator
 from palimpzest.query.operators.physical import PhysicalOperator
+from palimpzest.utils.model_info import Model
 
 
 class AggregateOp(PhysicalOperator):
@@ -588,20 +589,20 @@ class SemanticAggregate(AggregateOp):
 
         # get est. of conversion time per record from model card;
         model_name = self.model.value
-        model_conversion_time_per_record = MODEL_CARDS[model_name]["seconds_per_output_token"] * est_num_output_tokens
+        model_conversion_time_per_record = self.model.get_seconds_per_output_token() * est_num_output_tokens
 
         # get est. of conversion cost (in USD) per record from model card
-        usd_per_input_token = MODEL_CARDS[model_name].get("usd_per_input_token")
+        usd_per_input_token = self.model.get_usd_per_input_token()
         if getattr(self, "prompt_strategy", None) is not None and self.prompt_strategy.is_audio_prompt():
-            usd_per_input_token = MODEL_CARDS[model_name]["usd_per_audio_input_token"]
+            usd_per_input_token = self.model.get_usd_per_audio_input_token()
 
         model_conversion_usd_per_record = (
             usd_per_input_token * est_num_input_tokens
-            + MODEL_CARDS[model_name]["usd_per_output_token"] * est_num_output_tokens
+            + self.model.get_usd_per_output_token() * est_num_output_tokens
         )
 
         # estimate quality of output based on the strength of the model being used
-        quality = (MODEL_CARDS[model_name]["overall"] / 100.0)
+        quality = self.model.get_overall_score() / 100.0
 
         return OperatorCostEstimates(
             cardinality=1.0,

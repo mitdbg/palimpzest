@@ -53,6 +53,7 @@ testdata/enron-eval/*.txt
 pyrightconfig.json
 
 myenv/
+pz-env/
 
 # abacus-research data
 abacus-research/cuad-data/*
