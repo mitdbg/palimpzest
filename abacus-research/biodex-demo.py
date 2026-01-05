@@ -8,7 +8,7 @@ import datasets
 from chromadb.utils.embedding_functions.openai_embedding_function import OpenAIEmbeddingFunction
 
 import palimpzest as pz
-from palimpzest.constants import Model
+from palimpzest.constants import CuratedModel
 
 biodex_entry_cols = [
     {"name": "pmid", "type": str, "desc": "The PubMed ID of the medical paper"},
@@ -366,13 +366,13 @@ if __name__ == "__main__":
     plan = plan.sem_map(biodex_ranked_reactions_labels_cols, depends_on=["title", "abstract", "fulltext", "reaction_labels"])
 
     # set models
-    models = [Model.GPT_4o_MINI] if args.gpt4_mini_only else [
-        Model.GPT_4o,
-        Model.GPT_4o_MINI,
-        Model.LLAMA3_1_8B,
-        Model.LLAMA3_3_70B,
+    models = [CuratedModel.GPT_4o_MINI] if args.gpt4_mini_only else [
+        CuratedModel.GPT_4o,
+        CuratedModel.GPT_4o_MINI,
+        CuratedModel.LLAMA3_1_8B,
+        CuratedModel.LLAMA3_3_70B,
         # Model.MIXTRAL,  # NOTE: only available in tag `abacus-paper-experiments`
-        Model.DEEPSEEK_R1_DISTILL_QWEN_1_5B,
+       CuratedModel.DEEPSEEK_R1_DISTILL_QWEN_1_5B,
     ]
 
     # execute pz plan

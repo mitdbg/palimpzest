@@ -2,7 +2,7 @@ import yaml, time, requests, subprocess, os
 from palimpzest.core.models import PlanCost
 from palimpzest.policy import Policy
 from palimpzest.constants import MODEL_CARDS, CuratedModel
-from palimpzest.utils.model_helpers import predict_model_specs, get_model_provider, get_api_key_env_var, get_available_model_from_env
+from palimpzest.utils.model_helpers import predict_model_specs, get_model_provider, get_api_key_env_var, get_models
 
 CONFIG_FILENAME = "litellm_config.yaml"
 PROXY_PORT = 4000
@@ -237,22 +237,36 @@ class Model(str):
         return self.prediction["mmlu_pro_score"]
     
 
-def get_optimal_models(policy: Policy) -> list[Model]:
+def get_optimal_models(
+    policy: Policy, 
+    include_embedding: bool = False, 
+    use_vertex: bool = False, 
+    gemini_credentials_path: str | None = None, 
+    api_base: str | None = None
+) -> list[Model]:
     """
     Selects the top models from the available list based on the user's policy.
     
     This function:
-    1. Filters models that violate policy constraints (e.g. min quality).
-    2. Calculates a weighted score for each model using the policy's weights 
-       (Quality, Cost, Time).
-    3. Returns the top 5 models with the highest score.
+    1. Discovers available models (using env vars and params).
+    2. Filters models that violate policy constraints (e.g. min quality).
+    3. Calculates a weighted score for each model using the policy's weights.
+    4. Returns the top 5 models with the highest score.
     """
-    model_ids = get_available_model_from_env()
+    # 1. Gather Available Models
+    available_model_enums = get_models(
+        include_embedding=include_embedding, 
+        use_vertex=use_vertex, 
+        gemini_credentials_path=gemini_credentials_path, 
+        api_base=api_base
+    )
+    # Convert enums to string IDs for processing
+    model_ids = [m.value for m in available_model_enums]
 
     if not model_ids:
         return []
 
-    # 1. Gather Metrics and Apply Constraints
+    # 2. Gather Metrics and Apply Constraints
     candidates = []
     for mid in model_ids:
         # Retrieve or predict metrics
@@ -272,7 +286,6 @@ def get_optimal_models(policy: Policy) -> list[Model]:
         if time_val is None: time_val = float("inf")
 
         # Create proxy plan for constraint checking
-        # (Cost/Time set to 0.0 as we only check unit-invariant constraints like Quality here)
         normalized_quality = quality_score / 100.0
         proxy_plan = PlanCost(cost=0.0, time=0.0, quality=normalized_quality)
         
@@ -289,10 +302,7 @@ def get_optimal_models(policy: Policy) -> list[Model]:
     if not candidates:
         return []
 
-    # 2. Normalize Metrics (Min-Max Normalization)
-    # We want to map everything to [0, 1] to apply weights fairly.
-    
-    # Extract ranges
+    # 3. Normalize Metrics (Min-Max Normalization)
     quals = [c["quality"] for c in candidates]
     costs = [c["cost"] for c in candidates]
     times = [c["time"] for c in candidates]
@@ -301,15 +311,13 @@ def get_optimal_models(policy: Policy) -> list[Model]:
     min_c, max_c = min(costs), max(costs)
     min_t, max_t = min(times), max(times)
     
-    # Helper for safe normalization
     def normalize(val, min_v, max_v, invert=False):
         if max_v == min_v:
-            return 1.0 # If all values are same, treat as 'best'
+            return 1.0
         norm = (val - min_v) / (max_v - min_v)
         return (1.0 - norm) if invert else norm
 
-    # 3. Calculate Scores
-    # Weights from policy (e.g., {'cost': 1.0, 'time': 0.0, 'quality': 0.0})
+    # 4. Calculate Scores
     weights = policy.get_dict()
     w_q = weights.get("quality", 0.0)
     w_c = weights.get("cost", 0.0)
@@ -317,22 +325,19 @@ def get_optimal_models(policy: Policy) -> list[Model]:
     
     scored_candidates = []
     for cand in candidates:
-        # Quality is Benefit (Higher is Better)
         n_q = normalize(cand["quality"], min_q, max_q, invert=False)
-        
-        # Cost and Time are Costs (Lower is Better), so we invert the normalization
-        # so that 1.0 represents the cheapest/fastest (best) option.
         n_c = normalize(cand["cost"], min_c, max_c, invert=True)
         n_t = normalize(cand["time"], min_t, max_t, invert=True)
         
-        # Weighted Score (Simple Additive Weighting)
         score = (w_q * n_q) + (w_c * n_c) + (w_t * n_t)
         
         scored_candidates.append((score, cand["id"]))
 
-    # 4. Select Top 5
+    # 5. Select Top 5
     scored_candidates.sort(key=lambda x: x[0], reverse=True)
     top_models_ids = [mid for score, mid in scored_candidates[:5]]
+    
+    # Return list of Model objects
     top_models = [Model(mid) for mid in top_models_ids]
     
     return top_models

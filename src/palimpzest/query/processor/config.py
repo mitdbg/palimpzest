@@ -1,7 +1,8 @@
 from pydantic import BaseModel, ConfigDict, Field, field_validator, ValidationInfo
 
-from palimpzest.utils.model_info import Model, fetch_dynamic_model_info, get_optimal_models
 from palimpzest.policy import MaxQuality, Policy
+from palimpzest.constants import CuratedModel
+from palimpzest.utils.model_info import Model
 
 
 # TODO: Add description for each field.
@@ -21,8 +22,8 @@ class QueryProcessorConfig(BaseModel):
     num_samples: int = Field(default=None)
     verbose: bool = Field(default=False)
     progress: bool = Field(default=True)
-    available_models: list[Model] | None = Field(default=None)
-    remove_models: list[Model] | None = Field(default=None)
+    available_models: list[CuratedModel | str | Model] | None = Field(default=None)
+    remove_models: list[CuratedModel | str] | None = Field(default=None)
     max_workers: int | None = Field(default=64)
     join_parallelism: int = Field(default=64)
     batch_size: int | None = Field(default=None)
@@ -53,33 +54,3 @@ class QueryProcessorConfig(BaseModel):
     def to_dict(self) -> dict:
         """Convert the config to a dict representation."""
         return self.model_dump()
-
-    @field_validator("available_models", mode="before")
-    @classmethod
-    def convert_available_models(cls, model_list, info: ValidationInfo):
-        if model_list is None:
-            policy = info.data.get("policy")
-            if not isinstance(policy, Policy):
-                policy = MaxQuality()
-            return get_optimal_models(policy)
-
-        if not isinstance(model_list, list):
-            raise TypeError("Expected a list of strings")
-
-        if not all(isinstance(model, str) for model in model_list):
-            raise TypeError("Pass in models as strings")
-
-        fetch_dynamic_model_info(model_list)
-        return [Model(model) for model in model_list]
-    
-    # TODO: figure out what remove models parameter is
-    @field_validator("remove_models", mode="before")
-    @classmethod
-    def convert_remove_models(cls, model_list):
-        if not isinstance(model_list, list):
-            raise TypeError("Expected a list of strings")
-
-        if not all(isinstance(model, str) for model in model_list):
-            raise TypeError("Pass in models as strings")
-        
-        return [Model(model) for model in model_list]

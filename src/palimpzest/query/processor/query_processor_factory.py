@@ -13,7 +13,7 @@ from palimpzest.query.optimizer.optimizer import Optimizer
 from palimpzest.query.optimizer.optimizer_strategy_type import OptimizationStrategyType
 from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.query.processor.query_processor import QueryProcessor
-from palimpzest.utils.model_helpers import get_models
+from palimpzest.utils.model_info import Model, fetch_dynamic_model_info, get_optimal_models
 from palimpzest.validator.validator import Validator
 
 logger = logging.getLogger(__name__)
@@ -54,6 +54,37 @@ class QueryProcessorFactory:
             logger.debug(f"Normalized {strategy}: {strategy_enum}")
 
         return config
+    
+    @classmethod
+    def _normalize_models(cls, config: QueryProcessorConfig) -> QueryProcessorConfig:
+        """
+        Validate and normalize available_models and remove_models.
+        Converts strings to Model objects and fetches dynamic model info.
+        """
+        # 1. Normalize available_models
+        available_models = getattr(config, 'available_models', [])
+        if available_models is None or len(available_models) == 0:
+            # If no models provided, select optimal models based on policy
+            available_models_objs = get_optimal_models(
+                policy = config.policy,
+                use_vertex = config.use_vertex,
+                gemini_credentials_path = config.gemini_credentials_path,
+                api_base = config.api_base
+            )
+        # Fetch info for these models (accepts list of strings/CuratedModel)
+        fetch_dynamic_model_info(available_models)
+        available_models_objs = [Model(model) for model in available_models]
+
+        # 1. Normalize remove_models
+        remove_models = getattr(config, 'remove_models', [])
+
+        # remove any models specified in the config
+        if remove_models is not None and len(remove_models) > 0:
+            available_models_objs = [model for model in available_models_objs if model.value not in remove_models]
+            logger.info(f"Removed models from available models based on config: {remove_models}")
+        
+        config.available_models = available_models_objs
+        config.remove_models = remove_models
 
     @classmethod
     def _config_validation_and_normalization(cls, config: QueryProcessorConfig, train_dataset: dict[str, Dataset] | None, validator : Validator | None):
@@ -79,20 +110,7 @@ class QueryProcessorFactory:
 
         # convert the config values for processing, execution, and optimization strategies to enums
         config = cls._normalize_strategies(config)
-
-        # get available models
-        available_models = getattr(config, 'available_models', [])
-        if available_models is None or len(available_models) == 0:
-            available_models = get_models(use_vertex=config.use_vertex, gemini_credentials_path=config.gemini_credentials_path, api_base=config.api_base)
-
-        # remove any models specified in the config
-        remove_models = getattr(config, 'remove_models', [])
-        if remove_models is not None and len(remove_models) > 0:
-            available_models = [model for model in available_models if model not in remove_models]
-            logger.info(f"Removed models from available models based on config: {remove_models}")
-
-        # set the final set of available models in the config
-        config.available_models = available_models
+        config = cls._normalize_models(config)
 
         if len(config.available_models) == 0:
             raise ValueError("No available models found.")
