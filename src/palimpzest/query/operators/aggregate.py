@@ -738,13 +738,6 @@ class SemanticGroupByOp(AggregateOp):
     
     def get_model_name(self) -> str:
         return self.model.value
-    
-    def get_fields_to_generate(self, candidate: DataRecord) -> list[str]:
-        """
-        For aggregation operators, we need to generate ALL output fields (including group-by fields),
-        not just the new fields. This overrides the default behavior.
-        """
-        return list(self.output_schema.model_fields.keys())
 
     def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         """
