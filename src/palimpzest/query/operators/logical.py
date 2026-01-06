@@ -399,6 +399,7 @@ class GroupByAggregate(LogicalOperator):
             if f not in self.input_schema.model_fields:
                 raise TypeError(f"Supplied schema has no field {f}")
         
+        self.is_semantic = is_semantic
         self.gby_fields = gby_fields
         self.agg_fields = agg_fields
         self.agg_funcs = agg_funcs
@@ -409,6 +410,7 @@ class GroupByAggregate(LogicalOperator):
     def get_logical_id_params(self) -> dict:
         logical_id_params = super().get_logical_id_params()
         logical_id_params = {
+            "is_semantic": self.is_semantic,
             "gby_fields": self.gby_fields,
             "agg_fields": self.agg_fields,
             "agg_funcs": self.agg_funcs,
@@ -420,6 +422,7 @@ class GroupByAggregate(LogicalOperator):
     def get_logical_op_params(self) -> dict:
         logical_op_params = super().get_logical_op_params()
         logical_op_params = {
+            "is_semantic": self.is_semantic,
             "gby_fields": self.gby_fields,
             "agg_fields": self.agg_fields,
             "agg_funcs": self.agg_funcs,

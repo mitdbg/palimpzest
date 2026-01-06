@@ -19,6 +19,7 @@ from palimpzest.query.operators.aggregate import (
     MaxAggregateOp,
     MinAggregateOp,
     SemanticAggregate,
+    SemanticGroupByOp,
     SumAggregateOp,
 )
 from palimpzest.query.operators.compute import SmolAgentsCompute
@@ -1071,7 +1072,6 @@ class BasicSubstitutionRule(ImplementationRule):
         Distinct: DistinctOp,
         LimitScan: LimitScanOp,
         Project: ProjectOp,
-        GroupByAggregate: ApplyGroupByOp,
     }
 
     @classmethod
@@ -1086,6 +1086,23 @@ class BasicSubstitutionRule(ImplementationRule):
         logger.debug(f"Substituting BasicSubstitutionRule for {logical_expression}")
         physical_op_class = cls.LOGICAL_OP_CLASS_TO_PHYSICAL_OP_CLASS_MAP[logical_expression.operator.__class__]
         return cls._perform_substitution(logical_expression, physical_op_class, runtime_kwargs)
+
+
+class NonSemanticGroupBy(ImplementationRule):
+    """
+    Substitute a logical expression for a non-semantic GroupBy with ApplyGroupByOp.
+    """
+
+    @classmethod
+    def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
+        is_match = isinstance(logical_expression.operator, GroupByAggregate) and logical_expression.operator.is_semantic == False
+        logger.debug(f"NonSemanticGroupBy matches_pattern: {is_match} for {logical_expression}")
+        return is_match
+
+    @classmethod
+    def substitute(cls, logical_expression: LogicalExpression, **runtime_kwargs) -> set[PhysicalExpression]:
+        logger.debug(f"Substituting NonSemanticGroupBy for {logical_expression}")
+        return cls._perform_substitution(logical_expression, ApplyGroupByOp, runtime_kwargs)
 
 
 class SemanticGroupBy(ImplementationRule):
