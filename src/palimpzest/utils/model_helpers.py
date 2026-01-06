@@ -1,6 +1,53 @@
-import os, re
-from typing import Dict, Any
+import os, re, json
+from typing import Dict, Any, Optional
 from palimpzest.constants import CuratedModel
+
+# Global cache for benchmark metrics
+_KNOWN_MODEL_METRICS = {}
+
+def _load_benchmark_metrics():
+    """
+    Loads and flattens the model_mmlu_latency.json file into a dictionary
+    mapping model slugs to their metrics.
+    """
+    global _KNOWN_MODEL_METRICS
+    
+    # Avoid reloading if already populated
+    if _KNOWN_MODEL_METRICS:
+        return
+
+    # Assume json file is in the same directory as this script
+    json_path = os.path.join(os.path.dirname(__file__), 'model_mmlu_latency.json')
+    
+    if not os.path.exists(json_path):
+        # Fallback or warning could go here; for now we just return empty
+        print(f"Warning: Benchmark file not found at {json_path}")
+        return
+
+    try:
+        with open(json_path, 'r') as f:
+            data = json.load(f)
+
+        # Flatten the nested JSON structure: Provider -> Model -> Metrics
+        # Target format: "model-slug": {"tps": 123.4, "mmlu": 88.5}
+        for provider, models in data.items():
+            for model_id, specs in models.items():
+                slug = model_id.lower()
+                
+                # Parse metrics with safety checks
+                tps = specs.get("output_tokens_per_second")
+                mmlu = specs.get("MMLU_Pro_score")
+                
+                _KNOWN_MODEL_METRICS[slug] = {
+                    "tps": float(tps) if tps is not None else None,
+                    "mmlu": float(mmlu) if mmlu is not None else None
+                }
+                
+    except Exception as e:
+        print(f"Error loading benchmark metrics: {e}")
+
+# Load metrics immediately upon module import
+_load_benchmark_metrics()
 
 
 def get_model_provider(model_name: str) -> str:
@@ -72,8 +119,54 @@ def get_api_key_env_var(model_name: str):
     return provider_to_env_var.get(model_provider)
 
 
-# helper function to predict the pricing, latency, and overall benchmark score when data
-# is not available through endpoint / constants.py
+def _find_closest_benchmark_metric(model_slug: str) -> Optional[Dict[str, float]]:
+    """
+    Attempts to find MMLU and Latency metrics from _KNOWN_MODEL_METRICS
+    using exact matches, substring matches, and sibling model inference.
+    """
+    # Ensure metrics are loaded
+    if not _KNOWN_MODEL_METRICS:
+        _load_benchmark_metrics()
+        
+    slug = model_slug.lower()
+
+    # 1. Exact Match
+    if slug in _KNOWN_MODEL_METRICS:
+        return _KNOWN_MODEL_METRICS[slug]
+
+    # 2. Date-invariant Match (e.g. gpt-4o-2024-05-13 -> gpt-4o)
+    matches = [k for k in _KNOWN_MODEL_METRICS.keys() if k.startswith(slug) or slug in k]
+    if matches:
+        # Pick the first match; ideally this could be refined to pick the most recent/best match
+        best_match = matches[0]
+        return _KNOWN_MODEL_METRICS[best_match]
+
+    # 3. Sibling Inference (Base <-> Instruct)
+    is_instruct = "instruct" in slug or "chat" in slug
+    base_slug = slug.replace("-instruct", "").replace("-chat", "").strip("-")
+    
+    if is_instruct:
+        # User asks for Instruct, we look for Base
+        if base_slug in _KNOWN_MODEL_METRICS:
+            base_metrics = _KNOWN_MODEL_METRICS[base_slug]
+            # Heuristic: Instruct usually +10% MMLU, Speed similar (0.95x)
+            return {
+                "mmlu": base_metrics["mmlu"] * 1.1 if base_metrics["mmlu"] else None, 
+                "tps": (base_metrics["tps"] * 0.95) if base_metrics["tps"] else None
+            }
+    else:
+        # User asks for Base, we look for Instruct
+        instruct_slug = f"{slug}-instruct"
+        if instruct_slug in _KNOWN_MODEL_METRICS:
+            inst_metrics = _KNOWN_MODEL_METRICS[instruct_slug]
+            # Heuristic: Base usually -10% MMLU, Speed similar (1.05x)
+            return {
+                "mmlu": inst_metrics["mmlu"] * 0.9 if inst_metrics["mmlu"] else None,
+                "tps": (inst_metrics["tps"] * 1.05) if inst_metrics["tps"] else None
+            }
+
+    return None
+
 def predict_model_specs(full_model_id: str) -> Dict[str, Any]:
     """
     Predicts pricing (USD/1M tokens), latency (sec/token), and MMLU-Pro score
@@ -96,10 +189,8 @@ def predict_model_specs(full_model_id: str) -> Dict[str, Any]:
         "tier": "Standard"
     }
 
-    # ==============================================================================
     # 1. REASONING / "THINKING" MODELS (Highest Cost, Highest Latency, Best Score)
     # Keywords: o1, o3, o4, r1 (DeepSeek), reasoning, thinking
-    # ==============================================================================
     if re.search(r'\b(o1|o3|o4|r1|reasoning|thinking)\b', model_slug):
         prediction["tier"] = "Reasoning (Heavy)"
         prediction["mmlu_pro_score"] = 85.0
@@ -114,10 +205,8 @@ def predict_model_specs(full_model_id: str) -> Dict[str, Any]:
             prediction["usd_per_1m_output"] = 12.00
             prediction["seconds_per_output_token"] = 0.03
 
-    # ==============================================================================
     # 2. FUTURE FLAGSHIPS (GPT-5, Llama 4, Gemini 3, Opus 4/4.5)
     # Keywords: gpt-5, llama-4, gemini-3, opus-4, claude-4
-    # ==============================================================================
     elif re.search(r'(gpt-5|llama-4|gemini-3|opus-4|sonnet-4|grok-4|mistral-large-3)', model_slug):
         prediction["tier"] = "Next-Gen Flagship"
         prediction["mmlu_pro_score"] = 92.0 # Theoretical future score
@@ -125,10 +214,8 @@ def predict_model_specs(full_model_id: str) -> Dict[str, Any]:
         prediction["usd_per_1m_input"] = 5.00
         prediction["usd_per_1m_output"] = 15.00
 
-    # ==============================================================================
     # 3. CURRENT FLAGSHIPS (GPT-4, Opus 3/3.5, Gemini 1.5/2.5 Pro, Llama 3.1 405B)
     # Keywords: gpt-4, opus, gemini.*pro, large, 405b, command-r-plus, grok-3
-    # ==============================================================================
     elif re.search(r'(gpt-4|opus|gemini.*pro|large|405b|command-r-plus|grok-3)', model_slug):
         prediction["tier"] = "Current Flagship"
         prediction["mmlu_pro_score"] = 75.0
@@ -137,16 +224,14 @@ def predict_model_specs(full_model_id: str) -> Dict[str, Any]:
         prediction["usd_per_1m_output"] = 10.00
         
         # Special check for "Turbo/Flash" versions of flagships (Cheaper/Faster)
-        if re.search(r'(turbo|flash|lite)', model_slug):
+        if re.search(r'(turbo|flash|lite|fast)', model_slug):
             prediction["tier"] += " (Optimized)"
             prediction["usd_per_1m_input"] = 0.15
             prediction["usd_per_1m_output"] = 0.60
             prediction["seconds_per_output_token"] = 0.01 # Fast (~100 tok/s)
 
-    # ==============================================================================
     # 4. BALANCED / HIGH-MID (Sonnet, Llama 70B, Grok 2, Mistral Medium)
     # Keywords: sonnet, 70b, 90b, medium, grok-2, command-r (standard)
-    # ==============================================================================
     elif re.search(r'(sonnet|70b|90b|medium|grok-2|command-r)', model_slug):
         prediction["tier"] = "Balanced"
         prediction["mmlu_pro_score"] = 65.0
@@ -158,10 +243,8 @@ def predict_model_specs(full_model_id: str) -> Dict[str, Any]:
         if "sonnet" in model_slug:
              prediction["mmlu_pro_score"] = 78.0
 
-    # ==============================================================================
     # 5. ECONOMY / SMALL (Haiku, Mini, 8B, 7B, 3B, Flash-Lite)
     # Keywords: haiku, mini, nano, 8b, 7b, small, micro
-    # ==============================================================================
     elif re.search(r'(haiku|mini|nano|small|micro|\b[1-9]b\b|1[0-4]b)', model_slug):
         prediction["tier"] = "Economy"
         prediction["mmlu_pro_score"] = 45.0
@@ -174,14 +257,26 @@ def predict_model_specs(full_model_id: str) -> Dict[str, Any]:
              prediction["usd_per_1m_input"] = 0.05
              prediction["usd_per_1m_output"] = 0.20
 
-    # ==============================================================================
     # AUDIO / MULTIMODAL DETECTION
     # If the model is known to handle native audio, assign audio pricing
-    # ==============================================================================
     # Keywords: 4o, omni, gemini (usually multimodal), audio
     if re.search(r'(4o|omni|gemini|audio)', model_slug):
         # Audio input is generally 2-5x text input price
         prediction["usd_per_1m_audio_input"] = prediction["usd_per_1m_input"] * 4.0
+
+    # BENCHMARK DATA OVERRIDE
+    # Attempt to fetch ground-truth MMLU/Latency from known dataset
+    bench_data = _find_closest_benchmark_metric(model_slug)
+    if bench_data:
+        # Override MMLU if available
+        if bench_data.get("mmlu") is not None:
+            prediction["mmlu_pro_score"] = bench_data["mmlu"]
+        
+        # Override Latency if available
+        # Note: input is tokens/sec, we need seconds/token (1/x)
+        tps = bench_data.get("tps")
+        if tps and tps > 0:
+            prediction["seconds_per_output_token"] = 1.0 / tps
 
     return prediction
 
