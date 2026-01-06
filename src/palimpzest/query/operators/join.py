@@ -13,7 +13,6 @@ from pydantic.fields import FieldInfo
 from sentence_transformers import SentenceTransformer
 
 from palimpzest.constants import (
-    MODEL_CARDS,
     NAIVE_EST_JOIN_SELECTIVITY,
     NAIVE_EST_NUM_INPUT_TOKENS,
     Cardinality,
@@ -619,7 +618,7 @@ class EmbeddingJoin(LLMJoin):
             embeddings /= num_input_fields_present
 
         # compute cost of embedding(s)
-        total_embedding_cost = self.model.get_usd_per_input_token() * total_embedding_input_tokens
+        total_embedding_cost = self.embedding_model.get_usd_per_input_token() * total_embedding_input_tokens
         embedding_gen_stats = GenerationStats(
             model_name=self.embedding_model.value,
             total_input_tokens=0.0,

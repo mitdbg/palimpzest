@@ -11,9 +11,10 @@ from palimpzest.constants import (
     TOKENS_PER_CHARACTER,
     Cardinality,
     Modality,
-    Model,
+    CuratedModel,
     PromptStrategy,
 )
+from palimpzest.utils.model_info import Model
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.lib.schemas import (
     AUDIO_FIELD_TYPES,

@@ -18,7 +18,6 @@ from colorama import Fore, Style
 from pydantic.fields import FieldInfo
 
 from palimpzest.constants import (
-    MODEL_CARDS,
     Cardinality,
     PromptStrategy,
     CuratedModel

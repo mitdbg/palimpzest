@@ -72,8 +72,9 @@ class QueryProcessorFactory:
                 api_base = config.api_base
             )
         # Fetch info for these models (accepts list of strings/CuratedModel)
-        fetch_dynamic_model_info(available_models)
-        available_models_objs = [Model(model) for model in available_models]
+        else:
+            fetch_dynamic_model_info(available_models)
+            available_models_objs = [Model(model) for model in available_models]
 
         # 1. Normalize remove_models
         remove_models = getattr(config, 'remove_models', [])

@@ -7,7 +7,6 @@ from typing import Any
 from pydantic.fields import FieldInfo
 
 from palimpzest.constants import (
-    MODEL_CARDS,
     NAIVE_EST_FILTER_SELECTIVITY,
     NAIVE_EST_NUM_INPUT_TOKENS,
     Cardinality,

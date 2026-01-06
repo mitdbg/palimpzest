@@ -5,12 +5,10 @@ import time
 from typing import Any
 
 from palimpzest.constants import (
-    MODEL_CARDS,
     NAIVE_EST_NUM_GROUPS,
     NAIVE_EST_NUM_INPUT_TOKENS,
     NAIVE_EST_NUM_OUTPUT_TOKENS,
     AggFunc,
-    CuratedModel,
     PromptStrategy,
 )
 from palimpzest.core.elements.groupbysig import GroupBySig

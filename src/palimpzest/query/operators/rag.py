@@ -9,9 +9,8 @@ from openai import OpenAI
 from pydantic.fields import FieldInfo
 
 from palimpzest.constants import (
-    MODEL_CARDS,
     NAIVE_EST_NUM_OUTPUT_TOKENS,
-    CuratedModel,
+    CuratedModel
 )
 from palimpzest.utils.model_info import Model
 from palimpzest.core.elements.records import DataRecord
@@ -64,7 +63,7 @@ class RAGConvert(LLMConvert):
         est_num_output_tokens = NAIVE_EST_NUM_OUTPUT_TOKENS
         model_conversion_usd_per_record = (
             self.model.get_usd_per_input_token() * est_num_input_tokens
-            + MODEL_CARDS[self.model.value]["usd_per_output_token"] * est_num_output_tokens
+            + self.model.get_usd_per_output_token() * est_num_output_tokens
         )
 
         # set refined estimate of cost per record
