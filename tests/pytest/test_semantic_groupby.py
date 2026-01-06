@@ -23,7 +23,6 @@ def test_semantic_groupby_basic():
     try:
         # Create list of candidates from text file dataset with schema
         ds = pz.TextFileDataset(id="reviews", path="product-reviews/")
-        ds = ds.sem_map(review_cols)  # Add schema to extract complaint types
         output = ds.run()
         candidates = [dr for dr in output]
         
@@ -34,11 +33,25 @@ def test_semantic_groupby_basic():
         input_schema = candidates[0].schema if candidates else None
         
         # Create output schema (group by field + count)
+        # Using the same naming convention as Dataset.sem_groupby()
         from palimpzest.core.lib.schemas import create_schema_from_fields
-        output_schema = create_schema_from_fields([
-            {"name": "complaint", "type": str, "desc": "The complaint type"},
-            {"name": "count", "type": int, "desc": "Count of reviews in this group"}
-        ])
+        from typing import Any
+        
+        fields = []
+        # Add group by fields to output schema
+        for g in ['complaint']:
+            f = {"name": g, "type": Any, "desc": f"Group by field: {g}"}
+            fields.append(f)
+        
+        # Add aggregation fields to output schema
+        agg_fields_list = ['contents']
+        agg_funcs_list = ['count']
+        for i, agg_func in enumerate(agg_funcs_list):
+            agg_field_name = f"{agg_func}({agg_fields_list[i]})"
+            f = {"name": agg_field_name, "type": Any, "desc": f"Aggregate field: {agg_field_name}"}
+            fields.append(f)
+        
+        output_schema = create_schema_from_fields(fields)
         
         # Create instance of the physical operator
         sem_group_by_op = SemanticGroupByOp(
@@ -80,7 +93,6 @@ def test_semantic_groupby_via_dataset():
     try:
         # Create dataset and add schema
         ds = pz.TextFileDataset(id="reviews", path="product-reviews/")
-        ds = ds.sem_map(review_cols)  # Add schema to extract complaint types
         
         # Apply semantic group by operation
         ds = ds.sem_groupby(
