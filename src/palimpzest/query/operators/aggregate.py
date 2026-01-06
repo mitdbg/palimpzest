@@ -818,6 +818,9 @@ class SemanticGroupByOp(AggregateOp):
         drs = []
         record_op_stats_lst = []
         
+        # Get the output field names from the output schema
+        output_field_names = [f for f in self.output_schema.model_fields.keys() if f not in self.gby_fields]
+        
         for group_key in agg_state:
             # Build aggregated data item for this group
             data_item = {}
@@ -829,7 +832,7 @@ class SemanticGroupByOp(AggregateOp):
             vals = agg_state[group_key]
             for i in range(0, len(vals)):
                 agg_func = self.agg_funcs[i]
-                output_field_name = agg_func.lower()
+                output_field_name = output_field_names[i]
                 v = ApplyGroupByOp.agg_final(agg_func, vals[i])
                 data_item[output_field_name] = v
             
