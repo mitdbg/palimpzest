@@ -1126,7 +1126,7 @@ class SemanticGroupBy(ImplementationRule):
         variable_op_kwargs = [
             {
                 "model": model,
-                "prompt_strategy": PromptStrategy.GROUP_BY_NO_REASONING if model.is_reasoning_model() and no_reasoning else PromptStrategy.GROUP_BY,
+                "prompt_strategy": PromptStrategy.AGG_NO_REASONING if model.is_reasoning_model() and no_reasoning else PromptStrategy.AGG,
                 "reasoning_effort": runtime_kwargs["reasoning_effort"]
             }
             for model in models
