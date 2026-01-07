@@ -58,3 +58,31 @@ def get_models(include_embedding: bool = False, use_vertex: bool = False, gemini
         models.extend(vllm_models)
 
     return models
+
+
+def resolve_reasoning_settings(model: Model | None, reasoning_effort: str | None) -> tuple[bool, str]:
+    """
+    Resolve the reasoning settings based on the model and provided reasoning effort.
+    Returns a tuple indicating whether reasoning prompt should be used and the reasoning effort level.
+    By default, we use the reasoning prompt everywhere while setting the model reasoning effort to None (or minimal).
+    If a user explicitly provides a reasoning_effort, we pass that through to the model.
+    If the user explicitly disables reasoning_effort, we disable the reasoning prompt as well.
+    """
+    # turn off reasoning prompt if reasoning_effort is in [None, "disable", "minimal", "low"]
+    use_reasoning_prompt = reasoning_effort not in [None, "disable", "minimal", "low"]
+
+    # if reasoning_effort is set to "default", set it to None to use model defaults
+    if reasoning_effort == "default":
+        reasoning_effort = None
+
+    # translate reasoning_effort into model-specific settings
+    if model is not None and model.is_reasoning_model():
+        if model.is_vertex_model() or model.is_google_ai_studio_model():
+            if reasoning_effort is None and model in [Model.GEMINI_2_5_PRO, Model.GOOGLE_GEMINI_2_5_PRO]:
+                reasoning_effort = "low"
+            elif reasoning_effort is None:
+                reasoning_effort = "disable"
+        elif model.is_openai_model():
+            reasoning_effort = "minimal" if reasoning_effort in [None, "disable", "minimal", "low"] else reasoning_effort
+
+    return use_reasoning_prompt, reasoning_effort
