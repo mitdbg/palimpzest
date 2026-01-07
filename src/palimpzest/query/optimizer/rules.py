@@ -54,6 +54,7 @@ from palimpzest.query.operators.search import (
 from palimpzest.query.operators.split import SplitConvert, SplitFilter
 from palimpzest.query.operators.topk import TopKOp
 from palimpzest.query.optimizer.primitives import Expression, Group, LogicalExpression, PhysicalExpression
+from palimpzest.utils.model_helpers import resolve_reasoning_settings
 
 logger = logging.getLogger(__name__)
 
@@ -628,15 +629,17 @@ class LLMConvertBondedRule(ImplementationRule):
 
         # create variable physical operator kwargs for each model which can implement this logical_expression
         models = [model for model in runtime_kwargs["available_models"] if cls._model_matches_input(model, logical_expression)]
-        no_reasoning = runtime_kwargs["reasoning_effort"] in [None, "minimal", "low"]
-        variable_op_kwargs = [
-            {
-                "model": model,
-                "prompt_strategy": PromptStrategy.MAP_NO_REASONING if model.is_reasoning_model() and no_reasoning else PromptStrategy.MAP,
-                "reasoning_effort": runtime_kwargs["reasoning_effort"],
-            }
-            for model in models
-        ]
+        variable_op_kwargs = []
+        for model in models:
+            use_reasoning_prompt, reasoning_effort = resolve_reasoning_settings(model, runtime_kwargs["reasoning_effort"])
+            prompt_strategy = PromptStrategy.MAP if use_reasoning_prompt else PromptStrategy.MAP_NO_REASONING
+            variable_op_kwargs.append(
+                {
+                    "model": model,
+                    "prompt_strategy": prompt_strategy,
+                    "reasoning_effort": reasoning_effort,
+                }
+            )
 
         return cls._perform_substitution(logical_expression, LLMConvertBonded, runtime_kwargs, variable_op_kwargs)
 
@@ -665,18 +668,27 @@ class RAGRule(ImplementationRule):
 
         # create variable physical operator kwargs for each model which can implement this logical_expression
         models = [model for model in runtime_kwargs["available_models"] if cls._model_matches_input(model, logical_expression)]
-        variable_op_kwargs = [
-            {
-                "model": model,
-                "prompt_strategy": PromptStrategy.MAP if phys_op_cls is RAGConvert else PromptStrategy.FILTER,
-                "num_chunks_per_field": num_chunks_per_field,
-                "chunk_size": chunk_size,
-                "reasoning_effort": runtime_kwargs["reasoning_effort"],
-            }
-            for model in models
-            for num_chunks_per_field in cls.num_chunks_per_fields
-            for chunk_size in cls.chunk_sizes
-        ]
+        variable_op_kwargs = []
+        for model in models:
+             use_reasoning_prompt, reasoning_effort = resolve_reasoning_settings(model, runtime_kwargs["reasoning_effort"])
+             prompt_strategy = (
+                 PromptStrategy.MAP if use_reasoning_prompt else PromptStrategy.MAP_NO_REASONING
+                 if phys_op_cls is RAGConvert
+                 else PromptStrategy.FILTER if use_reasoning_prompt else PromptStrategy.FILTER_NO_REASONING
+             )
+             variable_op_kwargs.extend(
+                 [
+                    {
+                        "model": model,
+                        "prompt_strategy": prompt_strategy,
+                        "num_chunks_per_field": num_chunks_per_field,
+                        "chunk_size": chunk_size,
+                        "reasoning_effort": reasoning_effort,
+                    }
+                    for num_chunks_per_field in cls.num_chunks_per_fields
+                    for chunk_size in cls.chunk_sizes
+                 ]
+             )
 
         return cls._perform_substitution(logical_expression, phys_op_cls, runtime_kwargs, variable_op_kwargs)
 
@@ -704,6 +716,7 @@ class MixtureOfAgentsRule(ImplementationRule):
         phys_op_cls = MixtureOfAgentsConvert if isinstance(logical_expression.operator, ConvertScan) else MixtureOfAgentsFilter
 
         # create variable physical operator kwargs for each model which can implement this logical_expression
+        _, reasoning_effort = resolve_reasoning_settings(None, runtime_kwargs["reasoning_effort"])
         proposer_model_set = {model for model in runtime_kwargs["available_models"] if cls._model_matches_input(model, logical_expression)}
         aggregator_model_set = {model for model in runtime_kwargs["available_models"] if model.is_text_model()}
         variable_op_kwargs = [
@@ -711,7 +724,7 @@ class MixtureOfAgentsRule(ImplementationRule):
                 "proposer_models": list(proposer_models),
                 "temperatures": [temp] * len(proposer_models),
                 "aggregator_model": aggregator_model,
-                "reasoning_effort": runtime_kwargs["reasoning_effort"],
+                "reasoning_effort": reasoning_effort,
             }
             for k in cls.num_proposer_models
             for temp in cls.temperatures
@@ -743,18 +756,27 @@ class CritiqueAndRefineRule(ImplementationRule):
 
         # create variable physical operator kwargs for each model which can implement this logical_expression
         models = [model for model in runtime_kwargs["available_models"] if cls._model_matches_input(model, logical_expression)]
-        variable_op_kwargs = [
-            {
-                "model": model,
-                "critic_model": critic_model,
-                "refine_model": refine_model,
-                "prompt_strategy": PromptStrategy.MAP if phys_op_cls is CritiqueAndRefineConvert else PromptStrategy.FILTER,
-                "reasoning_effort": runtime_kwargs["reasoning_effort"],
-            }
-            for model in models
-            for critic_model in models
-            for refine_model in models
-        ]
+        variable_op_kwargs = []
+        for model in models:
+            use_reasoning_prompt, reasoning_effort = resolve_reasoning_settings(model, runtime_kwargs["reasoning_effort"])
+            prompt_strategy = (
+                PromptStrategy.MAP if use_reasoning_prompt else PromptStrategy.MAP_NO_REASONING
+                if phys_op_cls is CritiqueAndRefineConvert
+                else PromptStrategy.FILTER if use_reasoning_prompt else PromptStrategy.FILTER_NO_REASONING
+            )
+            variable_op_kwargs.extend(
+                [
+                    {
+                        "model": model,
+                        "critic_model": critic_model,
+                        "refine_model": refine_model,
+                        "prompt_strategy": prompt_strategy,
+                        "reasoning_effort": reasoning_effort,
+                    }
+                    for critic_model in models
+                    for refine_model in models
+                ]
+            )
 
         return cls._perform_substitution(logical_expression, phys_op_cls, runtime_kwargs, variable_op_kwargs)
 
@@ -782,12 +804,13 @@ class SplitRule(ImplementationRule):
 
         # create variable physical operator kwargs for each model which can implement this logical_expression
         models = [model for model in runtime_kwargs["available_models"] if cls._model_matches_input(model, logical_expression)]
+        _, reasoning_effort = resolve_reasoning_settings(None, runtime_kwargs["reasoning_effort"])
         variable_op_kwargs = [
             {
                 "model": model,
                 "min_size_to_chunk": min_size_to_chunk,
                 "num_chunks": num_chunks,
-                "reasoning_effort": runtime_kwargs["reasoning_effort"],
+                "reasoning_effort": reasoning_effort,
             }
             for model in models
             for min_size_to_chunk in cls.min_size_to_chunk
@@ -855,15 +878,17 @@ class LLMFilterRule(ImplementationRule):
 
         # create variable physical operator kwargs for each model which can implement this logical_expression
         models = [model for model in runtime_kwargs["available_models"] if cls._model_matches_input(model, logical_expression)]
-        no_reasoning = runtime_kwargs["reasoning_effort"] in [None, "minimal", "low"]
-        variable_op_kwargs = [
-            {
-                "model": model,
-                "prompt_strategy": PromptStrategy.FILTER_NO_REASONING if model.is_reasoning_model() and no_reasoning else PromptStrategy.FILTER,
-                "reasoning_effort": runtime_kwargs["reasoning_effort"]
-            }
-            for model in models
-        ]
+        variable_op_kwargs = []
+        for model in models:
+            use_reasoning_prompt, reasoning_effort = resolve_reasoning_settings(model, runtime_kwargs["reasoning_effort"])
+            prompt_strategy = PromptStrategy.FILTER if use_reasoning_prompt else PromptStrategy.FILTER_NO_REASONING
+            variable_op_kwargs.append(
+                {
+                    "model": model,
+                    "prompt_strategy": prompt_strategy,
+                    "reasoning_effort": reasoning_effort,
+                }
+            )
 
         return cls._perform_substitution(logical_expression, LLMFilter, runtime_kwargs, variable_op_kwargs)
 
@@ -902,17 +927,19 @@ class NestedLoopsJoinRule(ImplementationRule):
 
         # create variable physical operator kwargs for each model which can implement this logical_expression
         models = [model for model in runtime_kwargs["available_models"] if cls._model_matches_input(model, logical_expression)]
-        no_reasoning = runtime_kwargs["reasoning_effort"] in [None, "minimal", "low"]
-        variable_op_kwargs = [
-            {
-                "model": model,
-                "prompt_strategy": PromptStrategy.JOIN_NO_REASONING if model.is_reasoning_model() and no_reasoning else PromptStrategy.JOIN,
-                "join_parallelism": runtime_kwargs["join_parallelism"],
-                "reasoning_effort": runtime_kwargs["reasoning_effort"],
-                "retain_inputs": not runtime_kwargs["is_validation"],
-            }
-            for model in models
-        ]
+        variable_op_kwargs = []
+        for model in models:
+            use_reasoning_prompt, reasoning_effort = resolve_reasoning_settings(model, runtime_kwargs["reasoning_effort"])
+            prompt_strategy = PromptStrategy.JOIN if use_reasoning_prompt else PromptStrategy.JOIN_NO_REASONING
+            variable_op_kwargs.append(
+                {
+                    "model": model,
+                    "prompt_strategy": prompt_strategy,
+                    "join_parallelism": runtime_kwargs["join_parallelism"],
+                    "reasoning_effort": reasoning_effort,
+                    "retain_inputs": not runtime_kwargs["is_validation"],
+                }
+            )
 
         return cls._perform_substitution(logical_expression, NestedLoopsJoin, runtime_kwargs, variable_op_kwargs)
 
@@ -934,18 +961,20 @@ class EmbeddingJoinRule(ImplementationRule):
 
         # create variable physical operator kwargs for each model which can implement this logical_expression
         models = [model for model in runtime_kwargs["available_models"] if cls._model_matches_input(model, logical_expression)]
-        no_reasoning = runtime_kwargs["reasoning_effort"] in [None, "minimal", "low"]
-        variable_op_kwargs = [
-            {
-                "model": model,
-                "prompt_strategy": PromptStrategy.JOIN_NO_REASONING if model.is_reasoning_model() and no_reasoning else PromptStrategy.JOIN,
-                "join_parallelism": runtime_kwargs["join_parallelism"],
-                "reasoning_effort": runtime_kwargs["reasoning_effort"],
-                "retain_inputs": not runtime_kwargs["is_validation"],
-                "num_samples": 10, # TODO: iterate over different choices of num_samples
-            }
-            for model in models
-        ]
+        variable_op_kwargs = []
+        for model in models:
+            use_reasoning_prompt, reasoning_effort = resolve_reasoning_settings(model, runtime_kwargs["reasoning_effort"])
+            prompt_strategy = PromptStrategy.JOIN if use_reasoning_prompt else PromptStrategy.JOIN_NO_REASONING
+            variable_op_kwargs.append(
+                {
+                    "model": model,
+                    "prompt_strategy": prompt_strategy,
+                    "join_parallelism": runtime_kwargs["join_parallelism"],
+                    "reasoning_effort": reasoning_effort,
+                    "retain_inputs": not runtime_kwargs["is_validation"],
+                    "num_samples": 10, # TODO: iterate over different choices of num_samples
+                }
+            )
 
         return cls._perform_substitution(logical_expression, EmbeddingJoin, runtime_kwargs, variable_op_kwargs)
 
@@ -966,15 +995,17 @@ class SemanticAggregateRule(ImplementationRule):
 
         # create variable physical operator kwargs for each model which can implement this logical_expression
         models = [model for model in runtime_kwargs["available_models"] if cls._model_matches_input(model, logical_expression) and not model.is_llama_model()]
-        no_reasoning = runtime_kwargs["reasoning_effort"] in [None, "minimal", "low"]
-        variable_op_kwargs = [
-            {
-                "model": model,
-                "prompt_strategy": PromptStrategy.AGG_NO_REASONING if model.is_reasoning_model() and no_reasoning else PromptStrategy.AGG,
-                "reasoning_effort": runtime_kwargs["reasoning_effort"]
-            }
-            for model in models
-        ]
+        variable_op_kwargs = []
+        for model in models:
+            use_reasoning_prompt, reasoning_effort = resolve_reasoning_settings(model, runtime_kwargs["reasoning_effort"])
+            prompt_strategy = PromptStrategy.AGG if use_reasoning_prompt else PromptStrategy.AGG_NO_REASONING
+            variable_op_kwargs.append(
+                {
+                    "model": model,
+                    "prompt_strategy": prompt_strategy,
+                    "reasoning_effort": reasoning_effort,
+                }
+            )
 
         return cls._perform_substitution(logical_expression, SemanticAggregate, runtime_kwargs, variable_op_kwargs)
 

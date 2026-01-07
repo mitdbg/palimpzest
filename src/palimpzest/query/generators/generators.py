@@ -108,7 +108,7 @@ class Generator(Generic[ContextType, InputType]):
         self,
         model: Model,
         prompt_strategy: PromptStrategy,
-        reasoning_effort: str | None = None,
+        reasoning_effort: str | None,
         api_base: str | None = None,
         cardinality: Cardinality = Cardinality.ONE_TO_ONE,
         desc: str | None = None,
@@ -325,18 +325,7 @@ class Generator(Generic[ContextType, InputType]):
             if is_audio_op:
                 completion_kwargs = {"modalities": ["text"], **completion_kwargs}
             if self.model.is_reasoning_model():
-                if self.model.is_vertex_model():
-                    reasoning_effort = self.reasoning_effort
-                    if self.reasoning_effort is None and self.model == Model.GEMINI_2_5_PRO:
-                        reasoning_effort = "low"
-                    elif self.reasoning_effort is None:
-                        reasoning_effort = "disable"
-                    completion_kwargs = {"reasoning_effort": reasoning_effort, **completion_kwargs}
-                elif self.model.is_anthropic_model() and self.reasoning_effort is not None:
-                    completion_kwargs = {"reasoning_effort": self.reasoning_effort, **completion_kwargs}
-                elif self.model.is_openai_model():
-                    reasoning_effort = "minimal" if self.reasoning_effort is None else self.reasoning_effort
-                    completion_kwargs = {"reasoning_effort": reasoning_effort, **completion_kwargs}
+                completion_kwargs = {"reasoning_effort": self.reasoning_effort, **completion_kwargs}
             if self.model.is_vllm_model():
                 completion_kwargs = {"api_base": self.api_base, "api_key": os.environ.get("VLLM_API_KEY", "fake-api-key"), **completion_kwargs}
             completion = litellm.completion(model=self.model_name, messages=messages, **completion_kwargs)

@@ -31,7 +31,7 @@ def output_schema():
     ]
 )
 def test_generator(model, question, output_schema):
-    generator = Generator(model, PromptStrategy.MAP)
+    generator = Generator(model, PromptStrategy.MAP, None)
     output, _, gen_stats, _ = generator(question, output_schema.model_fields, **{"output_schema": output_schema})
     assert gen_stats.total_input_tokens > 0
     assert gen_stats.total_output_tokens > 0

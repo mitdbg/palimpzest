@@ -170,6 +170,9 @@ class QueryProcessorFactory:
         if config is None:
             config = QueryProcessorConfig()
 
+        # make a copy of the config to avoid modifying the original
+        config = config.copy()
+
         # apply any additional keyword arguments to the config and validate its contents
         config, validator = cls._config_validation_and_normalization(config, train_dataset, validator)
 
