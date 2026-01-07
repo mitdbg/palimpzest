@@ -1,6 +1,7 @@
 import pytest
 
-from palimpzest.constants import Model
+from palimpzest.constants import CuratedModel
+from palimpzest.utils.model_info import Model
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.core.lib.schemas import TextFile
 from palimpzest.core.models import RecordOpStats
@@ -128,7 +129,7 @@ def scan_convert_filter_varied_execution_data(scan_convert_filter_sentinel_plan,
         scan_drs.append(scan_dr)
 
     # create convert data records
-    models = [Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B]
+    models = [Model(CuratedModel.GPT_4o), Model(CuratedModel.GPT_4o_MINI), Model(CuratedModel.LLAMA3_1_8B)]
     for model in models:
         for idx in range(10):
             data_item = {"foo": f"foo{idx}", "bar": f"bar{idx}-{str(model)}"}
@@ -191,11 +192,11 @@ def scan_convert_filter_varied_execution_data(scan_convert_filter_sentinel_plan,
         # GPT-4o-mini passes even examples
         # LLAMA3_1_8B passes all examples
         passed_operator = None
-        if model == Model.GPT_4o:
+        if model.value == CuratedModel.GPT_4o.value:
             passed_operator = bool(source_idx % 2)
-        elif model == Model.GPT_4o_MINI:
+        elif model == CuratedModel.GPT_4o_MINI.value:
             passed_operator = not bool(source_idx % 2)
-        elif model == Model.LLAMA3_1_8B:
+        elif model == CuratedModel.LLAMA3_1_8B.value:
             passed_operator = True
 
         record_op_stats = RecordOpStats(
@@ -241,7 +242,7 @@ def scan_multi_convert_multi_filter_execution_data(scan_multi_convert_multi_filt
         scan_drs.append(scan_dr)
 
     # create first convert data records
-    models = [Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B]
+    models = [Model(CuratedModel.GPT_4o), Model(CuratedModel.GPT_4o_MINI), Model(CuratedModel.LLAMA3_1_8B)]
     for model in models:
         for source_idx in range(10):
             for one_to_many_idx in range(2):

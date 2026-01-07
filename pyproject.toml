@@ -14,7 +14,7 @@ dependencies = [
     "chromadb>=1.0.15",
     "colorama>=0.4.6",
     "datasets>=4.0.0",
-    "fastapi~=0.115.0",
+    "fastapi>=0.115.0",
     "gradio>=5.26.0",
     "litellm>=1.76.1",
     "numpy==2.0.2",
@@ -39,6 +39,7 @@ dependencies = [
     "together>=1.5.5",
     "tqdm~=4.66.1",
     "rich[jupyter]>=13.9.2",
+    "uvicorn>=0.29.0",
 ]
 classifiers=[
     "Development Status :: 4 - Beta",  # Change as appropriate

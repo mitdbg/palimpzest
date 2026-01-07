@@ -1,15 +1,20 @@
-import yaml, time, requests, subprocess, os
+import yaml, time, requests, subprocess, os, socket, json, random
 from palimpzest.core.models import PlanCost
 from palimpzest.policy import Policy
 from palimpzest.constants import MODEL_CARDS, CuratedModel
 from palimpzest.utils.model_helpers import predict_model_specs, get_model_provider, get_api_key_env_var, get_models
 
-CONFIG_FILENAME = "litellm_config.yaml"
-PROXY_PORT = 4000
-PROXY_URL = f"http://0.0.0.0:{PROXY_PORT}"
 DYNAMIC_MODEL_INFO = {}
 
-def _generate_config_yaml(available_models, filename):
+def get_free_port():
+    """Finds a free port on localhost."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(('', 0))
+        return s.getsockname()[1]
+
+def _generate_config_yaml(available_models):
+    rand_id = random.randint(100000, 999999)
+    config_filename = f"litellm_config_{rand_id}.yaml"
     config_list = []
     for model_str in available_models:
         env_var_name = get_api_key_env_var(model_str)
@@ -23,51 +28,75 @@ def _generate_config_yaml(available_models, filename):
         }
         config_list.append(entry)
     yaml_structure = {"model_list": config_list}
-    with open(filename, 'w') as f:
-        yaml.dump(yaml_structure, f, default_flow_style=False)
-
-def _wait_for_server(url, timeout=30):
-    start_time = time.time()
-    while time.time() - start_time < timeout:
-        try:
-            if requests.get(f"{url}/health").status_code == 200:
-                return True
-        except requests.ConnectionError:
-            pass
-        time.sleep(0.5)
-    return False
+    with open(config_filename, 'w') as f:
+        yaml.dump(yaml_structure, f, default_flow_style=False, sort_keys=False)
+    return config_filename
 
 def fetch_dynamic_model_info(available_models):
     global DYNAMIC_MODEL_INFO
-    _generate_config_yaml(available_models, CONFIG_FILENAME)
-    process = subprocess.Popen(
-        ["litellm", "--config", CONFIG_FILENAME, "--port", str(PROXY_PORT)],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE
-    )
+    
+    port = get_free_port()
+    proxy_url = f"http://127.0.0.1:{port}" 
+    
+    config_filename = _generate_config_yaml(available_models)
+    server_env = os.environ.copy()
+    process = None
     dynamic_model_info = {}
+
     try:
-        if not _wait_for_server(PROXY_URL):
-            raise Exception("Sever failed to start")
-        response = requests.get(
-            f"{PROXY_URL}/model/info", 
-            headers={"Authorization": "Bearer sk-1234"}
+        process = subprocess.Popen(
+            ["litellm", "--config", config_filename, "--port", str(port)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env=server_env
         )
-        response.raise_for_status()
-        data = response.json()
-        if "data" in data:
-            for item in data["data"]:
-                model_name = item.get("model_name")
-                dynamic_model_info[model_name] = item.get("model_info", {})
+
+        server_ready = False
+        max_retries = 20
+
+        for _ in range(max_retries):
+            if process.poll() is not None:
+                stdout, stderr = process.communicate()
+                print(f"LiteLLM process died unexpectedly: {stderr.decode()}")
+                break
+            try:
+                requests.get(f"{proxy_url}/health/readiness", timeout=1)
+                server_ready = True
+                break
+            except (requests.exceptions.ConnectionError, requests.exceptions.ReadTimeout):
+                time.sleep(0.5)
+            
+        if not server_ready:
+            print("Timeout: LiteLLM server failed to start within the limit.")
+            return {}
+
+        try: 
+            response = requests.get(f"{proxy_url}/model/info")
+            response.raise_for_status()
+            model_data = response.json()
+        
+            if "data" in model_data and len(model_data["data"]) > 0:
+                for item in model_data["data"]:
+                    model_name = item.get("model_name")
+                    dynamic_model_info[model_name] = item.get("model_info", {})
+
+        except Exception:
+            pass
+            
+        if not dynamic_model_info:
+            print(f"WARNING: LiteLLM server started but returned no model info.")
+
     finally:
-        process.terminate()
-        try:
-            process.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            process.kill()
-        # cleanup: remove the generated config file
-        if os.path.exists(CONFIG_FILENAME):
-            os.remove(CONFIG_FILENAME)
+        # 6. Robust Cleanup
+        if process:
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+        
+        if os.path.exists(config_filename):
+            os.remove(config_filename)
 
     DYNAMIC_MODEL_INFO = dynamic_model_info
     return dynamic_model_info
@@ -77,14 +106,18 @@ class Model(str):
     Supports any model id. Returns information about the model previously in MODEL_CARDS
     """
     def __new__(cls, value):
+        if isinstance(value, Model):
+            return value
         return super(Model, cls).__new__(cls, value)
     
     def __init__(self, value):
+        if isinstance(value, Model):
+            value = value.value
         self.prediction = predict_model_specs(self)
     
     @property
     def value(self):
-        return self
+        return str(self)
     
     def __repr__(self):
         return f"{self}"
@@ -117,38 +150,29 @@ class Model(str):
         return "hosted_vllm" in self.lower()
 
     def is_o_model(self):
-        return self in {CuratedModel.o4_MINI.value}
+        try:
+            configured_model = CuratedModel(self.value)
+            return configured_model.is_o_model()
+        except Exception:
+            return False
     
     def is_gpt_5_model(self):
-        gpt_5_models = {
-            CuratedModel.GPT_5.value,
-            CuratedModel.GPT_5_MINI.value,
-            CuratedModel.GPT_5_NANO.value
-        }
-        return self.value in gpt_5_models
-
+        try:
+            configured_model = CuratedModel(self.value)
+            return configured_model.is_gpt_5_model()
+        except Exception:
+            return False
+        
     def is_reasoning_model(self):
         info = DYNAMIC_MODEL_INFO.get(self.value, {})
         if "supports_reasoning" in info and info["supports_reasoning"] is not None:
             return info["supports_reasoning"]
         # configured list
-        known_reasoning_models = {
-            CuratedModel.GPT_5.value,
-            CuratedModel.GPT_5_MINI.value,
-            CuratedModel.GPT_5_NANO.value,
-            CuratedModel.o4_MINI.value,
-            CuratedModel.GEMINI_3_0_PRO.value,
-            CuratedModel.GEMINI_3_0_FLASH.value,
-            CuratedModel.GEMINI_2_5_PRO.value,
-            CuratedModel.GEMINI_2_5_FLASH.value,
-            CuratedModel.GEMINI_3_0_FLASH.value,
-            CuratedModel.GEMINI_3_0_PRO.value,
-            CuratedModel.GOOGLE_GEMINI_2_5_PRO.value,
-            CuratedModel.GOOGLE_GEMINI_2_5_FLASH.value,
-            CuratedModel.GOOGLE_GEMINI_2_5_FLASH_LITE.value,
-            CuratedModel.CLAUDE_3_7_SONNET.value,
-        }
-        return self.value in known_reasoning_models
+        try:
+            configured_model = CuratedModel(self.value)
+            return configured_model.is_reasoning_model()
+        except Exception:
+            return False
     
     def is_vision_model(self):
         info = DYNAMIC_MODEL_INFO.get(self.value, {})
@@ -179,17 +203,17 @@ class Model(str):
         # configured list
         try:
             configured_model = CuratedModel(self.value)
-            return configured_model.is_text_model(self)
+            return configured_model.is_text_model()
         except Exception:
             return False # default
     
     def is_embedding_model(self):
-        info = DYNAMIC_MODEL_INFO.get(self.vaue, {})
+        info = DYNAMIC_MODEL_INFO.get(self.value, {})
         if "mode" in info:
             return info["mode"] == "embedding"
         try:
             configured_model = CuratedModel(self.value)
-            return configured_model.is_embedding_model(self)
+            return configured_model.is_embedding_model()
         except Exception:
             return False # default
 

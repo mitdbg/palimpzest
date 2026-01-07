@@ -2,7 +2,8 @@ from copy import deepcopy
 
 import pytest
 
-from palimpzest.constants import Model
+from palimpzest.constants import CuratedModel
+from palimpzest.utils.model_info import Model
 from palimpzest.core.elements.filters import Filter
 from palimpzest.core.lib.schemas import TextFile, get_schema_field_names, union_schemas
 from palimpzest.core.models import PlanCost
@@ -61,7 +62,7 @@ def three_converts_min_cost_expected_plan(three_converts_workload, enron_eval_ti
         email_schema=email_schema,
         foobar_schema=foobar_schema,
         baz_schema=baz_schema,
-        models=[Model.LLAMA3_3_70B, Model.GPT_4o_MINI, Model.LLAMA3_3_70B],
+        models=[Model(CuratedModel.LLAMA3_3_70B), Model(CuratedModel.GPT_4o_MINI), Model(CuratedModel.LLAMA3_3_70B)],
         expected_cost=expected_cost,
         expected_time=expected_time,
         expected_quality=expected_quality,
@@ -80,7 +81,7 @@ def three_converts_max_quality_expected_plan(three_converts_workload, enron_eval
         email_schema=email_schema,
         foobar_schema=foobar_schema,
         baz_schema=baz_schema,
-        models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.GPT_4o],
+        models=[Model(CuratedModel.GPT_4o), Model(CuratedModel.GPT_4o_MINI), Model(CuratedModel.GPT_4o)],
         expected_cost=expected_cost,
         expected_time=expected_time,
         expected_quality=expected_quality,
@@ -99,7 +100,7 @@ def three_converts_min_cost_at_fixed_quality_expected_plan(three_converts_worklo
         email_schema=email_schema,
         foobar_schema=foobar_schema,
         baz_schema=baz_schema,
-        models=[Model.LLAMA3_3_70B, Model.GPT_4o_MINI, Model.GPT_4o],
+        models=[Model(CuratedModel.LLAMA3_3_70B), Model(CuratedModel.GPT_4o_MINI), Model(CuratedModel.GPT_4o)],
         expected_cost=expected_cost,
         expected_time=expected_time,
         expected_quality=expected_quality,
@@ -118,7 +119,7 @@ def three_converts_max_quality_at_fixed_cost_expected_plan(three_converts_worklo
         email_schema=email_schema,
         foobar_schema=foobar_schema,
         baz_schema=baz_schema,
-        models=[Model.GPT_4o_MINI, Model.GPT_4o_MINI, Model.GPT_4o],
+        models=[Model(CuratedModel.GPT_4o_MINI), Model(CuratedModel.GPT_4o_MINI), Model(CuratedModel.GPT_4o)],
         expected_cost=expected_cost,
         expected_time=expected_time,
         expected_quality=expected_quality,
@@ -176,7 +177,7 @@ def one_filter_one_convert_min_cost_expected_plan(one_filter_one_convert_workloa
         one_filter_one_convert_workload=one_filter_one_convert_workload,
         enron_eval_tiny=enron_eval_tiny,
         email_schema=email_schema,
-        models=[Model.LLAMA3_3_70B, Model.GPT_4o],
+        models=[Model(CuratedModel.LLAMA3_3_70B), Model(CuratedModel.GPT_4o)],
         expected_cost=expected_cost,
         expected_time=expected_time,
         expected_quality=expected_quality,
@@ -247,7 +248,7 @@ def two_converts_two_filters_min_cost_expected_plan(two_converts_two_filters_wor
         foobar_schema=foobar_schema,
         first_filter_str="filter2",
         # models: [first convert, second convert, filter1, filter2]
-        models=[Model.LLAMA3_3_70B, Model.GPT_4o_MINI, Model.GPT_4o_MINI, Model.LLAMA3_3_70B],
+        models=[Model(CuratedModel.LLAMA3_3_70B), Model(CuratedModel.GPT_4o_MINI), Model(CuratedModel.GPT_4o_MINI), Model(CuratedModel.LLAMA3_3_70B)],
         expected_cost=expected_cost,
         expected_time=expected_time,
         expected_quality=expected_quality,
@@ -276,7 +277,7 @@ def two_converts_two_filters_max_quality_expected_plan(two_converts_two_filters_
         foobar_schema=foobar_schema,
         first_filter_str="filter2",
         # models: [first convert, second convert, filter1, filter2]
-        models=[Model.LLAMA3_3_70B, Model.GPT_4o_MINI, Model.LLAMA3_3_70B, Model.GPT_4o],
+        models=[Model(CuratedModel.LLAMA3_3_70B), Model(CuratedModel.GPT_4o_MINI), Model(CuratedModel.LLAMA3_3_70B), Model(CuratedModel.GPT_4o)],
         expected_cost=expected_cost,
         expected_time=expected_time,
         expected_quality=expected_quality,
@@ -305,7 +306,7 @@ def two_converts_two_filters_min_cost_at_fixed_quality_expected_plan(two_convert
         foobar_schema=foobar_schema,
         first_filter_str="filter1",
         # models: [first convert, second convert, filter1, filter2]
-        models=[Model.GPT_4o_MINI, Model.LLAMA3_3_70B, Model.GPT_4o_MINI, Model.LLAMA3_3_70B],
+        models=[Model(CuratedModel.GPT_4o_MINI), Model(CuratedModel.LLAMA3_3_70B), Model(CuratedModel.GPT_4o_MINI), Model(CuratedModel.LLAMA3_3_70B)],
         expected_cost=expected_cost,
         expected_time=expected_time,
         expected_quality=expected_quality,
@@ -334,7 +335,7 @@ def two_converts_two_filters_max_quality_at_fixed_cost_expected_plan(two_convert
         foobar_schema=foobar_schema,
         first_filter_str="filter2",
         # models: [first convert, second convert, filter1, filter2]
-        models=[Model.GPT_4o_MINI, Model.LLAMA3_3_70B, Model.GPT_4o, Model.GPT_4o],
+        models=[Model(CuratedModel.GPT_4o_MINI), Model(CuratedModel.LLAMA3_3_70B), Model(CuratedModel.GPT_4o), Model(CuratedModel.GPT_4o)],
         expected_cost=expected_cost,
         expected_time=expected_time,
         expected_quality=expected_quality,

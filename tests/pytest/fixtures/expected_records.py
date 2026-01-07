@@ -2,7 +2,7 @@ import os
 
 import pytest
 
-from palimpzest.constants import Model
+from palimpzest.constants import CuratedModel
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.core.lib.schemas import File
 
@@ -106,7 +106,7 @@ def scan_convert_filter_empty_expected_outputs():
 def scan_convert_filter_varied_expected_outputs(foobar_schema):
     # create expected outputs to differ from champion outputs;
     # - champion outputs passes odd records
-    # - champion outputs always expects bar=f"bar{idx}-{str(Model.GPT_4o)}"
+    # - champion outputs always expects bar=f"bar{idx}-{str(CuratedModel.GPT_4o)}"
     expected_outputs = {}
     for source_idx in range(10):
         if source_idx % 3 > 0:
@@ -114,7 +114,7 @@ def scan_convert_filter_varied_expected_outputs(foobar_schema):
                 filename=f"file{source_idx}",
                 contents=None,
                 foo=f"foo{source_idx}",
-                bar=f"bar{source_idx}-{str(Model.GPT_4o_MINI)}" if source_idx < 6 else f"bar{source_idx}-{str(Model.LLAMA3_1_8B)}",
+                bar=f"bar{source_idx}-{str(CuratedModel.GPT_4o_MINI)}" if source_idx < 6 else f"bar{source_idx}-{str(CuratedModel.LLAMA3_1_8B)}",
             )
             dr = DataRecord(data_item, [source_idx])
             dr._passed_operator = True
@@ -143,8 +143,8 @@ def scan_multi_convert_multi_filter_expected_outputs(foobar_schema, baz_schema):
                 filename=f"file{source_idx}",
                 contents=None,
                 foo=f"foo{source_idx}-one-to-many-{one_to_many_idx}",
-                bar=f"bar{source_idx}-{str(Model.GPT_4o_MINI)}",
-                baz=f"baz{str(Model.GPT_4o_MINI)}",
+                bar=f"bar{source_idx}-{str(CuratedModel.GPT_4o_MINI)}",
+                baz=f"baz{str(CuratedModel.GPT_4o_MINI)}",
             )
             dr = DataRecord(data_item, [source_idx])
             dr._passed_operator = True

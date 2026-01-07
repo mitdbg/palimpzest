@@ -11,7 +11,6 @@ from palimpzest.constants import (
     NAIVE_EST_NUM_OUTPUT_TOKENS,
     NAIVE_EST_ONE_TO_MANY_SELECTIVITY,
     Cardinality,
-    CuratedModel,
     PromptStrategy,
 )
 from palimpzest.utils.model_info import Model
@@ -322,7 +321,6 @@ class LLMConvert(ConvertOp):
         est_num_output_tokens = NAIVE_EST_NUM_OUTPUT_TOKENS
 
         # get est. of conversion time per record from model card;
-        model_name = self.model.value
         model_conversion_time_per_record = self.model.get_seconds_per_output_token() * est_num_output_tokens
 
         # get est. of conversion cost (in USD) per record from model card

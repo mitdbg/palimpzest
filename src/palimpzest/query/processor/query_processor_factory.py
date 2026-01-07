@@ -73,7 +73,10 @@ class QueryProcessorFactory:
             )
         # Fetch info for these models (accepts list of strings/CuratedModel)
         else:
-            fetch_dynamic_model_info(available_models)
+            try:
+                fetch_dynamic_model_info(available_models)
+            except Exception as e:
+                logger.warning(f"Failed to fetch dynamic model info (litellm may not be installed or running): {e}.")
             available_models_objs = [Model(model) for model in available_models]
 
         # 1. Normalize remove_models

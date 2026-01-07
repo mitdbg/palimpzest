@@ -1,5 +1,5 @@
 """This testing class tests whether we can run a workload by defining a schema dynamically."""
-from palimpzest.constants import Model
+from palimpzest.constants import CuratedModel
 from palimpzest.core.lib.schemas import TextFile
 from palimpzest.policy import MinCost
 from palimpzest.query.operators.convert import LLMConvertBonded
@@ -31,7 +31,7 @@ def test_dynamicschema_json(mocker, enron_workload, enron_convert, enron_filter)
 
     config = QueryProcessorConfig(
         policy=MinCost(),
-        available_models=[Model.GPT_4o_MINI],
+        available_models=[CuratedModel.GPT_4o_MINI],
         num_samples=3,
         allow_bonded_query=True,
         allow_rag_reduction=False,
@@ -59,7 +59,7 @@ def test_dynamicschema_yml(mocker, enron_workload, enron_convert, enron_filter):
 
     config = QueryProcessorConfig(
         policy=MinCost(),
-        available_models=[Model.GPT_4o_MINI],
+        available_models=[CuratedModel.GPT_4o_MINI],
         num_samples=3,
         allow_bonded_query=True,
         allow_rag_reduction=False,

@@ -5,7 +5,8 @@ import os
 import pytest
 from pydantic import BaseModel, Field
 
-from palimpzest.constants import Model
+from palimpzest.constants import CuratedModel
+from palimpzest.utils.model_info import Model
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.lib.schemas import AudioFilepath, ImageFilepath, union_schemas
 from palimpzest.core.models import GenerationStats
@@ -79,7 +80,7 @@ def test_aggregate(mocker, input_schema, physical_op_class):
     if os.getenv("NO_GEMINI") and input_schema in [AudioInputSchema, TextAudioInputSchema, ImageAudioInputSchema, TextImageAudioInputSchema]:
         pytest.skip("Skipping multi-modal audio tests on CI which does not have access to gemini models")
 
-    model = Model.GPT_5_MINI if os.getenv("NO_GEMINI") else Model.GEMINI_2_5_FLASH
+    model = Model(CuratedModel.GPT_5_MINI) if os.getenv("NO_GEMINI") else Model(CuratedModel.GEMINI_2_5_FLASH)
 
     # construct the kwargs for the physical operator
     physical_op_kwargs = {
