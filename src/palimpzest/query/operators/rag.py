@@ -10,9 +10,8 @@ from pydantic.fields import FieldInfo
 
 from palimpzest.constants import (
     NAIVE_EST_NUM_OUTPUT_TOKENS,
-    CuratedModel
+    Model
 )
-from palimpzest.utils.model_info import Model
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.models import GenerationStats, OperatorCostEstimates
 from palimpzest.query.operators.convert import LLMConvert

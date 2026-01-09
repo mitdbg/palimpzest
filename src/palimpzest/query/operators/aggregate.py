@@ -10,6 +10,7 @@ from palimpzest.constants import (
     NAIVE_EST_NUM_OUTPUT_TOKENS,
     AggFunc,
     PromptStrategy,
+    Model
 )
 from palimpzest.core.elements.groupbysig import GroupBySig
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
@@ -17,7 +18,6 @@ from palimpzest.core.lib.schemas import Average, Count, Max, Min, Sum
 from palimpzest.core.models import OperatorCostEstimates, RecordOpStats
 from palimpzest.query.generators.generators import Generator
 from palimpzest.query.operators.physical import PhysicalOperator
-from palimpzest.utils.model_info import Model
 
 
 class AggregateOp(PhysicalOperator):

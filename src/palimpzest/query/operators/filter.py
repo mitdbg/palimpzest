@@ -11,13 +11,13 @@ from palimpzest.constants import (
     NAIVE_EST_NUM_INPUT_TOKENS,
     Cardinality,
     PromptStrategy,
+    Model,
 )
 from palimpzest.core.elements.filters import Filter
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.core.models import GenerationStats, OperatorCostEstimates, RecordOpStats
 from palimpzest.query.generators.generators import Generator
 from palimpzest.query.operators.physical import PhysicalOperator
-from palimpzest.utils.model_info import Model
 
 
 class FilterOp(PhysicalOperator, ABC):

@@ -10,7 +10,6 @@ from palimpzest.constants import (
     Cardinality,
     PromptStrategy,
 )
-from palimpzest.utils.model_info import Model
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.models import GenerationStats, OperatorCostEstimates
 from palimpzest.query.generators.generators import Generator

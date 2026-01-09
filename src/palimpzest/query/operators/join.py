@@ -16,7 +16,7 @@ from palimpzest.constants import (
     NAIVE_EST_JOIN_SELECTIVITY,
     NAIVE_EST_NUM_INPUT_TOKENS,
     Cardinality,
-    CuratedModel,
+    Model,
     PromptStrategy,
 )
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
@@ -24,7 +24,6 @@ from palimpzest.core.lib.schemas import AUDIO_FIELD_TYPES, IMAGE_FIELD_TYPES, Im
 from palimpzest.core.models import GenerationStats, OperatorCostEstimates, RecordOpStats
 from palimpzest.query.generators.generators import Generator
 from palimpzest.query.operators.physical import PhysicalOperator
-from palimpzest.utils.model_info import Model
 
 
 class Singleton:

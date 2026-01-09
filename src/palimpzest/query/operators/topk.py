@@ -12,8 +12,7 @@ from openai import OpenAI
 from pydantic import BaseModel
 from sentence_transformers import SentenceTransformer
 
-from palimpzest.constants import CuratedModel
-from palimpzest.utils.model_info import Model
+from palimpzest.constants import Model
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.core.models import GenerationStats, OperatorCostEstimates, RecordOpStats
 from palimpzest.query.operators.physical import PhysicalOperator

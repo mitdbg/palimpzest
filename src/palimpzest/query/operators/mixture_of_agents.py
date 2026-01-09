@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from pydantic.fields import FieldInfo
 
-from palimpzest.constants import Cardinality, PromptStrategy
-from palimpzest.utils.model_info import Model
+from palimpzest.constants import Cardinality, PromptStrategy, Model
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.models import GenerationStats, OperatorCostEstimates
 from palimpzest.query.generators.generators import Generator

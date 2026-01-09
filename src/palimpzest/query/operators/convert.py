@@ -12,8 +12,8 @@ from palimpzest.constants import (
     NAIVE_EST_ONE_TO_MANY_SELECTIVITY,
     Cardinality,
     PromptStrategy,
+    Model
 )
-from palimpzest.utils.model_info import Model
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.core.models import GenerationStats, OperatorCostEstimates, RecordOpStats
 from palimpzest.query.generators.generators import Generator
