@@ -13,7 +13,8 @@ from palimpzest.query.optimizer.optimizer import Optimizer
 from palimpzest.query.optimizer.optimizer_strategy_type import OptimizationStrategyType
 from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.query.processor.query_processor import QueryProcessor
-from palimpzest.utils.model_info import Model, fetch_dynamic_model_info, get_optimal_models
+from palimpzest.constants import Model
+from palimpzest.utils.model_helpers import get_optimal_models, fetch_dynamic_model_info
 from palimpzest.validator.validator import Validator
 
 logger = logging.getLogger(__name__)
@@ -62,10 +63,10 @@ class QueryProcessorFactory:
         Converts strings to Model objects and fetches dynamic model info.
         """
         # 1. Normalize available_models
-        available_models = getattr(config, 'available_models', [])
-        if available_models is None or len(available_models) == 0:
+        current_available_models = getattr(config, 'available_models', [])
+        if current_available_models is None or len(current_available_models) == 0:
             # If no models provided, select optimal models based on policy
-            available_models_objs = get_optimal_models(
+            current_available_models = get_optimal_models(
                 policy = config.policy,
                 use_vertex = config.use_vertex,
                 gemini_credentials_path = config.gemini_credentials_path,
@@ -74,20 +75,19 @@ class QueryProcessorFactory:
         # Fetch info for these models (accepts list of strings/CuratedModel)
         else:
             try:
-                fetch_dynamic_model_info(available_models)
+                fetch_dynamic_model_info(current_available_models)
             except Exception as e:
                 logger.warning(f"Failed to fetch dynamic model info (litellm may not be installed or running): {e}.")
-            available_models_objs = [Model(model) for model in available_models]
 
         # 1. Normalize remove_models
         remove_models = getattr(config, 'remove_models', [])
 
         # remove any models specified in the config
         if remove_models is not None and len(remove_models) > 0:
-            available_models_objs = [model for model in available_models_objs if model.value not in remove_models]
+            current_available_models = [model for model in current_available_models if model.value not in remove_models]
             logger.info(f"Removed models from available models based on config: {remove_models}")
         
-        config.available_models = available_models_objs
+        config.available_models = current_available_models
         config.remove_models = remove_models
 
     @classmethod

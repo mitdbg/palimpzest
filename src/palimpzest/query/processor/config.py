@@ -1,8 +1,7 @@
 from pydantic import BaseModel, ConfigDict, Field, field_validator, ValidationInfo
 
 from palimpzest.policy import MaxQuality, Policy
-from palimpzest.constants import CuratedModel
-from palimpzest.utils.model_info import Model
+from palimpzest.constants import Model
 
 
 # TODO: Add description for each field.
@@ -22,8 +21,8 @@ class QueryProcessorConfig(BaseModel):
     num_samples: int = Field(default=None)
     verbose: bool = Field(default=False)
     progress: bool = Field(default=True)
-    available_models: list[CuratedModel | str | Model] | None = Field(default=None)
-    remove_models: list[CuratedModel | str] | None = Field(default=None)
+    available_models: list[Model] | None = Field(default=None)
+    remove_models: list[Model] | None = Field(default=None)
     max_workers: int | None = Field(default=64)
     join_parallelism: int = Field(default=64)
     batch_size: int | None = Field(default=None)

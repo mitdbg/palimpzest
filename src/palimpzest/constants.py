@@ -1,7 +1,7 @@
 ### This file contains constants used by Palimpzest ###
 import os
 from enum import Enum
-from palimpzest.utils.model_helpers import get_model_specs
+from palimpzest.utils.model_info_helpers import get_model_specs
 
 DYNAMIC_MODEL_INFO = {}
 
@@ -239,6 +239,11 @@ class Model(str, Enum):
         obj._name_ = f"UNREGISTERED_{hash(value) & 0xfffffff:x}"
         obj._value_ = value
         obj.prefetched_specs = get_model_specs(value)
+        metadata = obj.prefetched_specs["metadata"]
+        obj.use_endpoint = (
+            metadata["is_text_model"] or metadata["is_audio_model"] or
+            metadata["is_reasoning_model"] or metadata["is_vision_model"] or metadata["is_embedding_model"] or
+            metadata["usd_per_input_token"] or metadata["usd_per_output_token"])
         return obj
     
     def __repr__(self):
