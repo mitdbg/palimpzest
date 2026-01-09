@@ -1,6 +1,9 @@
 ### This file contains constants used by Palimpzest ###
 import os
 from enum import Enum
+from palimpzest.utils.model_helpers import get_model_specs
+
+DYNAMIC_MODEL_INFO = {}
 
 class PromptStrategy(str, Enum):
     """
@@ -178,9 +181,7 @@ NAIVE_PDF_PROCESSOR_TIME_PER_RECORD = 10.0
 # Whether or not to log LLM outputs
 LOG_LLM_OUTPUT = False
 
-# Previously Model
-# ENUMS
-class CuratedModel(str, Enum):
+class Model(str, Enum):
     """
     Model describes the underlying LLM which should be used to perform some operation
     which requires invoking an LLM. It does NOT specify whether the model need be executed
@@ -223,9 +224,26 @@ class CuratedModel(str, Enum):
     TEXT_EMBEDDING_3_SMALL = "text-embedding-3-small"
     CLIP_VIT_B_32 = "clip-ViT-B-32"
 
-    def __repr__(self):
-        return f"{self.name}"
+    def __init__(self, value: str):
+        self.prefetched_specs = get_model_specs(self)
+        metadata = self.prefetched_specs["metadata"]
+        self.use_endpoint = (
+            metadata["is_text_model"] or metadata["is_audio_model"] or
+            metadata["is_reasoning_model"] or metadata["is_vision_model"] or metadata["is_embedding_model"] or
+            metadata["usd_per_input_token"] or metadata["usd_per_output_token"])
 
+    @classmethod
+    def _missing_(cls, value):
+        # create a pseudo-member for unknown values
+        obj = str.__new__(cls, value)
+        obj._name_ = f"UNREGISTERED_{hash(value) & 0xfffffff:x}"
+        obj._value_ = value
+        obj.prefetched_specs = get_model_specs(value)
+        return obj
+    
+    def __repr__(self):
+        return self.value
+    
     def is_llama_model(self):
         return "llama" in self.value.lower()
 
@@ -239,10 +257,10 @@ class CuratedModel(str, Enum):
         return "text-embedding" in self.value.lower()
 
     def is_o_model(self):
-        return self in [CuratedModel.o4_MINI]
+        return self in [Model.o4_MINI]
 
     def is_gpt_5_model(self):
-        return self in [CuratedModel.GPT_5, CuratedModel.GPT_5_MINI, CuratedModel.GPT_5_NANO]
+        return self in [Model.GPT_5, Model.GPT_5_MINI, Model.GPT_5_NANO]
 
     def is_openai_model(self):
         return "openai" in self.value.lower() or self.is_text_embedding_model()
@@ -260,62 +278,131 @@ class CuratedModel(str, Enum):
         return "hosted_vllm" in self.value.lower()
 
     def is_reasoning_model(self):
+        info = DYNAMIC_MODEL_INFO.get(self.value, {})
+        if "supports_reasoning" in info and info["supports_reasoning"] is not None:
+            return info["supports_reasoning"]
         reasoning_models = [
-            CuratedModel.GPT_5, CuratedModel.GPT_5_2,
-            CuratedModel.GPT_5_MINI, CuratedModel.GPT_5_NANO, CuratedModel.o4_MINI,
-            CuratedModel.GEMINI_2_5_PRO, CuratedModel.GEMINI_2_5_FLASH, CuratedModel.GEMINI_3_0_PRO, CuratedModel.GEMINI_3_0_FLASH,
-            CuratedModel.GOOGLE_GEMINI_2_5_PRO, CuratedModel.GOOGLE_GEMINI_2_5_FLASH, CuratedModel.GOOGLE_GEMINI_2_5_FLASH_LITE,
-            CuratedModel.GOOGLE_GEMINI_3_0_PRO, CuratedModel.GOOGLE_GEMINI_3_0_FLASH,
-            CuratedModel.CLAUDE_3_7_SONNET,
+            Model.GPT_5, Model.GPT_5_2,
+            Model.GPT_5_MINI, Model.GPT_5_NANO, Model.o4_MINI,
+            Model.GEMINI_2_5_PRO, Model.GEMINI_2_5_FLASH, Model.GEMINI_3_0_PRO, Model.GEMINI_3_0_FLASH,
+            Model.GOOGLE_GEMINI_2_5_PRO, Model.GOOGLE_GEMINI_2_5_FLASH, Model.GOOGLE_GEMINI_2_5_FLASH_LITE,
+            Model.GOOGLE_GEMINI_3_0_PRO, Model.GOOGLE_GEMINI_3_0_FLASH,
+            Model.CLAUDE_3_7_SONNET,
         ]
-        return self in reasoning_models
+        if self in reasoning_models:
+            return True
+        return self.prefetched_specs["is_reasoning_model"]
 
     def is_text_model(self):
+        info = DYNAMIC_MODEL_INFO.get(self.value, {})
+        if "mode" in info:
+            return info["mode"] in ["chat", "completion"]
         non_text_models = [
-            CuratedModel.LLAMA3_2_90B_V,
-            CuratedModel.CLIP_VIT_B_32, CuratedModel.TEXT_EMBEDDING_3_SMALL,
-            CuratedModel.GPT_4o_AUDIO_PREVIEW, CuratedModel.GPT_4o_MINI_AUDIO_PREVIEW,
+            Model.LLAMA3_2_90B_V,
+            Model.CLIP_VIT_B_32, Model.TEXT_EMBEDDING_3_SMALL,
+            Model.GPT_4o_AUDIO_PREVIEW, Model.GPT_4o_MINI_AUDIO_PREVIEW,
         ]
-        return self not in non_text_models
+        if self in non_text_models:
+            return False
+        return self.prefetched_specs["is_text_model"]
 
     # TODO: I think SONNET and HAIKU are vision-capable too
     def is_vision_model(self):
-        return self in [
-            CuratedModel.LLAMA3_2_90B_V, CuratedModel.LLAMA_4_MAVERICK, CuratedModel.GPT_5_2,
-            CuratedModel.GPT_4o, CuratedModel.GPT_4o_MINI, CuratedModel.GPT_4_1, CuratedModel.GPT_4_1_MINI, CuratedModel.GPT_4_1_NANO, CuratedModel.o4_MINI, CuratedModel.GPT_5, CuratedModel.GPT_5_MINI, CuratedModel.GPT_5_NANO,
-            CuratedModel.GEMINI_2_0_FLASH, CuratedModel.GEMINI_2_5_FLASH, CuratedModel.GEMINI_2_5_PRO,
-            CuratedModel.GOOGLE_GEMINI_2_5_PRO, CuratedModel.GOOGLE_GEMINI_2_5_FLASH, CuratedModel.GOOGLE_GEMINI_2_5_FLASH_LITE,
-            CuratedModel.GEMINI_3_0_FLASH, CuratedModel.GEMINI_3_0_PRO,
-            CuratedModel.GOOGLE_GEMINI_3_0_FLASH, CuratedModel.GOOGLE_GEMINI_3_0_PRO,
+        info = DYNAMIC_MODEL_INFO.get(self.value, {})
+        if "supports_vision" in info and info["supports_vision"] is not None:
+            return info["supports_vision"]
+        vision_models = [
+            Model.LLAMA3_2_90B_V, Model.LLAMA_4_MAVERICK, Model.GPT_5_2,
+            Model.GPT_4o, Model.GPT_4o_MINI, Model.GPT_4_1, Model.GPT_4_1_MINI, Model.GPT_4_1_NANO, Model.o4_MINI, Model.GPT_5, Model.GPT_5_MINI, Model.GPT_5_NANO,
+            Model.GEMINI_2_0_FLASH, Model.GEMINI_2_5_FLASH, Model.GEMINI_2_5_PRO,
+            Model.GOOGLE_GEMINI_2_5_PRO, Model.GOOGLE_GEMINI_2_5_FLASH, Model.GOOGLE_GEMINI_2_5_FLASH_LITE,
+            Model.GEMINI_3_0_FLASH, Model.GEMINI_3_0_PRO,
+            Model.GOOGLE_GEMINI_3_0_FLASH, Model.GOOGLE_GEMINI_3_0_PRO,
         ]
+        if self in vision_models:
+            return True
+        return self.prefetched_specs["is_vision_model"]
 
     def is_audio_model(self):
-        return self in [
-            CuratedModel.GPT_4o_AUDIO_PREVIEW, CuratedModel.GPT_4o_MINI_AUDIO_PREVIEW,
-            CuratedModel.GEMINI_2_0_FLASH, CuratedModel.GEMINI_2_5_FLASH, CuratedModel.GEMINI_2_5_PRO,
-            CuratedModel.GOOGLE_GEMINI_2_5_PRO, CuratedModel.GOOGLE_GEMINI_2_5_FLASH, CuratedModel.GOOGLE_GEMINI_2_5_FLASH_LITE,
-            CuratedModel.GEMINI_3_0_FLASH, CuratedModel.GOOGLE_GEMINI_3_0_FLASH,
+        info = DYNAMIC_MODEL_INFO.get(self.value, {})
+        if "supports_audio_input" in info and info["supports_audio_input"] is not None:
+            return info["supports_audio_input"]
+        audio_models = [
+            Model.GPT_4o_AUDIO_PREVIEW, Model.GPT_4o_MINI_AUDIO_PREVIEW,
+            Model.GEMINI_2_0_FLASH, Model.GEMINI_2_5_FLASH, Model.GEMINI_2_5_PRO,
+            Model.GOOGLE_GEMINI_2_5_PRO, Model.GOOGLE_GEMINI_2_5_FLASH, Model.GOOGLE_GEMINI_2_5_FLASH_LITE,
+            Model.GEMINI_3_0_FLASH, Model.GOOGLE_GEMINI_3_0_FLASH,
         ]
+        if self in audio_models:
+            return True
+        return self.prefetched_specs["is_audio_model"]
 
     def is_text_image_multimodal_model(self):
-        return self in [
-            CuratedModel.LLAMA_4_MAVERICK,
-            CuratedModel.GPT_4o, CuratedModel.GPT_4o_MINI, CuratedModel.GPT_4_1, CuratedModel.GPT_4_1_MINI, CuratedModel.GPT_4_1_NANO, CuratedModel.o4_MINI, CuratedModel.GPT_5, CuratedModel.GPT_5_MINI, CuratedModel.GPT_5_NANO, CuratedModel.GPT_5_2,
-            CuratedModel.GEMINI_2_0_FLASH, CuratedModel.GEMINI_2_5_FLASH, CuratedModel.GEMINI_2_5_PRO, CuratedModel.GEMINI_3_0_FLASH, CuratedModel.GEMINI_3_0_PRO,
-            CuratedModel.GOOGLE_GEMINI_2_5_PRO, CuratedModel.GOOGLE_GEMINI_2_5_FLASH, CuratedModel.GOOGLE_GEMINI_2_5_FLASH_LITE, CuratedModel.GOOGLE_GEMINI_3_0_FLASH, CuratedModel.GOOGLE_GEMINI_3_0_PRO,
+        text_image_models = [
+            Model.LLAMA_4_MAVERICK,
+            Model.GPT_4o, Model.GPT_4o_MINI, Model.GPT_4_1, Model.GPT_4_1_MINI, Model.GPT_4_1_NANO, Model.o4_MINI, Model.GPT_5, Model.GPT_5_MINI, Model.GPT_5_NANO, Model.GPT_5_2,
+            Model.GEMINI_2_0_FLASH, Model.GEMINI_2_5_FLASH, Model.GEMINI_2_5_PRO, Model.GEMINI_3_0_FLASH, Model.GEMINI_3_0_PRO,
+            Model.GOOGLE_GEMINI_2_5_PRO, Model.GOOGLE_GEMINI_2_5_FLASH, Model.GOOGLE_GEMINI_2_5_FLASH_LITE, Model.GOOGLE_GEMINI_3_0_FLASH, Model.GOOGLE_GEMINI_3_0_PRO,
         ]
+        if self in text_image_models:
+            return True
+        return self.is_text_model() and self.is_vision_model()
 
     def is_text_audio_multimodal_model(self):
-        return self in [
-            CuratedModel.GPT_4o_AUDIO_PREVIEW, CuratedModel.GPT_4o_MINI_AUDIO_PREVIEW,
-            CuratedModel.GEMINI_2_0_FLASH, CuratedModel.GEMINI_2_5_FLASH, CuratedModel.GEMINI_2_5_PRO, CuratedModel.GEMINI_3_0_FLASH,
-            CuratedModel.GOOGLE_GEMINI_2_5_PRO, CuratedModel.GOOGLE_GEMINI_2_5_FLASH, CuratedModel.GOOGLE_GEMINI_2_5_FLASH_LITE, CuratedModel.GOOGLE_GEMINI_3_0_FLASH,
+        text_audio_models = [
+            Model.GPT_4o_AUDIO_PREVIEW, Model.GPT_4o_MINI_AUDIO_PREVIEW,
+            Model.GEMINI_2_0_FLASH, Model.GEMINI_2_5_FLASH, Model.GEMINI_2_5_PRO, Model.GEMINI_3_0_FLASH,
+            Model.GOOGLE_GEMINI_2_5_PRO, Model.GOOGLE_GEMINI_2_5_FLASH, Model.GOOGLE_GEMINI_2_5_FLASH_LITE, Model.GOOGLE_GEMINI_3_0_FLASH,
         ]
+        if self in text_audio_models:
+            return True
+        return self.is_audio_model() and self.is_text_model()
 
     def is_embedding_model(self):
-        return self in [CuratedModel.CLIP_VIT_B_32, CuratedModel.TEXT_EMBEDDING_3_SMALL]
+        info = DYNAMIC_MODEL_INFO.get(self.value, {})
+        if "mode" in info:
+            return info["mode"] == "embedding"
+        embedding_models = [Model.CLIP_VIT_B_32, Model.TEXT_EMBEDDING_3_SMALL]
+        if self in embedding_models:
+            return True
+        return self.prefetched_specs["is_embedding_model"]
 
-Model = CuratedModel # for backward compatibility purposesq
+    def get_usd_per_input_token(self):
+        info = DYNAMIC_MODEL_INFO.get(self.value, {})
+        if "input_cost_per_token" in info and info["input_cost_per_token"] is not None:
+            return info["input_cost_per_token"]
+        if self.value in MODEL_CARDS:
+            return MODEL_CARDS[self]["usd_per_input_token"]
+        return self.prefetched_specs["usd_per_input_token"]
+    
+    def get_usd_per_output_token(self):
+        info = DYNAMIC_MODEL_INFO.get(self.value, {})
+        if "output_cost_per_token" in info and info["output_cost_per_token"] is not None:
+            return info["output_cost_per_token"]
+        if self.value in MODEL_CARDS:
+            return MODEL_CARDS[self]["usd_per_output_token"]
+        return self.prefetched_specs["usd_per_output_token"]
+    
+    def get_usd_per_audio_input_token(self):
+        assert self.is_audio_model(), "model must be an audio model to retrieve audio input token cost"
+        info = DYNAMIC_MODEL_INFO.get(self.value, {})
+        if "input_cost_per_audio_token" in info and info["input_cost_per_audio_token"] is not None:
+            return info["input_cost_per_audio_token"]
+        if self.value in MODEL_CARDS:
+            return MODEL_CARDS[self]["usd_per_audio_input_token"]
+        return self.prefetched_specs["usd_per_audio_input_token"]
+    
+    def get_seconds_per_output_token(self):
+        # LiteLLM endpoint doesn't provide information on the latency
+        if self.value in MODEL_CARDS:
+            return MODEL_CARDS[self]["seconds_per_output_token"]
+        return 1.0/self.prefetched_specs["output_tokens_per_second"]
+    
+    def get_overall_score(self):
+        # LiteLLM endpoint doesn't provide information on the MMLU-pro score
+        if self.value in MODEL_CARDS:
+            return MODEL_CARDS[self]["overall"]
+        return self.prefetched_specs["overall_score"]
 
 #### MODEL PERFORMANCE & COST METRICS ####
 # Overall model quality is computed using MMLU-Pro; multi-modal models currently use the same score for vision
@@ -640,40 +727,40 @@ VLLM_QWEN_1_5_0_5B_CHAT_MODEL_CARD = {
 }
 
 MODEL_CARDS = {
-    CuratedModel.LLAMA3_2_3B.value: LLAMA3_2_3B_INSTRUCT_MODEL_CARD,
-    CuratedModel.LLAMA3_1_8B.value: LLAMA3_1_8B_INSTRUCT_MODEL_CARD,
-    CuratedModel.LLAMA3_3_70B.value: LLAMA3_3_70B_INSTRUCT_MODEL_CARD,
-    CuratedModel.LLAMA3_2_90B_V.value: LLAMA3_2_90B_V_MODEL_CARD,
-    CuratedModel.DEEPSEEK_V3.value: DEEPSEEK_V3_MODEL_CARD,
-    CuratedModel.DEEPSEEK_R1_DISTILL_QWEN_1_5B.value: DEEPSEEK_R1_DISTILL_QWEN_1_5B_MODEL_CARD,
-    CuratedModel.GPT_4o.value: GPT_4o_MODEL_CARD,
-    CuratedModel.GPT_4o_MINI.value: GPT_4o_MINI_MODEL_CARD,
-    CuratedModel.GPT_4o_AUDIO_PREVIEW.value: GPT_4o_AUDIO_PREVIEW_MODEL_CARD,
-    CuratedModel.GPT_4o_MINI_AUDIO_PREVIEW.value: GPT_4o_MINI_AUDIO_PREVIEW_MODEL_CARD,
-    CuratedModel.GPT_4_1.value: GPT_4_1_MODEL_CARD,
-    CuratedModel.GPT_4_1_MINI.value: GPT_4_1_MINI_MODEL_CARD,
-    CuratedModel.GPT_4_1_NANO.value: GPT_4_1_NANO_MODEL_CARD,
-    CuratedModel.GPT_5.value: GPT_5_MODEL_CARD,
-    CuratedModel.GPT_5_MINI.value: GPT_5_MINI_MODEL_CARD,
-    CuratedModel.GPT_5_NANO.value: GPT_5_NANO_MODEL_CARD,
-    CuratedModel.GPT_5_2.value: GPT_5_2_MODEL_CARD,
-    CuratedModel.o4_MINI.value: o4_MINI_MODEL_CARD,
-    # CuratedModels.o1.value: o1_MODEL_CARD,
-    CuratedModel.TEXT_EMBEDDING_3_SMALL.value: TEXT_EMBEDDING_3_SMALL_MODEL_CARD,
-    CuratedModel.CLIP_VIT_B_32.value: CLIP_VIT_B_32_MODEL_CARD,
-    CuratedModel.CLAUDE_3_5_SONNET.value: CLAUDE_3_5_SONNET_MODEL_CARD,
-    CuratedModel.CLAUDE_3_7_SONNET.value: CLAUDE_3_7_SONNET_MODEL_CARD,
-    CuratedModel.CLAUDE_3_5_HAIKU.value: CLAUDE_3_5_HAIKU_MODEL_CARD,
-    CuratedModel.GEMINI_2_0_FLASH.value: GEMINI_2_0_FLASH_MODEL_CARD,
-    CuratedModel.GEMINI_2_5_FLASH.value: GEMINI_2_5_FLASH_MODEL_CARD,
-    CuratedModel.GEMINI_2_5_PRO.value: GEMINI_2_5_PRO_MODEL_CARD,
-    CuratedModel.GEMINI_3_0_FLASH.value: GEMINI_3_0_FLASH_MODEL_CARD,
-    CuratedModel.GEMINI_3_0_PRO.value: GEMINI_3_0_PRO_MODEL_CARD,
-    CuratedModel.GOOGLE_GEMINI_2_5_FLASH.value: GEMINI_2_5_FLASH_MODEL_CARD,
-    CuratedModel.GOOGLE_GEMINI_2_5_FLASH_LITE.value: GEMINI_2_5_FLASH_LITE_MODEL_CARD,
-    CuratedModel.GOOGLE_GEMINI_2_5_PRO.value: GEMINI_2_5_PRO_MODEL_CARD,
-    CuratedModel.GOOGLE_GEMINI_3_0_FLASH.value: GEMINI_3_0_FLASH_MODEL_CARD,
-    CuratedModel.GOOGLE_GEMINI_3_0_PRO.value: GEMINI_3_0_PRO_MODEL_CARD,
-    CuratedModel.LLAMA_4_MAVERICK.value: LLAMA_4_MAVERICK_MODEL_CARD,
-    CuratedModel.VLLM_QWEN_1_5_0_5B_CHAT.value: VLLM_QWEN_1_5_0_5B_CHAT_MODEL_CARD,
+    Model.LLAMA3_2_3B.value: LLAMA3_2_3B_INSTRUCT_MODEL_CARD,
+    Model.LLAMA3_1_8B.value: LLAMA3_1_8B_INSTRUCT_MODEL_CARD,
+    Model.LLAMA3_3_70B.value: LLAMA3_3_70B_INSTRUCT_MODEL_CARD,
+    Model.LLAMA3_2_90B_V.value: LLAMA3_2_90B_V_MODEL_CARD,
+    Model.DEEPSEEK_V3.value: DEEPSEEK_V3_MODEL_CARD,
+    Model.DEEPSEEK_R1_DISTILL_QWEN_1_5B.value: DEEPSEEK_R1_DISTILL_QWEN_1_5B_MODEL_CARD,
+    Model.GPT_4o.value: GPT_4o_MODEL_CARD,
+    Model.GPT_4o_MINI.value: GPT_4o_MINI_MODEL_CARD,
+    Model.GPT_4o_AUDIO_PREVIEW.value: GPT_4o_AUDIO_PREVIEW_MODEL_CARD,
+    Model.GPT_4o_MINI_AUDIO_PREVIEW.value: GPT_4o_MINI_AUDIO_PREVIEW_MODEL_CARD,
+    Model.GPT_4_1.value: GPT_4_1_MODEL_CARD,
+    Model.GPT_4_1_MINI.value: GPT_4_1_MINI_MODEL_CARD,
+    Model.GPT_4_1_NANO.value: GPT_4_1_NANO_MODEL_CARD,
+    Model.GPT_5.value: GPT_5_MODEL_CARD,
+    Model.GPT_5_MINI.value: GPT_5_MINI_MODEL_CARD,
+    Model.GPT_5_NANO.value: GPT_5_NANO_MODEL_CARD,
+    Model.GPT_5_2.value: GPT_5_2_MODEL_CARD,
+    Model.o4_MINI.value: o4_MINI_MODEL_CARD,
+    # Models.o1.value: o1_MODEL_CARD,
+    Model.TEXT_EMBEDDING_3_SMALL.value: TEXT_EMBEDDING_3_SMALL_MODEL_CARD,
+    Model.CLIP_VIT_B_32.value: CLIP_VIT_B_32_MODEL_CARD,
+    Model.CLAUDE_3_5_SONNET.value: CLAUDE_3_5_SONNET_MODEL_CARD,
+    Model.CLAUDE_3_7_SONNET.value: CLAUDE_3_7_SONNET_MODEL_CARD,
+    Model.CLAUDE_3_5_HAIKU.value: CLAUDE_3_5_HAIKU_MODEL_CARD,
+    Model.GEMINI_2_0_FLASH.value: GEMINI_2_0_FLASH_MODEL_CARD,
+    Model.GEMINI_2_5_FLASH.value: GEMINI_2_5_FLASH_MODEL_CARD,
+    Model.GEMINI_2_5_PRO.value: GEMINI_2_5_PRO_MODEL_CARD,
+    Model.GEMINI_3_0_FLASH.value: GEMINI_3_0_FLASH_MODEL_CARD,
+    Model.GEMINI_3_0_PRO.value: GEMINI_3_0_PRO_MODEL_CARD,
+    Model.GOOGLE_GEMINI_2_5_FLASH.value: GEMINI_2_5_FLASH_MODEL_CARD,
+    Model.GOOGLE_GEMINI_2_5_FLASH_LITE.value: GEMINI_2_5_FLASH_LITE_MODEL_CARD,
+    Model.GOOGLE_GEMINI_2_5_PRO.value: GEMINI_2_5_PRO_MODEL_CARD,
+    Model.GOOGLE_GEMINI_3_0_FLASH.value: GEMINI_3_0_FLASH_MODEL_CARD,
+    Model.GOOGLE_GEMINI_3_0_PRO.value: GEMINI_3_0_PRO_MODEL_CARD,
+    Model.LLAMA_4_MAVERICK.value: LLAMA_4_MAVERICK_MODEL_CARD,
+    Model.VLLM_QWEN_1_5_0_5B_CHAT.value: VLLM_QWEN_1_5_0_5B_CHAT_MODEL_CARD,
 }

@@ -2,7 +2,7 @@ import yaml, time, requests, subprocess, os, socket, json, random
 from palimpzest.core.models import PlanCost
 from palimpzest.policy import Policy
 from palimpzest.constants import MODEL_CARDS, CuratedModel
-from palimpzest.utils.model_helpers import predict_model_specs, get_model_provider, get_api_key_env_var, get_models
+from palimpzest.utils.model_helpers import get_model_specs, get_model_provider, get_api_key_env_var, get_models
 
 DYNAMIC_MODEL_INFO = {}
 
@@ -129,7 +129,7 @@ class Model(str):
         return "clip" in self.lower()
 
     def is_together_model(self):
-         return get_model_provider(self.value) == "together_ai"
+        return get_model_provider(self.value) == "together_ai"
     
     def is_anthropic_model(self):
         return get_model_provider(self.value) == "anthropic"
@@ -229,7 +229,7 @@ class Model(str):
             return info["input_cost_per_token"]
         if self.value in MODEL_CARDS:
             return MODEL_CARDS[self]["usd_per_input_token"]
-        return self.prediction["usd_per_1m_input"]/1e6
+        return self.prediction["usd_per_input_token"]
     
     def get_usd_per_output_token(self):
         info = DYNAMIC_MODEL_INFO.get(self.value, {})
@@ -237,14 +237,8 @@ class Model(str):
             return info["output_cost_per_token"]
         if self.value in MODEL_CARDS:
             return MODEL_CARDS[self]["usd_per_output_token"]
-        return self.prediction["usd_per_1m_input"]/1e6
+        return self.prediction["usd_per_output_token"]
     
-    def get_seconds_per_output_token(self):
-        # LiteLLM endpoint doesn't provide information on the latency
-        if self.value in MODEL_CARDS:
-            return MODEL_CARDS[self]["seconds_per_output_token"]
-        return self.prediction["seconds_per_output_token"]
-
     def get_usd_per_audio_input_token(self):
         assert self.is_audio_model(), "model must be an audio model to retrieve audio input token cost"
         info = DYNAMIC_MODEL_INFO.get(self.value, {})
@@ -252,13 +246,19 @@ class Model(str):
             return info["input_cost_per_audio_token"]
         if self.value in MODEL_CARDS:
             return MODEL_CARDS[self]["usd_per_audio_input_token"]
-        if self.prediction["usd_per_1m_audio_input"] is not None:
-            return self.prediction["usd_per_1m_audio_input"]/1e6
+        return self.prediction["used_per_audio_input_token"]
+    
+    def get_seconds_per_output_token(self):
+        # LiteLLM endpoint doesn't provide information on the latency
+        if self.value in MODEL_CARDS:
+            return MODEL_CARDS[self]["seconds_per_output_token"]
+        return 1.0/self.prediction["output_tokens_per_second"]
     
     def get_overall_score(self):
+        # LiteLLM endpoint doesn't provide information on the MMLU-pro score
         if self.value in MODEL_CARDS:
             return MODEL_CARDS[self]["overall"]
-        return self.prediction["mmlu_pro_score"]
+        return self.prediction["overall_score"]
     
 
 def get_optimal_models(
