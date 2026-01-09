@@ -6,8 +6,7 @@ import os
 
 import pytest
 
-from palimpzest.constants import CuratedModel, PromptStrategy
-from palimpzest.utils.model_info import Model
+from palimpzest.constants import Model, PromptStrategy
 from palimpzest.core.lib.schemas import File, TextFile, union_schemas
 from palimpzest.query.operators.convert import LLMConvertBonded
 from palimpzest.query.operators.scan import MarshalAndScanDataOp
@@ -31,7 +30,7 @@ def test_convert(mocker, convert_op, side_effect, email_schema, enron_eval_tiny)
     convert_op = convert_op(
         input_schema=File,
         output_schema=email_schema,
-        model=Model(CuratedModel.GPT_4o),
+        model=Model.GPT_4o,
         prompt_strategy=PromptStrategy.MAP,
         logical_op_id="test_convert",
     )

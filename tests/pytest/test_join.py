@@ -5,8 +5,7 @@ import os
 import pytest
 from pydantic import BaseModel, Field
 
-from palimpzest.constants import CuratedModel
-from palimpzest.utils.model_info import Model
+from palimpzest.constants import Model
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.lib.schemas import AudioFilepath, ImageFilepath, union_schemas
 from palimpzest.core.models import GenerationStats
@@ -99,7 +98,7 @@ def test_join(mocker, left_input_schema, right_input_schema, physical_op_class):
         "output_schema": input_schema,
         "condition": "Do the two inputs describe the same type of animal?",
         "logical_op_id": "test-join",
-        "model": Model(CuratedModel.GPT_5_MINI if os.getenv("NO_GEMINI") else CuratedModel.GEMINI_2_5_FLASH)
+        "model": Model.GPT_5_MINI if os.getenv("NO_GEMINI") else Model.GEMINI_2_5_FLASH
     }
     if physical_op_class == EmbeddingJoin:
         physical_op_kwargs["num_samples"] = 10
@@ -147,7 +146,7 @@ def test_embedding_join(mocker):
         "output_schema": input_schema,
         "condition": "Do the two inputs describe the same type of animal?",
         "logical_op_id": "test-join",
-        "model": Model(CuratedModel.GPT_5_MINI),
+        "model": Model.GPT_5_MINI,
         "num_samples": 8,
     }
 

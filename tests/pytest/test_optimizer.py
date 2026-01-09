@@ -3,8 +3,7 @@ import time
 
 import pytest
 
-from palimpzest.constants import Cardinality, CuratedModel
-from palimpzest.utils.model_info import Model
+from palimpzest.constants import Cardinality, Model
 from palimpzest.core.elements.filters import Filter
 from palimpzest.core.lib.schemas import TextFile
 from palimpzest.core.models import OperatorCostEstimates, PlanCost
@@ -112,7 +111,7 @@ class TestOptimizer:
             policy=policy,
             cost_model=cost_model,
             verbose=True,
-            available_models=[Model(CuratedModel.GPT_4o), Model(CuratedModel.GPT_4o_MINI), Model(CuratedModel.LLAMA3_1_8B)],
+            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B],
             optimizer_strategy=opt_strategy,
         )
         physical_plans = optimizer.optimize(plan)
@@ -130,7 +129,7 @@ class TestOptimizer:
             policy=policy,
             cost_model=cost_model,
             verbose=True,
-            available_models=[Model(CuratedModel.GPT_4o), Model(CuratedModel.GPT_4o_MINI), Model(CuratedModel.LLAMA3_1_8B)],
+            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B],
             optimizer_strategy=opt_strategy,
             allow_rag_reduction=False,
             allow_mixtures=False,
@@ -143,7 +142,7 @@ class TestOptimizer:
         assert len(physical_plan) == 2
         assert isinstance(physical_plan[0], MarshalAndScanDataOp)
         assert isinstance(physical_plan[1], LLMConvertBonded)
-        assert physical_plan[1].model.value == CuratedModel.GPT_4o.value
+        assert physical_plan[1].model.value == Model.GPT_4o.value
 
     def test_simple_min_cost_convert(self, enron_eval_tiny, email_schema, opt_strategy):
         plan = enron_eval_tiny
@@ -154,7 +153,7 @@ class TestOptimizer:
             policy=policy,
             cost_model=cost_model,
             verbose=True,
-            available_models=[Model(CuratedModel.GPT_4o), Model(CuratedModel.GPT_4o_MINI), Model(CuratedModel.LLAMA3_1_8B)],
+            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B],
             optimizer_strategy=opt_strategy,
         )
         physical_plans = optimizer.optimize(plan)
@@ -173,7 +172,7 @@ class TestOptimizer:
             policy=policy,
             cost_model=cost_model,
             verbose=True,
-            available_models=[Model(CuratedModel.GPT_4o), Model(CuratedModel.GPT_4o_MINI), Model(CuratedModel.LLAMA3_1_8B)],
+            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B],
             optimizer_strategy=opt_strategy,
         )
         physical_plans = optimizer.optimize(plan)
@@ -192,7 +191,7 @@ class TestOptimizer:
             policy=policy,
             cost_model=cost_model,
             verbose=True,
-            available_models=[Model(CuratedModel.VLLM_QWEN_1_5_0_5B_CHAT)],
+            available_models=[Model.VLLM_QWEN_1_5_0_5B_CHAT],
             optimizer_strategy=opt_strategy,
         )
         physical_plans = optimizer.optimize(plan)
@@ -212,7 +211,7 @@ class TestOptimizer:
             policy=policy,
             cost_model=cost_model,
             verbose=True,
-            available_models=[Model(CuratedModel.GPT_4o), Model(CuratedModel.GPT_4o_MINI), Model(CuratedModel.LLAMA3_1_8B)],
+            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B],
             optimizer_strategy=opt_strategy,
         )
         physical_plans = optimizer.optimize(plan)
@@ -234,7 +233,7 @@ class TestOptimizer:
             policy=policy,
             cost_model=cost_model,
             verbose=True,
-            available_models=[Model(CuratedModel.GPT_4o), Model(CuratedModel.GPT_4o_MINI), Model(CuratedModel.LLAMA3_1_8B)],
+            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B],
             optimizer_strategy=opt_strategy,
         )
         physical_plans = optimizer.optimize(plan)
@@ -253,7 +252,7 @@ class TestOptimizer:
             policy=policy,
             cost_model=cost_model,
             verbose=True,
-            available_models=[Model(CuratedModel.GPT_4o), Model(CuratedModel.GPT_4o_MINI), Model(CuratedModel.LLAMA3_1_8B)],
+            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B],
             allow_rag_reduction=False,
             allow_mixtures=False,
             allow_critic=False,
@@ -276,7 +275,7 @@ class TestOptimizer:
             policy=policy,
             cost_model=cost_model,
             verbose=True,
-            available_models=[Model(CuratedModel.GPT_4o), Model(CuratedModel.GPT_4o_MINI), Model(CuratedModel.LLAMA3_1_8B)],
+            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B],
             allow_rag_reduction=False,
             allow_mixtures=False,
             allow_critic=False,
@@ -312,7 +311,7 @@ class TestOptimizer:
             policy=policy,
             cost_model=cost_model,
             verbose=True,
-            available_models=[Model(CuratedModel.GPT_4o), Model(CuratedModel.GPT_4o_MINI), Model(CuratedModel.LLAMA3_1_8B)],
+            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B],
             allow_rag_reduction=False,
             allow_mixtures=False,
             allow_critic=False,
@@ -458,7 +457,7 @@ class TestParetoOptimizer:
             policy=policy,
             cost_model=cost_model,
             verbose=True,
-            available_models=[Model(CuratedModel.GPT_4o), Model(CuratedModel.GPT_4o_MINI), Model(CuratedModel.LLAMA3_1_8B)],
+            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B],
             optimizer_strategy=OptimizationStrategyType.PARETO,
             allow_rag_reduction=False,
             allow_mixtures=False,

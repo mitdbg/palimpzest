@@ -3,8 +3,7 @@ import os
 import pytest
 from pydantic import BaseModel, Field
 
-from palimpzest.constants import CuratedModel, PromptStrategy
-from palimpzest.utils.model_info import Model
+from palimpzest.constants import Model, PromptStrategy
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.query.generators.generators import Generator
 
@@ -25,10 +24,10 @@ def output_schema():
 @pytest.mark.parametrize(
     "model",
     [
-        pytest.param(Model(CuratedModel.GPT_4o_MINI), marks=pytest.mark.skipif(os.getenv("OPENAI_API_KEY") is None, reason="OPENAI_API_KEY not present")),
-        pytest.param(Model(CuratedModel.DEEPSEEK_V3), marks=pytest.mark.skipif(os.getenv("TOGETHER_API_KEY") is None, reason="TOGETHER_API_KEY not present")),
-        pytest.param(Model(CuratedModel.LLAMA3_2_3B), marks=pytest.mark.skipif(os.getenv("TOGETHER_API_KEY") is None, reason="TOGETHER_API_KEY not present")),
-        pytest.param(Model(CuratedModel.CLAUDE_3_5_HAIKU), marks=pytest.mark.skipif(os.getenv("ANTHROPIC_API_KEY") is None, reason="ANTHROPIC_API_KEY not present")),
+        pytest.param(Model.GPT_4o_MINI, marks=pytest.mark.skipif(os.getenv("OPENAI_API_KEY") is None, reason="OPENAI_API_KEY not present")),
+        pytest.param(Model.DEEPSEEK_V3, marks=pytest.mark.skipif(os.getenv("TOGETHER_API_KEY") is None, reason="TOGETHER_API_KEY not present")),
+        pytest.param(Model.LLAMA3_2_3B, marks=pytest.mark.skipif(os.getenv("TOGETHER_API_KEY") is None, reason="TOGETHER_API_KEY not present")),
+        pytest.param(Model.CLAUDE_3_5_HAIKU, marks=pytest.mark.skipif(os.getenv("ANTHROPIC_API_KEY") is None, reason="ANTHROPIC_API_KEY not present")),
     ]
 )
 def test_generator(model, question, output_schema):

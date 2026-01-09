@@ -4,8 +4,7 @@ import time
 import litellm
 
 # from colorama import Fore, Style
-from palimpzest.constants import Cardinality, CuratedModel, PromptStrategy
-from palimpzest.utils.model_info import Model
+from palimpzest.constants import Cardinality, Model, PromptStrategy
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.models import GenerationStats
 from palimpzest.prompts import (
@@ -31,7 +30,7 @@ class Validator:
           executes the full input to produce an output, evaluates the output, and then updates
           intermediate operator(s) based on the evaluation.
     """
-    def __init__(self, model: Model = Model(CuratedModel.o4_MINI)):
+    def __init__(self, model: Model = Model.o4_MINI):
         self.model = model
         self.filter_cache = {}
         self.join_cache = {}

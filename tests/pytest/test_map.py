@@ -5,8 +5,7 @@ import os
 import pytest
 from pydantic import BaseModel, Field
 
-from palimpzest.constants import CuratedModel
-from palimpzest.utils.model_info import Model
+from palimpzest.constants import Model
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.lib.schemas import AudioFilepath, ImageFilepath, union_schemas
 from palimpzest.core.models import GenerationStats
@@ -70,10 +69,10 @@ def test_map(mocker, input_schema, physical_op_class):
     if os.getenv("NO_GEMINI") and input_schema in [AudioInputSchema, TextAudioInputSchema, ImageAudioInputSchema, TextImageAudioInputSchema]:
         pytest.skip("Skipping audio tests on CI which does not have access to gemini models")
 
-    model = Model(CuratedModel.GPT_5_MINI if os.getenv("NO_GEMINI") else CuratedModel.GEMINI_2_5_FLASH)
-    proposer_models = [Model(CuratedModel.GPT_5), Model(CuratedModel.GPT_5_NANO)] if os.getenv("NO_GEMINI") else [Model(CuratedModel.GEMINI_2_5_PRO, CuratedModel.GEMINI_2_0_FLASH)]
-    critic_model = Model(CuratedModel.GPT_5_NANO if os.getenv("NO_GEMINI") else CuratedModel.GEMINI_2_0_FLASH)
-    refine_model = Model(CuratedModel.GPT_5 if os.getenv("NO_GEMINI") else CuratedModel.GEMINI_2_5_PRO)
+    model = Model.GPT_5_MINI if os.getenv("NO_GEMINI") else Model.GEMINI_2_5_FLASH
+    proposer_models = [Model.GPT_5, Model.GPT_5_NANO] if os.getenv("NO_GEMINI") else [Model.GEMINI_2_5_PRO, Model.GEMINI_2_0_FLASH]
+    critic_model = Model.GPT_5_NANO if os.getenv("NO_GEMINI") else Model.GEMINI_2_0_FLASH
+    refine_model = Model.GPT_5 if os.getenv("NO_GEMINI") else Model.GEMINI_2_5_PRO
 
     # construct the kwargs for the physical operator
     physical_op_kwargs = {"input_schema": input_schema, "output_schema": OutputSchema, "logical_op_id": "test-map"}

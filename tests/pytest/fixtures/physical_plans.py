@@ -1,7 +1,6 @@
 import pytest
 
-from palimpzest.constants import Cardinality, CuratedModel
-from palimpzest.utils.model_info import Model
+from palimpzest.constants import Cardinality, Model
 from palimpzest.core.data.iter_dataset import MemoryDataset
 from palimpzest.core.elements.filters import Filter
 from palimpzest.core.lib.schemas import File, TextFile
@@ -41,7 +40,7 @@ def llm_filter_plan(enron_eval_tiny):
         input_schema=File,
         output_schema=File,
         filter=filter,
-        model=Model(CuratedModel.GPT_4o_MINI),
+        model=Model.GPT_4o_MINI,
         logical_op_id="filter1",
     )
     plan = PhysicalPlan._from_ops(ops=[scan_op, filter_op])
@@ -54,7 +53,7 @@ def bonded_llm_convert_plan(email_schema, enron_eval_tiny):
     convert_op_llm = LLMConvertBonded(
         input_schema=TextFile,
         output_schema=email_schema,
-        model=Model(CuratedModel.GPT_4o_MINI),
+        model=Model.GPT_4o_MINI,
         logical_op_id="convert1",
     )
     plan = PhysicalPlan._from_ops(ops=[scan_op, convert_op_llm])
@@ -67,7 +66,7 @@ def rag_convert_plan(email_schema, enron_eval_tiny):
     convert_op_llm = RAGConvert(
         input_schema=TextFile,
         output_schema=email_schema,
-        model=Model(CuratedModel.GPT_4o_MINI),
+        model=Model.GPT_4o_MINI,
         num_chunks_per_field=1,
         chunk_size=1000,
         logical_op_id="rag_convert1",
@@ -82,7 +81,7 @@ def image_convert_plan(real_estate_listing_files_schema, image_real_estate_listi
     convert_op_llm = LLMConvertBonded(
         input_schema=real_estate_listing_files_schema,
         output_schema=image_real_estate_listing_schema,
-        model=Model(CuratedModel.GPT_4o_MINI),
+        model=Model.GPT_4o_MINI,
         logical_op_id="convert1",
     )
     plan = PhysicalPlan._from_ops(ops=[scan_op, convert_op_llm])
@@ -95,7 +94,7 @@ def one_to_many_convert_plan(real_estate_listing_files_schema, room_real_estate_
     convert_op_llm = LLMConvertBonded(
         input_schema=real_estate_listing_files_schema,
         output_schema=room_real_estate_listing_schema,
-        model=Model(CuratedModel.GPT_4o_MINI),
+        model=Model.GPT_4o_MINI,
         cardinality=Cardinality.ONE_TO_MANY,
         logical_op_id="convert1",
     )
@@ -114,7 +113,7 @@ def scan_convert_filter_sentinel_plan(foobar_schema):
             model=model,
             logical_op_id="convert1",
         )
-        for model in [Model(CuratedModel.GPT_4o_MINI), Model(CuratedModel.GPT_4o), Model(CuratedModel.LLAMA3_1_8B)]
+        for model in [Model.GPT_4o_MINI, Model.GPT_4o, Model.LLAMA3_1_8B]
     ]
     filter_ops = [
         LLMFilter(
@@ -124,7 +123,7 @@ def scan_convert_filter_sentinel_plan(foobar_schema):
             model=model,
             logical_op_id="filter1",
         )
-        for model in [Model(CuratedModel.GPT_4o_MINI), Model(CuratedModel.GPT_4o), Model(CuratedModel.LLAMA3_1_8B)]
+        for model in [Model.GPT_4o_MINI, Model.GPT_4o, Model.LLAMA3_1_8B]
     ]
     plan = SentinelPlan(operator_sets=[[scan_op], convert_ops, filter_ops])
     return plan
@@ -141,7 +140,7 @@ def scan_multi_convert_multi_filter_sentinel_plan(foobar_schema, baz_schema):
             model=model,
             logical_op_id="convert1",
         )
-        for model in [Model(CuratedModel.GPT_4o_MINI), Model(CuratedModel.GPT_4o), Model(CuratedModel.LLAMA3_1_8B)]
+        for model in [Model.GPT_4o_MINI, Model.GPT_4o, Model.LLAMA3_1_8B]
     ]
     filter_ops1 = [
         LLMFilter(
@@ -151,7 +150,7 @@ def scan_multi_convert_multi_filter_sentinel_plan(foobar_schema, baz_schema):
             model=model,
             logical_op_id="filter1",
         )
-        for model in [Model(CuratedModel.GPT_4o_MINI), Model(CuratedModel.GPT_4o), Model(CuratedModel.LLAMA3_1_8B)]
+        for model in [Model.GPT_4o_MINI, Model.GPT_4o, Model.LLAMA3_1_8B]
     ]
     filter_ops2 = [
         LLMFilter(
@@ -161,7 +160,7 @@ def scan_multi_convert_multi_filter_sentinel_plan(foobar_schema, baz_schema):
             model=model,
             logical_op_id="filter2",
         )
-        for model in [Model(CuratedModel.GPT_4o_MINI), Model(CuratedModel.GPT_4o), Model(CuratedModel.LLAMA3_1_8B)]
+        for model in [Model.GPT_4o_MINI, Model.GPT_4o, Model.LLAMA3_1_8B]
     ]
     convert_ops2 = [
         LLMConvertBonded(
@@ -170,7 +169,7 @@ def scan_multi_convert_multi_filter_sentinel_plan(foobar_schema, baz_schema):
             model=model,
             logical_op_id="convert2",
         )
-        for model in [Model(CuratedModel.GPT_4o_MINI), Model(CuratedModel.GPT_4o), Model(CuratedModel.LLAMA3_1_8B)]
+        for model in [Model.GPT_4o_MINI, Model.GPT_4o, Model.LLAMA3_1_8B]
     ]
     plan = SentinelPlan(operator_sets=[[scan_op], convert_ops1, filter_ops1, filter_ops2, convert_ops2])
     return plan

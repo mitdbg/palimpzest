@@ -1,6 +1,5 @@
 import logging
 
-from palimpzest.utils.model_info import Model
 from palimpzest.core.data.dataset import Dataset
 from palimpzest.core.elements.records import DataRecord, DataRecordCollection
 from palimpzest.core.models import ExecutionStats, PlanStats
@@ -12,6 +11,7 @@ from palimpzest.query.optimizer.optimizer_strategy_type import OptimizationStrat
 from palimpzest.query.optimizer.plan import SentinelPlan
 from palimpzest.utils.hash_helpers import hash_for_id
 from palimpzest.validator.validator import Validator
+from palimpzest.constants import Model
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ class QueryProcessor:
         progress: bool = True,
         max_workers: int | None = None,
         policy: Policy | None = None,
-        available_models: list[str | Model] | None = None,
+        available_models: list[Model] | None = None,
         **kwargs,  # needed in order to provide compatibility with QueryProcessorConfig
     ):
         """

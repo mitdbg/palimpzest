@@ -3,8 +3,7 @@ import os
 from copy import deepcopy
 from itertools import combinations
 
-from palimpzest.constants import AggFunc, CuratedModel, PromptStrategy
-from palimpzest.utils.model_info import Model
+from palimpzest.constants import AggFunc, Model, PromptStrategy
 from palimpzest.core.data.context_manager import ContextManager
 from palimpzest.core.lib.schemas import (
     AUDIO_FIELD_TYPES,
