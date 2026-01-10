@@ -181,6 +181,57 @@ NAIVE_PDF_PROCESSOR_TIME_PER_RECORD = 10.0
 # Whether or not to log LLM outputs
 LOG_LLM_OUTPUT = False
 
+class ModelProvider(str, Enum):
+    """
+    Providers define the backend service and credential logic for models.
+    """
+    OPENAI = "openai"
+    ANTHROPIC = "anthropic"
+    GOOGLE = "google"
+    VERTEX_AI = "vertex_ai"
+    HOSTED_VLLM = "hosted_vllm" # needs to be updated after issue 266
+    TOGETHER_AI = "together_ai"
+    DATABRICKS = "databricks"
+    BEDROCK = "bedrock"
+    COHERE = "cohere"
+    DEEPSEEK = "deepseek"
+    FIREWORKS_AI = "fireworks"
+    GROQ = "groq"
+    MISTRAL = "mistral"
+    AZURE = "azure"
+    XAI = "xai"
+    HUGGINGFACE = "huggingface"
+    UNKNOWN = "unknown"
+
+    @property
+    def api_key_env_var(self) -> str | None:
+        """
+        Returns the standard environment variable name for this provider's API key.
+        Incorporates dynamic logic for providers that support multiple keys (like Google).
+        """
+        # TODO: check code for special handling of google credential pahts
+        if self == ModelProvider.GOOGLE:
+            return "GEMINI_API_KEY" if os.getenv("GEMINI_API_KEY") else "GOOGLE_API_KEY"
+        
+        mapping = {
+            ModelProvider.OPENAI: "OPENAI_API_KEY",
+            ModelProvider.VERTEX_AI: "GOOGLE_APPLICATION_CREDENTIALS", # TODO: check exact usage in the code
+            ModelProvider.ANTHROPIC: "ANTHROPIC_API_KEY",
+            ModelProvider.TOGETHER_AI: "TOGETHER_API_KEY",
+            ModelProvider.AZURE: "AZURE_OPENAI_API_KEY",
+            ModelProvider.MISTRAL: "MISTRAL_API_KEY",
+            ModelProvider.COHERE: "CO_API_KEY",
+            ModelProvider.GROQ: "GROQ_API_KEY",
+            ModelProvider.HUGGINGFACE: "HF_TOKEN",
+            ModelProvider.DEEPSEEK: "DEEPSEEK_API_KEY",
+            ModelProvider.FIREWORKS_AI: "FIREWORKS_API_KEY",
+            ModelProvider.DATABRICKS: "DATABRICKS_API_TOKEN",
+            ModelProvider.BEDROCK: "AWS_ACCESS_KEY_ID", # Uses AWS Creds
+            ModelProvider.XAI: "XAI_API_KEY",
+            ModelProvider.HOSTED_VLLM: None
+        }
+        return mapping.get(self, None) # if unknown, maps to none
+
 class Model(str, Enum):
     """
     Model describes the underlying LLM which should be used to perform some operation
@@ -245,42 +296,99 @@ class Model(str, Enum):
             metadata["is_reasoning_model"] or metadata["is_vision_model"] or metadata["is_embedding_model"] or
             metadata["usd_per_input_token"] or metadata["usd_per_output_token"])
         return obj
+
+    @property
+    def provider(self) -> ModelProvider:
+        """Determines the provider based on the model string."""
+        val = self.value.lower()
+        # check for explicit prefixes (should suffice for most cases)
+        if "/" in val:
+            provider_str = val.split("/")[0]
+            try:
+                return ModelProvider(provider_str)
+            except ValueError:
+                pass 
+        # heuristic checks based on model names
+        if any(x in val for x in ["gpt-", "o1-", "dall-e", "text-embedding", "whisper"]):
+            return ModelProvider.OPENAI
+        if "claude" in val:
+            return ModelProvider.ANTHROPIC
+        if any(x in val for x in ["gemini", "gemma", "palm"]):
+            return ModelProvider.VERTEX_AI if "vertex" in val else ModelProvider.GOOGLE
+        if "clip" in val or "together_ai" in val:
+            return ModelProvider.TOGETHER_AI
+        if "mistral" in val or "mixtral" in val:
+            return ModelProvider.MISTRAL
+        if "command" in val:
+            return ModelProvider.COHERE
+        if "hosted_vllm" in val:
+            return ModelProvider.HOSTED_VLLM
+        if "xai" in val or "grok" in val:
+            return ModelProvider.XAI
+        if "llama" in val:
+            return ModelProvider.TOGETHER_AI # TODO: double check this
+        return ModelProvider.UNKNOWN
+    
+    @property
+    def api_key_env_var(self) -> str | None:
+        return self.provider.api_key_env_var
+    
+    @property
+    def api_key(self) -> str | None:
+        env_var = self.api_key_env_var
+        if env_var:
+            val = os.getenv(env_var)
+            return val
+        if self.provider == ModelProvider.VERTEX_AI:
+            default_gcloud_creds = os.path.join(os.path.expanduser("~"), ".config", "gcloud", "application_default_credentials.json")
+            if os.path.exists(default_gcloud_creds):
+                return default_gcloud_creds
+        if self.provider == ModelProvider.BEDROCK:
+            aws_creds = os.path.join(os.path.expanduser("~"), ".aws", "credentials")
+            if os.path.exists(aws_creds):
+                return "AWS_CREDENTIALS_FILE_FOUND"
+        return None
     
     def __repr__(self):
         return self.value
     
     def is_llama_model(self):
         return "llama" in self.value.lower()
-
-    def is_clip_model(self):
-        return "clip" in self.value.lower()
-
-    def is_together_model(self):
-        return "together_ai" in self.value.lower() or self.is_clip_model()
-
-    def is_text_embedding_model(self):
-        return "text-embedding" in self.value.lower()
-
+    
     def is_o_model(self):
-        return self in [Model.o4_MINI]
+        if self in [Model.o4_MINI]:
+            return True
+        val = self.value.lower().split("/")[-1]
+        return val.startswith("o") and len(val) > 1 and val[1].isdigit()
 
     def is_gpt_5_model(self):
-        return self in [Model.GPT_5, Model.GPT_5_MINI, Model.GPT_5_NANO]
+        if self in [Model.GPT_5, Model.GPT_5_MINI, Model.GPT_5_NANO, Model.GPT_5_2]:
+            return True
+        return "gpt-5" in self.value.lower()
 
-    def is_openai_model(self):
-        return "openai" in self.value.lower() or self.is_text_embedding_model()
+    # def is_clip_model(self):
+    #     return "clip" in self.value.lower()
 
-    def is_anthropic_model(self):
-        return "anthropic" in self.value.lower()
+    # def is_together_model(self):
+    #     return "together_ai" in self.value.lower() or self.is_clip_model()
 
-    def is_vertex_model(self):
-        return "vertex_ai" in self.value.lower()
+    # def is_text_embedding_model(self):
+    #     return "text-embedding" in self.value.lower()
 
-    def is_google_ai_studio_model(self):
-        return "gemini/" in self.value.lower()
+    # def is_openai_model(self):
+    #     return "openai" in self.value.lower() or self.is_text_embedding_model()
 
-    def is_vllm_model(self):
-        return "hosted_vllm" in self.value.lower()
+    # def is_anthropic_model(self):
+    #     return "anthropic" in self.value.lower()
+
+    # def is_vertex_model(self):
+    #     return "vertex_ai" in self.value.lower()
+
+    # def is_google_ai_studio_model(self):
+    #     return "gemini/" in self.value.lower()
+
+    # def is_vllm_model(self):
+    #     return "hosted_vllm" in self.value.lower()
 
     def is_reasoning_model(self):
         info = DYNAMIC_MODEL_INFO.get(self.value, {})
