@@ -23,7 +23,7 @@ class RAGConvert(LLMConvert):
         super().__init__(*args, **kwargs)
         # NOTE: in the future, we should abstract the embedding model to allow for different models
         self.client = None
-        self.embedding_model = Model(CuratedModel.TEXT_EMBEDDING_3_SMALL)
+        self.embedding_model = Model.TEXT_EMBEDDING_3_SMALL
         self.num_chunks_per_field = num_chunks_per_field
         self.chunk_size = chunk_size
 
@@ -233,7 +233,7 @@ class RAGFilter(LLMFilter):
         super().__init__(*args, **kwargs)
         # NOTE: in the future, we should abstract the embedding model to allow for different models
         self.client = None
-        self.embedding_model = Model(CuratedModel.TEXT_EMBEDDING_3_SMALL)
+        self.embedding_model = Model.TEXT_EMBEDDING_3_SMALL
         self.num_chunks_per_field = num_chunks_per_field
         self.chunk_size = chunk_size
 

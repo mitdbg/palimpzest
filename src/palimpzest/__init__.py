@@ -1,6 +1,6 @@
 import logging
 
-from palimpzest.constants import Cardinality, CuratedModel
+from palimpzest.constants import Cardinality, Model
 from palimpzest.core.data.context import Context, TextFileContext
 from palimpzest.core.data.dataset import Dataset
 from palimpzest.core.data.iter_dataset import (

@@ -72,7 +72,6 @@ class QueryProcessorFactory:
                 gemini_credentials_path = config.gemini_credentials_path,
                 api_base = config.api_base
             )
-        # Fetch info for these models (accepts list of strings/CuratedModel)
         else:
             try:
                 fetch_dynamic_model_info(current_available_models)

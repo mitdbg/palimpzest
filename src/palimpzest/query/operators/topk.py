@@ -234,7 +234,7 @@ class TopKOp(PhysicalOperator):
 
             model_name = self.index._embedding_function.model_name if uses_openai_embedding_fcn else "clip-ViT-B-32"
             err_msg = f"For Chromadb, we currently only support `text-embedding-3-small` and `clip-ViT-B-32`; your index uses: {model_name}"
-            embedding_model_names = [model.value for model in CuratedModel if model.is_embedding_model()]
+            embedding_model_names = [model.value for model in Model if model.is_embedding_model()]
             assert model_name in embedding_model_names, err_msg
 
             # compute embeddings

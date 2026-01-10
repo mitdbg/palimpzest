@@ -1,6 +1,6 @@
 import pytest
 
-from palimpzest.constants import CuratedModel
+from palimpzest.constants import Model
 
 
 # NOTE: this relies on knowledge of the fixtures in fixtures/execution_data.py
@@ -54,15 +54,15 @@ def scan_convert_filter_varied_qualities(scan_convert_filter_varied_execution_da
                     if record_op_stats.logical_op_id == "scan1-logical":
                         quality = 1.0
                     elif record_op_stats.logical_op_id == "convert1-logical":
-                        quality = 1.0 if str(CuratedModel.GPT_4o) in record_op_stats.full_op_id else 0.5
+                        quality = 1.0 if str(Model.GPT_4o) in record_op_stats.full_op_id else 0.5
                     elif record_op_stats.logical_op_id == "filter1-logical":
-                        if str(CuratedModel.GPT_4o) in record_op_stats.full_op_id:
+                        if str(Model.GPT_4o) in record_op_stats.full_op_id:
                             quality = 1.0
-                        elif str(CuratedModel.GPT_4o_MINI) in record_op_stats.full_op_id:
+                        elif str(Model.GPT_4o_MINI) in record_op_stats.full_op_id:
                             # by construction, champion model expects odd record outputs but GPT-3.5 outputs even records,
                             # so all records get quality 0.0
                             quality = 0.0
-                        elif str(CuratedModel.LLAMA3_1_8B) in record_op_stats.full_op_id:
+                        elif str(Model.LLAMA3_1_8B) in record_op_stats.full_op_id:
                             # by construction, champion model expects odd record outputs but LLAMA3_1_8B outputs all records,
                             # so even records get quality 0.0 and odd records get quality 1.0
                             quality = int(bool(source_idx % 2))
@@ -98,11 +98,11 @@ def scan_convert_filter_varied_override_qualities(scan_convert_filter_varied_exe
                         # for expected outputs w/record idx >= 6 (i.e. records 7, 8) the expected `bar` value is f"bar{idx}-{str(Model.LLAMA3_1_8B)}";
                         # for records 0, 3, 6, 9; the champion model expects outputs f"bar{idx}-{str(Model.GPT_4o)}"
                         if source_idx % 3 > 0 and source_idx < 6:
-                            quality = 1.0 if str(CuratedModel.GPT_4o_MINI) in record_op_stats.full_op_id else 0.5
+                            quality = 1.0 if str(Model.GPT_4o_MINI) in record_op_stats.full_op_id else 0.5
                         elif source_idx % 3 > 0:
-                            quality = 1.0 if str(CuratedModel.LLAMA3_1_8B) in record_op_stats.full_op_id else 0.5
+                            quality = 1.0 if str(Model.LLAMA3_1_8B) in record_op_stats.full_op_id else 0.5
                         else:
-                            quality = 1.0 if str(CuratedModel.GPT_4o) in record_op_stats.full_op_id else 0.5
+                            quality = 1.0 if str(Model.GPT_4o) in record_op_stats.full_op_id else 0.5
 
                     elif record_op_stats.logical_op_id == "filter1-logical":
                         # by construction, expected output passes all records with idx % 3 > 0, i.e. records 1, 2, 4, 5, 7, 8
@@ -111,10 +111,10 @@ def scan_convert_filter_varied_override_qualities(scan_convert_filter_varied_exe
                         # champion model passes all odd records
 
                         # using expected_record and match found
-                        if source_idx % 3 > 0 and source_idx < 6 and str(CuratedModel.GPT_4o_MINI) in record_op_stats.full_op_id:  # noqa: SIM114
+                        if source_idx % 3 > 0 and source_idx < 6 and str(Model.GPT_4o_MINI) in record_op_stats.full_op_id:  # noqa: SIM114
                             quality = int(record_op_stats.passed_operator)
                         
-                        elif source_idx % 3 > 0 and source_idx >= 6 and str(CuratedModel.LLAMA3_1_8B) in record_op_stats.full_op_id:  # noqa: SIM114
+                        elif source_idx % 3 > 0 and source_idx >= 6 and str(Model.LLAMA3_1_8B) in record_op_stats.full_op_id:  # noqa: SIM114
                             quality = int(record_op_stats.passed_operator)
 
                         # using champion record and it thinks record should pass
@@ -147,14 +147,14 @@ def scan_multi_convert_multi_filter_qualities(scan_multi_convert_multi_filter_ex
                     elif record_op_stats.logical_op_id == "convert1-logical":
                         # by construction, expected output is used to score records with source_idx < 7
                         # the second output (one_to_many_idx == 1) for source_idx == 0 is not expected
-                        # the expected `bar` value is f"bar{source_idx}-{str(CuratedModel.GPT_4o_MINI)}";
-                        # for records with source_idx >= 7; the champion model expects outputs f"bar{idx}-{str(CuratedModel.GPT_4o)}"
+                        # the expected `bar` value is f"bar{source_idx}-{str(Model.GPT_4o_MINI)}";
+                        # for records with source_idx >= 7; the champion model expects outputs f"bar{idx}-{str(Model.GPT_4o)}"
                         if source_idx == 0 and one_to_many_idx == 1:
                             quality = 0.0
                         elif source_idx < 7:
-                            quality = 1.0 if str(CuratedModel.GPT_4o_MINI) in record_op_stats.full_op_id else 0.5
+                            quality = 1.0 if str(Model.GPT_4o_MINI) in record_op_stats.full_op_id else 0.5
                         else:
-                            quality = 1.0 if str(CuratedModel.GPT_4o) in record_op_stats.full_op_id else 0.5
+                            quality = 1.0 if str(Model.GPT_4o) in record_op_stats.full_op_id else 0.5
 
                     elif record_op_stats.logical_op_id == "filter1-logical":
                         # by construction, expected output passes all records with source_idx < 7
@@ -174,7 +174,7 @@ def scan_multi_convert_multi_filter_qualities(scan_multi_convert_multi_filter_ex
 
                         # for records with source_idxs in [5, 6] if the *convert& model used was GPT_3_5, then the
                         # expected record will match and we expect the record to pass
-                        elif source_idx < 7 and str(CuratedModel.GPT_4o_MINI) in record_op_stats.record_state['bar']:
+                        elif source_idx < 7 and str(Model.GPT_4o_MINI) in record_op_stats.record_state['bar']:
                             quality = int(record_op_stats.passed_operator)
 
                         # for records with source_idxs in [5, 6] if the model used was *not* GPT_3_5, then the champion model will be used
@@ -194,7 +194,7 @@ def scan_multi_convert_multi_filter_qualities(scan_multi_convert_multi_filter_ex
                         if source_idx == 0 and one_to_many_idx == 1:
                             quality = 0.0
                         else:
-                            quality = 1.0 if str(CuratedModel.GPT_4o_MINI) in record_op_stats.full_op_id else 0.0
+                            quality = 1.0 if str(Model.GPT_4o_MINI) in record_op_stats.full_op_id else 0.0
 
                     record_set_expected_qualities.append(quality)
                 expected_qualities[logical_op_id][source_idx].append(record_set_expected_qualities)

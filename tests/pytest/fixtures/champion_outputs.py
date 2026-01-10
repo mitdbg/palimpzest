@@ -1,6 +1,6 @@
 import pytest
 
-from palimpzest.constants import CuratedModel
+from palimpzest.constants import Model
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.core.lib.schemas import TextFile
 
@@ -101,7 +101,7 @@ def scan_convert_filter_varied_champion_outputs(scan_convert_filter_sentinel_pla
         convert_dr.filename = f"file{source_idx}"
         convert_dr.contents = None
         convert_dr.foo = f"foo{source_idx}"
-        convert_dr.bar = f"bar{source_idx}-{str(CuratedModel.GPT_4o)}"
+        convert_dr.bar = f"bar{source_idx}-{str(Model.GPT_4o)}"
         champion_outputs[convert_logical_op_id][source_idx] = DataRecordSet([convert_dr], None)
 
     # add filter champion outputs
@@ -110,7 +110,7 @@ def scan_convert_filter_varied_champion_outputs(scan_convert_filter_sentinel_pla
         filter_dr.filename = f"file{source_idx}"
         filter_dr.contents = None
         filter_dr.foo = f"foo{source_idx}"
-        filter_dr.bar = f"bar{source_idx}-{str(CuratedModel.GPT_4o)}"
+        filter_dr.bar = f"bar{source_idx}-{str(Model.GPT_4o)}"
         filter_dr._passed_operator = bool(source_idx % 2)
         champion_outputs[filter_logical_op_id][source_idx] = DataRecordSet([filter_dr], None)
 
@@ -145,7 +145,7 @@ def scan_multi_convert_multi_filter_champion_outputs(scan_multi_convert_multi_fi
             convert_dr.filename = f"file{source_idx}"
             convert_dr.contents = None
             convert_dr.foo = f"foo{source_idx}-one-to-many-{one_to_many_idx}"
-            convert_dr.bar = f"bar{source_idx}-{str(CuratedModel.GPT_4o)}"
+            convert_dr.bar = f"bar{source_idx}-{str(Model.GPT_4o)}"
             drs.append(convert_dr)
 
         champion_outputs[convert1_logical_op_id][source_idx] = DataRecordSet(drs, None)
@@ -157,7 +157,7 @@ def scan_multi_convert_multi_filter_champion_outputs(scan_multi_convert_multi_fi
             filter_dr.filename = f"file{source_idx}"
             filter_dr.contents = None
             filter_dr.foo = f"foo{source_idx}-one-to-many-{one_to_many_idx}"
-            filter_dr.bar = f"bar{source_idx}-{str(CuratedModel.GPT_4o)}"
+            filter_dr.bar = f"bar{source_idx}-{str(Model.GPT_4o)}"
             filter_dr._passed_operator = bool(source_idx < 7)
             champion_outputs[filter1_logical_op_id][source_idx] = DataRecordSet([filter_dr], None)
 
@@ -168,7 +168,7 @@ def scan_multi_convert_multi_filter_champion_outputs(scan_multi_convert_multi_fi
             filter_dr.filename = f"file{source_idx}"
             filter_dr.contents = None
             filter_dr.foo = f"foo{source_idx}-one-to-many-{one_to_many_idx}"
-            filter_dr.bar = f"bar{source_idx}-{str(CuratedModel.GPT_4o)}"
+            filter_dr.bar = f"bar{source_idx}-{str(Model.GPT_4o)}"
             filter_dr._passed_operator = bool(source_idx < 5)
             champion_outputs[filter2_logical_op_id][source_idx] = DataRecordSet([filter_dr], None)
 
@@ -179,8 +179,8 @@ def scan_multi_convert_multi_filter_champion_outputs(scan_multi_convert_multi_fi
             convert_dr.filename = f"file{source_idx}"
             convert_dr.contents = None
             convert_dr.foo = f"foo{source_idx}-one-to-many-{one_to_many_idx}"
-            convert_dr.bar = f"bar{source_idx}-{str(CuratedModel.GPT_4o)}"
-            convert_dr.baz = f"baz{str(CuratedModel.GPT_4o)}"
+            convert_dr.bar = f"bar{source_idx}-{str(Model.GPT_4o)}"
+            convert_dr.baz = f"baz{str(Model.GPT_4o)}"
             champion_outputs[convert2_logical_op_id][source_idx] = DataRecordSet([convert_dr], None)
 
     return champion_outputs
