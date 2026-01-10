@@ -189,7 +189,7 @@ class ModelProvider(str, Enum):
     ANTHROPIC = "anthropic"
     GOOGLE = "google"
     VERTEX_AI = "vertex_ai"
-    HOSTED_VLLM = "hosted_vllm" # needs to be updated after issue 266
+    VLLM = "hosted_vllm" # needs to be updated after issue 266
     TOGETHER_AI = "together_ai"
     DATABRICKS = "databricks"
     BEDROCK = "bedrock"
@@ -228,7 +228,7 @@ class ModelProvider(str, Enum):
             ModelProvider.DATABRICKS: "DATABRICKS_API_TOKEN",
             ModelProvider.BEDROCK: "AWS_ACCESS_KEY_ID", # Uses AWS Creds
             ModelProvider.XAI: "XAI_API_KEY",
-            ModelProvider.HOSTED_VLLM: None
+            ModelProvider.VLLM: "VLLM_API_KEY"
         }
         return mapping.get(self, None) # if unknown, maps to none
 
@@ -333,22 +333,6 @@ class Model(str, Enum):
     def api_key_env_var(self) -> str | None:
         return self.provider.api_key_env_var
     
-    @property
-    def api_key(self) -> str | None:
-        env_var = self.api_key_env_var
-        if env_var:
-            val = os.getenv(env_var)
-            return val
-        if self.provider == ModelProvider.VERTEX_AI:
-            default_gcloud_creds = os.path.join(os.path.expanduser("~"), ".config", "gcloud", "application_default_credentials.json")
-            if os.path.exists(default_gcloud_creds):
-                return default_gcloud_creds
-        if self.provider == ModelProvider.BEDROCK:
-            aws_creds = os.path.join(os.path.expanduser("~"), ".aws", "credentials")
-            if os.path.exists(aws_creds):
-                return "AWS_CREDENTIALS_FILE_FOUND"
-        return None
-    
     def __repr__(self):
         return self.value
     
@@ -365,30 +349,6 @@ class Model(str, Enum):
         if self in [Model.GPT_5, Model.GPT_5_MINI, Model.GPT_5_NANO, Model.GPT_5_2]:
             return True
         return "gpt-5" in self.value.lower()
-
-    # def is_clip_model(self):
-    #     return "clip" in self.value.lower()
-
-    # def is_together_model(self):
-    #     return "together_ai" in self.value.lower() or self.is_clip_model()
-
-    # def is_text_embedding_model(self):
-    #     return "text-embedding" in self.value.lower()
-
-    # def is_openai_model(self):
-    #     return "openai" in self.value.lower() or self.is_text_embedding_model()
-
-    # def is_anthropic_model(self):
-    #     return "anthropic" in self.value.lower()
-
-    # def is_vertex_model(self):
-    #     return "vertex_ai" in self.value.lower()
-
-    # def is_google_ai_studio_model(self):
-    #     return "gemini/" in self.value.lower()
-
-    # def is_vllm_model(self):
-    #     return "hosted_vllm" in self.value.lower()
 
     def is_reasoning_model(self):
         info = DYNAMIC_MODEL_INFO.get(self.value, {})

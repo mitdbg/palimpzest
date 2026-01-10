@@ -13,7 +13,7 @@ from palimpzest.query.optimizer.optimizer import Optimizer
 from palimpzest.query.optimizer.optimizer_strategy_type import OptimizationStrategyType
 from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.query.processor.query_processor import QueryProcessor
-from palimpzest.constants import Model
+from palimpzest.constants import Model, ModelProvider
 from palimpzest.utils.model_helpers import get_optimal_models, fetch_dynamic_model_info
 from palimpzest.validator.validator import Validator
 
@@ -119,24 +119,19 @@ class QueryProcessorFactory:
         if len(config.available_models) == 0:
             raise ValueError("No available models found.")
 
-        openai_key = os.getenv("OPENAI_API_KEY")
-        anthropic_key = os.getenv("ANTHROPIC_API_KEY")
-        together_key = os.getenv("TOGETHER_API_KEY")
-        gemini_key = os.getenv("GEMINI_API_KEY")
-        google_key = os.getenv("GOOGLE_API_KEY")
-
         for model in config.available_models:
-            if model.is_openai_model() and not openai_key:
-                raise ValueError("OPENAI_API_KEY must be set to use OpenAI models.")
-            if model.is_anthropic_model() and not anthropic_key:
-                raise ValueError("ANTHROPIC_API_KEY must be set to use Anthropic models.")
-            if model.is_together_model() and not together_key:
-                raise ValueError("TOGETHER_API_KEY must be set to use Together models.")
-            if model.is_google_ai_studio_model() and not (gemini_key or google_key or config.gemini_credentials_path):
-                raise ValueError("GEMINI_API_KEY, GOOGLE_API_KEY, or gemini_credentials path must be set to use Google Gemini models.")
-            if model.is_vllm_model() and config.api_base is None:
+            provider = model.provider
+            env_var_name = model.api_key_env_var
+            if provider == ModelProvider.VLLM and config.api_base is None:
                 raise ValueError("api_base must be set to use vLLM models.")
-
+            elif provider == ModelProvider.GOOGLE:
+                has_env_creds = env_var_name and os.getenv(env_var_name)
+                has_config_creds = config.gemini_credentials_path and os.path.exists(config.gemini_credentials_path)
+                if not (has_env_creds or has_config_creds):
+                    raise ValueError("GEMINI_API_KEY, GOOGLE_API_KEY, or gemini_credentials path must be set to use Google Gemini models.")
+            elif env_var_name:
+                if not os.getenv(env_var_name):
+                    raise ValueError(f"{env_var_name} must be set to use {provider.value} models.")
         return config, validator
 
     @classmethod

@@ -1,98 +1,58 @@
 import yaml, time, requests, subprocess, os, socket, random, os
 from palimpzest.core.models import PlanCost
 from palimpzest.policy import Policy
-from palimpzest.constants import Model, DYNAMIC_MODEL_INFO
-from palimpzest.utils.model_info_helpers import get_api_key_env_var, get_model_provider
+from palimpzest.constants import Model, ModelProvider, DYNAMIC_MODEL_INFO
 
 # helper function to select the list of available models based on the 
 def get_available_model_from_env(include_embedding: bool = False):
     available_models = []
-    # Check for Vertex default credentials path if env var is missing
-    default_gcloud_creds = os.path.join(os.path.expanduser("~"), ".config", "gcloud", "application_default_credentials.json")
-    has_vertex_file_creds = os.path.exists(default_gcloud_creds)
-
     for model in Model:
-        model_id = model.value
+        # Skip embedding models if not requested
         if not include_embedding and model.is_embedding_model():
             continue
-        env_var_name = get_api_key_env_var(model_id)
-        is_available = False
-        if env_var_name and os.getenv(env_var_name):
-            is_available = True
-        elif get_model_provider(model_id) == "vertex_ai" and has_vertex_file_creds:
-            is_available = True
-        if is_available:
-            available_models.append(model_id)
+        if model.api_key is not None:
+            available_models.append(model.value)
+        elif model.provider == ModelProvider.HOSTED_VLLM:
+            available_models.append(model.value)
     return available_models
 
 def get_models(include_embedding: bool = False, use_vertex: bool = False, gemini_credentials_path: str | None = None, api_base: str | None = None):
     """
     Return the set of models which the system has access to based on the set environment variables.
     """
-    from palimpzest.constants import Model
     models = []
-    if os.getenv("OPENAI_API_KEY") not in [None, ""]:
-        openai_models = [model for model in Model if model.is_openai_model()]
-        if not include_embedding:
-            openai_models = [
-                model for model in openai_models if not model.is_embedding_model()
-            ]
-        models.extend(openai_models)
-
-    if os.getenv("TOGETHER_API_KEY") not in [None, ""]:
-        together_models = [model for model in Model if model.is_together_model()]
-        if not include_embedding:
-            together_models = [
-                model for model in together_models if not model.is_embedding_model()
-            ]
-        models.extend(together_models)
-
-    if os.getenv("ANTHROPIC_API_KEY") not in [None, ""]:
-        anthropic_models = [model for model in Model if model.is_anthropic_model()]
-        if not include_embedding:
-            anthropic_models = [
-                model for model in anthropic_models if not model.is_embedding_model()
-            ]
-        models.extend(anthropic_models)
-
-    gemini_credentials_path = (
-        os.path.join(os.path.expanduser("~"), ".config", "gcloud", "application_default_credentials.json")
-        if gemini_credentials_path is None
-        else gemini_credentials_path
-    )
-    if os.getenv("GEMINI_API_KEY") not in [None, ""] or (use_vertex and os.path.exists(gemini_credentials_path)):
-        vertex_models = [model for model in Model if model.is_vertex_model()]
-        google_ai_studio_models = [model for model in Model if model.is_google_ai_studio_model()]
-        if not include_embedding:
-            vertex_models = [
-                model for model in vertex_models if not model.is_embedding_model()
-            ]
-        if use_vertex:
-            models.extend(vertex_models)
-        else:
-            models.extend(google_ai_studio_models)
-
-    if api_base is not None:
-        vllm_models = [model for model in Model if model.is_vllm_model()]
-        if not include_embedding:
-            vllm_models = [
-                model for model in vllm_models if not model.is_embedding_model()
-            ]
-        models.extend(vllm_models)
-
+    
+    # We iterate over all defined Models and let their internal logic decide if they match the criteria
+    for model in Model:
+        # 1. Filter by embedding preference
+        if not include_embedding and model.is_embedding_model():
+            continue
+        # 2. Filter by availability (API Key existence)
+        has_key = model.api_key is not None
+        # Special handling for user-provided Vertex credentials path (overriding default)
+        if model.provider == ModelProvider.VERTEX_AI and gemini_credentials_path:
+            if os.path.exists(gemini_credentials_path):
+                has_key = True
+        # 3. Add models based on Provider groups (replicating original logic structure)
+        if model.provider == ModelProvider.OPENAI and has_key:
+            models.append(model)
+        elif model.provider == ModelProvider.TOGETHER_AI and has_key:
+            models.append(model)
+        elif model.provider == ModelProvider.ANTHROPIC and has_key:
+            models.append(model)
+        elif model.provider == ModelProvider.VERTEX_AI and has_key and use_vertex:
+            models.append(model)
+        elif model.provider == ModelProvider.GOOGLE and has_key and not use_vertex:
+            models.append(model)
+        elif model.provider == ModelProvider.HOSTED_VLLM and api_base is not None:
+            models.append(model)
+            
     return models
 
 def get_optimal_models( policy: Policy, include_embedding: bool = False, use_vertex: bool = False, gemini_credentials_path: str | None = None, api_base: str | None = None):
     """
     Selects the top models from the available list based on the user's policy.
-    
-    This function:
-    1. Discovers available models (using env vars and params).
-    2. Filters models that violate policy constraints (e.g. min quality).
-    3. Calculates a weighted score for each model using the policy's weights.
-    4. Returns the top 5 models with the highest score.
     """
-    from palimpzest.constants import MODEL_CARDS
     # 1. Gather Available Models
     available_models = get_models(
         include_embedding=include_embedding, 
@@ -100,7 +60,7 @@ def get_optimal_models( policy: Policy, include_embedding: bool = False, use_ver
         gemini_credentials_path=gemini_credentials_path, 
         api_base=api_base
     )
-    # Convert enums to string IDs for processing
+    
     if not available_models:
         return []
 
@@ -173,10 +133,6 @@ def get_optimal_models( policy: Policy, include_embedding: bool = False, use_ver
     
     return top_models
 
-# ---------------------------------------------------------------------------
-# DYNAMIC FETCHING UTILITIES
-# ---------------------------------------------------------------------------
-
 def get_free_port():
     """Finds a free port on localhost."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -187,13 +143,21 @@ def _generate_config_yaml(models: list[Model]):
     rand_id = random.randint(100000, 999999)
     config_filename = f"litellm_config_{rand_id}.yaml"
     config_list = []
-    for model_str in models:
-        env_var_name = get_api_key_env_var(model_str)
+    for model in models:
+        # Use Model property instead of helper function
+        # Ensure 'model' is an instance of Model enum or class
+        if isinstance(model, str):
+            model_obj = Model(model)
+        else:
+            model_obj = model
+            
+        env_var_name = model_obj.api_key_env_var
         api_key_val = f"os.environ/{env_var_name}" if env_var_name else None
+        
         entry = {
-            "model_name": model_str,
+            "model_name": model_obj.value,
             "litellm_params": {
-                "model": model_str,
+                "model": model_obj.value,
                 "api_key": api_key_val
             }
         }
@@ -203,7 +167,7 @@ def _generate_config_yaml(models: list[Model]):
         yaml.dump(yaml_structure, f, default_flow_style=False, sort_keys=False)
     return config_filename
 
-def fetch_dynamic_model_info(available_models: Model):
+def fetch_dynamic_model_info(available_models: list[Model]):
 
     # only fetch dynamic info for models that have estimated value
     models = [model for model in available_models if model.use_endpoint]
