@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from palimpzest.constants import AggFunc, Cardinality
 from palimpzest.core.elements.filters import Filter
-from palimpzest.core.lib.schemas import create_schema_from_fields, project, relax_schema, union_schemas
+from palimpzest.core.lib.schemas import create_schema_from_fields, create_groupby_schema_from_fields, project, relax_schema, union_schemas
 from palimpzest.policy import construct_policy_from_kwargs
 from palimpzest.query.operators.logical import (
     Aggregate,
@@ -573,23 +573,7 @@ class Dataset:
 
     def groupby(self, gby_fields, agg_fields, agg_funcs) -> Dataset:
         """Apply a group by operation to this dataset."""
-        from typing import Any
-        
-        # Construct the output schema dynamically based on gby_fields and agg_funcs
-        fields = []
-        
-        # Add group by fields to output schema
-        for g in gby_fields:
-            f = {"name": g, "type": Any, "desc": f"Group by field: {g}"}
-            fields.append(f)
-        
-        # Add aggregation fields to output schema
-        for i, agg_func in enumerate(agg_funcs):
-            agg_field_name = f"{agg_func}({agg_fields[i]})"
-            f = {"name": agg_field_name, "type": Any, "desc": f"Aggregate field: {agg_field_name}"}
-            fields.append(f)
-        
-        output_schema = create_schema_from_fields(fields)
+        output_schema = create_groupby_schema_from_fields(self.schema, gby_fields, agg_fields, agg_funcs)
         operator = GroupByAggregate(input_schema=self.schema, output_schema=output_schema, gby_fields=gby_fields, agg_fields=agg_fields, agg_funcs=agg_funcs)
         return Dataset(sources=[self], operator=operator, schema=output_schema)
 
@@ -607,23 +591,7 @@ class Dataset:
             ds = pz.TextFileDataset(id="reviews", dir="product-reviews/")
             ds = ds.sem_groupby(gby_fields=['complaint'], agg_fields=['contents'], agg_funcs=['count'])
         """
-        from typing import Any
-        
-        # Construct the output schema dynamically based on gby_fields and agg_funcs
-        fields = []
-        
-        # Add group by fields to output schema
-        for g in gby_fields:
-            f = {"name": g, "type": Any, "desc": f"Group by field: {g}"}
-            fields.append(f)
-        
-        # Add aggregation fields to output schema
-        for i, agg_func in enumerate(agg_funcs):
-            agg_field_name = f"{agg_func}({agg_fields[i]})"
-            f = {"name": agg_field_name, "type": Any, "desc": f"Aggregate field: {agg_field_name}"}
-            fields.append(f)
-        
-        output_schema = create_schema_from_fields(fields)
+        output_schema = create_groupby_schema_from_fields(self.schema, gby_fields, agg_fields, agg_funcs)
         
         # Create logical operator with direct parameters (no GroupBySig)
         operator = GroupByAggregate(
