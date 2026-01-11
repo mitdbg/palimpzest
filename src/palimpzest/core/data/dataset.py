@@ -573,7 +573,7 @@ class Dataset:
 
     def groupby(self, gby_fields, agg_fields, agg_funcs) -> Dataset:
         """Apply a group by operation to this dataset."""
-        output_schema = create_groupby_schema_from_fields(self.schema, gby_fields, agg_fields, agg_funcs)
+        output_schema = create_groupby_schema_from_fields(gby_fields, agg_fields)
         operator = GroupByAggregate(input_schema=self.schema, output_schema=output_schema, gby_fields=gby_fields, agg_fields=agg_fields, agg_funcs=agg_funcs)
         return Dataset(sources=[self], operator=operator, schema=output_schema)
 
@@ -591,7 +591,7 @@ class Dataset:
             ds = pz.TextFileDataset(id="reviews", dir="product-reviews/")
             ds = ds.sem_groupby(gby_fields=['complaint'], agg_fields=['contents'], agg_funcs=['count'])
         """
-        output_schema = create_groupby_schema_from_fields(self.schema, gby_fields, agg_fields, agg_funcs)
+        output_schema = create_groupby_schema_from_fields(gby_fields, agg_fields)
         
         # Create logical operator with direct parameters (no GroupBySig)
         operator = GroupByAggregate(
