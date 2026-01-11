@@ -590,7 +590,7 @@ class Dataset:
             fields.append(f)
         
         output_schema = create_schema_from_fields(fields)
-        operator = GroupByAggregate(input_schema=self.schema, gby_fields=gby_fields, agg_fields=agg_fields, agg_funcs=agg_funcs)
+        operator = GroupByAggregate(input_schema=self.schema, output_schema=output_schema, gby_fields=gby_fields, agg_fields=agg_fields, agg_funcs=agg_funcs)
         return Dataset(sources=[self], operator=operator, schema=output_schema)
 
     def sem_groupby(self, gby_fields: list[str], agg_fields: list[str], agg_funcs: list[str]) -> Dataset:
