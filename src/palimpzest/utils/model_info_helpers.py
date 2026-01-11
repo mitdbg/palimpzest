@@ -7,13 +7,19 @@ CURATED_MODEL_METRICS = {}
 def load_known_metrics():
     global LITELLM_MODEL_METRICS, CURATED_MODEL_METRICS
     if not LITELLM_MODEL_METRICS:
-        model_prices_and_context_window_url = "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
-        response = requests.get(model_prices_and_context_window_url)
-        LITELLM_MODEL_METRICS = response.json()
+        try:
+            model_prices_and_context_window_url = "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
+            response = requests.get(model_prices_and_context_window_url, timeout=5)
+            if response.status_code == 200:
+                LITELLM_MODEL_METRICS = response.json()
+        except Exception:
+            pass # Fail gracefully if offline
+            
     if not CURATED_MODEL_METRICS:
         curated_model_metrics_path = os.path.join(os.path.dirname(__file__), 'curated_model_info.json')
-        with open(curated_model_metrics_path, 'r') as f:
-            CURATED_MODEL_METRICS = json.load(f)
+        if os.path.exists(curated_model_metrics_path):
+            with open(curated_model_metrics_path, 'r') as f:
+                CURATED_MODEL_METRICS = json.load(f)
 
 load_known_metrics()
 
@@ -31,7 +37,7 @@ def get_known_model_info(full_model_id):
         "usd_per_audio_input_token": None,
         "output_tokens_per_second": None,
         "overall_score": None,
-        "litellm_provider": None
+        # "litellm_provider": None
     }
     
     # Normalize model name (remove provider prefix)
@@ -43,16 +49,20 @@ def get_known_model_info(full_model_id):
     # search logic: check full_model_id first, then model_name
     data_source_1 = LITELLM_MODEL_METRICS.get(full_model_id) or LITELLM_MODEL_METRICS.get(model_name)
     if data_source_1:
-        mode = data_source_1.get("mode", "")
+        # FIX: Only set is_text_model/is_embedding_model if "mode" is actually present.
+        # Otherwise keep it None so heuristics can fill it in.
+        if "mode" in data_source_1:
+            mode = data_source_1["mode"]
+            unified_info["is_text_model"] = (mode == "chat" or mode == "completion")
+            unified_info["is_embedding_model"] = (mode == "embedding")
+        
         unified_info["is_reasoning_model"] = data_source_1.get("supports_reasoning")
         unified_info["is_vision_model"] = data_source_1.get("supports_vision")
-        unified_info["is_text_model"] = (mode == "chat" or mode == "completion")
-        unified_info["is_embedding_model"] = (mode == "embedding")
         unified_info["is_audio_model"] = data_source_1.get("supports_audio_input")
         unified_info["usd_per_input_token"] = data_source_1.get("input_cost_per_token")
         unified_info["usd_per_output_token"] = data_source_1.get("output_cost_per_token")
         unified_info["usd_per_audio_input_token"] = data_source_1.get("input_cost_per_audio_token")
-        unified_info["litellm_provider"] = data_source_1.get("litellm_provider")
+        # unified_info["litellm_provider"] = data_source_1.get("litellm_provider")
 
     # search logic: check model_name only
     data_source_2 = CURATED_MODEL_METRICS.get(model_name)
@@ -97,8 +107,7 @@ def _find_closest_benchmark_metric(model_slug: str) -> Optional[Dict[str, float]
             "tps": data.get("output_tokens_per_second")
         }
 
-    # 2. Date/Version-invariant Match (e.g. gpt-4o matches gpt-4o-2024-05-13)
-    # matching keys starting with slug or containing slug
+    # 2. Date/Version-invariant Match
     matches = [k for k in CURATED_MODEL_METRICS.keys() if k.lower().startswith(slug) or slug in k.lower()]
     if matches:
         # Pick the first match (or sort by length/similarity if needed)
@@ -114,7 +123,6 @@ def _find_closest_benchmark_metric(model_slug: str) -> Optional[Dict[str, float]
     base_slug = slug.replace("-instruct", "").replace("-chat", "").strip("-")
     
     # Try finding the base version in the curated list
-    # (Note: keys in curated list are often case sensitive, so we iterate)
     curated_keys_lower = {k.lower(): k for k in CURATED_MODEL_METRICS.keys()}
     
     if is_instruct and base_slug in curated_keys_lower:
@@ -140,6 +148,7 @@ def _generate_heuristic_specs(model_slug: str) -> Dict[str, Any]:
         "mmlu_pro_score": 40.0,
         "is_reasoning_model": False,
         "is_vision_model": False,
+        "is_text_model": True, # default to true
         "is_audio_model": False,
         "is_embedding_model": False
     }
@@ -188,13 +197,15 @@ def _generate_heuristic_specs(model_slug: str) -> Dict[str, Any]:
              prediction["usd_per_1m_output"] = 0.20
 
     # Modality
-    if re.search(r'(4o|omni|gemini|audio)', model_slug):
+    if re.search(r'(audio)', model_slug):
         prediction["is_audio_model"] = True
         prediction["usd_per_1m_audio_input"] = prediction["usd_per_1m_input"] * 4.0
+    
     if re.search(r'(vision|4o|gemini|claude-3|pixtral|llama-3.2)', model_slug):
         prediction["is_vision_model"] = True
     if "embedding" in model_slug:
         prediction["is_embedding_model"] = True
+        prediction["is_text_model"] = False
 
     return prediction
 
@@ -210,18 +221,12 @@ def get_model_specs(full_model_id: str) -> Dict[str, Any]:
     metadata = {k: (v is None) for k, v in specs.items()}
     model_slug = full_model_id.split('/')[-1].lower()
 
-    # 2. Fill Provider
-    if specs["litellm_provider"] is None:
-        specs["litellm_provider"] = get_model_provider(full_model_id)
-
     # 3. Fuzzy Benchmark Lookup (Overlay if missing)
-    # If we missed score or speed in the strict lookup, try the fuzzy/sibling lookup in CURATED
     if specs["overall_score"] is None or specs["output_tokens_per_second"] is None:
         bench_data = _find_closest_benchmark_metric(model_slug)
         if bench_data:
             if specs["overall_score"] is None and bench_data.get("mmlu") is not None:
                 specs["overall_score"] = bench_data["mmlu"]
-                # Note: We keep metadata=True because this wasn't in the strict 'get_known_model_info'
             
             if specs["output_tokens_per_second"] is None and bench_data.get("tps") is not None:
                 specs["output_tokens_per_second"] = bench_data["tps"]
@@ -233,8 +238,6 @@ def get_model_specs(full_model_id: str) -> Dict[str, Any]:
     for key in ["is_reasoning_model", "is_vision_model", "is_text_model", "is_audio_model", "is_embedding_model"]:
         if specs[key] is None:
             specs[key] = heuristics.get(key, False)
-            if key == "is_text_model" and specs[key] is None:
-                 specs[key] = True # Default to text
 
     # Pricing
     if specs["usd_per_input_token"] is None:

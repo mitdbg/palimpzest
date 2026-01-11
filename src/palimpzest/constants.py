@@ -322,7 +322,7 @@ class Model(str, Enum):
         if "command" in val:
             return ModelProvider.COHERE
         if "hosted_vllm" in val:
-            return ModelProvider.HOSTED_VLLM
+            return ModelProvider.VLLM
         if "xai" in val or "grok" in val:
             return ModelProvider.XAI
         if "llama" in val:
@@ -340,20 +340,17 @@ class Model(str, Enum):
         return "llama" in self.value.lower()
     
     def is_o_model(self):
-        if self in [Model.o4_MINI]:
-            return True
+        if self in Model:
+            return self in [Model.o4_MINI]
         val = self.value.lower().split("/")[-1]
         return val.startswith("o") and len(val) > 1 and val[1].isdigit()
 
     def is_gpt_5_model(self):
-        if self in [Model.GPT_5, Model.GPT_5_MINI, Model.GPT_5_NANO, Model.GPT_5_2]:
-            return True
+        if self in Model:
+            return self in [Model.GPT_5, Model.GPT_5_MINI, Model.GPT_5_NANO, Model.GPT_5_2]
         return "gpt-5" in self.value.lower()
 
     def is_reasoning_model(self):
-        info = DYNAMIC_MODEL_INFO.get(self.value, {})
-        if "supports_reasoning" in info and info["supports_reasoning"] is not None:
-            return info["supports_reasoning"]
         reasoning_models = [
             Model.GPT_5, Model.GPT_5_2,
             Model.GPT_5_MINI, Model.GPT_5_NANO, Model.o4_MINI,
@@ -362,28 +359,28 @@ class Model(str, Enum):
             Model.GOOGLE_GEMINI_3_0_PRO, Model.GOOGLE_GEMINI_3_0_FLASH,
             Model.CLAUDE_3_7_SONNET,
         ]
-        if self in reasoning_models:
-            return True
+        if self in Model:
+            return self in reasoning_models
+        info = DYNAMIC_MODEL_INFO.get(self.value, {})
+        if "supports_reasoning" in info and info["supports_reasoning"] is not None:
+            return info["supports_reasoning"]
         return self.prefetched_specs["is_reasoning_model"]
 
     def is_text_model(self):
-        info = DYNAMIC_MODEL_INFO.get(self.value, {})
-        if "mode" in info:
-            return info["mode"] in ["chat", "completion"]
         non_text_models = [
             Model.LLAMA3_2_90B_V,
             Model.CLIP_VIT_B_32, Model.TEXT_EMBEDDING_3_SMALL,
             Model.GPT_4o_AUDIO_PREVIEW, Model.GPT_4o_MINI_AUDIO_PREVIEW,
         ]
-        if self in non_text_models:
-            return False
+        if self in Model:
+            return self not in non_text_models
+        info = DYNAMIC_MODEL_INFO.get(self.value, {})
+        if "mode" in info:
+            return info["mode"] in ["chat", "completion"]
         return self.prefetched_specs["is_text_model"]
 
     # TODO: I think SONNET and HAIKU are vision-capable too
     def is_vision_model(self):
-        info = DYNAMIC_MODEL_INFO.get(self.value, {})
-        if "supports_vision" in info and info["supports_vision"] is not None:
-            return info["supports_vision"]
         vision_models = [
             Model.LLAMA3_2_90B_V, Model.LLAMA_4_MAVERICK, Model.GPT_5_2,
             Model.GPT_4o, Model.GPT_4o_MINI, Model.GPT_4_1, Model.GPT_4_1_MINI, Model.GPT_4_1_NANO, Model.o4_MINI, Model.GPT_5, Model.GPT_5_MINI, Model.GPT_5_NANO,
@@ -392,22 +389,25 @@ class Model(str, Enum):
             Model.GEMINI_3_0_FLASH, Model.GEMINI_3_0_PRO,
             Model.GOOGLE_GEMINI_3_0_FLASH, Model.GOOGLE_GEMINI_3_0_PRO,
         ]
-        if self in vision_models:
-            return True
+        if self in Model:
+            return self in vision_models
+        info = DYNAMIC_MODEL_INFO.get(self.value, {})
+        if "supports_vision" in info and info["supports_vision"] is not None:
+            return info["supports_vision"]
         return self.prefetched_specs["is_vision_model"]
 
     def is_audio_model(self):
-        info = DYNAMIC_MODEL_INFO.get(self.value, {})
-        if "supports_audio_input" in info and info["supports_audio_input"] is not None:
-            return info["supports_audio_input"]
         audio_models = [
             Model.GPT_4o_AUDIO_PREVIEW, Model.GPT_4o_MINI_AUDIO_PREVIEW,
             Model.GEMINI_2_0_FLASH, Model.GEMINI_2_5_FLASH, Model.GEMINI_2_5_PRO,
             Model.GOOGLE_GEMINI_2_5_PRO, Model.GOOGLE_GEMINI_2_5_FLASH, Model.GOOGLE_GEMINI_2_5_FLASH_LITE,
             Model.GEMINI_3_0_FLASH, Model.GOOGLE_GEMINI_3_0_FLASH,
         ]
-        if self in audio_models:
-            return True
+        if self in Model:
+            return self in audio_models
+        info = DYNAMIC_MODEL_INFO.get(self.value, {})
+        if "supports_audio_input" in info and info["supports_audio_input"] is not None:
+            return info["supports_audio_input"]
         return self.prefetched_specs["is_audio_model"]
 
     def is_text_image_multimodal_model(self):
@@ -417,8 +417,8 @@ class Model(str, Enum):
             Model.GEMINI_2_0_FLASH, Model.GEMINI_2_5_FLASH, Model.GEMINI_2_5_PRO, Model.GEMINI_3_0_FLASH, Model.GEMINI_3_0_PRO,
             Model.GOOGLE_GEMINI_2_5_PRO, Model.GOOGLE_GEMINI_2_5_FLASH, Model.GOOGLE_GEMINI_2_5_FLASH_LITE, Model.GOOGLE_GEMINI_3_0_FLASH, Model.GOOGLE_GEMINI_3_0_PRO,
         ]
-        if self in text_image_models:
-            return True
+        if self in Model:
+            return self in text_image_models
         return self.is_text_model() and self.is_vision_model()
 
     def is_text_audio_multimodal_model(self):
@@ -427,25 +427,25 @@ class Model(str, Enum):
             Model.GEMINI_2_0_FLASH, Model.GEMINI_2_5_FLASH, Model.GEMINI_2_5_PRO, Model.GEMINI_3_0_FLASH,
             Model.GOOGLE_GEMINI_2_5_PRO, Model.GOOGLE_GEMINI_2_5_FLASH, Model.GOOGLE_GEMINI_2_5_FLASH_LITE, Model.GOOGLE_GEMINI_3_0_FLASH,
         ]
-        if self in text_audio_models:
-            return True
+        if self in Model:
+            return self in text_audio_models
         return self.is_audio_model() and self.is_text_model()
 
     def is_embedding_model(self):
+        embedding_models = [Model.CLIP_VIT_B_32, Model.TEXT_EMBEDDING_3_SMALL]
+        if self in Model:
+            return self in embedding_models
         info = DYNAMIC_MODEL_INFO.get(self.value, {})
         if "mode" in info:
             return info["mode"] == "embedding"
-        embedding_models = [Model.CLIP_VIT_B_32, Model.TEXT_EMBEDDING_3_SMALL]
-        if self in embedding_models:
-            return True
         return self.prefetched_specs["is_embedding_model"]
-
+    
     def get_usd_per_input_token(self):
         info = DYNAMIC_MODEL_INFO.get(self.value, {})
         if "input_cost_per_token" in info and info["input_cost_per_token"] is not None:
             return info["input_cost_per_token"]
         if self.value in MODEL_CARDS:
-            return MODEL_CARDS[self]["usd_per_input_token"]
+            return MODEL_CARDS[self.value]["usd_per_input_token"]
         return self.prefetched_specs["usd_per_input_token"]
     
     def get_usd_per_output_token(self):
@@ -453,28 +453,27 @@ class Model(str, Enum):
         if "output_cost_per_token" in info and info["output_cost_per_token"] is not None:
             return info["output_cost_per_token"]
         if self.value in MODEL_CARDS:
-            return MODEL_CARDS[self]["usd_per_output_token"]
+            return MODEL_CARDS[self.value]["usd_per_output_token"]
         return self.prefetched_specs["usd_per_output_token"]
     
     def get_usd_per_audio_input_token(self):
-        assert self.is_audio_model(), "model must be an audio model to retrieve audio input token cost"
         info = DYNAMIC_MODEL_INFO.get(self.value, {})
         if "input_cost_per_audio_token" in info and info["input_cost_per_audio_token"] is not None:
             return info["input_cost_per_audio_token"]
         if self.value in MODEL_CARDS:
-            return MODEL_CARDS[self]["usd_per_audio_input_token"]
-        return self.prefetched_specs["usd_per_audio_input_token"]
+            return MODEL_CARDS[self.value].get("usd_per_audio_input_token", 0.0)
+        return self.prefetched_specs.get("usd_per_audio_input_token", 0.0)
     
     def get_seconds_per_output_token(self):
         # LiteLLM endpoint doesn't provide information on the latency
         if self.value in MODEL_CARDS:
-            return MODEL_CARDS[self]["seconds_per_output_token"]
+            return MODEL_CARDS[self.value]["seconds_per_output_token"]
         return 1.0/self.prefetched_specs["output_tokens_per_second"]
     
     def get_overall_score(self):
         # LiteLLM endpoint doesn't provide information on the MMLU-pro score
         if self.value in MODEL_CARDS:
-            return MODEL_CARDS[self]["overall"]
+            return MODEL_CARDS[self.value]["overall"]
         return self.prefetched_specs["overall_score"]
 
 #### MODEL PERFORMANCE & COST METRICS ####

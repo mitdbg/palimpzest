@@ -1,4 +1,4 @@
-import yaml, time, requests, subprocess, os, socket, random, os
+import yaml, time, requests, subprocess, os, socket, random
 from palimpzest.core.models import PlanCost
 from palimpzest.policy import Policy
 from palimpzest.constants import Model, ModelProvider, DYNAMIC_MODEL_INFO
@@ -12,7 +12,7 @@ def get_available_model_from_env(include_embedding: bool = False):
             continue
         if model.api_key is not None:
             available_models.append(model.value)
-        elif model.provider == ModelProvider.HOSTED_VLLM:
+        elif model.provider == ModelProvider.VLLM:
             available_models.append(model.value)
     return available_models
 
@@ -28,7 +28,7 @@ def get_models(include_embedding: bool = False, use_vertex: bool = False, gemini
         if not include_embedding and model.is_embedding_model():
             continue
         # 2. Filter by availability (API Key existence)
-        has_key = model.api_key is not None
+        has_key = os.environ.get(model.api_key_env_var) is not None
         # Special handling for user-provided Vertex credentials path (overriding default)
         if model.provider == ModelProvider.VERTEX_AI and gemini_credentials_path:
             if os.path.exists(gemini_credentials_path):
@@ -44,7 +44,7 @@ def get_models(include_embedding: bool = False, use_vertex: bool = False, gemini
             models.append(model)
         elif model.provider == ModelProvider.GOOGLE and has_key and not use_vertex:
             models.append(model)
-        elif model.provider == ModelProvider.HOSTED_VLLM and api_base is not None:
+        elif model.provider == ModelProvider.VLLM and api_base is not None:
             models.append(model)
             
     return models

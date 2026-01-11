@@ -507,7 +507,7 @@ class EmbeddingJoin(LLMJoin):
             for field_name, field in self.input_schema.model_fields.items()
             if field_name.split(".")[-1] in self.get_input_fields()
         ])
-        self.embedding_model = Model.TEXT_EMBEDDING_3_SMALL.value if self.text_only else Model.CLIP_VIT_B_32
+        self.embedding_model = Model.TEXT_EMBEDDING_3_SMALL if self.text_only else Model.CLIP_VIT_B_32
         self.locks = Locks()
 
         # keep track of embedding costs that could not be amortized if no output records were produced

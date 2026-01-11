@@ -89,6 +89,8 @@ class QueryProcessorFactory:
         config.available_models = current_available_models
         config.remove_models = remove_models
 
+        return config
+
     @classmethod
     def _config_validation_and_normalization(cls, config: QueryProcessorConfig, train_dataset: dict[str, Dataset] | None, validator : Validator | None):
         if config.policy is None:
