@@ -142,7 +142,7 @@ class TestOptimizer:
         assert len(physical_plan) == 2
         assert isinstance(physical_plan[0], MarshalAndScanDataOp)
         assert isinstance(physical_plan[1], LLMConvertBonded)
-        assert physical_plan[1].model.value == Model.GPT_4o.value
+        assert physical_plan[1].model == Model.GPT_4o
 
     def test_simple_min_cost_convert(self, enron_eval_tiny, email_schema, opt_strategy):
         plan = enron_eval_tiny
@@ -457,7 +457,7 @@ class TestParetoOptimizer:
             policy=policy,
             cost_model=cost_model,
             verbose=True,
-            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B],
+            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_3_70B],
             optimizer_strategy=OptimizationStrategyType.PARETO,
             allow_rag_reduction=False,
             allow_mixtures=False,

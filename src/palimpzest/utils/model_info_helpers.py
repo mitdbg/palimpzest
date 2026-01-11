@@ -21,10 +21,13 @@ def load_known_metrics():
             with open(curated_model_metrics_path, 'r') as f:
                 CURATED_MODEL_METRICS = json.load(f)
 
-load_known_metrics()
-
 def get_known_model_info(full_model_id):
     global LITELLM_MODEL_METRICS, CURATED_MODEL_METRICS
+
+    # Lazy-load metrics on first use (avoids network call at import time)
+    if not LITELLM_MODEL_METRICS and not CURATED_MODEL_METRICS:
+        load_known_metrics()
+
     # Initialize the target dictionary with None
     unified_info = {
         "is_reasoning_model": None,
@@ -247,6 +250,8 @@ def get_model_specs(full_model_id: str) -> Dict[str, Any]:
     if specs["usd_per_audio_input_token"] is None:
         if heuristics["usd_per_1m_audio_input"]:
             specs["usd_per_audio_input_token"] = heuristics["usd_per_1m_audio_input"] / 1_000_000.0
+        else:
+            specs["usd_per_audio_input_token"] = 0.0
 
     # Performance / Score (if even fuzzy lookup failed)
     if specs["output_tokens_per_second"] is None:

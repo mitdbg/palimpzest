@@ -191,11 +191,11 @@ def scan_convert_filter_varied_execution_data(scan_convert_filter_sentinel_plan,
         # GPT-4o-mini passes even examples
         # LLAMA3_1_8B passes all examples
         passed_operator = None
-        if model.value == Model.GPT_4o.value:
+        if model == Model.GPT_4o:
             passed_operator = bool(source_idx % 2)
-        elif model == Model.GPT_4o_MINI.value:
+        elif model == Model.GPT_4o_MINI:
             passed_operator = not bool(source_idx % 2)
-        elif model == Model.LLAMA3_1_8B.value:
+        elif model == Model.LLAMA3_1_8B:
             passed_operator = True
 
         record_op_stats = RecordOpStats(

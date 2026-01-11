@@ -78,7 +78,6 @@ class QueryProcessorFactory:
             except Exception as e:
                 logger.warning(f"Failed to fetch dynamic model info (litellm may not be installed or running): {e}.")
 
-        # 1. Normalize remove_models
         remove_models = getattr(config, 'remove_models', [])
 
         # remove any models specified in the config

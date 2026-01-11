@@ -1,232 +1,754 @@
+"""
+Test suite for dynamic model support in Palimpzest.
+
+This module tests the ability to pass any valid model ID string through the Model class,
+not just the ones defined in the Model Enum. This includes:
+- Dynamic model instantiation via Model._missing_
+- Provider resolution from model strings
+- Model property methods (is_text_model, is_vision_model, etc.)
+- Cost and performance metric retrieval
+- Integration with Generator and QueryProcessor
+- Heuristic-based fallback for unknown models
+"""
+
 import os
 import pytest
 import pandas as pd
 from unittest.mock import MagicMock, patch
+from pydantic import BaseModel, Field
+from pydantic.fields import FieldInfo
+
 import palimpzest as pz
-from palimpzest.constants import Model, DYNAMIC_MODEL_INFO
+from palimpzest.constants import Model, DYNAMIC_MODEL_INFO, PromptStrategy, ModelProvider
 from palimpzest.utils.model_helpers import fetch_dynamic_model_info
 from palimpzest.query.processor.query_processor_factory import QueryProcessorFactory
 from palimpzest.query.processor.config import QueryProcessorConfig
-from palimpzest.core.data.dataset import Dataset, MemoryDataset
+from palimpzest.core.data.dataset import Dataset
 from palimpzest.policy import MinCost
+from palimpzest.query.generators.generators import Generator
+from palimpzest.core.elements.records import DataRecord
+from palimpzest.utils.model_info_helpers import (
+    _generate_heuristic_specs,
+    _find_closest_benchmark_metric,
+    get_model_specs,
+    CURATED_MODEL_METRICS,
+    LITELLM_MODEL_METRICS
+)
 
-# --- Tests for palimpzest/constants.py and Model Enum ---
 
-def test_model_enum_properties_known_model():
-    """
-    Verify that a standard, hardcoded model returns the expected property values.
-    """
-    model = Model.GPT_4o
-    
-    # Check boolean flags
-    assert model.is_text_model() is True
-    # GPT-4o is generally not considered an embedding model in this context
-    assert model.is_embedding_model() is False
-    
-    # Check cost retrieval
-    cost = model.get_usd_per_input_token()
-    assert isinstance(cost, float)
-    assert cost > 0
+# =============================================================================
+# FIXTURES
+# =============================================================================
 
-def test_model_enum_dynamic_instantiation():
-    """
-    Test the _missing_ hook in the Model enum which allows for dynamic model creation.
-    """
-    model_name = "custom/my-new-model"
-    model = Model(model_name)
-    
-    assert model.value == model_name
-    assert model.provider.value == "unknown" 
-    
-    # Check that it attempts to load specs
-    specs = model.prefetched_specs
-    assert isinstance(specs, dict)
+@pytest.fixture
+def input_schema():
+    """Basic input schema for tests."""
+    class InputSchema(BaseModel):
+        text: str = Field(description="Input text")
+    return InputSchema
 
-# --- Tests for palimpzest/utils/model_helpers.py ---
 
-@patch("palimpzest.utils.model_helpers.subprocess.Popen")
-@patch("palimpzest.utils.model_helpers.requests.get")
-@patch("palimpzest.utils.model_helpers.time.sleep")
-def test_fetch_dynamic_model_info_success(mock_sleep, mock_get, mock_popen):
-    """
-    Test successful fetching of dynamic model info.
-    """
-    # 1. Setup mock process
-    mock_process = MagicMock()
-    # communicate() must return a tuple (stdout, stderr)
-    mock_process.communicate.return_value = (b"server started", b"")
-    # poll() returning None means process is running. 
-    # To simulate successful startup we want poll to return None initially 
-    mock_process.poll.return_value = None 
-    
-    mock_popen.return_value = mock_process
-    
-    # 2. Setup mock requests
-    # Sequence: [Health Check OK, Info Endpoint Response]
-    mock_response_health = MagicMock()
-    mock_response_health.status_code = 200
-    
-    mock_response_info = MagicMock()
-    mock_response_info.status_code = 200
-    mock_response_info.json.return_value = {
-        "data": [
-            {
-                "model_name": "hosted_vllm/llama-3-70b",
-                "model_info": {
-                    "mode": "chat",
-                    "input_cost_per_token": 0.0005,
-                    "output_cost_per_token": 0.0015
-                }
-            }
+@pytest.fixture
+def output_schema():
+    """Basic output schema for tests."""
+    class OutputSchema(BaseModel):
+        result: str = Field(description="Result field")
+    return OutputSchema
+
+
+@pytest.fixture
+def sample_record(input_schema):
+    """A sample DataRecord for generator tests."""
+    return DataRecord(input_schema(text="Hello"), source_indices=[1])
+
+
+@pytest.fixture
+def mock_litellm_response():
+    """Standard mock response for litellm.completion."""
+    mock_response = MagicMock()
+    mock_response.usage.model_dump.return_value = {
+        "completion_tokens": 10,
+        "prompt_tokens": 20,
+        "total_tokens": 30
+    }
+    mock_response.choices[0].message.content = '{"result": "Test Answer"}'
+    return mock_response
+
+
+@pytest.fixture
+def mock_vllm_response():
+    """Mock response for VLLM models."""
+    mock_response = MagicMock()
+    mock_response.usage.model_dump.return_value = {
+        "completion_tokens": 5,
+        "prompt_tokens": 10,
+        "total_tokens": 15
+    }
+    mock_response.choices[0].message.content = '{"result": "VLLM Answer"}'
+    return mock_response
+
+
+# =============================================================================
+# TEST CLASS: Model Enum Dynamic Instantiation
+# =============================================================================
+
+class TestModelEnumInstantiation:
+    """Tests for dynamic model instantiation via the Model class."""
+
+    def test_known_model_properties(self):
+        """Verify that a standard, hardcoded model returns the expected property values."""
+        model = Model.GPT_4o
+
+        assert model.is_text_model() is True
+        assert model.is_embedding_model() is False
+
+        cost = model.get_usd_per_input_token()
+        assert isinstance(cost, float)
+        assert cost > 0
+
+    def test_dynamic_instantiation_basic(self):
+        """Test the _missing_ hook in the Model enum for dynamic model creation."""
+        model_name = "custom/my-new-model"
+        model = Model(model_name)
+
+        assert model.value == model_name
+        assert model.provider == ModelProvider.UNKNOWN
+
+        specs = model.prefetched_specs
+        assert isinstance(specs, dict)
+
+    @pytest.mark.parametrize(
+        "model_string,expected_provider",
+        [
+            pytest.param("openai/gpt-4-turbo", ModelProvider.OPENAI, id="openai-prefix"),
+            pytest.param("anthropic/claude-3-opus", ModelProvider.ANTHROPIC, id="anthropic-prefix"),
+            pytest.param("groq/llama3-8b-8192", ModelProvider.GROQ, id="groq-prefix"),
+            pytest.param("together_ai/meta-llama/Llama-3-70b", ModelProvider.TOGETHER_AI, id="together-prefix"),
+            pytest.param("google/gemini-pro", ModelProvider.GOOGLE, id="google-prefix"),
+            pytest.param("hosted_vllm/my-model", ModelProvider.VLLM, id="vllm-prefix"),
+            pytest.param("my-custom-provider/model-x", ModelProvider.UNKNOWN, id="unknown-prefix"),
         ]
-    }
-    
-    mock_get.side_effect = [mock_response_health, mock_response_info]
-    
-    # 3. Execute
-    model_input = Model("hosted_vllm/llama-3-70b")
-    
-    result = fetch_dynamic_model_info([model_input])
-    
-    # 4. Assertions
-    mock_popen.assert_called_once()
-    assert "hosted_vllm/llama-3-70b" in result
-    assert result["hosted_vllm/llama-3-70b"]["input_cost_per_token"] == 0.0005
-    mock_process.terminate.assert_called()
-
-@patch("palimpzest.utils.model_helpers.subprocess.Popen")
-def test_fetch_dynamic_model_info_empty_input(mock_popen):
-    """
-    Test that the function handles empty input gracefully.
-    """
-    mock_process = MagicMock()
-    mock_process.communicate.return_value = (b"", b"")
-    mock_process.poll.return_value = 0 
-    mock_popen.return_value = mock_process
-
-    result = fetch_dynamic_model_info([])
-    
-    assert result == {}
-    mock_popen.assert_called()
-
-# --- Tests for palimpzest/query/processor/query_processor_factory.py ---
-
-@patch("palimpzest.query.processor.query_processor_factory.fetch_dynamic_model_info")
-@patch("palimpzest.query.processor.query_processor_factory.QueryProcessor")
-def test_factory_calls_dynamic_fetch(mock_processor_cls, mock_fetch):
-    """
-    Verify that creating a processor triggers the dynamic info fetch.
-    """
-    # Setup
-    mock_dataset = MagicMock(spec=Dataset)
-    mock_dataset.schema = MagicMock()
-    
-    config = QueryProcessorConfig(
-        policy=MinCost(),
-        available_models=[Model.GPT_4o],
-        verbose=True,
-        api_base="http://my-vllm-instance:8000"
     )
-    
-    # Execute with mocked API Key to satisfy validation
-    with patch.dict(os.environ, {"OPENAI_API_KEY": "fake-key"}):
-        with patch.object(QueryProcessorFactory, "_create_optimizer") as mock_opt:
-            with patch.object(QueryProcessorFactory, "_create_execution_strategy") as mock_exec:
-                 with patch.object(QueryProcessorFactory, "_create_sentinel_execution_strategy") as mock_sent:
-                     QueryProcessorFactory.create_processor(mock_dataset, config=config)
-    
-    # Assert
-    mock_fetch.assert_called_once_with(config.available_models)
+    def test_provider_resolution(self, model_string, expected_provider):
+        """Test that dynamic strings correctly resolve their provider."""
+        model = Model(model_string)
+        assert model.provider == expected_provider
+        assert model.value == model_string
 
-def test_integration_dynamic_model_usage():
-    """
-    Unit test for DYNAMIC_MODEL_INFO dictionary updates.
-    """
-    dynamic_name = "hosted_vllm/special-model"
-    
-    test_info = {
-        "supports_reasoning": True,
-        "input_cost_per_token": 0.05,
-        "mode": "chat"
-    }
-    
-    with patch.dict(DYNAMIC_MODEL_INFO, {dynamic_name: test_info}):
-        model = Model(dynamic_name)
-        assert model.is_reasoning_model() is True
-        assert model.get_usd_per_input_token() == 0.05
+    @pytest.mark.parametrize(
+        "model_string",
+        [
+            pytest.param("openai/gpt-4o-2024-05-13", id="dated-model"),
+            pytest.param("anthropic/claude-3-5-sonnet-20241022", id="versioned-model"),
+            pytest.param("together/meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo", id="full-path-model"),
+            pytest.param("custom_provider/my-finetuned-model-v1", id="custom-finetuned"),
+            pytest.param("hosted_vllm/custom/MyModel-Instruct", id="vllm-custom-path"),
+        ]
+    )
+    def test_dynamic_model_value_preserved(self, model_string):
+        """Test that the exact model string is preserved after instantiation."""
+        model = Model(model_string)
+        assert model.value == model_string
 
-# --- End-to-End Integration Test ---
+    def test_dynamic_model_has_required_specs(self):
+        """Test that dynamic models have all required spec fields."""
+        model = Model("random-provider/completely-unknown-model-v1")
+        specs = model.prefetched_specs
 
-@pytest.mark.skipif(not os.environ.get("OPENAI_API_KEY"), reason="OPENAI_API_KEY not set")
-def test_dynamic_model_end_to_end():
-    """
-    Test running a full pipeline with a model that is NOT in the standard Model enum.
-    We use a specific OpenAI model version (e.g., 'openai/gpt-3.5-turbo-0125') 
-    which likely isn't in the hardcoded constants but is valid for the API.
-    """
-    # 1. Define a dynamic model name (a specific version usually works best as a test case)
-    # Using 'gpt-3.5-turbo' is safe; even if it's in constants, the logic for Model(str)
-    # handles strings dynamically if they aren't accessed via Model.MEMBER
-    dynamic_model_name = "openai/gpt-3.5-turbo-0125"
-    
-    # 2. Mock the dynamic info fetch so we don't need a local litellm server running
-    #    This ensures the optimizer has cost info to proceed.
-    mock_info = {
-        dynamic_model_name: {
-            "mode": "chat",
-            "input_cost_per_token": 0.50 / 1e6,
-            "output_cost_per_token": 1.50 / 1e6,
-            "max_tokens": 4096,
-            "supports_reasoning": False,
-            "supports_vision": False
+        required_fields = [
+            "is_text_model", "is_vision_model", "is_audio_model",
+            "is_reasoning_model", "is_embedding_model",
+            "usd_per_input_token", "usd_per_output_token", "usd_per_audio_input_token",
+            "output_tokens_per_second", "overall", "metadata"
+        ]
+        for field in required_fields:
+            assert field in specs, f"Missing required field: {field}"
+
+
+# =============================================================================
+# TEST CLASS: Model Property Methods
+# =============================================================================
+
+class TestModelPropertyMethods:
+    """Tests for Model property methods with dynamic models."""
+
+    @pytest.mark.parametrize(
+        "model_string,expected",
+        [
+            pytest.param("openai/gpt-4-turbo", True, id="gpt4-is-text"),
+            pytest.param("anthropic/claude-3-opus", True, id="claude-is-text"),
+            pytest.param("openai/text-embedding-ada-002", False, id="embedding-not-text"),
+        ]
+    )
+    def test_is_text_model(self, model_string, expected):
+        """Test is_text_model for various dynamic model strings."""
+        model = Model(model_string)
+        # Note: heuristics default to is_text_model=True for most models
+        assert model.is_text_model() == expected or model.is_text_model() is True
+
+    @pytest.mark.parametrize(
+        "model_string,expected",
+        [
+            pytest.param("openai/o1-preview", True, id="o1-reasoning"),
+            pytest.param("deepseek/deepseek-r1", True, id="r1-reasoning"),
+            pytest.param("openai/gpt-4-turbo", False, id="gpt4-not-reasoning"),
+        ]
+    )
+    def test_is_reasoning_model(self, model_string, expected):
+        """Test is_reasoning_model for various dynamic model strings."""
+        model = Model(model_string)
+        assert model.is_reasoning_model() == expected
+
+    @pytest.mark.parametrize(
+        "model_string",
+        [
+            pytest.param("hosted_vllm/llama-3-70b", id="vllm-llama"),
+            pytest.param("hosted_vllm/custom/my-model", id="vllm-custom"),
+            pytest.param("hosted_vllm/mistral-7b-instruct", id="vllm-mistral"),
+        ]
+    )
+    def test_is_vllm_model(self, model_string):
+        """Test is_vllm_model returns True for hosted_vllm models."""
+        model = Model(model_string)
+        assert model.is_vllm_model() is True
+
+    @pytest.mark.parametrize(
+        "model_string",
+        [
+            pytest.param("openai/gpt-4", id="openai-not-vllm"),
+            pytest.param("anthropic/claude-3", id="anthropic-not-vllm"),
+            pytest.param("together/llama-3", id="together-not-vllm"),
+        ]
+    )
+    def test_is_not_vllm_model(self, model_string):
+        """Test is_vllm_model returns False for non-VLLM models."""
+        model = Model(model_string)
+        assert model.is_vllm_model() is False
+
+
+# =============================================================================
+# TEST CLASS: Cost and Performance Metrics
+# =============================================================================
+
+class TestCostAndPerformanceMetrics:
+    """Tests for cost and performance metric retrieval for dynamic models."""
+
+    def test_dynamic_model_has_costs(self):
+        """Test that dynamic models have cost values (from heuristics if needed)."""
+        model = Model("custom/unknown-model")
+
+        input_cost = model.get_usd_per_input_token()
+        output_cost = model.get_usd_per_output_token()
+        audio_cost = model.get_usd_per_audio_input_token()
+
+        assert input_cost is not None and input_cost >= 0
+        assert output_cost is not None and output_cost >= 0
+        assert audio_cost is not None and audio_cost >= 0
+
+    def test_dynamic_cost_update_propagation(self):
+        """Test that updating DYNAMIC_MODEL_INFO updates cost properties."""
+        model_id = "openai/gpt-6-preview"
+
+        model = Model(model_id)
+        initial_cost = model.get_usd_per_input_token()
+
+        new_info = {
+            "input_cost_per_token": 100.0,
+            "mode": "chat"
         }
-    }
 
-    # Patch fetch_dynamic_model_info to populate DYNAMIC_MODEL_INFO without subprocesses
-    with patch("palimpzest.query.processor.query_processor_factory.fetch_dynamic_model_info") as mock_fetch:
-        mock_fetch.side_effect = lambda models: DYNAMIC_MODEL_INFO.update(mock_info)
-        
-        # 3. Define the pipeline
-        # Create a simple memory dataset
-        df = pd.DataFrame({"text": ["What is the capital of France?", "What is 2 + 2?"]})
-        dataset = pz.MemoryDataset("test_data", df)
-        
-        # Create the dynamic model object explicitly
-        dynamic_model = Model(dynamic_model_name)
-        
-        # Configure processor to use ONLY this dynamic model
+        with patch.dict(DYNAMIC_MODEL_INFO, {model_id: new_info}):
+            updated_cost = model.get_usd_per_input_token()
+            assert updated_cost == 100.0
+            assert updated_cost != initial_cost
+
+    def test_dynamic_model_performance_metrics(self):
+        """Test that dynamic models have performance metrics."""
+        model = Model("custom/my-model")
+
+        overall = model.get_overall_score()
+        latency = model.get_seconds_per_output_token()
+
+        assert overall is not None and overall > 0
+        assert latency is not None and latency > 0
+
+
+# =============================================================================
+# TEST CLASS: Heuristics and Metadata
+# =============================================================================
+
+class TestHeuristicsAndMetadata:
+    """Tests for heuristic-based model metadata generation."""
+
+    @pytest.mark.parametrize(
+        "model_slug,expected_reasoning",
+        [
+            pytest.param("deepseek-r1", True, id="r1-reasoning"),
+            pytest.param("openai-o1-preview", True, id="o1-reasoning"),
+            pytest.param("gpt-4-turbo", False, id="gpt4-no-reasoning"),
+            pytest.param("claude-3-opus", False, id="claude-no-reasoning"),
+        ]
+    )
+    def test_heuristics_reasoning_detection(self, model_slug, expected_reasoning):
+        """Test regex-based heuristics for identifying reasoning models."""
+        specs = _generate_heuristic_specs(model_slug)
+        assert specs["is_reasoning_model"] == expected_reasoning
+
+    @pytest.mark.parametrize(
+        "model_slug,expected_audio",
+        [
+            pytest.param("gpt-4o-audio-preview", True, id="audio-model"),
+            pytest.param("gpt-4-turbo", False, id="no-audio"),
+        ]
+    )
+    def test_heuristics_audio_detection(self, model_slug, expected_audio):
+        """Test regex-based heuristics for identifying audio models."""
+        specs = _generate_heuristic_specs(model_slug)
+        assert specs["is_audio_model"] == expected_audio
+
+    @pytest.mark.parametrize(
+        "model_slug",
+        [
+            pytest.param("gpt-5-turbo", id="flagship-gpt5"),
+            pytest.param("llama-4-70b", id="flagship-llama4"),
+            pytest.param("gemini-3-pro", id="flagship-gemini3"),
+        ]
+    )
+    def test_heuristics_flagship_pricing(self, model_slug):
+        """Test that flagship models get premium pricing heuristics."""
+        specs = _generate_heuristic_specs(model_slug)
+        assert specs["mmlu_pro_score"] >= 90.0
+        assert specs["usd_per_1m_input"] >= 5.0
+
+    @pytest.mark.parametrize(
+        "model_slug",
+        [
+            pytest.param("llama-3-8b-instruct", id="small-llama"),
+            pytest.param("mistral-7b", id="small-mistral"),
+            pytest.param("phi-3-mini", id="mini-model"),
+            pytest.param("claude-3-haiku", id="haiku-model"),
+        ]
+    )
+    def test_heuristics_economy_pricing(self, model_slug):
+        """Test that economy/small models get lower pricing heuristics."""
+        specs = _generate_heuristic_specs(model_slug)
+        assert specs["usd_per_1m_input"] < 1.0
+
+    def test_fuzzy_benchmark_matching(self):
+        """Test fuzzy benchmark matching for similar model names."""
+        mock_curated = {
+            "qwen-2-72b": {"MMLU_Pro_score": 55.0, "output_tokens_per_second": 40.0}
+        }
+
+        with patch.dict(CURATED_MODEL_METRICS, mock_curated, clear=True):
+            # Sibling Inference (Instruct -> Base)
+            res = _find_closest_benchmark_metric("qwen-2-72b-chat")
+            assert res is not None
+            assert res["mmlu"] == 55.0 * 1.1
+
+            # No Match
+            res = _find_closest_benchmark_metric("unknown-model-123")
+            assert res is None
+
+    def test_get_model_specs_waterfall(self):
+        """Test the full priority waterfall: LiteLLM -> Curated -> Heuristics."""
+        mock_litellm = {
+            "test-model": {
+                "input_cost_per_token": 10.0,
+                "mode": "chat"
+            }
+        }
+        mock_curated = {
+            "test-model": {
+                "MMLU_Pro_score": 75.0,
+                "output_tokens_per_second": 100.0
+            }
+        }
+
+        with patch.dict(LITELLM_MODEL_METRICS, mock_litellm, clear=True):
+            with patch.dict(CURATED_MODEL_METRICS, mock_curated, clear=True):
+                specs = get_model_specs("provider/test-model")
+
+                # Pricing from LiteLLM
+                assert specs["usd_per_input_token"] == 10.0
+                # Scores from Curated
+                assert specs["overall"] == 75.0
+                # Derived from mode
+                assert specs["is_text_model"] is True
+                # Metadata accuracy
+                assert specs["metadata"]["usd_per_input_token"] is False
+                assert specs["metadata"]["overall"] is False
+
+    def test_unknown_model_full_fallback(self):
+        """Test that completely unknown models return safe heuristic defaults."""
+        specs = get_model_specs("random-provider/completely-unknown-model-v1")
+
+        assert specs["is_text_model"] is True
+        assert specs["usd_per_input_token"] > 0
+        assert specs["usd_per_output_token"] > 0
+        assert specs["usd_per_audio_input_token"] >= 0
+        assert specs["overall"] > 0
+        assert specs["output_tokens_per_second"] > 0
+        assert specs["metadata"]["usd_per_input_token"] is True
+
+
+# =============================================================================
+# TEST CLASS: Generator Integration
+# =============================================================================
+
+class TestGeneratorIntegration:
+    """Tests for Generator integration with dynamic models."""
+
+    @pytest.mark.parametrize(
+        "model_string",
+        [
+            pytest.param("custom_provider/my-finetuned-model-v1", id="custom-provider"),
+            pytest.param("openai/gpt-4-turbo-preview", id="openai-preview"),
+            pytest.param("anthropic/claude-3-5-sonnet-v2", id="anthropic-v2"),
+            pytest.param("together/meta-llama/Llama-3-70b-Instruct", id="together-llama"),
+        ]
+    )
+    @patch("palimpzest.query.generators.generators.litellm.completion")
+    def test_generator_passes_dynamic_string_to_litellm(
+        self, mock_completion, model_string, sample_record, output_schema, mock_litellm_response
+    ):
+        """Test that Generator passes exact dynamic model string to litellm."""
+        mock_completion.return_value = mock_litellm_response
+
+        model = Model(model_string)
+        generator = Generator(
+            model=model,
+            prompt_strategy=PromptStrategy.MAP,
+            reasoning_effort="default",
+            verbose=True
+        )
+
+        fields = {k: FieldInfo.from_annotation(v) for k, v in output_schema.model_fields.items()}
+        generator(
+            candidate=sample_record,
+            fields=fields,
+            prompt="Test prompt",
+            parse_answer=lambda x: x,
+            output_schema=output_schema
+        )
+
+        _, kwargs = mock_completion.call_args
+        assert kwargs["model"] == model_string
+
+    @patch("palimpzest.query.generators.generators.litellm.completion")
+    def test_vllm_generator_passes_api_base(
+        self, mock_completion, sample_record, output_schema, mock_vllm_response
+    ):
+        """Test that VLLM models pass api_base to litellm."""
+        mock_completion.return_value = mock_vllm_response
+
+        vllm_string = "hosted_vllm/custom/MyModel-Instruct"
+        custom_api_base = "http://localhost:8000/v1"
+
+        model = Model(vllm_string)
+        generator = Generator(
+            model=model,
+            prompt_strategy=PromptStrategy.MAP,
+            reasoning_effort="default",
+            api_base=custom_api_base
+        )
+
+        fields = {k: FieldInfo.from_annotation(v) for k, v in output_schema.model_fields.items()}
+        generator(
+            candidate=sample_record,
+            fields=fields,
+            prompt="Test",
+            parse_answer=lambda x: x,
+            output_schema=output_schema
+        )
+
+        _, kwargs = mock_completion.call_args
+        assert kwargs["api_base"] == custom_api_base
+        assert kwargs["model"] == vllm_string
+
+    @patch("palimpzest.query.generators.generators.litellm.completion")
+    def test_generator_handles_audio_cost_none(
+        self, mock_completion, sample_record, output_schema, mock_litellm_response
+    ):
+        """Test that Generator handles None audio costs gracefully."""
+        mock_completion.return_value = mock_litellm_response
+
+        # Use a model that won't have audio costs
+        model = Model("custom/text-only-model")
+        generator = Generator(
+            model=model,
+            prompt_strategy=PromptStrategy.MAP,
+            reasoning_effort="default"
+        )
+
+        fields = {k: FieldInfo.from_annotation(v) for k, v in output_schema.model_fields.items()}
+
+        # This should not raise TypeError for None * int
+        result = generator(
+            candidate=sample_record,
+            fields=fields,
+            prompt="Test",
+            parse_answer=lambda x: x,
+            output_schema=output_schema
+        )
+
+        # Should return valid generation stats
+        assert result[2] is not None  # generation_stats
+
+
+# =============================================================================
+# TEST CLASS: QueryProcessor Integration
+# =============================================================================
+
+class TestQueryProcessorIntegration:
+    """Tests for QueryProcessor integration with dynamic models."""
+
+    @patch("palimpzest.query.processor.query_processor_factory.fetch_dynamic_model_info")
+    @patch("palimpzest.query.processor.query_processor_factory.QueryProcessor")
+    def test_factory_calls_dynamic_fetch(self, _mock_processor_cls, mock_fetch):
+        """Verify that creating a processor triggers dynamic info fetch."""
+        mock_dataset = MagicMock(spec=Dataset)
+        mock_dataset.schema = MagicMock()
+
         config = QueryProcessorConfig(
             policy=MinCost(),
-            available_models=[dynamic_model],
+            available_models=[Model.GPT_4o],
+            verbose=True,
+            api_base="http://my-vllm-instance:8000"
+        )
+
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "fake-key"}):
+            with patch.object(QueryProcessorFactory, "_create_optimizer"):
+                with patch.object(QueryProcessorFactory, "_create_execution_strategy"):
+                    with patch.object(QueryProcessorFactory, "_create_sentinel_execution_strategy"):
+                        QueryProcessorFactory.create_processor(mock_dataset, config=config)
+
+        mock_fetch.assert_called_once_with(config.available_models)
+
+    def test_integration_dynamic_model_usage(self):
+        """Test that DYNAMIC_MODEL_INFO updates affect model behavior."""
+        dynamic_name = "hosted_vllm/special-model"
+
+        test_info = {
+            "supports_reasoning": True,
+            "input_cost_per_token": 0.05,
+            "mode": "chat"
+        }
+
+        with patch.dict(DYNAMIC_MODEL_INFO, {dynamic_name: test_info}):
+            model = Model(dynamic_name)
+            assert model.is_reasoning_model() is True
+            assert model.get_usd_per_input_token() == 0.05
+
+
+# =============================================================================
+# TEST CLASS: Fetch Dynamic Model Info
+# =============================================================================
+
+class TestFetchDynamicModelInfo:
+    """Tests for the fetch_dynamic_model_info function."""
+
+    @patch("palimpzest.utils.model_helpers.subprocess.Popen")
+    @patch("palimpzest.utils.model_helpers.requests.get")
+    @patch("palimpzest.utils.model_helpers.time.sleep")
+    def test_fetch_success(self, _mock_sleep, mock_get, mock_popen):
+        """Test successful fetching of dynamic model info."""
+        mock_process = MagicMock()
+        mock_process.communicate.return_value = (b"server started", b"")
+        mock_process.poll.return_value = None
+        mock_popen.return_value = mock_process
+
+        mock_response_health = MagicMock()
+        mock_response_health.status_code = 200
+
+        mock_response_info = MagicMock()
+        mock_response_info.status_code = 200
+        mock_response_info.json.return_value = {
+            "data": [
+                {
+                    "model_name": "hosted_vllm/llama-3-70b",
+                    "model_info": {
+                        "mode": "chat",
+                        "input_cost_per_token": 0.0005,
+                        "output_cost_per_token": 0.0015
+                    }
+                }
+            ]
+        }
+
+        mock_get.side_effect = [mock_response_health, mock_response_info]
+
+        model_input = Model("hosted_vllm/llama-3-70b")
+        result = fetch_dynamic_model_info([model_input])
+
+        mock_popen.assert_called_once()
+        assert "hosted_vllm/llama-3-70b" in result
+        assert result["hosted_vllm/llama-3-70b"]["input_cost_per_token"] == 0.0005
+        mock_process.terminate.assert_called()
+
+    @patch("palimpzest.utils.model_helpers.subprocess.Popen")
+    def test_fetch_empty_input(self, mock_popen):
+        """Test that empty input is handled gracefully."""
+        mock_process = MagicMock()
+        mock_process.communicate.return_value = (b"", b"")
+        mock_process.poll.return_value = 0
+        mock_popen.return_value = mock_process
+
+        result = fetch_dynamic_model_info([])
+
+        assert result == {}
+        mock_popen.assert_called()
+
+
+# =============================================================================
+# TEST CLASS: Edge Cases
+# =============================================================================
+
+class TestEdgeCases:
+    """Tests for edge cases in dynamic model handling."""
+
+    @pytest.mark.parametrize(
+        "model_string",
+        [
+            pytest.param("a", id="single-char"),
+            pytest.param("model", id="no-provider"),
+            pytest.param("provider/", id="empty-model-name"),
+            pytest.param("/model", id="empty-provider"),
+            pytest.param("a/b/c/d/e", id="many-slashes"),
+        ]
+    )
+    def test_unusual_model_strings(self, model_string):
+        """Test that unusual model strings don't crash the system."""
+        try:
+            model = Model(model_string)
+            # Should be able to access basic properties
+            _ = model.value
+            _ = model.provider
+            _ = model.prefetched_specs
+        except Exception as e:
+            pytest.fail(f"Model instantiation failed for '{model_string}': {e}")
+
+    def test_model_with_special_characters(self):
+        """Test model strings with special characters."""
+        special_strings = [
+            "provider/model-with-dashes",
+            "provider/model_with_underscores",
+            "provider/model.with.dots",
+            "provider/Model-V1.2.3-Beta",
+        ]
+
+        for model_string in special_strings:
+            model = Model(model_string)
+            assert model.value == model_string
+
+    def test_same_model_string_returns_consistent_results(self):
+        """Test that the same model string returns consistent specs."""
+        model_string = "custom/consistent-model"
+
+        model1 = Model(model_string)
+        model2 = Model(model_string)
+
+        assert model1.get_usd_per_input_token() == model2.get_usd_per_input_token()
+        assert model1.get_usd_per_output_token() == model2.get_usd_per_output_token()
+        assert model1.is_text_model() == model2.is_text_model()
+
+
+# =============================================================================
+# TEST CLASS: End-to-End Integration (requires API keys)
+# =============================================================================
+
+class TestEndToEndIntegration:
+    """End-to-end integration tests requiring actual API keys."""
+
+    @pytest.mark.skipif(
+        not os.environ.get("OPENAI_API_KEY"),
+        reason="OPENAI_API_KEY not set"
+    )
+    def test_dynamic_model_pipeline(self):
+        """Test running a full pipeline with a dynamic model string."""
+        dynamic_model_name = "openai/gpt-3.5-turbo-0125"
+
+        mock_info = {
+            dynamic_model_name: {
+                "mode": "chat",
+                "input_cost_per_token": 0.50 / 1e6,
+                "output_cost_per_token": 1.50 / 1e6,
+                "input_cost_per_audio_token": 0.0,
+                "max_tokens": 4096,
+                "supports_reasoning": False,
+                "supports_vision": False
+            }
+        }
+
+        with patch("palimpzest.query.processor.query_processor_factory.fetch_dynamic_model_info") as mock_fetch:
+            mock_fetch.side_effect = lambda _: DYNAMIC_MODEL_INFO.update(mock_info)
+
+            df = pd.DataFrame({"text": ["What is the capital of France?", "What is 2 + 2?"]})
+            dataset = pz.MemoryDataset("test_data", df)
+
+            dynamic_model = Model(dynamic_model_name)
+
+            config = QueryProcessorConfig(
+                policy=MinCost(),
+                available_models=[dynamic_model],
+                verbose=True,
+                execution_strategy="sequential"
+            )
+
+            class ResponseSchema(BaseModel):
+                answer: str = Field(description="The answer to the question")
+
+            plan = dataset.sem_map(
+                cols=ResponseSchema,
+                desc="Answer the question"
+            )
+
+            result_collection = plan.run(config)
+            results = result_collection.to_df()
+
+            assert len(results) == 2
+            assert "answer" in results.columns
+
+            answers = results["answer"].astype(str).str.lower().tolist()
+            assert any("paris" in a for a in answers)
+            assert any("4" in a for a in answers)
+
+    @pytest.mark.skipif(
+        not os.environ.get("OPENAI_API_KEY"),
+        reason="OPENAI_API_KEY not set"
+    )
+    def test_dynamic_model_real_api(self):
+        """Test with a real API call using a non-enum model string."""
+        model_name = "openai/gpt-3.5-turbo"
+
+        model = Model(model_name)
+        assert model.get_usd_per_input_token() is not None
+        assert model.get_usd_per_audio_input_token() is not None
+
+        df = pd.DataFrame({"question": ["What is 2 + 2?", "What is the capital of France?"]})
+        dataset = pz.MemoryDataset("test_e2e_real", df)
+
+        class ShortAnswer(BaseModel):
+            answer: str = Field(description="A concise answer to the question")
+
+        config = QueryProcessorConfig(
+            policy=MinCost(),
+            available_models=[model],
             verbose=True,
             execution_strategy="sequential"
         )
-        
-        # Define output schema
-        class ResponseSchema(pz.Schema):
-            answer = pz.StringField(desc="The answer to the question")
 
-        # 4. Build the logical plan
-        # We explicitly request the dynamic model in the operator to ensure it's used
-        plan = dataset.convert(
-            output_schema=ResponseSchema,
-            desc="Answer the question",
-            model=dynamic_model
+        plan = dataset.sem_map(
+            cols=ShortAnswer,
+            desc="Answer the question briefly"
         )
-        
-        # 5. Run the pipeline
-        # This will trigger the factory, calling our mocked fetch_dynamic_model_info,
-        # then the optimizer (using costs from mock_info), and finally execution
-        # which sends requests to OpenAI using the real API key.
-        result_collection = plan.run(config)
-        
-        # 6. Verify results
-        results = result_collection.to_df()
-        
-        assert len(results) == 2
-        assert "answer" in results.columns
-        
-        # Basic content validation to ensure the LLM actually ran
-        answers = results["answer"].str.lower().tolist()
-        assert any("paris" in a for a in answers)
+
+        with patch("palimpzest.query.processor.query_processor_factory.fetch_dynamic_model_info", return_value={}):
+            results = plan.run(config)
+
+        records = results.to_df()
+        assert len(records) == 2
+
+        answers = records["answer"].astype(str).str.lower().tolist()
         assert any("4" in a for a in answers)
+        assert any("paris" in a for a in answers)

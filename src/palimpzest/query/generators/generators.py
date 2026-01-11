@@ -323,25 +323,14 @@ class Generator(Generic[ContextType, InputType]):
             if not self.model.is_o_model() and not self.model.is_gpt_5_model():
                 completion_kwargs = {"temperature": kwargs.get("temperature", 0.0), **completion_kwargs}
             if is_audio_op:
-                completion_kwargs["modalities"] = ["text"]
-
-            # reasoning effort
+                completion_kwargs = {"modalities": ["text"], **completion_kwargs}
             if self.model.is_reasoning_model():
-                reasoning_effort = self.reasoning_effort
-                if reasoning_effort is None:
-                    if self.model.provider == ModelProvider.VERTEX_AI:
-                        reasoning_effort = "low" if self.model.value == Model.GEMINI_2_5_PRO else "minimal"
-                    elif self.model.provider == ModelProvider.OPENAI:
-                        reasoning_effort = "minimal"
-                completion_kwargs = {"reasoning_effort": reasoning_effort, **completion_kwargs}
-                    
-            if self.model.provider == ModelProvider.VLLM:
+                completion_kwargs = {"reasoning_effort": self.reasoning_effort, **completion_kwargs}
+            if self.model.is_vllm_model():
                 completion_kwargs = {"api_base": self.api_base, "api_key": os.environ.get("VLLM_API_KEY", "fake-api-key"), **completion_kwargs}
-            
             completion = litellm.completion(model=self.model_name, messages=messages, **completion_kwargs)
             end_time = time.time()
             logger.debug(f"Generated completion in {end_time - start_time:.2f} seconds")
-        
         # if there's an error generating the completion, we have to return an empty answer
         # and can only account for the time spent performing the failed generation
         except Exception as e:

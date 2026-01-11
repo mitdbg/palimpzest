@@ -189,7 +189,6 @@ class ModelProvider(str, Enum):
     ANTHROPIC = "anthropic"
     GOOGLE = "google"
     VERTEX_AI = "vertex_ai"
-    VLLM = "hosted_vllm" # needs to be updated after issue 266
     TOGETHER_AI = "together_ai"
     DATABRICKS = "databricks"
     BEDROCK = "bedrock"
@@ -201,6 +200,7 @@ class ModelProvider(str, Enum):
     AZURE = "azure"
     XAI = "xai"
     HUGGINGFACE = "huggingface"
+    VLLM = "hosted_vllm" # needs to be updated after issue 266
     UNKNOWN = "unknown"
 
     @property
@@ -209,13 +209,12 @@ class ModelProvider(str, Enum):
         Returns the standard environment variable name for this provider's API key.
         Incorporates dynamic logic for providers that support multiple keys (like Google).
         """
-        # TODO: check code for special handling of google credential pahts
         if self == ModelProvider.GOOGLE:
             return "GEMINI_API_KEY" if os.getenv("GEMINI_API_KEY") else "GOOGLE_API_KEY"
         
         mapping = {
             ModelProvider.OPENAI: "OPENAI_API_KEY",
-            ModelProvider.VERTEX_AI: "GOOGLE_APPLICATION_CREDENTIALS", # TODO: check exact usage in the code
+            ModelProvider.VERTEX_AI: "GOOGLE_APPLICATION_CREDENTIALS",
             ModelProvider.ANTHROPIC: "ANTHROPIC_API_KEY",
             ModelProvider.TOGETHER_AI: "TOGETHER_API_KEY",
             ModelProvider.AZURE: "AZURE_OPENAI_API_KEY",
@@ -326,7 +325,7 @@ class Model(str, Enum):
         if "xai" in val or "grok" in val:
             return ModelProvider.XAI
         if "llama" in val:
-            return ModelProvider.TOGETHER_AI # TODO: double check this
+            return ModelProvider.TOGETHER_AI
         return ModelProvider.UNKNOWN
     
     @property
@@ -340,14 +339,14 @@ class Model(str, Enum):
         return "llama" in self.value.lower()
     
     def is_o_model(self):
-        if self in Model:
-            return self in [Model.o4_MINI]
+        if self.value in Model:
+            return self.value in [Model.o4_MINI]
         val = self.value.lower().split("/")[-1]
         return val.startswith("o") and len(val) > 1 and val[1].isdigit()
 
     def is_gpt_5_model(self):
-        if self in Model:
-            return self in [Model.GPT_5, Model.GPT_5_MINI, Model.GPT_5_NANO, Model.GPT_5_2]
+        if self.value in Model:
+            return self.value in [Model.GPT_5, Model.GPT_5_MINI, Model.GPT_5_NANO, Model.GPT_5_2]
         return "gpt-5" in self.value.lower()
 
     def is_reasoning_model(self):
@@ -359,8 +358,8 @@ class Model(str, Enum):
             Model.GOOGLE_GEMINI_3_0_PRO, Model.GOOGLE_GEMINI_3_0_FLASH,
             Model.CLAUDE_3_7_SONNET,
         ]
-        if self in Model:
-            return self in reasoning_models
+        if self.value in Model:
+            return self.value in reasoning_models
         info = DYNAMIC_MODEL_INFO.get(self.value, {})
         if "supports_reasoning" in info and info["supports_reasoning"] is not None:
             return info["supports_reasoning"]
@@ -372,8 +371,8 @@ class Model(str, Enum):
             Model.CLIP_VIT_B_32, Model.TEXT_EMBEDDING_3_SMALL,
             Model.GPT_4o_AUDIO_PREVIEW, Model.GPT_4o_MINI_AUDIO_PREVIEW,
         ]
-        if self in Model:
-            return self not in non_text_models
+        if self.value in Model:
+            return self.value not in non_text_models
         info = DYNAMIC_MODEL_INFO.get(self.value, {})
         if "mode" in info:
             return info["mode"] in ["chat", "completion"]
@@ -389,8 +388,8 @@ class Model(str, Enum):
             Model.GEMINI_3_0_FLASH, Model.GEMINI_3_0_PRO,
             Model.GOOGLE_GEMINI_3_0_FLASH, Model.GOOGLE_GEMINI_3_0_PRO,
         ]
-        if self in Model:
-            return self in vision_models
+        if self.value in Model:
+            return self.value in vision_models
         info = DYNAMIC_MODEL_INFO.get(self.value, {})
         if "supports_vision" in info and info["supports_vision"] is not None:
             return info["supports_vision"]
@@ -403,12 +402,15 @@ class Model(str, Enum):
             Model.GOOGLE_GEMINI_2_5_PRO, Model.GOOGLE_GEMINI_2_5_FLASH, Model.GOOGLE_GEMINI_2_5_FLASH_LITE,
             Model.GEMINI_3_0_FLASH, Model.GOOGLE_GEMINI_3_0_FLASH,
         ]
-        if self in Model:
+        if self.value in Model:
             return self in audio_models
         info = DYNAMIC_MODEL_INFO.get(self.value, {})
         if "supports_audio_input" in info and info["supports_audio_input"] is not None:
             return info["supports_audio_input"]
         return self.prefetched_specs["is_audio_model"]
+    
+    def is_vllm_model(self):
+        return "hosted_vllm" in self.value.lower()
 
     def is_text_image_multimodal_model(self):
         text_image_models = [
@@ -417,8 +419,8 @@ class Model(str, Enum):
             Model.GEMINI_2_0_FLASH, Model.GEMINI_2_5_FLASH, Model.GEMINI_2_5_PRO, Model.GEMINI_3_0_FLASH, Model.GEMINI_3_0_PRO,
             Model.GOOGLE_GEMINI_2_5_PRO, Model.GOOGLE_GEMINI_2_5_FLASH, Model.GOOGLE_GEMINI_2_5_FLASH_LITE, Model.GOOGLE_GEMINI_3_0_FLASH, Model.GOOGLE_GEMINI_3_0_PRO,
         ]
-        if self in Model:
-            return self in text_image_models
+        if self.value in Model:
+            return self.value in text_image_models
         return self.is_text_model() and self.is_vision_model()
 
     def is_text_audio_multimodal_model(self):
@@ -427,14 +429,14 @@ class Model(str, Enum):
             Model.GEMINI_2_0_FLASH, Model.GEMINI_2_5_FLASH, Model.GEMINI_2_5_PRO, Model.GEMINI_3_0_FLASH,
             Model.GOOGLE_GEMINI_2_5_PRO, Model.GOOGLE_GEMINI_2_5_FLASH, Model.GOOGLE_GEMINI_2_5_FLASH_LITE, Model.GOOGLE_GEMINI_3_0_FLASH,
         ]
-        if self in Model:
-            return self in text_audio_models
+        if self.value in Model:
+            return self.value in text_audio_models
         return self.is_audio_model() and self.is_text_model()
 
     def is_embedding_model(self):
         embedding_models = [Model.CLIP_VIT_B_32, Model.TEXT_EMBEDDING_3_SMALL]
-        if self in Model:
-            return self in embedding_models
+        if self.value in Model:
+            return self.value in embedding_models
         info = DYNAMIC_MODEL_INFO.get(self.value, {})
         if "mode" in info:
             return info["mode"] == "embedding"
@@ -492,7 +494,7 @@ class Model(str, Enum):
 # - https://artificialanalysis.ai/models/llama-3-1-instruct-8b
 #
 LLAMA3_2_3B_INSTRUCT_MODEL_CARD = {
-    ##### Cost in USD ##### 
+    ##### Cost in USD #####
     "usd_per_input_token": 0.06 / 1e6,
     "usd_per_output_token": 0.06 / 1e6,
     ##### Time #####
@@ -817,7 +819,7 @@ MODEL_CARDS = {
     Model.GPT_5_NANO.value: GPT_5_NANO_MODEL_CARD,
     Model.GPT_5_2.value: GPT_5_2_MODEL_CARD,
     Model.o4_MINI.value: o4_MINI_MODEL_CARD,
-    # Models.o1.value: o1_MODEL_CARD,
+    # Model.o1.value: o1_MODEL_CARD,
     Model.TEXT_EMBEDDING_3_SMALL.value: TEXT_EMBEDDING_3_SMALL_MODEL_CARD,
     Model.CLIP_VIT_B_32.value: CLIP_VIT_B_32_MODEL_CARD,
     Model.CLAUDE_3_5_SONNET.value: CLAUDE_3_5_SONNET_MODEL_CARD,
