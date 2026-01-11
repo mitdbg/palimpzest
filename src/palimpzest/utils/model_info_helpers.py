@@ -36,7 +36,7 @@ def get_known_model_info(full_model_id):
         "usd_per_output_token": None,
         "usd_per_audio_input_token": None,
         "output_tokens_per_second": None,
-        "overall_score": None,
+        "overall": None,
         # "litellm_provider": None
     }
     
@@ -78,7 +78,7 @@ def get_known_model_info(full_model_id):
             "usd_per_output_token": "usd_per_output_token",
             "usd_per_audio_input_token": "usd_per_audio_input_token",
             "output_tokens_per_second": "output_tokens_per_second",
-            "overall_score": "MMLU_Pro_score"
+            "overall": "MMLU_Pro_score"
         }
         for target_key, source_key in mapping_2.items():
             # ONLY fill if currently None (do not overwrite)
@@ -222,11 +222,11 @@ def get_model_specs(full_model_id: str) -> Dict[str, Any]:
     model_slug = full_model_id.split('/')[-1].lower()
 
     # 3. Fuzzy Benchmark Lookup (Overlay if missing)
-    if specs["overall_score"] is None or specs["output_tokens_per_second"] is None:
+    if specs["overall"] is None or specs["output_tokens_per_second"] is None:
         bench_data = _find_closest_benchmark_metric(model_slug)
         if bench_data:
-            if specs["overall_score"] is None and bench_data.get("mmlu") is not None:
-                specs["overall_score"] = bench_data["mmlu"]
+            if specs["overall"] is None and bench_data.get("mmlu") is not None:
+                specs["overall"] = bench_data["mmlu"]
             
             if specs["output_tokens_per_second"] is None and bench_data.get("tps") is not None:
                 specs["output_tokens_per_second"] = bench_data["tps"]
@@ -253,8 +253,8 @@ def get_model_specs(full_model_id: str) -> Dict[str, Any]:
         sec_per_tok = heuristics["seconds_per_output_token"]
         specs["output_tokens_per_second"] = 1.0 / sec_per_tok if sec_per_tok > 0 else 0
         
-    if specs["overall_score"] is None:
-        specs["overall_score"] = heuristics["mmlu_pro_score"]
+    if specs["overall"] is None:
+        specs["overall"] = heuristics["mmlu_pro_score"]
 
     specs["metadata"] = metadata
     return specs

@@ -441,27 +441,27 @@ class Model(str, Enum):
         return self.prefetched_specs["is_embedding_model"]
     
     def get_usd_per_input_token(self):
+        if self.value in MODEL_CARDS:
+            return MODEL_CARDS[self.value]["usd_per_input_token"]
         info = DYNAMIC_MODEL_INFO.get(self.value, {})
         if "input_cost_per_token" in info and info["input_cost_per_token"] is not None:
             return info["input_cost_per_token"]
-        if self.value in MODEL_CARDS:
-            return MODEL_CARDS[self.value]["usd_per_input_token"]
         return self.prefetched_specs["usd_per_input_token"]
     
     def get_usd_per_output_token(self):
+        if self.value in MODEL_CARDS:
+            return MODEL_CARDS[self.value]["usd_per_output_token"]
         info = DYNAMIC_MODEL_INFO.get(self.value, {})
         if "output_cost_per_token" in info and info["output_cost_per_token"] is not None:
             return info["output_cost_per_token"]
-        if self.value in MODEL_CARDS:
-            return MODEL_CARDS[self.value]["usd_per_output_token"]
         return self.prefetched_specs["usd_per_output_token"]
     
     def get_usd_per_audio_input_token(self):
+        if self.value in MODEL_CARDS:
+            return MODEL_CARDS[self.value].get("usd_per_audio_input_token", 0.0)
         info = DYNAMIC_MODEL_INFO.get(self.value, {})
         if "input_cost_per_audio_token" in info and info["input_cost_per_audio_token"] is not None:
             return info["input_cost_per_audio_token"]
-        if self.value in MODEL_CARDS:
-            return MODEL_CARDS[self.value].get("usd_per_audio_input_token", 0.0)
         return self.prefetched_specs.get("usd_per_audio_input_token", 0.0)
     
     def get_seconds_per_output_token(self):
@@ -474,7 +474,7 @@ class Model(str, Enum):
         # LiteLLM endpoint doesn't provide information on the MMLU-pro score
         if self.value in MODEL_CARDS:
             return MODEL_CARDS[self.value]["overall"]
-        return self.prefetched_specs["overall_score"]
+        return self.prefetched_specs["overall"]
 
 #### MODEL PERFORMANCE & COST METRICS ####
 # Overall model quality is computed using MMLU-Pro; multi-modal models currently use the same score for vision

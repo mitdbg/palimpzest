@@ -1,4 +1,6 @@
-from pydantic import BaseModel, ConfigDict, Field, field_validator, ValidationInfo
+from __future__ import annotations
+
+from pydantic import BaseModel, ConfigDict, Field
 
 from palimpzest.policy import MaxQuality, Policy
 from palimpzest.constants import Model
@@ -18,7 +20,7 @@ class QueryProcessorConfig(BaseModel):
     policy: Policy = Field(default_factory=MaxQuality)
     enforce_types: bool = Field(default=False)
     scan_start_idx: int = Field(default=0)
-    num_samples: int = Field(default=None)
+    num_samples: int | None = Field(default=None)
     verbose: bool = Field(default=False)
     progress: bool = Field(default=True)
     available_models: list[Model] | None = Field(default=None)
@@ -26,7 +28,7 @@ class QueryProcessorConfig(BaseModel):
     max_workers: int | None = Field(default=64)
     join_parallelism: int = Field(default=64)
     batch_size: int | None = Field(default=None)
-    reasoning_effort: str | None = Field(default=None)  # Gemini: "disable", "low", "medium", "high"
+    reasoning_effort: str | None = Field(default="default")  # Gemini: "disable", "low", "medium", "high"
     use_vertex: bool = Field(default=False)  # Whether to use Vertex models for Gemini or Google models
     gemini_credentials_path: str | None = Field(default=None)  # Path to Gemini credentials file
     api_base: str | None = Field(default=None)  # API base URL for vLLM
@@ -53,3 +55,7 @@ class QueryProcessorConfig(BaseModel):
     def to_dict(self) -> dict:
         """Convert the config to a dict representation."""
         return self.model_dump()
+
+    def copy(self) -> QueryProcessorConfig:
+        """Create a copy of the config."""
+        return QueryProcessorConfig(**self.to_dict())

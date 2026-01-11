@@ -108,7 +108,7 @@ class Generator(Generic[ContextType, InputType]):
         self,
         model: Model,
         prompt_strategy: PromptStrategy,
-        reasoning_effort: str | None = None,
+        reasoning_effort: str | None,
         api_base: str | None = None,
         cardinality: Cardinality = Cardinality.ONE_TO_ONE,
         desc: str | None = None,
