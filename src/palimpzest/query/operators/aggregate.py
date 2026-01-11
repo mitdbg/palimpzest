@@ -852,7 +852,7 @@ class SemanticGroupByOp(AggregateOp):
                 logical_op_id=self.logical_op_id or "semantic-groupby",
                 op_name=self.op_name(),
                 time_per_record=(time.time() - start_time) / len(agg_state),
-                cost_per_record=gen_stats.total_output_cost / len(agg_state),
+                cost_per_record=gen_stats.cost_per_record / len(agg_state),
                 model_name=self.get_model_name(),
                 input_fields=self.get_input_fields(),
                 generated_fields=list(self.output_schema.model_fields.keys()),
