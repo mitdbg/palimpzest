@@ -170,7 +170,7 @@ class ApplyGroupByOp(AggregateOp):
         drs: list[DataRecord] = []
         group_by_fields = self.gby_fields
         # Construct aggregation field names: "func(field)"
-        agg_field_names = [f"{func}({field})" for func, field in zip(self.agg_funcs, self.agg_fields)]
+        agg_field_names = [f"({field})" for field in (self.agg_fields)]
         for g in agg_state:
             # build up data item
             data_item = {}

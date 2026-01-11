@@ -47,7 +47,7 @@ def test_semantic_groupby_basic():
         agg_fields_list = ['contents']
         agg_funcs_list = ['count']
         for i, agg_func in enumerate(agg_funcs_list):
-            agg_field_name = f"{agg_func}({agg_fields_list[i]})"
+            agg_field_name = f"({agg_fields_list[i]})"
             f = {"name": agg_field_name, "type": Any, "desc": f"Aggregate field: {agg_field_name}"}
             fields.append(f)
         
