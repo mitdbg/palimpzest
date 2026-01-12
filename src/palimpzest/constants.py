@@ -270,6 +270,13 @@ class Model:
             metadata["supports_prompt_caching"] or metadata["usd_per_cached_input_token"]
         )
 
+    def __lt__(self, other):
+        if isinstance(other, Model):
+            return self.value < other.value
+        if isinstance(other, str):
+            return self.value < other
+        return NotImplemented
+
     @classmethod
     def _create(cls, value: str) -> Model:
         """
