@@ -1,4 +1,6 @@
 ### This file contains constants used by Palimpzest ###
+from __future__ import annotations
+
 import os
 from enum import Enum
 
@@ -232,75 +234,80 @@ class ModelProvider(str, Enum):
         }
         return mapping.get(self) # if unknown, maps to none
 
-class Model(str, Enum):
+class Model:
     """
     Model describes the underlying LLM which should be used to perform some operation
     which requires invoking an LLM. It does NOT specify whether the model need be executed
     remotely or locally (if applicable).
-    """
-    LLAMA3_2_3B = "together_ai/meta-llama/Llama-3.2-3B-Instruct-Turbo"
-    LLAMA3_1_8B = "together_ai/meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo"
-    LLAMA3_3_70B = "together_ai/meta-llama/Llama-3.3-70B-Instruct-Turbo"
-    LLAMA3_2_90B_V = "together_ai/meta-llama/Llama-3.2-90B-Vision-Instruct-Turbo"
-    DEEPSEEK_V3 = "together_ai/deepseek-ai/DeepSeek-V3"
-    DEEPSEEK_R1_DISTILL_QWEN_1_5B = "together_ai/deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"
-    GPT_4o = "openai/gpt-4o-2024-08-06"
-    GPT_4o_MINI = "openai/gpt-4o-mini-2024-07-18"
-    GPT_4_1 = "openai/gpt-4.1-2025-04-14"
-    GPT_4_1_MINI = "openai/gpt-4.1-mini-2025-04-14"
-    GPT_4_1_NANO = "openai/gpt-4.1-nano-2025-04-14"
-    GPT_5 = "openai/gpt-5-2025-08-07"
-    GPT_5_MINI = "openai/gpt-5-mini-2025-08-07"
-    GPT_5_NANO = "openai/gpt-5-nano-2025-08-07"
-    GPT_5_2 = "openai/gpt-5.2-2025-12-11"
-    o4_MINI = "openai/o4-mini-2025-04-16"  # noqa: N815
-    CLAUDE_3_5_SONNET = "anthropic/claude-3-5-sonnet-20241022"
-    CLAUDE_3_7_SONNET = "anthropic/claude-3-7-sonnet-20250219"
-    CLAUDE_4_SONNET = "anthropic/claude-sonnet-4-20250514"
-    CLAUDE_4_5_SONNET = "anthropic/claude-sonnet-4-5-20250929"
-    CLAUDE_3_5_HAIKU = "anthropic/claude-3-5-haiku-20241022"
-    CLAUDE_4_5_HAIKU = "anthropic/claude-haiku-4-5-20251001"
-    GEMINI_3_0_PRO = "vertex_ai/gemini-3-pro-preview" # image
-    GEMINI_3_0_FLASH = "vertex_ai/gemini-3-flash-12-25" # Text, Image, Video, Audio, and PDF
-    GEMINI_2_0_FLASH = "vertex_ai/gemini-2.0-flash"
-    GEMINI_2_5_FLASH = "vertex_ai/gemini-2.5-flash"
-    GEMINI_2_5_PRO = "vertex_ai/gemini-2.5-pro"
-    GOOGLE_GEMINI_3_0_PRO = "gemini/gemini-3-pro-preview"
-    GOOGLE_GEMINI_3_0_FLASH = "gemini/gemini-3-flash-12-25"
-    GOOGLE_GEMINI_2_5_FLASH = "gemini/gemini-2.5-flash"
-    GOOGLE_GEMINI_2_5_FLASH_LITE = "gemini/gemini-2.5-flash-lite"
-    GOOGLE_GEMINI_2_5_PRO = "gemini/gemini-2.5-pro"
-    LLAMA_4_MAVERICK = "vertex_ai/meta/llama-4-maverick-17b-128e-instruct-maas"
-    GPT_4o_AUDIO_PREVIEW = "openai/gpt-4o-audio-preview"
-    GPT_4o_MINI_AUDIO_PREVIEW = "openai/gpt-4o-mini-audio-preview"
-    VLLM_QWEN_1_5_0_5B_CHAT = "hosted_vllm/qwen/Qwen1.5-0.5B-Chat"
-    # o1 = "o1-2024-12-17"
-    TEXT_EMBEDDING_3_SMALL = "text-embedding-3-small"
-    CLIP_VIT_B_32 = "clip-ViT-B-32"
 
-    def __init__(self, value: str):
-        self.prefetched_specs = get_model_specs(self)
+    This class should not be instantiated directly. Use one of the predefined constants
+    (e.g., Model.GPT_4o) or the factory method Model.from_litellm() for dynamic model strings.
+    """
+
+    # Registry of known models (maps value string to Model instance)
+    _registry: dict[str, Model] = {}
+
+    # Sentinel to enforce private constructor
+    _INTERNAL_CREATE = object()
+
+    def __init__(self, value: str, *, _token: object = None):
+        """
+        Private constructor. Do not call directly.
+        Use Model.from_litellm() or predefined constants like Model.GPT_4o.
+        """
+        if _token is not Model._INTERNAL_CREATE:
+            raise TypeError(
+                "Model cannot be instantiated directly. "
+                "Use Model.from_litellm() or predefined constants like Model.GPT_4o"
+            )
+        self._value = value
+        self.prefetched_specs = get_model_specs(value)
         metadata = self.prefetched_specs["metadata"]
         self.use_endpoint = (
             metadata["is_text_model"] or metadata["is_audio_model"] or
             metadata["is_reasoning_model"] or metadata["is_vision_model"] or metadata["is_embedding_model"] or
             metadata["usd_per_input_token"] or metadata["usd_per_output_token"] or
-            metadata["supports_prompt_caching"] or metadata["usd_per_cached_input_token"])
+            metadata["supports_prompt_caching"] or metadata["usd_per_cached_input_token"]
+        )
 
     @classmethod
-    def _missing_(cls, value):
-        # create a pseudo-member for unknown values
-        obj = str.__new__(cls, value)
-        obj._name_ = f"UNREGISTERED_{hash(value) & 0xfffffff:x}"
-        obj._value_ = value
-        obj.prefetched_specs = get_model_specs(value)
-        metadata = obj.prefetched_specs["metadata"]
-        obj.use_endpoint = (
-            metadata["is_text_model"] or metadata["is_audio_model"] or
-            metadata["is_reasoning_model"] or metadata["is_vision_model"] or metadata["is_embedding_model"] or
-            metadata["usd_per_input_token"] or metadata["usd_per_output_token"] or
-            metadata["supports_prompt_caching"] or metadata["usd_per_cached_input_token"])
-        return obj
+    def _create(cls, value: str) -> Model:
+        """
+        Internal factory for creating known model constants.
+        Registers the model in the internal registry.
+        """
+        model = cls(value, _token=cls._INTERNAL_CREATE)
+        cls._registry[value] = model
+        return model
+
+    @classmethod
+    def from_litellm(cls, value: str) -> Model:
+        """
+        Factory method to create a Model from a LiteLLM model string.
+
+        If the model is already registered (i.e., it's a known constant),
+        returns the existing instance. Otherwise, creates a new Model instance
+        by looking up capabilities from LiteLLM.
+
+        Args:
+            value: The LiteLLM model identifier string (e.g., "openai/gpt-4o-2024-08-06")
+
+        Returns:
+            A Model instance with capabilities populated from LiteLLM.
+        """
+        if value in cls._registry:
+            return cls._registry[value]
+        # Create a new model instance for runtime/dynamic values
+        return cls(value, _token=cls._INTERNAL_CREATE)
+
+    def _is_registered(self) -> bool:
+        """Check if this model is a registered/known constant."""
+        return self._value in Model._registry
+
+    @property
+    def value(self) -> str:
+        """The model identifier string (e.g., 'openai/gpt-4o-2024-08-06')."""
+        return self._value
 
     @property
     def provider(self) -> ModelProvider:
@@ -312,7 +319,7 @@ class Model(str, Enum):
             try:
                 return ModelProvider(provider_str)
             except ValueError:
-                pass 
+                pass
         # heuristic checks based on model names
         if any(x in val for x in ["gpt-", "o1-", "dall-e", "text-embedding", "whisper"]):
             return ModelProvider.OPENAI
@@ -333,29 +340,42 @@ class Model(str, Enum):
         if "llama" in val:
             return ModelProvider.TOGETHER_AI
         return ModelProvider.UNKNOWN
-    
+
     @property
     def api_key_env_var(self) -> str | None:
         return self.provider.api_key_env_var
-    
-    def __repr__(self):
+
+    def __repr__(self) -> str:
         return self.value
-    
-    def is_llama_model(self):
+
+    def __str__(self) -> str:
+        return self.value
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, Model):
+            return self._value == other._value
+        if isinstance(other, str):
+            return self._value == other
+        return NotImplemented
+
+    def __hash__(self) -> int:
+        return hash(self._value)
+
+    def is_llama_model(self) -> bool:
         return "llama" in self.value.lower()
-    
-    def is_o_model(self):
-        if self.value in Model:
-            return self.value in [Model.o4_MINI]
+
+    def is_o_model(self) -> bool:
+        if self._is_registered():
+            return self == Model.o4_MINI
         val = self.value.lower().split("/")[-1]
         return val.startswith("o") and len(val) > 1 and val[1].isdigit()
 
-    def is_gpt_5_model(self):
-        if self.value in Model:
-            return self.value in [Model.GPT_5, Model.GPT_5_MINI, Model.GPT_5_NANO, Model.GPT_5_2]
+    def is_gpt_5_model(self) -> bool:
+        if self._is_registered():
+            return self in [Model.GPT_5, Model.GPT_5_MINI, Model.GPT_5_NANO, Model.GPT_5_2]
         return "gpt-5" in self.value.lower()
 
-    def is_reasoning_model(self):
+    def is_reasoning_model(self) -> bool:
         reasoning_models = [
             Model.GPT_5, Model.GPT_5_2,
             Model.GPT_5_MINI, Model.GPT_5_NANO, Model.o4_MINI,
@@ -364,28 +384,27 @@ class Model(str, Enum):
             Model.GOOGLE_GEMINI_3_0_PRO, Model.GOOGLE_GEMINI_3_0_FLASH,
             Model.CLAUDE_3_7_SONNET, Model.CLAUDE_4_5_HAIKU, Model.CLAUDE_4_5_SONNET, Model.CLAUDE_4_SONNET
         ]
-        if self.value in Model:
-            return self.value in reasoning_models
+        if self._is_registered():
+            return self in reasoning_models
         info = DYNAMIC_MODEL_INFO.get(self.value, {})
         if "supports_reasoning" in info and info["supports_reasoning"] is not None:
             return info["supports_reasoning"]
         return self.prefetched_specs["is_reasoning_model"]
 
-    def is_text_model(self):
+    def is_text_model(self) -> bool:
         non_text_models = [
             Model.LLAMA3_2_90B_V,
             Model.CLIP_VIT_B_32, Model.TEXT_EMBEDDING_3_SMALL,
             Model.GPT_4o_AUDIO_PREVIEW, Model.GPT_4o_MINI_AUDIO_PREVIEW,
         ]
-        if self.value in Model:
-            return self.value not in non_text_models
+        if self._is_registered():
+            return self not in non_text_models
         info = DYNAMIC_MODEL_INFO.get(self.value, {})
         if "mode" in info:
             return info["mode"] in ["chat", "completion"]
         return self.prefetched_specs["is_text_model"]
 
-    # TODO: I think SONNET and HAIKU are vision-capable too
-    def is_vision_model(self):
+    def is_vision_model(self) -> bool:
         vision_models = [
             Model.LLAMA3_2_90B_V, Model.LLAMA_4_MAVERICK, Model.GPT_5_2,
             Model.GPT_4o, Model.GPT_4o_MINI, Model.GPT_4_1, Model.GPT_4_1_MINI, Model.GPT_4_1_NANO, Model.o4_MINI, Model.GPT_5, Model.GPT_5_MINI, Model.GPT_5_NANO,
@@ -395,61 +414,61 @@ class Model(str, Enum):
             Model.GOOGLE_GEMINI_3_0_FLASH, Model.GOOGLE_GEMINI_3_0_PRO,
             Model.CLAUDE_4_5_HAIKU, Model.CLAUDE_4_5_SONNET, Model.CLAUDE_4_SONNET
         ]
-        if self.value in Model:
-            return self.value in vision_models
+        if self._is_registered():
+            return self in vision_models
         info = DYNAMIC_MODEL_INFO.get(self.value, {})
         if "supports_vision" in info and info["supports_vision"] is not None:
             return info["supports_vision"]
         return self.prefetched_specs["is_vision_model"]
 
-    def is_audio_model(self):
+    def is_audio_model(self) -> bool:
         audio_models = [
             Model.GPT_4o_AUDIO_PREVIEW, Model.GPT_4o_MINI_AUDIO_PREVIEW,
             Model.GEMINI_2_0_FLASH, Model.GEMINI_2_5_FLASH, Model.GEMINI_2_5_PRO,
             Model.GOOGLE_GEMINI_2_5_PRO, Model.GOOGLE_GEMINI_2_5_FLASH, Model.GOOGLE_GEMINI_2_5_FLASH_LITE,
             Model.GEMINI_3_0_FLASH, Model.GOOGLE_GEMINI_3_0_FLASH,
         ]
-        if self.value in Model:
+        if self._is_registered():
             return self in audio_models
         info = DYNAMIC_MODEL_INFO.get(self.value, {})
         if "supports_audio_input" in info and info["supports_audio_input"] is not None:
             return info["supports_audio_input"]
         return self.prefetched_specs["is_audio_model"]
-    
-    def is_vllm_model(self):
+
+    def is_vllm_model(self) -> bool:
         return "hosted_vllm" in self.value.lower()
 
-    def is_text_image_multimodal_model(self):
+    def is_text_image_multimodal_model(self) -> bool:
         text_image_models = [
             Model.LLAMA_4_MAVERICK,
             Model.GPT_4o, Model.GPT_4o_MINI, Model.GPT_4_1, Model.GPT_4_1_MINI, Model.GPT_4_1_NANO, Model.o4_MINI, Model.GPT_5, Model.GPT_5_MINI, Model.GPT_5_NANO, Model.GPT_5_2,
             Model.GEMINI_2_0_FLASH, Model.GEMINI_2_5_FLASH, Model.GEMINI_2_5_PRO, Model.GEMINI_3_0_FLASH, Model.GEMINI_3_0_PRO,
             Model.GOOGLE_GEMINI_2_5_PRO, Model.GOOGLE_GEMINI_2_5_FLASH, Model.GOOGLE_GEMINI_2_5_FLASH_LITE, Model.GOOGLE_GEMINI_3_0_FLASH, Model.GOOGLE_GEMINI_3_0_PRO,
         ]
-        if self.value in Model:
-            return self.value in text_image_models
+        if self._is_registered():
+            return self in text_image_models
         return self.is_text_model() and self.is_vision_model()
 
-    def is_text_audio_multimodal_model(self):
+    def is_text_audio_multimodal_model(self) -> bool:
         text_audio_models = [
             Model.GPT_4o_AUDIO_PREVIEW, Model.GPT_4o_MINI_AUDIO_PREVIEW,
             Model.GEMINI_2_0_FLASH, Model.GEMINI_2_5_FLASH, Model.GEMINI_2_5_PRO, Model.GEMINI_3_0_FLASH,
             Model.GOOGLE_GEMINI_2_5_PRO, Model.GOOGLE_GEMINI_2_5_FLASH, Model.GOOGLE_GEMINI_2_5_FLASH_LITE, Model.GOOGLE_GEMINI_3_0_FLASH,
         ]
-        if self.value in Model:
-            return self.value in text_audio_models
+        if self._is_registered():
+            return self in text_audio_models
         return self.is_audio_model() and self.is_text_model()
 
-    def is_embedding_model(self):
+    def is_embedding_model(self) -> bool:
         embedding_models = [Model.CLIP_VIT_B_32, Model.TEXT_EMBEDDING_3_SMALL]
-        if self.value in Model:
-            return self.value in embedding_models
+        if self._is_registered():
+            return self in embedding_models
         info = DYNAMIC_MODEL_INFO.get(self.value, {})
         if "mode" in info and info["mode"] is not None:
             return info["mode"] == "embedding"
         return self.prefetched_specs["is_embedding_model"]
-    
-    def supports_prompt_caching(self):
+
+    def supports_prompt_caching(self) -> bool:
         prompt_caching_models = [
             Model.CLAUDE_4_5_HAIKU, Model.CLAUDE_4_SONNET, Model.CLAUDE_4_5_SONNET, Model.CLAUDE_3_5_SONNET, Model.CLAUDE_3_5_HAIKU,
             Model.GPT_4o_MINI, Model.GPT_4o, Model.GPT_4_1, Model.GPT_4_1_MINI, Model.GPT_4_1_NANO,
@@ -457,30 +476,30 @@ class Model(str, Enum):
             Model.GEMINI_2_0_FLASH, Model.GEMINI_2_5_FLASH, Model.GEMINI_2_5_PRO, Model.GEMINI_3_0_FLASH, Model.GEMINI_3_0_PRO,
             Model.GOOGLE_GEMINI_2_5_FLASH, Model.GOOGLE_GEMINI_2_5_FLASH_LITE, Model.GOOGLE_GEMINI_2_5_PRO, Model.GOOGLE_GEMINI_3_0_FLASH, Model.GOOGLE_GEMINI_3_0_PRO
         ]
-        if self.value in Model:
-            return self.value in prompt_caching_models
+        if self._is_registered():
+            return self in prompt_caching_models
         info = DYNAMIC_MODEL_INFO.get(self.value, {})
         if "supports_prompt_caching" in info and info["supports_prompt_caching"] is not None:
             return info["supports_prompt_caching"]
         return self.prefetched_specs["supports_prompt_caching"]
-    
-    def get_usd_per_input_token(self):
+
+    def get_usd_per_input_token(self) -> float:
         if self.value in MODEL_CARDS:
             return MODEL_CARDS[self.value]["usd_per_input_token"]
         info = DYNAMIC_MODEL_INFO.get(self.value, {})
         if "input_cost_per_token" in info and info["input_cost_per_token"]:
             return info["input_cost_per_token"]
         return self.prefetched_specs["usd_per_input_token"]
-    
-    def get_usd_per_output_token(self):
+
+    def get_usd_per_output_token(self) -> float:
         if self.value in MODEL_CARDS:
             return MODEL_CARDS[self.value]["usd_per_output_token"]
         info = DYNAMIC_MODEL_INFO.get(self.value, {})
         if "output_cost_per_token" in info and info["output_cost_per_token"]:
             return info["output_cost_per_token"]
         return self.prefetched_specs["usd_per_output_token"]
-    
-    def get_usd_per_audio_input_token(self):
+
+    def get_usd_per_audio_input_token(self) -> float:
         if not self.is_audio_model():
             return 0.0
         if self.value in MODEL_CARDS:
@@ -489,9 +508,8 @@ class Model(str, Enum):
         if "input_cost_per_audio_token" in info and info["input_cost_per_audio_token"]:
             return info["input_cost_per_audio_token"]
         return self.prefetched_specs.get("usd_per_audio_input_token", 0.0)
-    
-    # cached_read_input_token_cost
-    def get_usd_per_cached_input_token(self):
+
+    def get_usd_per_cached_input_token(self) -> float:
         if not self.supports_prompt_caching():
             return 0.0
         if self.value in MODEL_CARDS:
@@ -500,18 +518,60 @@ class Model(str, Enum):
         if "cached_read_input_token_cost" in info and info["cached_read_input_token_cost"]:
             return info["cached_read_input_token_cost"]
         return self.prefetched_specs.get("usd_per_cached_input_token")
-    
-    def get_seconds_per_output_token(self):
+
+    def get_seconds_per_output_token(self) -> float:
         # LiteLLM endpoint doesn't provide information on the latency
         if self.value in MODEL_CARDS:
             return MODEL_CARDS[self.value]["seconds_per_output_token"]
         return 1.0/self.prefetched_specs["output_tokens_per_second"]
-    
-    def get_overall_score(self):
+
+    def get_overall_score(self) -> float:
         # LiteLLM endpoint doesn't provide information on the MMLU-pro score
         if self.value in MODEL_CARDS:
             return MODEL_CARDS[self.value]["overall"]
         return self.prefetched_specs["overall"]
+
+
+# Define model constants as class attributes
+# These are created using the internal _create factory method
+Model.LLAMA3_2_3B = Model._create("together_ai/meta-llama/Llama-3.2-3B-Instruct-Turbo")
+Model.LLAMA3_1_8B = Model._create("together_ai/meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo")
+Model.LLAMA3_3_70B = Model._create("together_ai/meta-llama/Llama-3.3-70B-Instruct-Turbo")
+Model.LLAMA3_2_90B_V = Model._create("together_ai/meta-llama/Llama-3.2-90B-Vision-Instruct-Turbo")
+Model.DEEPSEEK_V3 = Model._create("together_ai/deepseek-ai/DeepSeek-V3")
+Model.DEEPSEEK_R1_DISTILL_QWEN_1_5B = Model._create("together_ai/deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B")
+Model.GPT_4o = Model._create("openai/gpt-4o-2024-08-06")
+Model.GPT_4o_MINI = Model._create("openai/gpt-4o-mini-2024-07-18")
+Model.GPT_4_1 = Model._create("openai/gpt-4.1-2025-04-14")
+Model.GPT_4_1_MINI = Model._create("openai/gpt-4.1-mini-2025-04-14")
+Model.GPT_4_1_NANO = Model._create("openai/gpt-4.1-nano-2025-04-14")
+Model.GPT_5 = Model._create("openai/gpt-5-2025-08-07")
+Model.GPT_5_MINI = Model._create("openai/gpt-5-mini-2025-08-07")
+Model.GPT_5_NANO = Model._create("openai/gpt-5-nano-2025-08-07")
+Model.GPT_5_2 = Model._create("openai/gpt-5.2-2025-12-11")
+Model.o4_MINI = Model._create("openai/o4-mini-2025-04-16")  # noqa: N815
+Model.CLAUDE_3_5_SONNET = Model._create("anthropic/claude-3-5-sonnet-20241022")
+Model.CLAUDE_3_7_SONNET = Model._create("anthropic/claude-3-7-sonnet-20250219")
+Model.CLAUDE_4_SONNET = Model._create("anthropic/claude-sonnet-4-20250514")
+Model.CLAUDE_4_5_SONNET = Model._create("anthropic/claude-sonnet-4-5-20250929")
+Model.CLAUDE_3_5_HAIKU = Model._create("anthropic/claude-3-5-haiku-20241022")
+Model.CLAUDE_4_5_HAIKU = Model._create("anthropic/claude-haiku-4-5-20251001")
+Model.GEMINI_3_0_PRO = Model._create("vertex_ai/gemini-3-pro-preview")  # image
+Model.GEMINI_3_0_FLASH = Model._create("vertex_ai/gemini-3-flash-12-25")  # Text, Image, Video, Audio, and PDF
+Model.GEMINI_2_0_FLASH = Model._create("vertex_ai/gemini-2.0-flash")
+Model.GEMINI_2_5_FLASH = Model._create("vertex_ai/gemini-2.5-flash")
+Model.GEMINI_2_5_PRO = Model._create("vertex_ai/gemini-2.5-pro")
+Model.GOOGLE_GEMINI_3_0_PRO = Model._create("gemini/gemini-3-pro-preview")
+Model.GOOGLE_GEMINI_3_0_FLASH = Model._create("gemini/gemini-3-flash-12-25")
+Model.GOOGLE_GEMINI_2_5_FLASH = Model._create("gemini/gemini-2.5-flash")
+Model.GOOGLE_GEMINI_2_5_FLASH_LITE = Model._create("gemini/gemini-2.5-flash-lite")
+Model.GOOGLE_GEMINI_2_5_PRO = Model._create("gemini/gemini-2.5-pro")
+Model.LLAMA_4_MAVERICK = Model._create("vertex_ai/meta/llama-4-maverick-17b-128e-instruct-maas")
+Model.GPT_4o_AUDIO_PREVIEW = Model._create("openai/gpt-4o-audio-preview")
+Model.GPT_4o_MINI_AUDIO_PREVIEW = Model._create("openai/gpt-4o-mini-audio-preview")
+Model.VLLM_QWEN_1_5_0_5B_CHAT = Model._create("hosted_vllm/qwen/Qwen1.5-0.5B-Chat")
+Model.TEXT_EMBEDDING_3_SMALL = Model._create("text-embedding-3-small")
+Model.CLIP_VIT_B_32 = Model._create("clip-ViT-B-32")
 
 #### MODEL PERFORMANCE & COST METRICS ####
 # Overall model quality is computed using MMLU-Pro; multi-modal models currently use the same score for vision

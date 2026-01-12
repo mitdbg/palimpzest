@@ -2,8 +2,9 @@
 Test suite for dynamic model support in Palimpzest.
 
 This module tests the ability to pass any valid model ID string through the Model class,
-not just the ones defined in the Model Enum. This includes:
-- Dynamic model instantiation via Model._missing_
+not just the predefined model constants. This includes:
+- Dynamic model instantiation via Model.from_litellm() factory method
+- Private constructor enforcement
 - Provider resolution from model strings
 - Model property methods (is_text_model, is_vision_model, etc.)
 - Cost and performance metric retrieval
@@ -89,10 +90,10 @@ def mock_vllm_response():
 
 
 # =============================================================================
-# TEST CLASS: Model Enum Dynamic Instantiation
+# TEST CLASS: Model Class Dynamic Instantiation
 # =============================================================================
 
-class TestModelEnumInstantiation:
+class TestModelInstantiation:
     """Tests for dynamic model instantiation via the Model class."""
 
     def test_known_model_properties(self):
@@ -106,16 +107,38 @@ class TestModelEnumInstantiation:
         assert isinstance(cost, float)
         assert cost > 0
 
-    def test_dynamic_instantiation_basic(self):
-        """Test the _missing_ hook in the Model enum for dynamic model creation."""
+    def test_direct_instantiation_raises_error(self):
+        """Test that directly instantiating Model raises TypeError."""
+        with pytest.raises(TypeError, match="Model cannot be instantiated directly"):
+            Model("custom/my-new-model")
+
+    def test_from_litellm_basic(self):
+        """Test the from_litellm factory method for dynamic model creation."""
         model_name = "custom/my-new-model"
-        model = Model(model_name)
+        model = Model.from_litellm(model_name)
 
         assert model.value == model_name
         assert model.provider == ModelProvider.UNKNOWN
 
         specs = model.prefetched_specs
         assert isinstance(specs, dict)
+
+    def test_from_litellm_returns_registered_constant(self):
+        """Test that from_litellm returns the existing constant for known models."""
+        # Use the exact string that Model.GPT_4o was created with
+        model_from_factory = Model.from_litellm("openai/gpt-4o-2024-08-06")
+
+        # Should return the same instance as the constant
+        assert model_from_factory is Model.GPT_4o
+
+    def test_is_registered_method(self):
+        """Test the _is_registered method."""
+        # Known model should be registered
+        assert Model.GPT_4o._is_registered() is True
+
+        # Dynamic model should not be registered
+        dynamic_model = Model.from_litellm("custom/unknown-model")
+        assert dynamic_model._is_registered() is False
 
     @pytest.mark.parametrize(
         "model_string,expected_provider",
@@ -131,7 +154,7 @@ class TestModelEnumInstantiation:
     )
     def test_provider_resolution(self, model_string, expected_provider):
         """Test that dynamic strings correctly resolve their provider."""
-        model = Model(model_string)
+        model = Model.from_litellm(model_string)
         assert model.provider == expected_provider
         assert model.value == model_string
 
@@ -147,12 +170,12 @@ class TestModelEnumInstantiation:
     )
     def test_dynamic_model_value_preserved(self, model_string):
         """Test that the exact model string is preserved after instantiation."""
-        model = Model(model_string)
+        model = Model.from_litellm(model_string)
         assert model.value == model_string
 
     def test_dynamic_model_has_required_specs(self):
         """Test that dynamic models have all required spec fields."""
-        model = Model("random-provider/completely-unknown-model-v1")
+        model = Model.from_litellm("random-provider/completely-unknown-model-v1")
         specs = model.prefetched_specs
 
         required_fields = [
@@ -163,6 +186,42 @@ class TestModelEnumInstantiation:
         ]
         for field in required_fields:
             assert field in specs, f"Missing required field: {field}"
+
+    def test_model_equality(self):
+        """Test that Model equality works correctly."""
+        # Same model should be equal
+        model1 = Model.from_litellm("custom/my-model")
+        model2 = Model.from_litellm("custom/my-model")
+        assert model1 == model2
+
+        # Model should equal its string value
+        assert model1 == "custom/my-model"
+
+        # Different models should not be equal
+        model3 = Model.from_litellm("custom/other-model")
+        assert model1 != model3
+
+    def test_model_hash(self):
+        """Test that Model instances are hashable and can be used in sets/dicts."""
+        model1 = Model.from_litellm("custom/my-model")
+        model2 = Model.from_litellm("custom/my-model")
+
+        # Should have the same hash
+        assert hash(model1) == hash(model2)
+
+        # Should work in a set
+        model_set = {model1, model2}
+        assert len(model_set) == 1
+
+        # Should work as dict key
+        model_dict = {model1: "value"}
+        assert model_dict[model2] == "value"
+
+    def test_model_str_and_repr(self):
+        """Test string representations of Model."""
+        model = Model.from_litellm("custom/my-model")
+        assert str(model) == "custom/my-model"
+        assert repr(model) == "custom/my-model"
 
 
 # =============================================================================
@@ -182,7 +241,7 @@ class TestModelPropertyMethods:
     )
     def test_is_text_model(self, model_string, expected):
         """Test is_text_model for various dynamic model strings."""
-        model = Model(model_string)
+        model = Model.from_litellm(model_string)
         # Note: heuristics default to is_text_model=True for most models
         assert model.is_text_model() == expected or model.is_text_model() is True
 
@@ -196,7 +255,7 @@ class TestModelPropertyMethods:
     )
     def test_is_vllm_model(self, model_string):
         """Test is_vllm_model returns True for hosted_vllm models."""
-        model = Model(model_string)
+        model = Model.from_litellm(model_string)
         assert model.is_vllm_model() is True
 
     @pytest.mark.parametrize(
@@ -209,7 +268,7 @@ class TestModelPropertyMethods:
     )
     def test_is_not_vllm_model(self, model_string):
         """Test is_vllm_model returns False for non-VLLM models."""
-        model = Model(model_string)
+        model = Model.from_litellm(model_string)
         assert model.is_vllm_model() is False
 
 
@@ -222,7 +281,7 @@ class TestCostAndPerformanceMetrics:
 
     def test_dynamic_model_has_costs(self):
         """Test that dynamic models have cost values (from heuristics if needed)."""
-        model = Model("custom/unknown-model")
+        model = Model.from_litellm("custom/unknown-model")
 
         input_cost = model.get_usd_per_input_token()
         output_cost = model.get_usd_per_output_token()
@@ -236,7 +295,7 @@ class TestCostAndPerformanceMetrics:
         """Test that updating DYNAMIC_MODEL_INFO updates cost properties."""
         model_id = "openai/gpt-6-preview"
 
-        model = Model(model_id)
+        model = Model.from_litellm(model_id)
         initial_cost = model.get_usd_per_input_token()
 
         new_info = {
@@ -251,7 +310,7 @@ class TestCostAndPerformanceMetrics:
 
     def test_dynamic_model_performance_metrics(self):
         """Test that dynamic models have performance metrics."""
-        model = Model("custom/my-model")
+        model = Model.from_litellm("custom/my-model")
 
         overall = model.get_overall_score()
         latency = model.get_seconds_per_output_token()
@@ -402,7 +461,7 @@ class TestGeneratorIntegration:
         """Test that Generator passes exact dynamic model string to litellm."""
         mock_completion.return_value = mock_litellm_response
 
-        model = Model(model_string)
+        model = Model.from_litellm(model_string)
         generator = Generator(
             model=model,
             prompt_strategy=PromptStrategy.MAP,
@@ -432,7 +491,7 @@ class TestGeneratorIntegration:
         vllm_string = "hosted_vllm/custom/MyModel-Instruct"
         custom_api_base = "http://localhost:8000/v1"
 
-        model = Model(vllm_string)
+        model = Model.from_litellm(vllm_string)
         generator = Generator(
             model=model,
             prompt_strategy=PromptStrategy.MAP,
@@ -461,7 +520,7 @@ class TestGeneratorIntegration:
         mock_completion.return_value = mock_litellm_response
 
         # Use a model that won't have audio costs
-        model = Model("custom/text-only-model")
+        model = Model.from_litellm("custom/text-only-model")
         generator = Generator(
             model=model,
             prompt_strategy=PromptStrategy.MAP,
@@ -550,7 +609,7 @@ class TestFetchDynamicModelInfo:
 
         mock_get.side_effect = [mock_response_health, mock_response_info]
 
-        model_input = Model("hosted_vllm/llama-3-70b")
+        model_input = Model.from_litellm("hosted_vllm/llama-3-70b")
         result = fetch_dynamic_model_info([model_input])
 
         mock_popen.assert_called_once()
@@ -592,7 +651,7 @@ class TestEdgeCases:
     def test_unusual_model_strings(self, model_string):
         """Test that unusual model strings don't crash the system."""
         try:
-            model = Model(model_string)
+            model = Model.from_litellm(model_string)
             # Should be able to access basic properties
             _ = model.value
             _ = model.provider
@@ -610,15 +669,15 @@ class TestEdgeCases:
         ]
 
         for model_string in special_strings:
-            model = Model(model_string)
+            model = Model.from_litellm(model_string)
             assert model.value == model_string
 
     def test_same_model_string_returns_consistent_results(self):
         """Test that the same model string returns consistent specs."""
         model_string = "custom/consistent-model"
 
-        model1 = Model(model_string)
-        model2 = Model(model_string)
+        model1 = Model.from_litellm(model_string)
+        model2 = Model.from_litellm(model_string)
 
         assert model1.get_usd_per_input_token() == model2.get_usd_per_input_token()
         assert model1.get_usd_per_output_token() == model2.get_usd_per_output_token()
@@ -658,7 +717,7 @@ class TestEndToEndIntegration:
             df = pd.DataFrame({"text": ["What is the capital of France?", "What is 2 + 2?"]})
             dataset = pz.MemoryDataset("test_data", df)
 
-            dynamic_model = Model(dynamic_model_name)
+            dynamic_model = Model.from_litellm(dynamic_model_name)
 
             config = QueryProcessorConfig(
                 policy=MinCost(),
@@ -693,7 +752,7 @@ class TestEndToEndIntegration:
         """Test with a real API call using a non-enum model string."""
         model_name = "openai/gpt-3.5-turbo"
 
-        model = Model(model_name)
+        model = Model.from_litellm(model_name)
         assert model.get_usd_per_input_token() is not None
         assert model.get_usd_per_audio_input_token() is not None
 
