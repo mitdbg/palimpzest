@@ -17,7 +17,7 @@ def load_known_metrics():
             if response.status_code == 200:
                 LITELLM_MODEL_METRICS = response.json()
         except Exception:
-            pass # Fail gracefully if offline
+            pass
             
     if not CURATED_MODEL_METRICS:
         curated_model_metrics_path = os.path.join(os.path.dirname(__file__), 'curated_model_info.json')
@@ -39,12 +39,13 @@ def get_known_model_info(full_model_id):
         "is_text_model": None,
         "is_audio_model": None,
         "is_embedding_model": None,
+        "supports_prompt_caching": None,
         "usd_per_input_token": None,
+        "usd_per_cached_input_token": None,
         "usd_per_output_token": None,
         "usd_per_audio_input_token": None,
         "output_tokens_per_second": None,
-        "overall": None,
-        # "litellm_provider": None
+        "overall": None
     }
     
     # Normalize model name (remove provider prefix)
@@ -63,10 +64,11 @@ def get_known_model_info(full_model_id):
         unified_info["is_reasoning_model"] = data_source_1.get("supports_reasoning")
         unified_info["is_vision_model"] = data_source_1.get("supports_vision")
         unified_info["is_audio_model"] = data_source_1.get("supports_audio_input")
+        unified_info["supports_prompt_caching"] = data_source_1.get("support_prompt_caching")
         unified_info["usd_per_input_token"] = data_source_1.get("input_cost_per_token")
+        unified_info["usd_per_cached_input_token"] = data_source_1.get("cached_read_input_token_cost")
         unified_info["usd_per_output_token"] = data_source_1.get("output_cost_per_token")
         unified_info["usd_per_audio_input_token"] = data_source_1.get("input_cost_per_audio_token")
-        # unified_info["litellm_provider"] = data_source_1.get("litellm_provider")
 
     # search logic: check model_name only
     data_source_2 = CURATED_MODEL_METRICS.get(model_name)
@@ -78,7 +80,9 @@ def get_known_model_info(full_model_id):
             "is_text_model": "is_text_model",
             "is_audio_model": "is_audio_model",
             "is_embedding_model": "is_embedding_model",
-            "usd_per_input_token": "usd_per_input_token",
+            "supports_prompt_caching": "supports_prompt_caching",
+            "usd_per_input_token" : "usd_per_input_token",
+            "usd_per_cached_input_token": "usd_per_cached_input_token",
             "usd_per_output_token": "usd_per_output_token",
             "usd_per_audio_input_token": "usd_per_audio_input_token",
             "output_tokens_per_second": "output_tokens_per_second",
@@ -148,13 +152,15 @@ def _generate_heuristic_specs(model_slug: str) -> Dict[str, Any]:
         "usd_per_1m_input": 0.50,
         "usd_per_1m_output": 1.50,
         "usd_per_1m_audio_input": None,
+        "usd_per_1m_cached_input": None,
         "seconds_per_output_token": 0.02,
         "mmlu_pro_score": 40.0,
         "is_reasoning_model": False,
         "is_vision_model": False,
-        "is_text_model": True, # default to true
+        "is_text_model": True,
         "is_audio_model": False,
-        "is_embedding_model": False
+        "is_embedding_model": False,
+        "supports_prompt_caching": False
     }
 
     # Reasoning
@@ -211,6 +217,27 @@ def _generate_heuristic_specs(model_slug: str) -> Dict[str, Any]:
         prediction["is_embedding_model"] = True
         prediction["is_text_model"] = False
 
+    # --- Prompt Caching Heuristics ---
+    # Anthropic (Claude 3/3.5 supports caching, usually ~10% of input cost)
+    if "claude-3" in model_slug:
+        prediction["supports_prompt_caching"] = True
+        prediction["usd_per_1m_cached_input"] = prediction["usd_per_1m_input"] * 0.10
+
+    # OpenAI (GPT-4o/mini/o1 support caching, usually ~50% of input cost)
+    elif re.search(r'(gpt-4o|o1|mini)', model_slug):
+        prediction["supports_prompt_caching"] = True
+        prediction["usd_per_1m_cached_input"] = prediction["usd_per_1m_input"] * 0.50
+
+    # Google (Gemini 1.5 supports caching, usually ~25% of input cost)
+    elif "gemini-1.5" in model_slug:
+        prediction["supports_prompt_caching"] = True
+        prediction["usd_per_1m_cached_input"] = prediction["usd_per_1m_input"] * 0.25
+
+    # DeepSeek (Supports caching on V2/V3/Reasoner, usually ~10% of input cost)
+    elif "deepseek" in model_slug:
+        prediction["supports_prompt_caching"] = True
+        prediction["usd_per_1m_cached_input"] = prediction["usd_per_1m_input"] * 0.10
+
     return prediction
 
 def get_model_specs(full_model_id: str) -> Dict[str, Any]:
@@ -239,8 +266,8 @@ def get_model_specs(full_model_id: str) -> Dict[str, Any]:
     heuristics = _generate_heuristic_specs(model_slug)
 
     # Booleans
-    for key in ["is_reasoning_model", "is_vision_model", "is_text_model", "is_audio_model", "is_embedding_model"]:
-        if specs[key] is None:
+    for key in ["is_reasoning_model", "is_vision_model", "is_text_model", "is_audio_model", "is_embedding_model", "supports_prompt_caching"]:
+        if specs.get(key) is None:
             specs[key] = heuristics.get(key, False)
 
     # Pricing
@@ -248,6 +275,16 @@ def get_model_specs(full_model_id: str) -> Dict[str, Any]:
         specs["usd_per_input_token"] = heuristics["usd_per_1m_input"] / 1_000_000.0
     if specs["usd_per_output_token"] is None:
         specs["usd_per_output_token"] = heuristics["usd_per_1m_output"] / 1_000_000.0
+        
+    # Cached Input Pricing
+    if specs["usd_per_cached_input_token"] is None:
+        if heuristics["usd_per_1m_cached_input"] is not None:
+            specs["usd_per_cached_input_token"] = heuristics["usd_per_1m_cached_input"] / 1_000_000.0
+        else:
+            # If prompt caching is supported but we have no price, default to input price (safest estimate)
+            # or keep as None if you prefer strictness. Here we default to input price if None.
+            specs["usd_per_cached_input_token"] = specs["usd_per_input_token"] if specs["supports_prompt_caching"] else 0.0
+
     if specs["usd_per_audio_input_token"] is None:
         if heuristics["usd_per_1m_audio_input"]:
             specs["usd_per_audio_input_token"] = heuristics["usd_per_1m_audio_input"] / 1_000_000.0

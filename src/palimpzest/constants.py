@@ -256,7 +256,10 @@ class Model(str, Enum):
     o4_MINI = "openai/o4-mini-2025-04-16"  # noqa: N815
     CLAUDE_3_5_SONNET = "anthropic/claude-3-5-sonnet-20241022"
     CLAUDE_3_7_SONNET = "anthropic/claude-3-7-sonnet-20250219"
+    CLAUDE_4_SONNET = "anthropic/claude-sonnet-4-20250514"
+    CLAUDE_4_5_SONNET = "anthropic/claude-sonnet-4-5-20250929"
     CLAUDE_3_5_HAIKU = "anthropic/claude-3-5-haiku-20241022"
+    CLAUDE_4_5_HAIKU = "anthropic/claude-haiku-4-5-20251001"
     GEMINI_3_0_PRO = "vertex_ai/gemini-3-pro-preview" # image
     GEMINI_3_0_FLASH = "vertex_ai/gemini-3-flash-12-25" # Text, Image, Video, Audio, and PDF
     GEMINI_2_0_FLASH = "vertex_ai/gemini-2.0-flash"
@@ -281,7 +284,8 @@ class Model(str, Enum):
         self.use_endpoint = (
             metadata["is_text_model"] or metadata["is_audio_model"] or
             metadata["is_reasoning_model"] or metadata["is_vision_model"] or metadata["is_embedding_model"] or
-            metadata["usd_per_input_token"] or metadata["usd_per_output_token"])
+            metadata["usd_per_input_token"] or metadata["usd_per_output_token"] or
+            metadata["supports_prompt_caching"] or metadata["usd_per_cached_input_token"])
 
     @classmethod
     def _missing_(cls, value):
@@ -294,7 +298,8 @@ class Model(str, Enum):
         obj.use_endpoint = (
             metadata["is_text_model"] or metadata["is_audio_model"] or
             metadata["is_reasoning_model"] or metadata["is_vision_model"] or metadata["is_embedding_model"] or
-            metadata["usd_per_input_token"] or metadata["usd_per_output_token"])
+            metadata["usd_per_input_token"] or metadata["usd_per_output_token"] or
+            metadata["supports_prompt_caching"] or metadata["usd_per_cached_input_token"])
         return obj
 
     @property
@@ -357,7 +362,7 @@ class Model(str, Enum):
             Model.GEMINI_2_5_PRO, Model.GEMINI_2_5_FLASH, Model.GEMINI_3_0_PRO, Model.GEMINI_3_0_FLASH,
             Model.GOOGLE_GEMINI_2_5_PRO, Model.GOOGLE_GEMINI_2_5_FLASH, Model.GOOGLE_GEMINI_2_5_FLASH_LITE,
             Model.GOOGLE_GEMINI_3_0_PRO, Model.GOOGLE_GEMINI_3_0_FLASH,
-            Model.CLAUDE_3_7_SONNET,
+            Model.CLAUDE_3_7_SONNET, Model.CLAUDE_4_5_HAIKU, Model.CLAUDE_4_5_SONNET, Model.CLAUDE_4_SONNET
         ]
         if self.value in Model:
             return self.value in reasoning_models
@@ -388,6 +393,7 @@ class Model(str, Enum):
             Model.GOOGLE_GEMINI_2_5_PRO, Model.GOOGLE_GEMINI_2_5_FLASH, Model.GOOGLE_GEMINI_2_5_FLASH_LITE,
             Model.GEMINI_3_0_FLASH, Model.GEMINI_3_0_PRO,
             Model.GOOGLE_GEMINI_3_0_FLASH, Model.GOOGLE_GEMINI_3_0_PRO,
+            Model.CLAUDE_4_5_HAIKU, Model.CLAUDE_4_5_SONNET, Model.CLAUDE_4_SONNET
         ]
         if self.value in Model:
             return self.value in vision_models
@@ -439,15 +445,30 @@ class Model(str, Enum):
         if self.value in Model:
             return self.value in embedding_models
         info = DYNAMIC_MODEL_INFO.get(self.value, {})
-        if "mode" in info:
+        if "mode" in info and info["mode"] is not None:
             return info["mode"] == "embedding"
         return self.prefetched_specs["is_embedding_model"]
+    
+    def supports_prompt_caching(self):
+        prompt_caching_models = [
+            Model.CLAUDE_4_5_HAIKU, Model.CLAUDE_4_SONNET, Model.CLAUDE_4_5_SONNET, Model.CLAUDE_3_5_SONNET, Model.CLAUDE_3_5_HAIKU,
+            Model.GPT_4o_MINI, Model.GPT_4o, Model.GPT_4_1, Model.GPT_4_1_MINI, Model.GPT_4_1_NANO,
+            Model.o4_MINI, Model.GPT_5_MINI, Model.GPT_5, Model.GPT_5_NANO, Model.GPT_5_2,
+            Model.GEMINI_2_0_FLASH, Model.GEMINI_2_5_FLASH, Model.GEMINI_2_5_PRO, Model.GEMINI_3_0_FLASH, Model.GEMINI_3_0_PRO,
+            Model.GOOGLE_GEMINI_2_5_FLASH, Model.GOOGLE_GEMINI_2_5_FLASH_LITE, Model.GOOGLE_GEMINI_2_5_PRO, Model.GOOGLE_GEMINI_3_0_FLASH, Model.GOOGLE_GEMINI_3_0_PRO
+        ]
+        if self.value in Model:
+            return self.value in prompt_caching_models
+        info = DYNAMIC_MODEL_INFO.get(self.value, {})
+        if "supports_prompt_caching" in info and info["supports_prompt_caching"] is not None:
+            return info["supports_prompt_caching"]
+        return self.prefetched_specs["supports_prompt_caching"]
     
     def get_usd_per_input_token(self):
         if self.value in MODEL_CARDS:
             return MODEL_CARDS[self.value]["usd_per_input_token"]
         info = DYNAMIC_MODEL_INFO.get(self.value, {})
-        if "input_cost_per_token" in info and info["input_cost_per_token"] is not None:
+        if "input_cost_per_token" in info and info["input_cost_per_token"]:
             return info["input_cost_per_token"]
         return self.prefetched_specs["usd_per_input_token"]
     
@@ -455,17 +476,30 @@ class Model(str, Enum):
         if self.value in MODEL_CARDS:
             return MODEL_CARDS[self.value]["usd_per_output_token"]
         info = DYNAMIC_MODEL_INFO.get(self.value, {})
-        if "output_cost_per_token" in info and info["output_cost_per_token"] is not None:
+        if "output_cost_per_token" in info and info["output_cost_per_token"]:
             return info["output_cost_per_token"]
         return self.prefetched_specs["usd_per_output_token"]
     
     def get_usd_per_audio_input_token(self):
+        if not self.is_audio_model():
+            return 0.0
         if self.value in MODEL_CARDS:
             return MODEL_CARDS[self.value].get("usd_per_audio_input_token", 0.0)
         info = DYNAMIC_MODEL_INFO.get(self.value, {})
-        if "input_cost_per_audio_token" in info and info["input_cost_per_audio_token"] is not None:
+        if "input_cost_per_audio_token" in info and info["input_cost_per_audio_token"]:
             return info["input_cost_per_audio_token"]
         return self.prefetched_specs.get("usd_per_audio_input_token", 0.0)
+    
+    # cached_read_input_token_cost
+    def get_usd_per_cached_input_token(self):
+        if not self.supports_prompt_caching():
+            return 0.0
+        if self.value in MODEL_CARDS:
+            return MODEL_CARDS[self.value].get("usd_per_cached_input_token", 0.0)
+        info = DYNAMIC_MODEL_INFO.get(self.value, {})
+        if "cached_read_input_token_cost" in info and info["cached_read_input_token_cost"]:
+            return info["cached_read_input_token_cost"]
+        return self.prefetched_specs.get("usd_per_cached_input_token")
     
     def get_seconds_per_output_token(self):
         # LiteLLM endpoint doesn't provide information on the latency
@@ -551,8 +585,9 @@ DEEPSEEK_R1_DISTILL_QWEN_1_5B_MODEL_CARD = {
 GPT_4o_AUDIO_PREVIEW_MODEL_CARD = {
     # NOTE: COPYING OVERALL AND SECONDS_PER_OUTPUT_TOKEN FROM GPT_4o; need to update when we have audio-specific benchmarks
     ##### Cost in USD #####
-    "usd_per_audio_input_token": 2.5 / 1e6,
-    "usd_per_output_token": 10.0 / 1e6,
+    # https://platform.openai.com/docs/pricing
+    "usd_per_audio_input_token": 40.00 / 1e6,
+    "usd_per_output_token": 80.00 / 1e6,
     ##### Time #####
     "seconds_per_output_token": 0.0080,
     ##### Agg. Benchmark #####
@@ -561,8 +596,8 @@ GPT_4o_AUDIO_PREVIEW_MODEL_CARD = {
 GPT_4o_MINI_AUDIO_PREVIEW_MODEL_CARD = {
     # NOTE: COPYING OVERALL AND SECONDS_PER_OUTPUT_TOKEN FROM GPT_4o; need to update when we have audio-specific benchmarks
     ##### Cost in USD #####
-    "usd_per_audio_input_token": 0.15 / 1e6,
-    "usd_per_output_token": 0.6 / 1e6,
+    "usd_per_audio_input_token": 10 / 1e6,
+    "usd_per_output_token": 20 / 1e6,
     ##### Time #####
     "seconds_per_output_token": 0.0159,
     ##### Agg. Benchmark #####
@@ -573,6 +608,7 @@ GPT_4o_MODEL_CARD = {
     ##### Cost in USD #####
     "usd_per_input_token": 2.5 / 1e6,
     "usd_per_output_token": 10.0 / 1e6,
+    "usd_per_cached_input_token": 1.25 / 1e6,
     ##### Time #####
     "seconds_per_output_token": 0.0080,
     ##### Agg. Benchmark #####
@@ -583,6 +619,7 @@ GPT_4o_MINI_MODEL_CARD = {
     ##### Cost in USD #####
     "usd_per_input_token": 0.15 / 1e6,
     "usd_per_output_token": 0.6 / 1e6,
+    "usd_per_cached_input_token": 0.075 / 1e6,
     ##### Time #####
     "seconds_per_output_token": 0.0159,
     ##### Agg. Benchmark #####
@@ -593,6 +630,7 @@ GPT_4_1_MODEL_CARD = {
     ##### Cost in USD #####
     "usd_per_input_token": 2.0 / 1e6,
     "usd_per_output_token": 8.0 / 1e6,
+    "usd_per_cached_input_token": 0.50 / 1e6,
     ##### Time #####
     "seconds_per_output_token": 0.0076,
     ##### Agg. Benchmark #####
@@ -603,6 +641,7 @@ GPT_4_1_MINI_MODEL_CARD = {
     ##### Cost in USD #####
     "usd_per_input_token": 0.4 / 1e6,
     "usd_per_output_token": 1.6 / 1e6,
+    "usd_per_cached_input_token": 0.10 / 1e6,
     ##### Time #####
     "seconds_per_output_token": 0.0161,
     ##### Agg. Benchmark #####
@@ -613,6 +652,7 @@ GPT_4_1_NANO_MODEL_CARD = {
     ##### Cost in USD #####
     "usd_per_input_token": 0.1 / 1e6,
     "usd_per_output_token": 0.4 / 1e6,
+    "usd_per_cached_input_token": 0.025 / 1e6,
     ##### Time #####
     "seconds_per_output_token": 0.0060,
     ##### Agg. Benchmark #####
@@ -623,6 +663,7 @@ GPT_5_MODEL_CARD = {
     ##### Cost in USD #####
     "usd_per_input_token": 1.25 / 1e6,
     "usd_per_output_token": 10.0 / 1e6,
+    "usd_per_cached_input_token": 0.125 / 1e6,
     ##### Time #####
     "seconds_per_output_token": 0.0060,
     ##### Agg. Benchmark #####
@@ -633,6 +674,7 @@ GPT_5_MINI_MODEL_CARD = {
     ##### Cost in USD #####
     "usd_per_input_token": 0.25 / 1e6,
     "usd_per_output_token": 2.0 / 1e6,
+    "usd_per_cached_input_token": 0.025 / 1e6,
     ##### Time #####
     "seconds_per_output_token": 0.0135,
     ##### Agg. Benchmark #####
@@ -643,6 +685,7 @@ GPT_5_NANO_MODEL_CARD = {
     ##### Cost in USD #####
     "usd_per_input_token": 0.05 / 1e6,
     "usd_per_output_token": 0.4 / 1e6,
+    "usd_per_cached_input_token": 0.005 / 1e6,
     ##### Time #####
     "seconds_per_output_token": 0.0055,
     ##### Agg. Benchmark #####
@@ -651,8 +694,9 @@ GPT_5_NANO_MODEL_CARD = {
 GPT_5_2_MODEL_CARD = {
     # NOTE: it is unclear if the same ($ / token) costs can be applied for vision, or if we have to calculate this ourselves
     ##### Cost in USD #####
-    "usd_per_input_token": 1.75/1e6,
-    "usd_per_output_token": 14/1e6,
+    "usd_per_input_token": 1.75 / 1e6,
+    "usd_per_output_token": 14 / 1e6,
+    "usd_per_cached_input_token": 0.175 / 1e6,
     ##### Time #####
     "seconds_per_output_token": 0.01471,
     ##### Agg. Benchmark #####
@@ -663,6 +707,7 @@ o4_MINI_MODEL_CARD = {  # noqa: N816
     ##### Cost in USD #####
     "usd_per_input_token": 1.1 / 1e6,
     "usd_per_output_token": 4.4 / 1e6,
+    "usd_per_cached_input_token": 0.275 / 1e6,
     ##### Time #####
     "seconds_per_output_token": 0.0092,
     ##### Agg. Benchmark #####
@@ -673,6 +718,7 @@ o4_MINI_MODEL_CARD = {  # noqa: N816
 #     ##### Cost in USD #####
 #     "usd_per_input_token": 15 / 1e6,
 #     "usd_per_output_token": 60 / 1e6,
+#     "usd_per_cached_input_token": 7.50 / 1e6,
 #     ##### Time #####
 #     "seconds_per_output_token": 0.0110,
 #     ##### Agg. Benchmark #####
@@ -700,6 +746,7 @@ CLAUDE_3_5_SONNET_MODEL_CARD = {
     ##### Cost in USD #####
     "usd_per_input_token": 3.0 / 1e6,
     "usd_per_output_token": 15.0 / 1e6,
+    "usd_per_cached_input_token": 0.30 / 1e6,
     ##### Time #####
     "seconds_per_output_token": 0.0154,
     ##### Agg. Benchmark #####
@@ -709,25 +756,60 @@ CLAUDE_3_7_SONNET_MODEL_CARD = {
     ##### Cost in USD #####
     "usd_per_input_token": 3.0 / 1e6,
     "usd_per_output_token": 15.0 / 1e6,
+    "usd_per_cached_input_token": 0.30 / 1e6,
     ##### Time #####
     "seconds_per_output_token": 0.0156,
     ##### Agg. Benchmark #####
     "overall": 80.7,
 }
+CLAUDE_4_SONNET_MODEL_CARD = {
+    ##### Cost in USD #####
+    # https://platform.claude.com/docs/en/about-claude/pricing
+    "usd_per_input_token": 3.0 / 1e6,
+    "usd_per_output_token": 15.0 / 1e6,
+    "usd_per_cached_input_token": 0.30 / 1e6,
+    ##### Time #####
+    "seconds_per_output_token": 1.0 / 71.3,
+    ##### Agg. Benchmark #####
+    "overall": 83.87,
+}
+CLAUDE_4_5_SONNET_MODEL_CARD = {
+    ##### Cost in USD #####
+    # https://platform.claude.com/docs/en/about-claude/pricing
+    "usd_per_input_token": 3.0 / 1e6,
+    "usd_per_output_token": 15.0 / 1e6,
+    "usd_per_cached_input_token": 0.30 / 1e6,
+    ##### Time #####
+    "seconds_per_output_token": 1.0 / 78.6,
+    ##### Agg. Benchmark #####
+    "overall": 87.36,
+}
 CLAUDE_3_5_HAIKU_MODEL_CARD = {
     ##### Cost in USD #####
     "usd_per_input_token": 0.8 / 1e6,
     "usd_per_output_token": 4.0 / 1e6,
+    "usd_per_cached_input_token": 0.08 / 1e6,
     ##### Time #####
     "seconds_per_output_token": 0.0189,
     ##### Agg. Benchmark #####
     "overall": 64.1,
+}
+CLAUDE_4_5_HAIKU_MODEL_CARD = {
+    ##### Cost in USD #####
+    "usd_per_input_token": 1 / 1e6,
+    "usd_per_output_token": 1.25 / 1e6,
+    "usd_per_cached_input_token": 2 / 1e6,
+    ##### Time #####
+    "seconds_per_output_token": 1.0 / 118.3,
+    ##### Agg. Benchmark #####
+    "overall": 78.72,
 }
 GEMINI_2_0_FLASH_MODEL_CARD = {
     ##### Cost in USD #####
     "usd_per_input_token": 0.15 / 1e6,
     "usd_per_output_token": 0.6 / 1e6,
     "usd_per_audio_input_token": 1.0 / 1e6,
+    "usd_per_cached_input_token": 0.025 / 1e6,
     ##### Time #####
     "seconds_per_output_token": 0.0054,
     ##### Agg. Benchmark #####
@@ -748,6 +830,7 @@ GEMINI_2_5_FLASH_MODEL_CARD = {
     "usd_per_input_token": 0.30 / 1e6,
     "usd_per_output_token": 2.5 / 1e6,
     "usd_per_audio_input_token": 1.0 / 1e6,
+    "usd_per_cached_input_token": 0.03 / 1e6,
     ##### Time #####
     "seconds_per_output_token": 0.0044,
     ##### Agg. Benchmark #####
@@ -758,6 +841,7 @@ GEMINI_2_5_PRO_MODEL_CARD = {
     "usd_per_input_token": 1.25 / 1e6,
     "usd_per_output_token": 10.0 / 1e6,
     "usd_per_audio_input_token": 1.25 / 1e6,
+    "usd_per_cached_input_token": 0.125 / 1e6,
     ##### Time #####
     "seconds_per_output_token": 0.0072,
     ##### Agg. Benchmark #####
@@ -768,6 +852,7 @@ GEMINI_3_0_FLASH_MODEL_CARD = {
     "usd_per_input_token": 0.5/1e6,
     "usd_per_output_token": 3/1e6,
     "usd_per_audio_input_token": 1.0/1e6,
+    "usd_per_cached_input_token": 0.05 / 1e6,
     ##### Time #####
     "seconds_per_output_token": 0.00457247,
     ##### Agg. Benchmark #####
@@ -777,6 +862,7 @@ GEMINI_3_0_PRO_MODEL_CARD = {
     ##### Cost in USD #####
     "usd_per_input_token": 2.0/1e6,
     "usd_per_output_token": 12.0/1e6,
+    "usd_per_cached_input_token": 0.20 / 1e6,
     ##### Time #####
     "seconds_per_output_token": 0.0075758,
     ##### Agg. Benchmark #####
@@ -825,7 +911,10 @@ MODEL_CARDS = {
     Model.CLIP_VIT_B_32.value: CLIP_VIT_B_32_MODEL_CARD,
     Model.CLAUDE_3_5_SONNET.value: CLAUDE_3_5_SONNET_MODEL_CARD,
     Model.CLAUDE_3_7_SONNET.value: CLAUDE_3_7_SONNET_MODEL_CARD,
+    Model.CLAUDE_4_SONNET.value: CLAUDE_4_SONNET_MODEL_CARD,
+    Model.CLAUDE_4_5_SONNET.value: CLAUDE_4_5_SONNET_MODEL_CARD,
     Model.CLAUDE_3_5_HAIKU.value: CLAUDE_3_5_HAIKU_MODEL_CARD,
+    Model.CLAUDE_4_5_HAIKU.value: CLAUDE_4_5_HAIKU_MODEL_CARD,
     Model.GEMINI_2_0_FLASH.value: GEMINI_2_0_FLASH_MODEL_CARD,
     Model.GEMINI_2_5_FLASH.value: GEMINI_2_5_FLASH_MODEL_CARD,
     Model.GEMINI_2_5_PRO.value: GEMINI_2_5_PRO_MODEL_CARD,
