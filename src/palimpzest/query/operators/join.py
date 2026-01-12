@@ -487,6 +487,16 @@ class NestedLoopsJoin(LLMJoin):
 
         return DataRecordSet(output_records, output_record_op_stats), num_inputs_processed
 
+class BlockNestedLoopsJoin(LLMJoin):
+    # Implements block nested loops join with a known selectivity.
+    def naive_cost_estimates(self, left_source_op_cost_estimates: OperatorCostEstimates, right_source_op_cost_estimates: OperatorCostEstimates):
+        pass
+
+    def _find_batch_sizes(self):
+        pass
+
+    def __call__(self, left_candidates: list[DataRecord], right_candidates: list[DataRecord], final: bool = False) -> tuple[DataRecordSet, int]:
+        pass
 
 class EmbeddingJoin(LLMJoin):
     # NOTE: we currently do not support audio joins as embedding models for audio seem to have

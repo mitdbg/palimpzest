@@ -153,6 +153,8 @@ class PromptStrategy(str, Enum):
     # join prompt strategies
     JOIN = "join"
     JOIN_NO_REASONING = "join-no-reasoning"
+    JOIN_BLOCK = "join-block"
+    JOIN_BLOCK_NO_REASONING = "join-block-no-reasoning"
 
     # map prompt strategies
     MAP = "map"
@@ -171,7 +173,7 @@ class PromptStrategy(str, Enum):
         return "filter" in self.value
 
     def is_join_prompt(self):
-        return "join" in self.value
+        return "join" in self.value and "block" not in self.value
 
     def is_map_prompt(self):
         return "map" in self.value
@@ -193,6 +195,9 @@ class PromptStrategy(str, Enum):
 
     def is_split_merger_prompt(self):
         return "split-merger" in self.value
+
+    def is_block_join_prompt(self):
+        return "join-block" in self.value
 
     def is_no_reasoning_prompt(self):
         return "no-reasoning" in self.value
