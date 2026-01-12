@@ -24,6 +24,9 @@ class GenerationStats(BaseModel):
     # the number of input text tokens
     input_text_tokens: int = 0
 
+    # the number of cached input text tokens
+    cached_input_tokens: int = 0
+
     # the number of input image tokens
     input_image_tokens: int = 0
 
@@ -40,6 +43,9 @@ class GenerationStats(BaseModel):
 
     # the total cost of processing the input tokens; None if this operation did not use an LLM
     total_input_cost: float = 0.0
+
+    # the total cost of reading the cached input tokens; None if this operation did not use an LLM
+    total_cached_input_cost: float = 0.0
 
     # the total cost of processing the output tokens; None if this operation did not use an LLM
     total_output_cost: float = 0.0
