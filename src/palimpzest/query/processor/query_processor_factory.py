@@ -4,6 +4,7 @@ from enum import Enum
 
 from dotenv import load_dotenv
 
+from palimpzest.constants import ModelProvider
 from palimpzest.core.data.dataset import Dataset
 from palimpzest.core.elements.records import DataRecordCollection
 from palimpzest.query.execution.execution_strategy import ExecutionStrategy, SentinelExecutionStrategy
@@ -13,8 +14,7 @@ from palimpzest.query.optimizer.optimizer import Optimizer
 from palimpzest.query.optimizer.optimizer_strategy_type import OptimizationStrategyType
 from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.query.processor.query_processor import QueryProcessor
-from palimpzest.constants import Model, ModelProvider
-from palimpzest.utils.model_helpers import get_optimal_models, fetch_dynamic_model_info
+from palimpzest.utils.model_helpers import fetch_dynamic_model_info, get_optimal_models
 from palimpzest.validator.validator import Validator
 
 logger = logging.getLogger(__name__)
@@ -78,6 +78,7 @@ class QueryProcessorFactory:
             except Exception as e:
                 logger.warning(f"Failed to fetch dynamic model info (litellm may not be installed or running): {e}.")
 
+        # 1. Normalize remove_models
         remove_models = getattr(config, 'remove_models', [])
 
         # remove any models specified in the config
@@ -129,8 +130,7 @@ class QueryProcessorFactory:
                 has_config_creds = config.gemini_credentials_path and os.path.exists(config.gemini_credentials_path)
                 if not (has_env_creds or has_config_creds):
                     raise ValueError("GEMINI_API_KEY, GOOGLE_API_KEY, or gemini_credentials path must be set to use Google Gemini models.")
-            elif env_var_name:
-                if not os.getenv(env_var_name):
+            elif env_var_name and not os.getenv(env_var_name):
                     raise ValueError(f"{env_var_name} must be set to use {provider.value} models.")
         return config, validator
 

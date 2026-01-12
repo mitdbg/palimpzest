@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from palimpzest.policy import MaxQuality, Policy
 from palimpzest.constants import Model
+from palimpzest.policy import MaxQuality, Policy
 
 
 # TODO: Add description for each field.

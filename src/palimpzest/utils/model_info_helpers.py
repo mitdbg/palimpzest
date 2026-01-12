@@ -1,5 +1,9 @@
-import requests, os, json, re
-from typing import Dict, Any, Optional
+import json
+import os
+import re
+from typing import Any, Dict, Optional
+
+import requests
 
 LITELLM_MODEL_METRICS = {}
 CURATED_MODEL_METRICS = {}
@@ -18,7 +22,7 @@ def load_known_metrics():
     if not CURATED_MODEL_METRICS:
         curated_model_metrics_path = os.path.join(os.path.dirname(__file__), 'curated_model_info.json')
         if os.path.exists(curated_model_metrics_path):
-            with open(curated_model_metrics_path, 'r') as f:
+            with open(curated_model_metrics_path) as f:
                 CURATED_MODEL_METRICS = json.load(f)
 
 def get_known_model_info(full_model_id):
@@ -44,10 +48,7 @@ def get_known_model_info(full_model_id):
     }
     
     # Normalize model name (remove provider prefix)
-    if "/" in full_model_id:
-        model_name = full_model_id.split("/", 1)[1]
-    else:
-        model_name = full_model_id
+    model_name = full_model_id.split("/", 1)[1] if "/" in full_model_id else full_model_id
 
     # search logic: check full_model_id first, then model_name
     data_source_1 = LITELLM_MODEL_METRICS.get(full_model_id) or LITELLM_MODEL_METRICS.get(model_name)
@@ -111,7 +112,7 @@ def _find_closest_benchmark_metric(model_slug: str) -> Optional[Dict[str, float]
         }
 
     # 2. Date/Version-invariant Match
-    matches = [k for k in CURATED_MODEL_METRICS.keys() if k.lower().startswith(slug) or slug in k.lower()]
+    matches = [k for k in CURATED_MODEL_METRICS if k.lower().startswith(slug) or slug in k.lower()]
     if matches:
         # Pick the first match (or sort by length/similarity if needed)
         best_match = matches[0]
@@ -126,7 +127,7 @@ def _find_closest_benchmark_metric(model_slug: str) -> Optional[Dict[str, float]
     base_slug = slug.replace("-instruct", "").replace("-chat", "").strip("-")
     
     # Try finding the base version in the curated list
-    curated_keys_lower = {k.lower(): k for k in CURATED_MODEL_METRICS.keys()}
+    curated_keys_lower = {k.lower(): k for k in CURATED_MODEL_METRICS}
     
     if is_instruct and base_slug in curated_keys_lower:
         base_key = curated_keys_lower[base_slug]

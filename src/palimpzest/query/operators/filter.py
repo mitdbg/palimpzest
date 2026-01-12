@@ -10,8 +10,8 @@ from palimpzest.constants import (
     NAIVE_EST_FILTER_SELECTIVITY,
     NAIVE_EST_NUM_INPUT_TOKENS,
     Cardinality,
-    PromptStrategy,
     Model,
+    PromptStrategy,
 )
 from palimpzest.core.elements.filters import Filter
 from palimpzest.core.elements.records import DataRecord, DataRecordSet

@@ -8,10 +8,7 @@ from numpy.linalg import norm
 from openai import OpenAI
 from pydantic.fields import FieldInfo
 
-from palimpzest.constants import (
-    NAIVE_EST_NUM_OUTPUT_TOKENS,
-    Model
-)
+from palimpzest.constants import NAIVE_EST_NUM_OUTPUT_TOKENS, Model
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.models import GenerationStats, OperatorCostEstimates
 from palimpzest.query.operators.convert import LLMConvert

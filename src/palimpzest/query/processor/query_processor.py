@@ -1,5 +1,6 @@
 import logging
 
+from palimpzest.constants import Model
 from palimpzest.core.data.dataset import Dataset
 from palimpzest.core.elements.records import DataRecord, DataRecordCollection
 from palimpzest.core.models import ExecutionStats, PlanStats
@@ -11,7 +12,6 @@ from palimpzest.query.optimizer.optimizer_strategy_type import OptimizationStrat
 from palimpzest.query.optimizer.plan import SentinelPlan
 from palimpzest.utils.hash_helpers import hash_for_id
 from palimpzest.validator.validator import Validator
-from palimpzest.constants import Model
 
 logger = logging.getLogger(__name__)
 

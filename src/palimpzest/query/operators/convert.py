@@ -11,8 +11,8 @@ from palimpzest.constants import (
     NAIVE_EST_NUM_OUTPUT_TOKENS,
     NAIVE_EST_ONE_TO_MANY_SELECTIVITY,
     Cardinality,
+    Model,
     PromptStrategy,
-    Model
 )
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.core.models import GenerationStats, OperatorCostEstimates, RecordOpStats

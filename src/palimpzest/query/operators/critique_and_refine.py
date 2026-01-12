@@ -4,7 +4,7 @@ from typing import Any
 
 from pydantic.fields import FieldInfo
 
-from palimpzest.constants import Cardinality, PromptStrategy, Model
+from palimpzest.constants import Cardinality, Model, PromptStrategy
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.models import GenerationStats, OperatorCostEstimates
 from palimpzest.query.generators.generators import Generator

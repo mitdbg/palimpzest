@@ -1,7 +1,16 @@
-import yaml, time, requests, subprocess, os, socket, random
+import os
+import random
+import socket
+import subprocess
+import time
+
+import requests
+import yaml
+
+from palimpzest.constants import DYNAMIC_MODEL_INFO, Model, ModelProvider
 from palimpzest.core.models import PlanCost
 from palimpzest.policy import Policy
-from palimpzest.constants import Model, ModelProvider, DYNAMIC_MODEL_INFO
+
 
 # helper function to select the list of available models based on the 
 def get_available_model_from_env(include_embedding: bool = False):
@@ -10,9 +19,7 @@ def get_available_model_from_env(include_embedding: bool = False):
         # Skip embedding models if not requested
         if not include_embedding and model.is_embedding_model():
             continue
-        if model.api_key is not None:
-            available_models.append(model.value)
-        elif model.provider == ModelProvider.VLLM:
+        if model.api_key is not None or model.provider == ModelProvider.VLLM:
             available_models.append(model.value)
     return available_models
 
@@ -30,21 +37,10 @@ def get_models(include_embedding: bool = False, use_vertex: bool = False, gemini
         # 2. Filter by availability (API Key existence)
         has_key = os.environ.get(model.api_key_env_var) is not None
         # Special handling for user-provided Vertex credentials path (overriding default)
-        if model.provider == ModelProvider.VERTEX_AI and gemini_credentials_path:
-            if os.path.exists(gemini_credentials_path):
-                has_key = True
+        if model.provider == ModelProvider.VERTEX_AI and gemini_credentials_path and os.path.exists(gemini_credentials_path):
+            has_key = True
         # 3. Add models based on Provider groups (replicating original logic structure)
-        if model.provider == ModelProvider.OPENAI and has_key:
-            models.append(model)
-        elif model.provider == ModelProvider.TOGETHER_AI and has_key:
-            models.append(model)
-        elif model.provider == ModelProvider.ANTHROPIC and has_key:
-            models.append(model)
-        elif model.provider == ModelProvider.VERTEX_AI and has_key and use_vertex:
-            models.append(model)
-        elif model.provider == ModelProvider.GOOGLE and has_key and not use_vertex:
-            models.append(model)
-        elif model.provider == ModelProvider.VLLM and api_base is not None:
+        if model.provider == ModelProvider.OPENAI and has_key or model.provider == ModelProvider.TOGETHER_AI and has_key or model.provider == ModelProvider.ANTHROPIC and has_key or model.provider == ModelProvider.VERTEX_AI and has_key and use_vertex or model.provider == ModelProvider.GOOGLE and has_key and not use_vertex or model.provider == ModelProvider.VLLM and api_base is not None:
             models.append(model)
             
     return models
@@ -72,9 +68,12 @@ def get_optimal_models( policy: Policy, include_embedding: bool = False, use_ver
         cost = model.get_usd_per_output_token()
         time_val = model.get_seconds_per_output_token()
         
-        if quality_score is None: quality_score = 0
-        if cost is None: cost = float("inf")
-        if time_val is None: time_val = float("inf")
+        if quality_score is None:
+            quality_score = 0
+        if cost is None:
+            cost = float("inf")
+        if time_val is None:
+            time_val = float("inf")
 
         # Create proxy plan for constraint checking
         normalized_quality = quality_score / 100.0
@@ -146,10 +145,7 @@ def _generate_config_yaml(models: list[Model]):
     for model in models:
         # Use Model property instead of helper function
         # Ensure 'model' is an instance of Model enum or class
-        if isinstance(model, str):
-            model_obj = Model(model)
-        else:
-            model_obj = model
+        model_obj = Model(model) if isinstance(model, str) else model
             
         env_var_name = model_obj.api_key_env_var
         api_key_val = f"os.environ/{env_var_name}" if env_var_name else None
@@ -214,7 +210,7 @@ def fetch_dynamic_model_info(available_models: list[Model]):
         except Exception:
             pass
         if not dynamic_model_info:
-            print(f"WARNING: LiteLLM server started but returned no model info.")
+            print("WARNING: LiteLLM server started but returned no model info.")
     
     finally: # cleanup
         if process:

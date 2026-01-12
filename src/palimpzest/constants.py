@@ -1,6 +1,7 @@
 ### This file contains constants used by Palimpzest ###
 import os
 from enum import Enum
+
 from palimpzest.utils.model_info_helpers import get_model_specs
 
 DYNAMIC_MODEL_INFO = {}
@@ -229,7 +230,7 @@ class ModelProvider(str, Enum):
             ModelProvider.XAI: "XAI_API_KEY",
             ModelProvider.VLLM: "VLLM_API_KEY"
         }
-        return mapping.get(self, None) # if unknown, maps to none
+        return mapping.get(self) # if unknown, maps to none
 
 class Model(str, Enum):
     """

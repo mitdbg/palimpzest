@@ -17,12 +17,7 @@ import regex as re  # Use regex instead of re to used variable length lookbehind
 from colorama import Fore, Style
 from pydantic.fields import FieldInfo
 
-from palimpzest.constants import (
-    Cardinality,
-    PromptStrategy,
-    Model,
-    ModelProvider
-)
+from palimpzest.constants import Cardinality, Model, PromptStrategy
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.models import GenerationStats
 from palimpzest.prompts import PromptFactory

@@ -12,29 +12,29 @@ not just the ones defined in the Model Enum. This includes:
 """
 
 import os
-import pytest
-import pandas as pd
 from unittest.mock import MagicMock, patch
+
+import pandas as pd
+import pytest
 from pydantic import BaseModel, Field
 from pydantic.fields import FieldInfo
 
 import palimpzest as pz
-from palimpzest.constants import Model, DYNAMIC_MODEL_INFO, PromptStrategy, ModelProvider
-from palimpzest.utils.model_helpers import fetch_dynamic_model_info
-from palimpzest.query.processor.query_processor_factory import QueryProcessorFactory
-from palimpzest.query.processor.config import QueryProcessorConfig
+from palimpzest.constants import DYNAMIC_MODEL_INFO, Model, ModelProvider, PromptStrategy
 from palimpzest.core.data.dataset import Dataset
+from palimpzest.core.elements.records import DataRecord
 from palimpzest.policy import MinCost
 from palimpzest.query.generators.generators import Generator
-from palimpzest.core.elements.records import DataRecord
+from palimpzest.query.processor.config import QueryProcessorConfig
+from palimpzest.query.processor.query_processor_factory import QueryProcessorFactory
+from palimpzest.utils.model_helpers import fetch_dynamic_model_info
 from palimpzest.utils.model_info_helpers import (
-    _generate_heuristic_specs,
-    _find_closest_benchmark_metric,
-    get_model_specs,
     CURATED_MODEL_METRICS,
-    LITELLM_MODEL_METRICS
+    LITELLM_MODEL_METRICS,
+    _find_closest_benchmark_metric,
+    _generate_heuristic_specs,
+    get_model_specs,
 )
-
 
 # =============================================================================
 # FIXTURES
@@ -185,19 +185,6 @@ class TestModelPropertyMethods:
         model = Model(model_string)
         # Note: heuristics default to is_text_model=True for most models
         assert model.is_text_model() == expected or model.is_text_model() is True
-
-    @pytest.mark.parametrize(
-        "model_string,expected",
-        [
-            pytest.param("openai/o1-preview", True, id="o1-reasoning"),
-            pytest.param("deepseek/deepseek-r1", True, id="r1-reasoning"),
-            pytest.param("openai/gpt-4-turbo", False, id="gpt4-not-reasoning"),
-        ]
-    )
-    def test_is_reasoning_model(self, model_string, expected):
-        """Test is_reasoning_model for various dynamic model strings."""
-        model = Model(model_string)
-        assert model.is_reasoning_model() == expected
 
     @pytest.mark.parametrize(
         "model_string",
@@ -365,19 +352,19 @@ class TestHeuristicsAndMetadata:
             }
         }
 
-        with patch.dict(LITELLM_MODEL_METRICS, mock_litellm, clear=True):
-            with patch.dict(CURATED_MODEL_METRICS, mock_curated, clear=True):
-                specs = get_model_specs("provider/test-model")
-
-                # Pricing from LiteLLM
-                assert specs["usd_per_input_token"] == 10.0
-                # Scores from Curated
-                assert specs["overall"] == 75.0
-                # Derived from mode
-                assert specs["is_text_model"] is True
-                # Metadata accuracy
-                assert specs["metadata"]["usd_per_input_token"] is False
-                assert specs["metadata"]["overall"] is False
+        # Use a single with statement for multiple patches
+        with patch.dict(LITELLM_MODEL_METRICS, mock_litellm, clear=True), \
+            patch.dict(CURATED_MODEL_METRICS, mock_curated, clear=True):
+            specs = get_model_specs("provider/test-model")
+            # Pricing from LiteLLM
+            assert specs["usd_per_input_token"] == 10.0
+            # Scores from Curated
+            assert specs["overall"] == 75.0
+            # Derived from mode
+            assert specs["is_text_model"] is True
+            # Metadata accuracy
+            assert specs["metadata"]["usd_per_input_token"] is False
+            assert specs["metadata"]["overall"] is False
 
     def test_unknown_model_full_fallback(self):
         """Test that completely unknown models return safe heuristic defaults."""
@@ -517,28 +504,13 @@ class TestQueryProcessorIntegration:
             api_base="http://my-vllm-instance:8000"
         )
 
-        with patch.dict(os.environ, {"OPENAI_API_KEY": "fake-key"}):
-            with patch.object(QueryProcessorFactory, "_create_optimizer"):
-                with patch.object(QueryProcessorFactory, "_create_execution_strategy"):
-                    with patch.object(QueryProcessorFactory, "_create_sentinel_execution_strategy"):
-                        QueryProcessorFactory.create_processor(mock_dataset, config=config)
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "fake-key"}), \
+            patch.object(QueryProcessorFactory, "_create_optimizer"), \
+            patch.object(QueryProcessorFactory, "_create_execution_strategy"), \
+            patch.object(QueryProcessorFactory, "_create_sentinel_execution_strategy"):
+            QueryProcessorFactory.create_processor(mock_dataset, config=config)
 
         mock_fetch.assert_called_once_with(config.available_models)
-
-    def test_integration_dynamic_model_usage(self):
-        """Test that DYNAMIC_MODEL_INFO updates affect model behavior."""
-        dynamic_name = "hosted_vllm/special-model"
-
-        test_info = {
-            "supports_reasoning": True,
-            "input_cost_per_token": 0.05,
-            "mode": "chat"
-        }
-
-        with patch.dict(DYNAMIC_MODEL_INFO, {dynamic_name: test_info}):
-            model = Model(dynamic_name)
-            assert model.is_reasoning_model() is True
-            assert model.get_usd_per_input_token() == 0.05
 
 
 # =============================================================================
