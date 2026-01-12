@@ -12,10 +12,10 @@ from palimpzest.core.models import PlanCost
 from palimpzest.policy import Policy
 
 
-# helper function to select the list of available models based on the 
+# helper function to select the list of available models based on the
 def get_available_model_from_env(include_embedding: bool = False):
     available_models = []
-    for model in Model:
+    for model in Model.get_all_models():
         # Skip embedding models if not requested
         if not include_embedding and model.is_embedding_model():
             continue
@@ -30,7 +30,7 @@ def get_models(include_embedding: bool = False, use_vertex: bool = False, gemini
     models = []
     
     # We iterate over all defined Models and let their internal logic decide if they match the criteria
-    for model in Model:
+    for model in Model.get_all_models():
         # 1. Filter by embedding preference
         if not include_embedding and model.is_embedding_model():
             continue
@@ -144,8 +144,8 @@ def _generate_config_yaml(models: list[Model]):
     config_list = []
     for model in models:
         # Use Model property instead of helper function
-        # Ensure 'model' is an instance of Model enum or class
-        model_obj = Model(model) if isinstance(model, str) else model
+        # Ensure 'model' is an instance of Model class
+        model_obj = Model.from_litellm(model) if isinstance(model, str) else model
             
         env_var_name = model_obj.api_key_env_var
         api_key_val = f"os.environ/{env_var_name}" if env_var_name else None

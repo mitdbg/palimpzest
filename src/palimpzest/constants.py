@@ -300,6 +300,14 @@ class Model:
         # Create a new model instance for runtime/dynamic values
         return cls(value, _token=cls._INTERNAL_CREATE)
 
+    @classmethod
+    def get_all_models(cls) -> list[Model]:
+        """
+        Returns a list of all registered Model constants.
+        Useful for iterating over known models, similar to Enum iteration.
+        """
+        return list(cls._registry.values())
+
     def _is_registered(self) -> bool:
         """Check if this model is a registered/known constant."""
         return self._value in Model._registry

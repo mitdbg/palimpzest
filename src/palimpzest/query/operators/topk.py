@@ -234,7 +234,7 @@ class TopKOp(PhysicalOperator):
 
             model_name = self.index._embedding_function.model_name if uses_openai_embedding_fcn else "clip-ViT-B-32"
             err_msg = f"For Chromadb, we currently only support `text-embedding-3-small` and `clip-ViT-B-32`; your index uses: {model_name}"
-            embedding_model_names = [model.value for model in Model if model.is_embedding_model()]
+            embedding_model_names = [model.value for model in Model.get_all_models() if model.is_embedding_model()]
             assert model_name in embedding_model_names, err_msg
 
             # compute embeddings
@@ -254,7 +254,7 @@ class TopKOp(PhysicalOperator):
                 embed_total_time = time.time() - embed_start_time
 
                 # compute cost of embedding(s)
-                emb_model = Model(model_name)
+                emb_model = Model.from_litellm(model_name)
                 total_input_cost = emb_model.get_usd_per_input_token() * total_input_tokens
                 gen_stats = GenerationStats(
                     model_name=model_name,
