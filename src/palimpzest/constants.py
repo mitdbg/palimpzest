@@ -128,7 +128,15 @@ class Model(str, Enum):
 
     def is_embedding_model(self):
         return self in [Model.CLIP_VIT_B_32, Model.TEXT_EMBEDDING_3_SMALL]
-
+    
+    def supports_prompt_caching(self):
+        return self in [
+            Model.CLAUDE_3_5_SONNET, Model.CLAUDE_3_5_HAIKU,
+            Model.GPT_4o_MINI, Model.GPT_4o, Model.GPT_4_1, Model.GPT_4_1_MINI, Model.GPT_4_1_NANO,
+            Model.o4_MINI, Model.GPT_5_MINI, Model.GPT_5, Model.GPT_5_NANO,
+            Model.GEMINI_2_0_FLASH, Model.GEMINI_2_5_FLASH, Model.GEMINI_2_5_PRO,
+            Model.GOOGLE_GEMINI_2_5_FLASH, Model.GOOGLE_GEMINI_2_5_FLASH_LITE, Model.GOOGLE_GEMINI_2_5_PRO
+        ]
 
 class PromptStrategy(str, Enum):
     """
@@ -379,8 +387,9 @@ DEEPSEEK_R1_DISTILL_QWEN_1_5B_MODEL_CARD = {
 GPT_4o_AUDIO_PREVIEW_MODEL_CARD = {
     # NOTE: COPYING OVERALL AND SECONDS_PER_OUTPUT_TOKEN FROM GPT_4o; need to update when we have audio-specific benchmarks
     ##### Cost in USD #####
-    "usd_per_audio_input_token": 2.5 / 1e6,
-    "usd_per_output_token": 10.0 / 1e6,
+    # https://platform.openai.com/docs/pricing
+    "usd_per_audio_input_token": 40.00 / 1e6,
+    "usd_per_output_token": 80.00 / 1e6,
     ##### Time #####
     "seconds_per_output_token": 0.0080,
     ##### Agg. Benchmark #####
@@ -389,8 +398,8 @@ GPT_4o_AUDIO_PREVIEW_MODEL_CARD = {
 GPT_4o_MINI_AUDIO_PREVIEW_MODEL_CARD = {
     # NOTE: COPYING OVERALL AND SECONDS_PER_OUTPUT_TOKEN FROM GPT_4o; need to update when we have audio-specific benchmarks
     ##### Cost in USD #####
-    "usd_per_audio_input_token": 0.15 / 1e6,
-    "usd_per_output_token": 0.6 / 1e6,
+    "usd_per_audio_input_token": 10 / 1e6,
+    "usd_per_output_token": 20 / 1e6,
     ##### Time #####
     "seconds_per_output_token": 0.0159,
     ##### Agg. Benchmark #####
@@ -401,6 +410,7 @@ GPT_4o_MODEL_CARD = {
     ##### Cost in USD #####
     "usd_per_input_token": 2.5 / 1e6,
     "usd_per_output_token": 10.0 / 1e6,
+    "usd_per_cached_input_token": 1.25 / 1e6,
     ##### Time #####
     "seconds_per_output_token": 0.0080,
     ##### Agg. Benchmark #####
@@ -411,6 +421,7 @@ GPT_4o_MINI_MODEL_CARD = {
     ##### Cost in USD #####
     "usd_per_input_token": 0.15 / 1e6,
     "usd_per_output_token": 0.6 / 1e6,
+    "usd_per_cached_input_token": 0.075 / 1e6,
     ##### Time #####
     "seconds_per_output_token": 0.0159,
     ##### Agg. Benchmark #####
@@ -421,6 +432,7 @@ GPT_4_1_MODEL_CARD = {
     ##### Cost in USD #####
     "usd_per_input_token": 2.0 / 1e6,
     "usd_per_output_token": 8.0 / 1e6,
+    "usd_per_cached_input_token": 0.50 / 1e6,
     ##### Time #####
     "seconds_per_output_token": 0.0076,
     ##### Agg. Benchmark #####
@@ -431,6 +443,7 @@ GPT_4_1_MINI_MODEL_CARD = {
     ##### Cost in USD #####
     "usd_per_input_token": 0.4 / 1e6,
     "usd_per_output_token": 1.6 / 1e6,
+    "usd_per_cached_input_token": 0.10 / 1e6,
     ##### Time #####
     "seconds_per_output_token": 0.0161,
     ##### Agg. Benchmark #####
@@ -441,6 +454,7 @@ GPT_4_1_NANO_MODEL_CARD = {
     ##### Cost in USD #####
     "usd_per_input_token": 0.1 / 1e6,
     "usd_per_output_token": 0.4 / 1e6,
+    "usd_per_cached_input_token": 0.025 / 1e6,
     ##### Time #####
     "seconds_per_output_token": 0.0060,
     ##### Agg. Benchmark #####
@@ -451,6 +465,7 @@ GPT_5_MODEL_CARD = {
     ##### Cost in USD #####
     "usd_per_input_token": 1.25 / 1e6,
     "usd_per_output_token": 10.0 / 1e6,
+    "usd_per_cached_input_token": 0.125 / 1e6,
     ##### Time #####
     "seconds_per_output_token": 0.0060,
     ##### Agg. Benchmark #####
@@ -461,6 +476,7 @@ GPT_5_MINI_MODEL_CARD = {
     ##### Cost in USD #####
     "usd_per_input_token": 0.25 / 1e6,
     "usd_per_output_token": 2.0 / 1e6,
+    "usd_per_cached_input_token": 0.025 / 1e6,
     ##### Time #####
     "seconds_per_output_token": 0.0135,
     ##### Agg. Benchmark #####
@@ -471,6 +487,7 @@ GPT_5_NANO_MODEL_CARD = {
     ##### Cost in USD #####
     "usd_per_input_token": 0.05 / 1e6,
     "usd_per_output_token": 0.4 / 1e6,
+    "usd_per_cached_input_token": 0.005 / 1e6,
     ##### Time #####
     "seconds_per_output_token": 0.0055,
     ##### Agg. Benchmark #####
@@ -481,6 +498,7 @@ o4_MINI_MODEL_CARD = {  # noqa: N816
     ##### Cost in USD #####
     "usd_per_input_token": 1.1 / 1e6,
     "usd_per_output_token": 4.4 / 1e6,
+    "usd_per_cached_input_token": 0.275 / 1e6,
     ##### Time #####
     "seconds_per_output_token": 0.0092,
     ##### Agg. Benchmark #####
@@ -491,6 +509,7 @@ o4_MINI_MODEL_CARD = {  # noqa: N816
 #     ##### Cost in USD #####
 #     "usd_per_input_token": 15 / 1e6,
 #     "usd_per_output_token": 60 / 1e6,
+#     "usd_per_cached_input_token": 7.50 / 1e6,
 #     ##### Time #####
 #     "seconds_per_output_token": 0.0110,
 #     ##### Agg. Benchmark #####
@@ -518,6 +537,7 @@ CLAUDE_3_5_SONNET_MODEL_CARD = {
     ##### Cost in USD #####
     "usd_per_input_token": 3.0 / 1e6,
     "usd_per_output_token": 15.0 / 1e6,
+    "usd_per_cached_input_token": 0.30 / 1e6,
     ##### Time #####
     "seconds_per_output_token": 0.0154,
     ##### Agg. Benchmark #####
@@ -527,6 +547,7 @@ CLAUDE_3_7_SONNET_MODEL_CARD = {
     ##### Cost in USD #####
     "usd_per_input_token": 3.0 / 1e6,
     "usd_per_output_token": 15.0 / 1e6,
+    "usd_per_cached_input_token": 0.30 / 1e6,
     ##### Time #####
     "seconds_per_output_token": 0.0156,
     ##### Agg. Benchmark #####
@@ -536,6 +557,7 @@ CLAUDE_3_5_HAIKU_MODEL_CARD = {
     ##### Cost in USD #####
     "usd_per_input_token": 0.8 / 1e6,
     "usd_per_output_token": 4.0 / 1e6,
+    "usd_per_cached_input_token": 0.08 / 1e6,
     ##### Time #####
     "seconds_per_output_token": 0.0189,
     ##### Agg. Benchmark #####
@@ -546,6 +568,7 @@ GEMINI_2_0_FLASH_MODEL_CARD = {
     "usd_per_input_token": 0.15 / 1e6,
     "usd_per_output_token": 0.6 / 1e6,
     "usd_per_audio_input_token": 1.0 / 1e6,
+    "usd_per_cached_input_token": 0.025 / 1e6,
     ##### Time #####
     "seconds_per_output_token": 0.0054,
     ##### Agg. Benchmark #####
@@ -566,6 +589,7 @@ GEMINI_2_5_FLASH_MODEL_CARD = {
     "usd_per_input_token": 0.30 / 1e6,
     "usd_per_output_token": 2.5 / 1e6,
     "usd_per_audio_input_token": 1.0 / 1e6,
+    "usd_per_cached_input_token": 0.03 / 1e6,
     ##### Time #####
     "seconds_per_output_token": 0.0044,
     ##### Agg. Benchmark #####
@@ -576,6 +600,7 @@ GEMINI_2_5_PRO_MODEL_CARD = {
     "usd_per_input_token": 1.25 / 1e6,
     "usd_per_output_token": 10.0 / 1e6,
     "usd_per_audio_input_token": 1.25 / 1e6,
+    "usd_per_cached_input_token": 0.125 / 1e6,
     ##### Time #####
     "seconds_per_output_token": 0.0072,
     ##### Agg. Benchmark #####
