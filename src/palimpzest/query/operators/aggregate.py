@@ -169,8 +169,6 @@ class ApplyGroupByOp(AggregateOp):
         # return list of data records (one per group)
         drs: list[DataRecord] = []
         group_by_fields = self.gby_fields
-        # Construct aggregation field names: "func(field)"
-        agg_field_names = [f"({field})" for field in (self.agg_fields)]
         for g in agg_state:
             # build up data item
             data_item = {}
@@ -180,7 +178,7 @@ class ApplyGroupByOp(AggregateOp):
             vals = agg_state[g]
             for i in range(0, len(vals)):
                 v = ApplyGroupByOp.agg_final(self.agg_funcs[i], vals[i])
-                data_item[agg_field_names[i]] = v
+                data_item[self.agg_fields[i]] = v
 
             # create new DataRecord
             schema = self.output_schema
@@ -819,7 +817,7 @@ class SemanticGroupByOp(AggregateOp):
         record_op_stats_lst = []
         
         # Get the output field names from the output schema
-        output_field_names = [f for f in self.output_schema.model_fields.keys() if f not in self.gby_fields]
+        output_field_names = [f for f in self.output_schema.model_fields if f not in self.gby_fields]
         
         for group_key in agg_state:
             # Build aggregated data item for this group
@@ -869,7 +867,7 @@ class SemanticGroupByOp(AggregateOp):
         
         return DataRecordSet(drs, record_op_stats_lst)
     
-    def _assign_groups_llm(self, candidates: list[DataRecord]) -> tuple[list[str], any]:
+    def _assign_groups_llm(self, candidates: list[DataRecord]) -> tuple[list[str], GenerationStats]:
         """
         Phase 1: Use LLM to assign each candidate to a semantic group.
         

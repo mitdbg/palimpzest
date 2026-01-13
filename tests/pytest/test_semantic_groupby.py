@@ -7,9 +7,10 @@ of product reviews and grouping them by complaint type.
 """
 
 import pandas as pd
+
 import palimpzest as pz
-from palimpzest.query.operators.aggregate import SemanticGroupByOp
 from palimpzest.constants import Model
+from palimpzest.query.operators.aggregate import SemanticGroupByOp
 
 # Define columns for the review schema
 review_cols = [
@@ -18,122 +19,87 @@ review_cols = [
 
 def test_semantic_groupby_basic():
     """Test basic semantic group by functionality using the physical operator directly."""
-    print("Testing SemanticGroupByOp basic functionality...")
+    # Create list of candidates from text file dataset with schema
+    ds = pz.TextFileDataset(id="reviews", path="tests/pytest/data/product-reviews/")
+    output = ds.run()
+    candidates = [dr for dr in output]
     
-    try:
-        # Create list of candidates from text file dataset with schema
-        ds = pz.TextFileDataset(id="reviews", path="product-reviews/")
-        output = ds.run()
-        candidates = [dr for dr in output]
-        
-        print(f"Loaded {len(candidates)} review candidates with schema")
-        print(f"Sample candidate fields: {list(candidates[0].to_dict().keys()) if candidates else 'none'}")
-        
-        # Get input schema from the candidates
-        input_schema = candidates[0].schema if candidates else None
-        
-        # Create output schema (group by field + count)
-        # Using the same naming convention as Dataset.sem_groupby()
-        from palimpzest.core.lib.schemas import create_schema_from_fields
-        from typing import Any
-        
-        fields = []
-        # Add group by fields to output schema
-        for g in ['complaint']:
-            f = {"name": g, "type": Any, "desc": f"Group by field: {g}"}
-            fields.append(f)
-        
-        # Add aggregation fields to output schema
-        agg_fields_list = ['contents']
-        agg_funcs_list = ['count']
-        for i, agg_func in enumerate(agg_funcs_list):
-            agg_field_name = f"({agg_fields_list[i]})"
-            f = {"name": agg_field_name, "type": Any, "desc": f"Aggregate field: {agg_field_name}"}
-            fields.append(f)
-        
-        output_schema = create_schema_from_fields(fields)
-        
-        # Create instance of the physical operator
-        sem_group_by_op = SemanticGroupByOp(
-            gby_fields=['complaint'], 
-            agg_fields=['contents'], 
-            agg_funcs=['count'],
-            input_schema=input_schema,
-            output_schema=output_schema,
-            model=Model.GPT_4o_MINI,
-            logical_op_id="test_semantic_groupby",  # Required for RecordOpStats
-            verbose=False
-        )
-        
-        print(f"Created SemanticGroupByOp: {sem_group_by_op}")
-        
-        # Execute the group by operation
-        grouped_output = sem_group_by_op(candidates)
-        
-        # Convert to DataFrame and print
-        df = pd.DataFrame([dr.to_dict() for dr in grouped_output])
-        print("\nGrouped Results:")
-        print(df)
-        print(f"\nTotal groups: {len(df)}")
-        # print(f"Total cost: ${grouped_output.stats.cost:.4f}")
-        # print(f"Total time: {grouped_output.stats.time:.2f}s")
-        
-        return True
-        
-    except Exception as e:
-        print(f"Error during test: {e}")
-        import traceback
-        traceback.print_exc()
-        return False
+    print(f"Loaded {len(candidates)} review candidates with schema")
+    print(f"Sample candidate fields: {list(candidates[0].to_dict().keys()) if candidates else 'none'}")
+    
+    # Get input schema from the candidates
+    input_schema = candidates[0].schema if candidates else None
+    
+    # Create output schema (group by field + count)
+    # Using the same naming convention as Dataset.sem_groupby()
+    from typing import Any
+
+    from palimpzest.core.lib.schemas import create_schema_from_fields
+
+    # define the groupby and aggregate fields
+    gby_fields = ['complaint']
+    agg_fields = ['contents']
+    agg_funcs = ['count']
+    
+    fields = []
+    # Add group by fields to output schema
+    for g in gby_fields:
+        f = {"name": g, "type": Any, "desc": f"Group by field: {g}"}
+        fields.append(f)
+    
+    # Add aggregation fields to output schema
+    for agg_field_name in agg_fields:
+        f = {"name": agg_field_name, "type": Any, "desc": f"Aggregate field: {agg_field_name}"}
+        fields.append(f)
+
+    output_schema = create_schema_from_fields(fields)
+
+    # Create instance of the physical operator
+    sem_group_by_op = SemanticGroupByOp(
+        gby_fields=gby_fields,
+        agg_fields=agg_fields,
+        agg_funcs=agg_funcs,
+        input_schema=input_schema,
+        output_schema=output_schema,
+        model=Model.GPT_4o_MINI,
+        logical_op_id="test_semantic_groupby",  # Required for RecordOpStats
+        verbose=False
+    )
+    
+    print(f"Created SemanticGroupByOp: {sem_group_by_op}")
+    
+    # Execute the group by operation
+    grouped_output = sem_group_by_op(candidates)
+    
+    # Convert to DataFrame and print
+    df = pd.DataFrame([dr.to_dict() for dr in grouped_output])
+    print("\nGrouped Results:")
+    print(df)
+    print(f"\nTotal groups: {len(df)}")
+    # print(f"Total cost: ${grouped_output.stats.cost:.4f}")
+    # print(f"Total time: {grouped_output.stats.time:.2f}s")
+    
+    assert False
 
 def test_semantic_groupby_via_dataset():
     """Test semantic group by via Dataset API."""
-    print("\nTesting sem_groupby via Dataset API...")
+    # Create dataset and add schema
+    ds = pz.TextFileDataset(id="reviews", path="tests/pytest/data/product-reviews/")
     
-    try:
-        # Create dataset and add schema
-        ds = pz.TextFileDataset(id="reviews", path="product-reviews/")
-        
-        # Apply semantic group by operation
-        ds = ds.sem_groupby(
-            gby_fields=['complaint'], 
-            agg_fields=['contents'], 
-            agg_funcs=['count']
-        )
-        
-        # Run the query
-        output = ds.run()
-        
-        # Convert to DataFrame and print
-        df = output.to_df()
-        print("\nGrouped Results:")
-        print(df)
-        print(f"\nTotal groups: {len(df)}")
-        # print(f"Total cost: ${output.stats.cost:.4f}")
-        # print(f"Total time: {output.stats.time:.2f}s")
-        
-        return True
-        
-    except Exception as e:
-        print(f"Error during test: {e}")
-        import traceback
-        traceback.print_exc()
-        return False
-
-if __name__ == "__main__":
-    print("=" * 80)
-    print("Semantic GroupBy Test Suite")
-    print("=" * 80)
+    # Apply semantic group by operation
+    ds = ds.sem_groupby(
+        gby_fields=['complaint'], 
+        agg_fields=['contents'], 
+        agg_funcs=['count']
+    )
     
-    print("\nRunning tests...\n")
+    # Run the query
+    output = ds.run()
     
-    # Run tests
-    print("Test 1: Basic SemanticGroupByOp")
-    test_semantic_groupby_basic()
-    
-    print("\n" + "=" * 80)
-    print("Test 2: Dataset.sem_groupby() API")
-    test_semantic_groupby_via_dataset()
-    
-    print("\n" + "=" * 80)
-    print("All tests completed!")
+    # Convert to DataFrame and print
+    df = output.to_df()
+    print("\nGrouped Results:")
+    print(df)
+    print(f"\nTotal groups: {len(df)}")
+    # print(f"Total cost: ${output.stats.cost:.4f}")
+    # print(f"Total time: {output.stats.time:.2f}s")
