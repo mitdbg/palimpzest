@@ -141,7 +141,22 @@ def create_schema_from_df(df: pd.DataFrame) -> type[BaseModel]:
     # create and return the new schema
     return _create_pickleable_model(fields)
 
+def create_groupby_schema_from_fields(gby_fields: list[str], agg_fields: list[str]):
+    # construct the output schema dynamically based on groupby and aggregate fields
+    fields = []
+    
+    # add group by fields to output schema
+    for g in gby_fields:
+        f = {"name": g, "type": Any, "desc": f"Group by field: {g}"}
+        fields.append(f)
+    
+    # add aggregation fields to output schema
+    for agg_field in agg_fields:
+        f = {"name": agg_field, "type": Any, "desc": f"Aggregate field: {agg_field}"}
+        fields.append(f)
 
+    return create_schema_from_fields(fields)
+    
 def union_schemas(models: list[type[BaseModel]], join: bool = False, on: list[str] | None = None) -> type[BaseModel]:
     """Union multiple Pydantic models into a single model."""
     # convert on to empty list if None

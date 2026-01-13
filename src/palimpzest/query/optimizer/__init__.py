@@ -33,6 +33,9 @@ from palimpzest.query.optimizer.rules import (
     NonLLMFilterRule as _NonLLMFilterRule,
 )
 from palimpzest.query.optimizer.rules import (
+    NonSemanticGroupBy as _NonSemanticGroupBy,
+)
+from palimpzest.query.optimizer.rules import (
     PushDownFilter as _PushDownFilter,
 )
 from palimpzest.query.optimizer.rules import (
@@ -49,6 +52,9 @@ from palimpzest.query.optimizer.rules import (
 )
 from palimpzest.query.optimizer.rules import (
     SemanticAggregateRule as _SemanticAggregateRule,
+)
+from palimpzest.query.optimizer.rules import (
+    SemanticGroupBy as _SemanticGroupBy,
 )
 from palimpzest.query.optimizer.rules import (
     SplitRule as _SplitRule,
@@ -73,14 +79,16 @@ ALL_RULES = [
     _MixtureOfAgentsRule,
     _NonLLMConvertRule,
     _NonLLMFilterRule,
+    _NonSemanticGroupBy,
     _PushDownFilter,
     _RAGRule,
     _RelationalJoinRule,
     _ReorderConverts,
+    _SemanticAggregateRule,
+    _SemanticGroupBy,
+    _SplitRule,
     _TopKRule,
     _Rule,
-    _SemanticAggregateRule,
-    _SplitRule,
     _TransformationRule,
 ]
 

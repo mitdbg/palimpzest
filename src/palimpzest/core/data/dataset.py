@@ -9,8 +9,7 @@ from pydantic import BaseModel
 
 from palimpzest.constants import AggFunc, Cardinality
 from palimpzest.core.elements.filters import Filter
-from palimpzest.core.elements.groupbysig import GroupBySig
-from palimpzest.core.lib.schemas import create_schema_from_fields, project, relax_schema, union_schemas
+from palimpzest.core.lib.schemas import create_schema_from_fields, create_groupby_schema_from_fields, project, relax_schema, union_schemas
 from palimpzest.policy import construct_policy_from_kwargs
 from palimpzest.query.operators.logical import (
     Aggregate,
@@ -572,9 +571,38 @@ class Dataset:
         operator = Aggregate(input_schema=self.schema, agg_func=AggFunc.MAX)
         return Dataset(sources=[self], operator=operator, schema=operator.output_schema)
 
-    def groupby(self, groupby: GroupBySig) -> Dataset:
-        output_schema = groupby.output_schema()
-        operator = GroupByAggregate(input_schema=self.schema, output_schema=output_schema, group_by_sig=groupby)
+    def groupby(self, gby_fields, agg_fields, agg_funcs) -> Dataset:
+        """Apply a group by operation to this dataset."""
+        output_schema = create_groupby_schema_from_fields(gby_fields, agg_fields)
+        operator = GroupByAggregate(input_schema=self.schema, output_schema=output_schema, gby_fields=gby_fields, agg_fields=agg_fields, agg_funcs=agg_funcs)
+        return Dataset(sources=[self], operator=operator, schema=output_schema)
+
+    def sem_groupby(self, gby_fields: list[str], agg_fields: list[str], agg_funcs: list[str]) -> Dataset:
+        """
+        Apply a semantic group by operation to this set using an LLM. This operator groups records 
+        by the specified `gby_fields` and applies the `agg_funcs` to the `agg_fields` for each group.
+
+        Args:
+            gby_fields: List of field names to group by (e.g., ['complaint'])
+            agg_fields: List of field names to aggregate (e.g., ['contents'])
+            agg_funcs: List of aggregation functions to apply (e.g., ['count'])
+
+        Example:
+            ds = pz.TextFileDataset(id="reviews", dir="product-reviews/")
+            ds = ds.sem_groupby(gby_fields=['complaint'], agg_fields=['contents'], agg_funcs=['count'])
+        """
+        output_schema = create_groupby_schema_from_fields(gby_fields, agg_fields)
+        
+        # Create logical operator with direct parameters (no GroupBySig)
+        operator = GroupByAggregate(
+            input_schema=self.schema,
+            is_semantic=True,
+            output_schema=output_schema,
+            gby_fields=gby_fields,
+            agg_fields=agg_fields,
+            agg_funcs=agg_funcs
+        )
+        
         return Dataset(sources=[self], operator=operator, schema=output_schema)
 
     def sem_agg(self, col: dict | type[BaseModel], agg: str, depends_on: str | list[str] | None = None) -> Dataset:
