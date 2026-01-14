@@ -24,8 +24,11 @@ class GenerationStats(BaseModel):
     # the number of input text tokens
     input_text_tokens: int = 0
 
-    # the number of cached input text tokens
-    cached_input_tokens: int = 0
+    # the number of cached tokens
+    cached_creation_tokens: int = 0
+
+    # The number of tokens read from the cache (charged at a discount)
+    cache_read_tokens: int = 0
 
     # the number of input image tokens
     input_image_tokens: int = 0
@@ -44,8 +47,11 @@ class GenerationStats(BaseModel):
     # the total cost of processing the input tokens; None if this operation did not use an LLM
     total_input_cost: float = 0.0
 
-    # the total cost of reading the cached input tokens; None if this operation did not use an LLM
-    total_cached_input_cost: float = 0.0
+    # The cost associated with reading from the cache
+    cache_read_cost: float = 0.0
+
+    # The cost associated with writing to the cache
+    cache_creation_cost: float = 0.0
 
     # the total cost of processing the output tokens; None if this operation did not use an LLM
     total_output_cost: float = 0.0
@@ -72,8 +78,12 @@ class GenerationStats(BaseModel):
         # self.raw_answers.extend(other.raw_answers)
         for model_field in [
             "total_input_tokens",
+            "cache_read_tokens",
+            "cache_creation_tokens",
             "total_output_tokens",
             "total_input_cost",
+            "cache_read_cost",
+            "cache_creation_cost",
             "total_output_cost",
             "cost_per_record",
             "llm_call_duration_secs",
@@ -92,8 +102,12 @@ class GenerationStats(BaseModel):
             field: getattr(self, field) + getattr(other, field)
             for field in [
                 "total_input_tokens",
+                "cache_read_tokens",
+                "cache_creation_tokens",
                 "total_output_tokens",
                 "total_input_cost",
+                "cache_read_cost",
+                "cache_creation_cost",
                 "total_output_cost",
                 "llm_call_duration_secs",
                 "fn_call_duration_secs",
