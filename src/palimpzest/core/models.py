@@ -25,7 +25,7 @@ class GenerationStats(BaseModel):
     input_text_tokens: int = 0
 
     # the number of cached tokens
-    cached_creation_tokens: int = 0
+    cache_creation_tokens: int = 0
 
     # The number of tokens read from the cache (charged at a discount)
     cache_read_tokens: int = 0
