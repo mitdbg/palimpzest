@@ -88,7 +88,27 @@
         "is_embedding_model": false,
         "supports_prompt_caching": false,
         "provider": "together_ai",
-        "sources": null
+        "sources": [
+            "https://www.reddit.com/r/LocalLLaMA/comments/1iserf9/deepseek_r1_distilled_models_mmlu_pro_benchmarks/"
+        ],
+        "note": "seconds_per_output_token copied to be same as LLAMA3_1_8B_INSTRUCT_MODEL_CARD; need to update when we have data"
+    },
+    "together_ai/deepseek-ai/DeepSeek-R1-0528-Qwen3-8B":{
+        "usd_per_input_token": 6e-08,
+        "usd_per_output_token": 9e-08,
+        "seconds_per_output_token": 0.02,
+        "MMLU_Pro_score": 85.0,
+        "is_reasoning_model": true,
+        "is_text_model": true,
+        "is_vision_model": false,
+        "is_audio_model": false,
+        "is_embedding_model": false,
+        "supports_prompt_caching": false,
+        "provider": "together_ai",
+        "sources": [
+            "https://llm-stats.com/models/compare/deepseek-r1-0528-vs-qwen3-vl-8b-instruct",
+            "https://artificialanalysis.ai/models/deepseek-r1-qwen3-8b"
+        ]
     },
     "openai/gpt-4o-2024-08-06": {
         "usd_per_input_token": 2.5e-06,
@@ -104,7 +124,8 @@
         "is_embedding_model": false,
         "supports_prompt_caching": true,
         "provider": "openai",
-        "sources": null
+        "sources": null,
+        "note": "it is unclear if the same ($ / token) costs can be applied for vision, or if we have to calculate this ourselves"
     },
     "openai/gpt-4o-mini-2024-07-18": {
         "usd_per_input_token": 1.5e-07,
@@ -278,7 +299,7 @@
         "is_embedding_model": false,
         "supports_prompt_caching": false,
         "provider": "anthropic",
-        "sources": null
+        "sources": ["https://platform.claude.com/docs/en/about-claude/pricing"]
     },
     "anthropic/claude-sonnet-4-20250514": {
         "usd_per_input_token": 3e-06,
@@ -294,7 +315,7 @@
         "is_embedding_model": false,
         "supports_prompt_caching": true,
         "provider": "anthropic",
-        "sources": null
+        "sources": ["https://platform.claude.com/docs/en/about-claude/pricing"]
     },
     "anthropic/claude-sonnet-4-5-20250929": {
         "usd_per_input_token": 3e-06,
@@ -310,7 +331,7 @@
         "is_embedding_model": false,
         "supports_prompt_caching": true,
         "provider": "anthropic",
-        "sources": null
+        "sources": ["https://platform.claude.com/docs/en/about-claude/pricing"]
     },
     "anthropic/claude-3-5-haiku-20241022": {
         "usd_per_input_token": 8e-07,
@@ -326,7 +347,7 @@
         "is_embedding_model": false,
         "supports_prompt_caching": true,
         "provider": "anthropic",
-        "sources": null
+        "sources": ["https://platform.claude.com/docs/en/about-claude/pricing"]
     },
     "anthropic/claude-haiku-4-5-20251001": {
         "usd_per_input_token": 1e-06,
@@ -342,28 +363,47 @@
         "is_embedding_model": false,
         "supports_prompt_caching": true,
         "provider": "anthropic",
-        "sources": null
+        "sources": ["https://platform.claude.com/docs/en/about-claude/pricing"]
     },
-    "vertex_ai/gemini-3-pro-preview": {
-        "usd_per_input_token": 2e-06,
-        "usd_per_output_token": 1.2e-05,
-        "usd_per_cache_read_token": 2e-07,
-        "seconds_per_output_token": 0.0075758,
-        "MMLU_Pro_score": 90.1,
+    "anthropic/claude-opus-4-5-20251101": {
+        "usd_per_input_token": 5e-06,
+        "usd_per_output_token": 2.5e-05,
+        "usd_per_cache_read_token": 5e-07,
+        "usd_per_cache_creation_token": 6.25e-06,
+        "seconds_per_output_token": 0.01642,
+        "MMLU_Pro_score": 87.3,
         "is_reasoning_model": true,
         "is_text_model": true,
         "is_vision_model": true,
         "is_audio_model": false,
         "is_embedding_model": false,
         "supports_prompt_caching": true,
-        "provider": "vertex_ai",
+        "provider": "anthropic",
         "sources": null
     },
-    "vertex_ai/gemini-3-flash-12-25": {
-        "usd_per_input_token": 5e-07,
+    "vertex_ai/gemini-3-pro-preview": {
+        "usd_per_input_token": 2e-06,
+        "usd_per_audio_input_token": 2e-06,
+        "usd_per_output_token": 1.2e-05,
+        "usd_per_image_output_token": 120e-06,
+        "usd_per_cache_read_token": 2e-07,
+        "seconds_per_output_token": 0.0075758,
+        "MMLU_Pro_score": 90.1,
+        "is_reasoning_model": true,
+        "is_text_model": true,
+        "is_vision_model": true,
+        "is_audio_model": true,
+        "is_embedding_model": false,
+        "supports_prompt_caching": true,
+        "provider": "vertex_ai",
+        "sources": ["https://cloud.google.com/vertex-ai/generative-ai/pricing"]
+    },
+    "vertex_ai/gemini-3-flash-preview": {
+        "usd_per_input_token": 0.5e-06,
         "usd_per_output_token": 3e-06,
         "usd_per_audio_input_token": 1e-06,
-        "usd_per_cache_read_token": 5e-08,
+        "usd_per_cache_read_token": 0.05e-06,
+        "usd_per_audio_cache_read_token": 0.1e-06,
         "seconds_per_output_token": 0.00457247,
         "MMLU_Pro_score": 87.63,
         "is_reasoning_model": true,
@@ -373,13 +413,12 @@
         "is_embedding_model": false,
         "supports_prompt_caching": true,
         "provider": "vertex_ai",
-        "sources": null
+        "sources": ["https://cloud.google.com/vertex-ai/generative-ai/pricing"]
     },
     "vertex_ai/gemini-2.0-flash": {
         "usd_per_input_token": 1.5e-07,
         "usd_per_output_token": 6e-07,
         "usd_per_audio_input_token": 1e-06,
-        "usd_per_cache_read_token": 2.5e-08,
         "seconds_per_output_token": 0.0054,
         "MMLU_Pro_score": 77.4,
         "is_reasoning_model": false,
@@ -387,13 +426,33 @@
         "is_vision_model": true,
         "is_audio_model": true,
         "is_embedding_model": false,
+        "supports_prompt_caching": false,
+        "provider": "vertex_ai",
+        "sources": ["https://cloud.google.com/vertex-ai/generative-ai/pricing"],
+        "note": "MMLU-pro score interpolated between gemini 2.5 flash and gemini 2.0 flash"
+    },
+    "vertex_ai/gemini-2.5-flash-lite": {
+        "usd_per_input_token": 0.1e-06,
+        "usd_per_output_token": 0.4e-06,
+        "usd_per_audio_input_token": 0.3e-06,
+        "usd_per_cache_read_token": 0.010e-06,
+        "usd_per_audio_cache_read_token": 0.030e-06,
+        "seconds_per_output_token": 0.0034,
+        "MMLU_Pro_score": 79.1,
+        "is_reasoning_model": true,
+        "is_text_model": true,
+        "is_vision_model": true,
+        "is_audio_model": true,
+        "is_embedding_model": false,
         "supports_prompt_caching": true,
         "provider": "vertex_ai",
-        "sources": null
+        "sources": null,
+        "note": "MMLU-pro score interpolated between gemini 2.5 flash and gemini 2.0 flash"
     },
     "vertex_ai/gemini-2.5-flash": {
-        "usd_per_input_token": 3e-07,
+        "usd_per_input_token": 0.30e-06,
         "usd_per_output_token": 2.5e-06,
+        "usd_per_image_output_token": 30e-06,
         "usd_per_audio_input_token": 1e-06,
         "usd_per_cache_read_token": 3e-08,
         "seconds_per_output_token": 0.0044,
@@ -405,7 +464,7 @@
         "is_embedding_model": false,
         "supports_prompt_caching": true,
         "provider": "vertex_ai",
-        "sources": null
+        "sources": ["https://cloud.google.com/vertex-ai/generative-ai/pricing"]
     },
     "vertex_ai/gemini-2.5-pro": {
         "usd_per_input_token": 1.25e-06,
@@ -421,11 +480,13 @@
         "is_embedding_model": false,
         "supports_prompt_caching": true,
         "provider": "vertex_ai",
-        "sources": null
+        "sources": ["https://cloud.google.com/vertex-ai/generative-ai/pricing"]
     },
-    "gemini/gemini-3-pro-preview": {
+    "gemini/gemini-3-pro-image-preview": {
         "usd_per_input_token": 2e-06,
+        "usd_per_audio_input_token": 2e-06,
         "usd_per_output_token": 1.2e-05,
+        "usd_per_image_output_token": 120e-06,
         "usd_per_cache_read_token": 2e-07,
         "seconds_per_output_token": 0.0075758,
         "MMLU_Pro_score": 90.1,
@@ -434,11 +495,27 @@
         "is_vision_model": true,
         "is_audio_model": false,
         "is_embedding_model": false,
+        "supports_prompt_caching": false,
+        "provider": "gemini",
+        "sources": ["https://ai.google.dev/gemini-api/docs/pricing"]
+    },
+    "gemini/gemini-3-pro-preview": {
+        "usd_per_input_token": 2e-06,
+        "usd_per_audio_input_token": 2e-06,
+        "usd_per_output_token": 1.2e-05,
+        "usd_per_cache_read_token": 2e-07,
+        "seconds_per_output_token": 0.0075758,
+        "MMLU_Pro_score": 90.1,
+        "is_reasoning_model": true,
+        "is_text_model": true,
+        "is_vision_model": false,
+        "is_audio_model": true,
+        "is_embedding_model": false,
         "supports_prompt_caching": true,
         "provider": "gemini",
-        "sources": null
+        "sources": ["https://ai.google.dev/gemini-api/docs/pricing"]
     },
-    "gemini/gemini-3-flash-12-25": {
+    "gemini/gemini-3-flash-preview": {
         "usd_per_input_token": 5e-07,
         "usd_per_output_token": 3e-06,
         "usd_per_audio_input_token": 1e-06,
@@ -452,7 +529,7 @@
         "is_embedding_model": false,
         "supports_prompt_caching": true,
         "provider": "gemini",
-        "sources": null
+        "sources": ["https://ai.google.dev/gemini-api/docs/pricing"]
     },
     "gemini/gemini-2.5-flash": {
         "usd_per_input_token": 3e-07,
@@ -468,11 +545,13 @@
         "is_embedding_model": false,
         "supports_prompt_caching": true,
         "provider": "gemini",
-        "sources": null
+        "sources": ["https://ai.google.dev/gemini-api/docs/pricing"]
     },
     "gemini/gemini-2.5-flash-lite": {
         "usd_per_input_token": 1e-07,
         "usd_per_output_token": 4e-07,
+        "usd_per_cache_read_token": 0.01e-06,
+        "usd_per_audio_cache_read_token": 0.03e-06,
         "usd_per_audio_input_token": 3e-07,
         "seconds_per_output_token": 0.0034,
         "MMLU_Pro_score": 79.1,
@@ -483,7 +562,8 @@
         "is_embedding_model": false,
         "supports_prompt_caching": true,
         "provider": "gemini",
-        "sources": null
+        "sources": ["https://ai.google.dev/gemini-api/docs/pricing"],
+        "note": "MMLU-pro score interpolated between gemini 2.5 flash and gemini 2.0 flash"
     },
     "gemini/gemini-2.5-pro": {
         "usd_per_input_token": 1.25e-06,
@@ -499,7 +579,7 @@
         "is_embedding_model": false,
         "supports_prompt_caching": true,
         "provider": "gemini",
-        "sources": null
+        "sources": ["https://ai.google.dev/gemini-api/docs/pricing"]
     },
     "vertex_ai/meta/llama-4-maverick-17b-128e-instruct-maas": {
         "usd_per_input_token": 3.5e-07,
@@ -516,31 +596,35 @@
         "sources": null
     },
     "openai/gpt-4o-audio-preview": {
-        "usd_per_output_token": 8e-05,
-        "usd_per_audio_input_token": 4e-05,
+        "usd_per_input_token": 2.5e-06,
+        "usd_per_output_token": 1.0e-05,
+        "usd_per_input_audio_token": 40e-6,
+        "usd_per_output_audio_token": 80e-6,
         "seconds_per_output_token": 0.008,
         "MMLU_Pro_score": 74.1,
         "is_reasoning_model": false,
-        "is_text_model": false,
+        "is_text_model": true,
         "is_vision_model": false,
         "is_audio_model": true,
         "is_embedding_model": false,
         "supports_prompt_caching": false,
         "provider": "openai",
-        "sources": null
+        "sources": ["https://platform.openai.com/docs/models/gpt-4o-audio-preview"]
     },
     "openai/gpt-4o-mini-audio-preview": {
-        "usd_per_output_token": 2e-05,
-        "usd_per_audio_input_token": 1e-05,
+        "usd_per_input_token": 0.15e-06,
+        "usd_per_output_token": 0.60e-06,
+        "usd_per_audio_input_token": 10e-06,
+        "usd_per_audio_output_tokne": 20e-06,
         "seconds_per_output_token": 0.0159,
         "MMLU_Pro_score": 62.7,
         "is_reasoning_model": false,
-        "is_text_model": false,
+        "is_text_model": true,
         "is_vision_model": false,
         "is_audio_model": true,
         "is_embedding_model": false,
         "provider": "openai",
-        "sources": null
+        "sources": ["https://platform.openai.com/docs/models/gpt-4o-mini-audio-preview"]
     },
     "hosted_vllm/qwen/Qwen1.5-0.5B-Chat": {
         "usd_per_input_token": 0.0,
@@ -554,7 +638,8 @@
         "is_vllm_model": true,
         "is_embedding_model": false,
         "provider": "hosted_vllm",
-        "sources": null
+        "sources": null,
+        "note": "fill in seconds per output token and MMLU-pro score fill in with better estimates."
     },
     "text-embedding-3-small": {
         "usd_per_input_token": 2e-08,
@@ -567,7 +652,22 @@
         "is_audio_model": false,
         "is_embedding_model": true,
         "provider": "openai",
-        "sources": null
+        "sources": ["https://platform.openai.com/docs/models/text-embedding-3-small"],
+        "note": "just copying GPT_4o_MINI_MODEL_CARD for now for overall and seconds per output token"
+    },
+    "text-embedding-3-large": {
+        "usd_per_input_token": 0.13e-08,
+        "usd_per_output_token": null,
+        "seconds_per_output_token": null,
+        "MMLU_Pro_score": null,
+        "is_reasoning_model": false,
+        "is_text_model": false,
+        "is_vision_model": false,
+        "is_audio_model": false,
+        "is_embedding_model": true,
+        "provider": "openai",
+        "sources": ["https://platform.openai.com/docs/models/text-embedding-3-large"],
+        "note": "just copying GPT_4o_MINI_MODEL_CARD for now for overall and seconds per output token"
     },
     "clip-ViT-B-32": {
         "usd_per_input_token": 0.0,
@@ -581,6 +681,7 @@
         "is_clip_model": true,
         "is_embedding_model": true,
         "provider": "together_ai",
-        "sources": null
+        "sources": null,
+        "note": "just copying TEXT_EMBEDDING_3_SMALL_MODEL_CARD for now for seconds per output token; imageNet top-1 accuracy"
     }
 }

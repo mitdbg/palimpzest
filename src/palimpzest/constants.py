@@ -309,13 +309,13 @@ class Model:
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, Model):
-            return self._value == other._value
+            return self.value == other.value
         if isinstance(other, str):
-            return self._value == other
+            return self.value == other
         return NotImplemented
 
     def __hash__(self) -> int:
-        return hash(self._value)
+        return hash(self.value)
 
     def is_llama_model(self) -> bool:
         return self.model_specs.get("is_llama_model", False)
@@ -363,10 +363,10 @@ class Model:
         return self.model_specs.get("usd_per_audio_input_token", 0.0)
 
     def get_usd_per_cache_read_token(self) -> float:
-        return self.model_specs.get("usd_per_cache_read_input_token", 0.0)
+        return self.model_specs.get("usd_per_cache_read_token", 0.0)
     
     def get_usd_per_cache_creation_token(self) -> float:
-        return self.model_specs.get("usd_per_cache_creation_input_token", self.get_usd_per_input_token())
+        return self.model_specs.get("usd_per_cache_creation_token", self.get_usd_per_input_token())
     
     def get_seconds_per_output_token(self) -> float:
         return self.model_specs.get("seconds_per_output_token", 0.0)
@@ -430,293 +430,7 @@ Model.CLIP_VIT_B_32 = Model("clip-ViT-B-32")
 # values more precisely:
 # - https://artificialanalysis.ai/models/llama-3-1-instruct-8b
 #
-LLAMA3_2_3B_INSTRUCT_MODEL_CARD = {
-    ##### Cost in USD #####
-    "usd_per_input_token": 0.06 / 1e6,
-    "usd_per_output_token": 0.06 / 1e6,
-    ##### Time #####
-    "seconds_per_output_token": 0.0079,
-    ##### Agg. Benchmark #####
-    "overall": 36.50, # https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct/discussions/13
-}
-LLAMA3_1_8B_INSTRUCT_MODEL_CARD = {
-    ##### Cost in USD #####
-    "usd_per_input_token": 0.18 / 1e6,
-    "usd_per_output_token": 0.18 / 1e6,
-    ##### Time #####
-    "seconds_per_output_token": 0.0050,
-    ##### Agg. Benchmark #####
-    "overall": 44.25,
-}
-LLAMA3_3_70B_INSTRUCT_MODEL_CARD = {
-    ##### Cost in USD #####
-    "usd_per_input_token": 0.88 / 1e6,
-    "usd_per_output_token": 0.88 / 1e6,
-    ##### Time #####
-    "seconds_per_output_token": 0.0122,
-    ##### Agg. Benchmark #####
-    "overall": 69.9,
-}
-LLAMA3_2_90B_V_MODEL_CARD = {
-    ##### Cost in USD #####
-    "usd_per_input_token": 1.2 / 1e6,
-    "usd_per_output_token": 1.2 / 1e6,
-    ##### Time #####
-    "seconds_per_output_token": 0.0303,
-    ##### Agg. Benchmark #####
-    "overall": 65.00, # set to be slightly higher than gpt-4o-mini
-}
-DEEPSEEK_V3_MODEL_CARD = {
-    ##### Cost in USD #####
-    "usd_per_input_token": 1.25 / 1E6,
-    "usd_per_output_token": 1.25 / 1E6,
-    ##### Time #####
-    "seconds_per_output_token": 0.0114,
-    ##### Agg. Benchmark #####
-    "overall": 73.8,
-}
-DEEPSEEK_R1_DISTILL_QWEN_1_5B_MODEL_CARD = {
-    ##### Cost in USD #####
-    "usd_per_input_token": 0.18 / 1E6,
-    "usd_per_output_token": 0.18 / 1E6,
-    ##### Time #####
-    "seconds_per_output_token": 0.0050, # NOTE: copied to be same as LLAMA3_1_8B_INSTRUCT_MODEL_CARD; need to update when we have data
-    ##### Agg. Benchmark #####
-    "overall": 39.90, # https://www.reddit.com/r/LocalLLaMA/comments/1iserf9/deepseek_r1_distilled_models_mmlu_pro_benchmarks/
-}
-GPT_4o_AUDIO_PREVIEW_MODEL_CARD = {
-    # NOTE: COPYING OVERALL AND SECONDS_PER_OUTPUT_TOKEN FROM GPT_4o; need to update when we have audio-specific benchmarks
-    ##### Cost in USD #####
-    # https://platform.openai.com/docs/pricing
-    "usd_per_audio_input_token": 40.00 / 1e6,
-    "usd_per_output_token": 80.00 / 1e6,
-    ##### Time #####
-    "seconds_per_output_token": 0.0080,
-    ##### Agg. Benchmark #####
-    "overall": 74.1,
-}
-GPT_4o_MINI_AUDIO_PREVIEW_MODEL_CARD = {
-    # NOTE: COPYING OVERALL AND SECONDS_PER_OUTPUT_TOKEN FROM GPT_4o; need to update when we have audio-specific benchmarks
-    ##### Cost in USD #####
-    "usd_per_audio_input_token": 10 / 1e6,
-    "usd_per_output_token": 20 / 1e6,
-    ##### Time #####
-    "seconds_per_output_token": 0.0159,
-    ##### Agg. Benchmark #####
-    "overall": 62.7,
-}
-GPT_4o_MODEL_CARD = {
-    # NOTE: it is unclear if the same ($ / token) costs can be applied for vision, or if we have to calculate this ourselves
-    ##### Cost in USD #####
-    "usd_per_input_token": 2.5 / 1e6,
-    "usd_per_output_token": 10.0 / 1e6,
-    "usd_per_cached_input_token": 1.25 / 1e6,
-    ##### Time #####
-    "seconds_per_output_token": 0.0080,
-    ##### Agg. Benchmark #####
-    "overall": 74.1,
-}
-GPT_4o_MINI_MODEL_CARD = {
-    # NOTE: it is unclear if the same ($ / token) costs can be applied for vision, or if we have to calculate this ourselves
-    ##### Cost in USD #####
-    "usd_per_input_token": 0.15 / 1e6,
-    "usd_per_output_token": 0.6 / 1e6,
-    "usd_per_cached_input_token": 0.075 / 1e6,
-    ##### Time #####
-    "seconds_per_output_token": 0.0159,
-    ##### Agg. Benchmark #####
-    "overall": 62.7,
-}
-GPT_4_1_MODEL_CARD = {
-    # NOTE: it is unclear if the same ($ / token) costs can be applied for vision, or if we have to calculate this ourselves
-    ##### Cost in USD #####
-    "usd_per_input_token": 2.0 / 1e6,
-    "usd_per_output_token": 8.0 / 1e6,
-    "usd_per_cached_input_token": 0.50 / 1e6,
-    ##### Time #####
-    "seconds_per_output_token": 0.0076,
-    ##### Agg. Benchmark #####
-    "overall": 80.5,
-}
-GPT_4_1_MINI_MODEL_CARD = {
-    # NOTE: it is unclear if the same ($ / token) costs can be applied for vision, or if we have to calculate this ourselves
-    ##### Cost in USD #####
-    "usd_per_input_token": 0.4 / 1e6,
-    "usd_per_output_token": 1.6 / 1e6,
-    "usd_per_cached_input_token": 0.10 / 1e6,
-    ##### Time #####
-    "seconds_per_output_token": 0.0161,
-    ##### Agg. Benchmark #####
-    "overall": 77.2,
-}
-GPT_4_1_NANO_MODEL_CARD = {
-    # NOTE: it is unclear if the same ($ / token) costs can be applied for vision, or if we have to calculate this ourselves
-    ##### Cost in USD #####
-    "usd_per_input_token": 0.1 / 1e6,
-    "usd_per_output_token": 0.4 / 1e6,
-    "usd_per_cached_input_token": 0.025 / 1e6,
-    ##### Time #####
-    "seconds_per_output_token": 0.0060,
-    ##### Agg. Benchmark #####
-    "overall": 62.3,
-}
-GPT_5_MODEL_CARD = {
-    # NOTE: it is unclear if the same ($ / token) costs can be applied for vision, or if we have to calculate this ourselves
-    ##### Cost in USD #####
-    "usd_per_input_token": 1.25 / 1e6,
-    "usd_per_output_token": 10.0 / 1e6,
-    "usd_per_cached_input_token": 0.125 / 1e6,
-    ##### Time #####
-    "seconds_per_output_token": 0.0060,
-    ##### Agg. Benchmark #####
-    "overall": 87.00,
-}
-GPT_5_MINI_MODEL_CARD = {
-    # NOTE: it is unclear if the same ($ / token) costs can be applied for vision, or if we have to calculate this ourselves
-    ##### Cost in USD #####
-    "usd_per_input_token": 0.25 / 1e6,
-    "usd_per_output_token": 2.0 / 1e6,
-    "usd_per_cached_input_token": 0.025 / 1e6,
-    ##### Time #####
-    "seconds_per_output_token": 0.0135,
-    ##### Agg. Benchmark #####
-    "overall": 82.50,
-}
-GPT_5_NANO_MODEL_CARD = {
-    # NOTE: it is unclear if the same ($ / token) costs can be applied for vision, or if we have to calculate this ourselves
-    ##### Cost in USD #####
-    "usd_per_input_token": 0.05 / 1e6,
-    "usd_per_output_token": 0.4 / 1e6,
-    "usd_per_cached_input_token": 0.005 / 1e6,
-    ##### Time #####
-    "seconds_per_output_token": 0.0055,
-    ##### Agg. Benchmark #####
-    "overall": 77.9,
-}
-GPT_5_2_MODEL_CARD = {
-    # NOTE: it is unclear if the same ($ / token) costs can be applied for vision, or if we have to calculate this ourselves
-    ##### Cost in USD #####
-    "usd_per_input_token": 1.75 / 1e6,
-    "usd_per_output_token": 14 / 1e6,
-    "usd_per_cached_input_token": 0.175 / 1e6,
-    ##### Time #####
-    "seconds_per_output_token": 0.01471,
-    ##### Agg. Benchmark #####
-    "overall": 86.23,
-}
-o4_MINI_MODEL_CARD = {  # noqa: N816
-    # NOTE: it is unclear if the same ($ / token) costs can be applied for vision, or if we have to calculate this ourselves
-    ##### Cost in USD #####
-    "usd_per_input_token": 1.1 / 1e6,
-    "usd_per_output_token": 4.4 / 1e6,
-    "usd_per_cached_input_token": 0.275 / 1e6,
-    ##### Time #####
-    "seconds_per_output_token": 0.0092,
-    ##### Agg. Benchmark #####
-    "overall": 80.6,  # using number reported for o3-mini; true number is likely higher
-}
-# o1_MODEL_CARD = {  # noqa: N816
-#     # NOTE: it is unclear if the same ($ / token) costs can be applied for vision, or if we have to calculate this ourselves
-#     ##### Cost in USD #####
-#     "usd_per_input_token": 15 / 1e6,
-#     "usd_per_output_token": 60 / 1e6,
-#     "usd_per_cached_input_token": 7.50 / 1e6,
-#     ##### Time #####
-#     "seconds_per_output_token": 0.0110,
-#     ##### Agg. Benchmark #####
-#     "overall": 83.50,
-# }
-TEXT_EMBEDDING_3_SMALL_MODEL_CARD = {
-    ##### Cost in USD #####
-    "usd_per_input_token": 0.02 / 1e6,
-    "usd_per_output_token": None,
-    ##### Time #####
-    "seconds_per_output_token": 0.0098,  # NOTE: just copying GPT_4o_MINI_MODEL_CARD for now
-    ##### Agg. Benchmark #####
-    "overall": 63.09,  # NOTE: just copying GPT_4o_MINI_MODEL_CARD for now
-}
-CLIP_VIT_B_32_MODEL_CARD = {
-    ##### Cost in USD #####
-    "usd_per_input_token": 0.00,
-    "usd_per_output_token": None,
-    ##### Time #####
-    "seconds_per_output_token": 0.0098,  # NOTE: just copying TEXT_EMBEDDING_3_SMALL_MODEL_CARD for now
-    ##### Agg. Benchmark #####
-    "overall": 63.3,  # NOTE: imageNet top-1 accuracy
-}
-CLAUDE_3_5_SONNET_MODEL_CARD = {
-    ##### Cost in USD #####
-    "usd_per_input_token": 3.0 / 1e6,
-    "usd_per_output_token": 15.0 / 1e6,
-    "usd_per_cached_input_token": 0.30 / 1e6,
-    ##### Time #####
-    "seconds_per_output_token": 0.0154,
-    ##### Agg. Benchmark #####
-    "overall": 78.4,
-}
-CLAUDE_3_7_SONNET_MODEL_CARD = {
-    ##### Cost in USD #####
-    "usd_per_input_token": 3.0 / 1e6,
-    "usd_per_output_token": 15.0 / 1e6,
-    "usd_per_cached_input_token": 0.30 / 1e6,
-    ##### Time #####
-    "seconds_per_output_token": 0.0156,
-    ##### Agg. Benchmark #####
-    "overall": 80.7,
-}
-CLAUDE_4_SONNET_MODEL_CARD = {
-    ##### Cost in USD #####
-    # https://platform.claude.com/docs/en/about-claude/pricing
-    "usd_per_input_token": 3.0 / 1e6,
-    "usd_per_output_token": 15.0 / 1e6,
-    "usd_per_cached_input_token": 0.30 / 1e6,
-    ##### Time #####
-    "seconds_per_output_token": 1.0 / 71.3,
-    ##### Agg. Benchmark #####
-    "overall": 83.87,
-}
-CLAUDE_4_5_SONNET_MODEL_CARD = {
-    ##### Cost in USD #####
-    # https://platform.claude.com/docs/en/about-claude/pricing
-    "usd_per_input_token": 3.0 / 1e6,
-    "usd_per_output_token": 15.0 / 1e6,
-    "usd_per_cached_input_token": 0.30 / 1e6,
-    ##### Time #####
-    "seconds_per_output_token": 1.0 / 78.6,
-    ##### Agg. Benchmark #####
-    "overall": 87.36,
-}
-CLAUDE_3_5_HAIKU_MODEL_CARD = {
-    ##### Cost in USD #####
-    "usd_per_input_token": 0.8 / 1e6,
-    "usd_per_output_token": 4.0 / 1e6,
-    "usd_per_cached_input_token": 0.08 / 1e6,
-    ##### Time #####
-    "seconds_per_output_token": 0.0189,
-    ##### Agg. Benchmark #####
-    "overall": 64.1,
-}
-CLAUDE_4_5_HAIKU_MODEL_CARD = {
-    ##### Cost in USD #####
-    "usd_per_input_token": 1 / 1e6,
-    "usd_per_output_token": 1.25 / 1e6,
-    "usd_per_cached_input_token": 2 / 1e6,
-    ##### Time #####
-    "seconds_per_output_token": 1.0 / 118.3,
-    ##### Agg. Benchmark #####
-    "overall": 78.72,
-}
-GEMINI_2_0_FLASH_MODEL_CARD = {
-    ##### Cost in USD #####
-    "usd_per_input_token": 0.15 / 1e6,
-    "usd_per_output_token": 0.6 / 1e6,
-    "usd_per_audio_input_token": 1.0 / 1e6,
-    "usd_per_cached_input_token": 0.025 / 1e6,
-    ##### Time #####
-    "seconds_per_output_token": 0.0054,
-    ##### Agg. Benchmark #####
-    "overall": 77.40,
-}
+
 GEMINI_2_5_FLASH_LITE_MODEL_CARD = {
     ##### Cost in USD #####
     "usd_per_input_token": 0.1 / 1e6,

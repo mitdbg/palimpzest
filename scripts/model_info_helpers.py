@@ -8,7 +8,8 @@ import requests
 LITELLM_MODEL_METRICS = {}
 CURATED_MODEL_METRICS = {}
 
-MODEL_INFO_URL = "http://localhost:8000/" # TODO: replace with S3 json link (curated_model_info.json)
+# TODO: replace with S3 json link (curated_model_info.json)
+MODEL_INFO_URL = "https://raw.githubusercontent.com/mitdbg/palimpzest/GeneralizeLiteLLM-265/src/palimpzest/utils/curated_model_info.json"
 
 def load_known_metrics():
     global LITELLM_MODEL_METRICS, CURATED_MODEL_METRICS
