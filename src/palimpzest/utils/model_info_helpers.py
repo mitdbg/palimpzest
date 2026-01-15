@@ -5,7 +5,7 @@ class ModelMetricsManager:
     Manages fetching and caching of model metrics from an external source.
     """
     def __init__(self):
-        self.data_url = "http://localhost:8000/" # TODO: replace with S3 json link (curated_model_info.json)
+        self.data_url = "https://raw.githubusercontent.com/mitdbg/palimpzest/GeneralizeLiteLLM-265/src/palimpzest/utils/pz_models_information.json" # TODO: replace with S3 json link (curated_model_info.json)
         self._metrics_cache = None  # Initialize as None (empty)
 
     def _load_data(self):

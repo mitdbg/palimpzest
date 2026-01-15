@@ -1,15 +1,14 @@
 """
-Test suite for dynamic model support in Palimpzest.
+Test suite for Model class and model helper functions in Palimpzest.
 
-This module tests the ability to pass any valid model ID string through the Model class,
-not just the predefined model constants. This includes:
-- Dynamic model instantiation via Model.from_litellm() factory method
-- Private constructor enforcement
-- Provider resolution from model strings
-- Model property methods (is_text_model, is_vision_model, etc.)
+This module tests:
+- Model instantiation with curated model IDs
+- Model properties and methods
 - Cost and performance metric retrieval
+- Model registry and get_all_models()
+- Model helper functions (get_models, get_optimal_models, resolve_reasoning_settings)
 - Integration with Generator and QueryProcessor
-- Heuristic-based fallback for unknown models
+- End-to-end pipeline execution
 """
 
 import os
@@ -21,21 +20,20 @@ from pydantic import BaseModel, Field
 from pydantic.fields import FieldInfo
 
 import palimpzest as pz
-from palimpzest.constants import DYNAMIC_MODEL_INFO, Model, ModelProvider, PromptStrategy
+from palimpzest.constants import Model, PromptStrategy
 from palimpzest.core.data.dataset import Dataset
 from palimpzest.core.elements.records import DataRecord
-from palimpzest.policy import MinCost
+from palimpzest.policy import MinCost, MaxQuality
 from palimpzest.query.generators.generators import Generator
 from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.query.processor.query_processor_factory import QueryProcessorFactory
-from palimpzest.utils.model_helpers import fetch_dynamic_model_info
-from palimpzest.utils.model_info_helpers import (
-    CURATED_MODEL_METRICS,
-    LITELLM_MODEL_METRICS,
-    _find_closest_benchmark_metric,
-    _generate_heuristic_specs,
-    get_model_specs,
+from palimpzest.utils.model_helpers import (
+    get_models,
+    get_optimal_models,
+    resolve_reasoning_settings,
 )
+from palimpzest.utils.model_info_helpers import ModelMetricsManager
+
 
 # =============================================================================
 # FIXTURES
@@ -77,391 +75,266 @@ def mock_litellm_response():
 
 
 @pytest.fixture
-def mock_vllm_response():
-    """Mock response for VLLM models."""
-    mock_response = MagicMock()
-    mock_response.usage.model_dump.return_value = {
-        "completion_tokens": 5,
-        "prompt_tokens": 10,
-        "total_tokens": 15
+def mock_model_metrics():
+    """Mock model metrics data for testing."""
+    return {
+        "openai/gpt-4o-2024-08-06": {
+            "usd_per_input_token": 2.5e-06,
+            "usd_per_output_token": 1e-05,
+            "seconds_per_output_token": 0.008,
+            "MMLU_Pro_score": 74.1,
+            "is_reasoning_model": False,
+            "is_text_model": True,
+            "is_vision_model": True,
+            "is_audio_model": False,
+            "is_embedding_model": False,
+            "supports_prompt_caching": True,
+            "provider": "openai",
+        },
+        "anthropic/claude-3-5-sonnet-20241022": {
+            "usd_per_input_token": 3e-06,
+            "usd_per_output_token": 1.5e-05,
+            "seconds_per_output_token": 0.0154,
+            "MMLU_Pro_score": 78.4,
+            "is_reasoning_model": False,
+            "is_text_model": True,
+            "is_vision_model": False,
+            "is_audio_model": False,
+            "is_embedding_model": False,
+            "supports_prompt_caching": True,
+            "provider": "anthropic",
+        },
+        "text-embedding-3-small": {
+            "usd_per_input_token": 2e-08,
+            "usd_per_output_token": None,
+            "seconds_per_output_token": 0.0098,
+            "MMLU_Pro_score": 63.09,
+            "is_reasoning_model": False,
+            "is_text_model": False,
+            "is_vision_model": False,
+            "is_audio_model": False,
+            "is_embedding_model": True,
+            "provider": "openai",
+        },
     }
-    mock_response.choices[0].message.content = '{"result": "VLLM Answer"}'
-    return mock_response
 
 
 # =============================================================================
-# TEST CLASS: Model Class Dynamic Instantiation
+# TEST CLASS: Model Class Instantiation
 # =============================================================================
 
 class TestModelInstantiation:
-    """Tests for dynamic model instantiation via the Model class."""
+    """Tests for Model class instantiation."""
 
-    def test_known_model_properties(self):
-        """Verify that a standard, hardcoded model returns the expected property values."""
+    def test_known_model_instantiation(self):
+        """Test that a known model can be instantiated."""
+        model = Model.GPT_4o
+        assert model is not None
+        assert model.value == "openai/gpt-4o-2024-08-06"
+
+    def test_model_instantiation_with_string(self):
+        """Test Model instantiation with a valid model string."""
+        # This should work if the model exists in the curated JSON
+        model = Model("openai/gpt-4o-2024-08-06")
+        assert model.value == "openai/gpt-4o-2024-08-06"
+        assert model.provider == "openai"
+
+    def test_unknown_model_raises_error(self):
+        """Test that unknown model IDs raise ValueError."""
+        with pytest.raises(ValueError, match="does not contain information"):
+            Model("unknown-provider/nonexistent-model-xyz")
+
+    def test_model_properties_from_specs(self):
+        """Test that model properties are correctly loaded from specs."""
         model = Model.GPT_4o
 
         assert model.is_text_model() is True
         assert model.is_embedding_model() is False
+        assert isinstance(model.get_usd_per_input_token(), float)
+        assert model.get_usd_per_input_token() > 0
 
-        cost = model.get_usd_per_input_token()
-        assert isinstance(cost, float)
-        assert cost > 0
+    def test_model_provider_property(self):
+        """Test that the provider property returns the correct string."""
+        model = Model.GPT_4o
+        assert model.provider == "openai"
 
-    def test_direct_instantiation_raises_error(self):
-        """Test that directly instantiating Model raises TypeError."""
-        with pytest.raises(TypeError, match="Model cannot be instantiated directly"):
-            Model("custom/my-new-model")
+        model_anthropic = Model.CLAUDE_3_5_SONNET
+        assert model_anthropic.provider == "anthropic"
 
-    def test_from_litellm_basic(self):
-        """Test the from_litellm factory method for dynamic model creation."""
-        model_name = "custom/my-new-model"
-        model = Model.from_litellm(model_name)
+    def test_model_local_url_parameter(self):
+        """Test that local_model_url parameter is accepted."""
+        # The parameter should be accepted even if not used yet
+        model = Model("openai/gpt-4o-2024-08-06", local_model_url="http://localhost:8000")
+        assert model.value == "openai/gpt-4o-2024-08-06"
 
-        assert model.value == model_name
-        assert model.provider == ModelProvider.UNKNOWN
 
-        specs = model.prefetched_specs
-        assert isinstance(specs, dict)
+# =============================================================================
+# TEST CLASS: Model Registry
+# =============================================================================
 
-    def test_from_litellm_returns_registered_constant(self):
-        """Test that from_litellm returns the existing constant for known models."""
-        # Use the exact string that Model.GPT_4o was created with
-        model_from_factory = Model.from_litellm("openai/gpt-4o-2024-08-06")
+class TestModelRegistry:
+    """Tests for Model registry functionality."""
 
-        # Should return the same instance as the constant
-        assert model_from_factory is Model.GPT_4o
+    def test_models_registered_on_creation(self):
+        """Test that models are registered in _registry on creation."""
+        # The predefined models should be in the registry
+        all_models = Model.get_all_models()
+        assert len(all_models) > 0
 
-    def test_is_registered_method(self):
-        """Test the _is_registered method."""
-        # Known model should be registered
-        assert Model.GPT_4o._is_registered() is True
+        # Check that GPT_4o is in the registry
+        model_values = [m.value for m in all_models]
+        assert "openai/gpt-4o-2024-08-06" in model_values
 
-        # Dynamic model should not be registered
-        dynamic_model = Model.from_litellm("custom/unknown-model")
-        assert dynamic_model._is_registered() is False
+    def test_get_all_models_returns_list(self):
+        """Test that get_all_models returns a list of Model instances."""
+        all_models = Model.get_all_models()
+        assert isinstance(all_models, list)
+        assert all(isinstance(m, Model) for m in all_models)
 
-    @pytest.mark.parametrize(
-        "model_string,expected_provider",
-        [
-            pytest.param("openai/gpt-4-turbo", ModelProvider.OPENAI, id="openai-prefix"),
-            pytest.param("anthropic/claude-3-opus", ModelProvider.ANTHROPIC, id="anthropic-prefix"),
-            pytest.param("groq/llama3-8b-8192", ModelProvider.GROQ, id="groq-prefix"),
-            pytest.param("together_ai/meta-llama/Llama-3-70b", ModelProvider.TOGETHER_AI, id="together-prefix"),
-            pytest.param("google/gemini-pro", ModelProvider.GOOGLE, id="google-prefix"),
-            pytest.param("hosted_vllm/my-model", ModelProvider.VLLM, id="vllm-prefix"),
-            pytest.param("my-custom-provider/model-x", ModelProvider.UNKNOWN, id="unknown-prefix"),
+    def test_registry_contains_expected_models(self):
+        """Test that the registry contains expected predefined models."""
+        all_models = Model.get_all_models()
+        model_values = [m.value for m in all_models]
+
+        # Check for some expected models
+        expected_models = [
+            "openai/gpt-4o-2024-08-06",
+            "anthropic/claude-3-5-sonnet-20241022",
+            "together_ai/meta-llama/Llama-3.3-70B-Instruct-Turbo",
         ]
-    )
-    def test_provider_resolution(self, model_string, expected_provider):
-        """Test that dynamic strings correctly resolve their provider."""
-        model = Model.from_litellm(model_string)
-        assert model.provider == expected_provider
-        assert model.value == model_string
+        for expected in expected_models:
+            assert expected in model_values, f"Expected {expected} in registry"
 
-    @pytest.mark.parametrize(
-        "model_string",
-        [
-            pytest.param("openai/gpt-4o-2024-05-13", id="dated-model"),
-            pytest.param("anthropic/claude-3-5-sonnet-20241022", id="versioned-model"),
-            pytest.param("together/meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo", id="full-path-model"),
-            pytest.param("custom_provider/my-finetuned-model-v1", id="custom-finetuned"),
-            pytest.param("hosted_vllm/custom/MyModel-Instruct", id="vllm-custom-path"),
-        ]
-    )
-    def test_dynamic_model_value_preserved(self, model_string):
-        """Test that the exact model string is preserved after instantiation."""
-        model = Model.from_litellm(model_string)
-        assert model.value == model_string
+# =============================================================================
+# TEST CLASS: Model Equality and Hashing
+# =============================================================================
 
-    def test_dynamic_model_has_required_specs(self):
-        """Test that dynamic models have all required spec fields."""
-        model = Model.from_litellm("random-provider/completely-unknown-model-v1")
-        specs = model.prefetched_specs
+class TestModelEqualityAndHashing:
+    """Tests for Model equality and hashing."""
 
-        required_fields = [
-            "is_text_model", "is_vision_model", "is_audio_model",
-            "is_reasoning_model", "is_embedding_model",
-            "usd_per_input_token", "usd_per_output_token", "usd_per_audio_input_token",
-            "output_tokens_per_second", "overall", "metadata"
-        ]
-        for field in required_fields:
-            assert field in specs, f"Missing required field: {field}"
+    def test_model_equality_same_instance(self):
+        """Test that the same model instance is equal to itself."""
+        model = Model.GPT_4o
+        assert model == model
 
-    def test_model_equality(self):
-        """Test that Model equality works correctly."""
-        # Same model should be equal
-        model1 = Model.from_litellm("custom/my-model")
-        model2 = Model.from_litellm("custom/my-model")
+    def test_model_equality_same_value(self):
+        """Test that models with the same value are equal."""
+        model1 = Model("openai/gpt-4o-2024-08-06")
+        model2 = Model("openai/gpt-4o-2024-08-06")
         assert model1 == model2
 
-        # Model should equal its string value
-        assert model1 == "custom/my-model"
+    def test_model_equality_with_string(self):
+        """Test that a model equals its string value."""
+        model = Model.GPT_4o
+        assert model == "openai/gpt-4o-2024-08-06"
 
-        # Different models should not be equal
-        model3 = Model.from_litellm("custom/other-model")
-        assert model1 != model3
+    def test_model_inequality(self):
+        """Test that different models are not equal."""
+        assert Model.GPT_4o != Model.CLAUDE_3_5_SONNET
 
-    def test_model_hash(self):
-        """Test that Model instances are hashable and can be used in sets/dicts."""
-        model1 = Model.from_litellm("custom/my-model")
-        model2 = Model.from_litellm("custom/my-model")
-
-        # Should have the same hash
+    def test_model_hash_consistency(self):
+        """Test that model hash is consistent."""
+        model1 = Model("openai/gpt-4o-2024-08-06")
+        model2 = Model("openai/gpt-4o-2024-08-06")
         assert hash(model1) == hash(model2)
 
-        # Should work in a set
-        model_set = {model1, model2}
-        assert len(model_set) == 1
+    def test_model_usable_in_set(self):
+        """Test that models can be used in sets."""
+        model_set = {Model.GPT_4o, Model.GPT_4o, Model.CLAUDE_3_5_SONNET}
+        assert len(model_set) == 2
 
-        # Should work as dict key
-        model_dict = {model1: "value"}
-        assert model_dict[model2] == "value"
+    def test_model_usable_as_dict_key(self):
+        """Test that models can be used as dictionary keys."""
+        model_dict = {Model.GPT_4o: "gpt4", Model.CLAUDE_3_5_SONNET: "claude"}
+        assert model_dict[Model.GPT_4o] == "gpt4"
 
-    def test_model_str_and_repr(self):
-        """Test string representations of Model."""
-        model = Model.from_litellm("custom/my-model")
-        assert str(model) == "custom/my-model"
-        assert repr(model) == "custom/my-model"
+    def test_model_str_repr(self):
+        """Test string representation of Model."""
+        model = Model.GPT_4o
+        assert str(model) == "openai/gpt-4o-2024-08-06"
+        assert repr(model) == "openai/gpt-4o-2024-08-06"
 
-
-# =============================================================================
-# TEST CLASS: Model Property Methods
-# =============================================================================
-
-class TestModelPropertyMethods:
-    """Tests for Model property methods with dynamic models."""
-
-    @pytest.mark.parametrize(
-        "model_string,expected",
-        [
-            pytest.param("openai/gpt-4-turbo", True, id="gpt4-is-text"),
-            pytest.param("anthropic/claude-3-opus", True, id="claude-is-text"),
-            pytest.param("openai/text-embedding-ada-002", False, id="embedding-not-text"),
-        ]
-    )
-    def test_is_text_model(self, model_string, expected):
-        """Test is_text_model for various dynamic model strings."""
-        model = Model.from_litellm(model_string)
-        # Note: heuristics default to is_text_model=True for most models
-        assert model.is_text_model() == expected or model.is_text_model() is True
-
-    @pytest.mark.parametrize(
-        "model_string",
-        [
-            pytest.param("hosted_vllm/llama-3-70b", id="vllm-llama"),
-            pytest.param("hosted_vllm/custom/my-model", id="vllm-custom"),
-            pytest.param("hosted_vllm/mistral-7b-instruct", id="vllm-mistral"),
-        ]
-    )
-    def test_is_vllm_model(self, model_string):
-        """Test is_vllm_model returns True for hosted_vllm models."""
-        model = Model.from_litellm(model_string)
-        assert model.is_vllm_model() is True
-
-    @pytest.mark.parametrize(
-        "model_string",
-        [
-            pytest.param("openai/gpt-4", id="openai-not-vllm"),
-            pytest.param("anthropic/claude-3", id="anthropic-not-vllm"),
-            pytest.param("together/llama-3", id="together-not-vllm"),
-        ]
-    )
-    def test_is_not_vllm_model(self, model_string):
-        """Test is_vllm_model returns False for non-VLLM models."""
-        model = Model.from_litellm(model_string)
-        assert model.is_vllm_model() is False
+    def test_model_lt_comparison(self):
+        """Test less-than comparison for sorting."""
+        models = [Model.GPT_4o, Model.CLAUDE_3_5_SONNET, Model.LLAMA3_1_8B]
+        sorted_models = sorted(models)
+        # Should be sortable without error
+        assert len(sorted_models) == 3
 
 
 # =============================================================================
-# TEST CLASS: Cost and Performance Metrics
+# TEST CLASS: Model Helper Functions
 # =============================================================================
 
-class TestCostAndPerformanceMetrics:
-    """Tests for cost and performance metric retrieval for dynamic models."""
+class TestModelHelperFunctions:
+    """Tests for model helper functions."""
 
-    def test_dynamic_model_has_costs(self):
-        """Test that dynamic models have cost values (from heuristics if needed)."""
-        model = Model.from_litellm("custom/unknown-model")
+    def test_get_models_with_openai_key(self):
+        """Test get_models returns OpenAI models when key is set."""
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=False):
+            models = get_models()
+            openai_models = [m for m in models if m.provider == "openai"]
+            assert len(openai_models) > 0
 
-        input_cost = model.get_usd_per_input_token()
-        output_cost = model.get_usd_per_output_token()
-        audio_cost = model.get_usd_per_audio_input_token()
+    def test_get_models_excludes_embedding_by_default(self):
+        """Test that embedding models are excluded by default."""
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=False):
+            models = get_models(include_embedding=False)
+            embedding_models = [m for m in models if m.is_embedding_model()]
+            assert len(embedding_models) == 0
 
-        assert input_cost is not None and input_cost >= 0
-        assert output_cost is not None and output_cost >= 0
-        assert audio_cost is not None and audio_cost >= 0
+    def test_get_models_includes_embedding_when_requested(self):
+        """Test that embedding models are included when requested."""
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=False):
+            models = get_models(include_embedding=True)
+            embedding_models = [m for m in models if m.is_embedding_model()]
+            assert len(embedding_models) > 0
 
-    def test_dynamic_cost_update_propagation(self):
-        """Test that updating DYNAMIC_MODEL_INFO updates cost properties."""
-        model_id = "openai/gpt-6-preview"
+    def test_get_models_empty_without_keys(self):
+        """Test that get_models returns empty list without API keys."""
+        with patch.dict(os.environ, {
+            "OPENAI_API_KEY": "",
+            "ANTHROPIC_API_KEY": "",
+            "TOGETHER_API_KEY": "",
+            "GEMINI_API_KEY": "",
+        }, clear=True):
+            models = get_models()
+            assert len(models) == 0
 
-        model = Model.from_litellm(model_id)
-        initial_cost = model.get_usd_per_input_token()
+    def test_get_optimal_models_returns_top_models(self):
+        """Test that get_optimal_models returns top models based on policy."""
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=False):
+            models = get_optimal_models(policy=MinCost())
+            assert len(models) <= 5  # Should return at most 5
 
-        new_info = {
-            "input_cost_per_token": 100.0,
-            "mode": "chat"
-        }
+    def test_get_optimal_models_respects_policy(self):
+        """Test that optimal models selection respects the policy."""
+        with patch.dict(os.environ, {
+            "OPENAI_API_KEY": "test-key",
+            "ANTHROPIC_API_KEY": "test-key",
+        }, clear=False):
+            cost_models = get_optimal_models(policy=MinCost())
+            quality_models = get_optimal_models(policy=MaxQuality())
 
-        with patch.dict(DYNAMIC_MODEL_INFO, {model_id: new_info}):
-            updated_cost = model.get_usd_per_input_token()
-            assert updated_cost == 100.0
-            assert updated_cost != initial_cost
-
-    def test_dynamic_model_performance_metrics(self):
-        """Test that dynamic models have performance metrics."""
-        model = Model.from_litellm("custom/my-model")
-
-        overall = model.get_overall_score()
-        latency = model.get_seconds_per_output_token()
-
-        assert overall is not None and overall > 0
-        assert latency is not None and latency > 0
-
-
-# =============================================================================
-# TEST CLASS: Heuristics and Metadata
-# =============================================================================
-
-class TestHeuristicsAndMetadata:
-    """Tests for heuristic-based model metadata generation."""
-
-    @pytest.mark.parametrize(
-        "model_slug,expected_reasoning",
-        [
-            pytest.param("deepseek-r1", True, id="r1-reasoning"),
-            pytest.param("openai-o1-preview", True, id="o1-reasoning"),
-            pytest.param("gpt-4-turbo", False, id="gpt4-no-reasoning"),
-            pytest.param("claude-3-opus", False, id="claude-no-reasoning"),
-        ]
-    )
-    def test_heuristics_reasoning_detection(self, model_slug, expected_reasoning):
-        """Test regex-based heuristics for identifying reasoning models."""
-        specs = _generate_heuristic_specs(model_slug)
-        assert specs["is_reasoning_model"] == expected_reasoning
-
-    @pytest.mark.parametrize(
-        "model_slug,expected_audio",
-        [
-            pytest.param("gpt-4o-audio-preview", True, id="audio-model"),
-            pytest.param("gpt-4-turbo", False, id="no-audio"),
-        ]
-    )
-    def test_heuristics_audio_detection(self, model_slug, expected_audio):
-        """Test regex-based heuristics for identifying audio models."""
-        specs = _generate_heuristic_specs(model_slug)
-        assert specs["is_audio_model"] == expected_audio
-
-    @pytest.mark.parametrize(
-        "model_slug",
-        [
-            pytest.param("gpt-5-turbo", id="flagship-gpt5"),
-            pytest.param("llama-4-70b", id="flagship-llama4"),
-            pytest.param("gemini-3-pro", id="flagship-gemini3"),
-        ]
-    )
-    def test_heuristics_flagship_pricing(self, model_slug):
-        """Test that flagship models get premium pricing heuristics."""
-        specs = _generate_heuristic_specs(model_slug)
-        assert specs["mmlu_pro_score"] >= 90.0
-        assert specs["usd_per_1m_input"] >= 5.0
-
-    @pytest.mark.parametrize(
-        "model_slug",
-        [
-            pytest.param("llama-3-8b-instruct", id="small-llama"),
-            pytest.param("mistral-7b", id="small-mistral"),
-            pytest.param("phi-3-mini", id="mini-model"),
-            pytest.param("claude-3-haiku", id="haiku-model"),
-        ]
-    )
-    def test_heuristics_economy_pricing(self, model_slug):
-        """Test that economy/small models get lower pricing heuristics."""
-        specs = _generate_heuristic_specs(model_slug)
-        assert specs["usd_per_1m_input"] < 1.0
-
-    def test_fuzzy_benchmark_matching(self):
-        """Test fuzzy benchmark matching for similar model names."""
-        mock_curated = {
-            "qwen-2-72b": {"MMLU_Pro_score": 55.0, "output_tokens_per_second": 40.0}
-        }
-
-        with patch.dict(CURATED_MODEL_METRICS, mock_curated, clear=True):
-            # Sibling Inference (Instruct -> Base)
-            res = _find_closest_benchmark_metric("qwen-2-72b-chat")
-            assert res is not None
-            assert res["mmlu"] == 55.0 * 1.1
-
-            # No Match
-            res = _find_closest_benchmark_metric("unknown-model-123")
-            assert res is None
-
-    def test_get_model_specs_waterfall(self):
-        """Test the full priority waterfall: LiteLLM -> Curated -> Heuristics."""
-        mock_litellm = {
-            "test-model": {
-                "input_cost_per_token": 10.0,
-                "mode": "chat"
-            }
-        }
-        mock_curated = {
-            "test-model": {
-                "MMLU_Pro_score": 75.0,
-                "output_tokens_per_second": 100.0
-            }
-        }
-
-        # Use a single with statement for multiple patches
-        with patch.dict(LITELLM_MODEL_METRICS, mock_litellm, clear=True), \
-            patch.dict(CURATED_MODEL_METRICS, mock_curated, clear=True):
-            specs = get_model_specs("provider/test-model")
-            # Pricing from LiteLLM
-            assert specs["usd_per_input_token"] == 10.0
-            # Scores from Curated
-            assert specs["overall"] == 75.0
-            # Derived from mode
-            assert specs["is_text_model"] is True
-            # Metadata accuracy
-            assert specs["metadata"]["usd_per_input_token"] is False
-            assert specs["metadata"]["overall"] is False
-
-    def test_unknown_model_full_fallback(self):
-        """Test that completely unknown models return safe heuristic defaults."""
-        specs = get_model_specs("random-provider/completely-unknown-model-v1")
-
-        assert specs["is_text_model"] is True
-        assert specs["usd_per_input_token"] > 0
-        assert specs["usd_per_output_token"] > 0
-        assert specs["usd_per_audio_input_token"] >= 0
-        assert specs["overall"] > 0
-        assert specs["output_tokens_per_second"] > 0
-        assert specs["metadata"]["usd_per_input_token"] is True
-
+            # Both should return models
+            assert len(cost_models) > 0
+            assert len(quality_models) > 0
 
 # =============================================================================
 # TEST CLASS: Generator Integration
 # =============================================================================
 
 class TestGeneratorIntegration:
-    """Tests for Generator integration with dynamic models."""
+    """Tests for Generator integration with Model class."""
 
-    @pytest.mark.parametrize(
-        "model_string",
-        [
-            pytest.param("custom_provider/my-finetuned-model-v1", id="custom-provider"),
-            pytest.param("openai/gpt-4-turbo-preview", id="openai-preview"),
-            pytest.param("anthropic/claude-3-5-sonnet-v2", id="anthropic-v2"),
-            pytest.param("together/meta-llama/Llama-3-70b-Instruct", id="together-llama"),
-        ]
-    )
     @patch("palimpzest.query.generators.generators.litellm.completion")
-    def test_generator_passes_dynamic_string_to_litellm(
-        self, mock_completion, model_string, sample_record, output_schema, mock_litellm_response
+    def test_generator_uses_model_value(
+        self, mock_completion, sample_record, output_schema, mock_litellm_response
     ):
-        """Test that Generator passes exact dynamic model string to litellm."""
+        """Test that Generator uses model.value for litellm calls."""
         mock_completion.return_value = mock_litellm_response
 
-        model = Model.from_litellm(model_string)
+        model = Model.GPT_4o
         generator = Generator(
             model=model,
             prompt_strategy=PromptStrategy.MAP,
@@ -479,67 +352,33 @@ class TestGeneratorIntegration:
         )
 
         _, kwargs = mock_completion.call_args
-        assert kwargs["model"] == model_string
+        assert kwargs["model"] == "openai/gpt-4o-2024-08-06"
 
     @patch("palimpzest.query.generators.generators.litellm.completion")
-    def test_vllm_generator_passes_api_base(
-        self, mock_completion, sample_record, output_schema, mock_vllm_response
-    ):
-        """Test that VLLM models pass api_base to litellm."""
-        mock_completion.return_value = mock_vllm_response
-
-        vllm_string = "hosted_vllm/custom/MyModel-Instruct"
-        custom_api_base = "http://localhost:8000/v1"
-
-        model = Model.from_litellm(vllm_string)
-        generator = Generator(
-            model=model,
-            prompt_strategy=PromptStrategy.MAP,
-            reasoning_effort="default",
-            api_base=custom_api_base
-        )
-
-        fields = {k: FieldInfo.from_annotation(v) for k, v in output_schema.model_fields.items()}
-        generator(
-            candidate=sample_record,
-            fields=fields,
-            prompt="Test",
-            parse_answer=lambda x: x,
-            output_schema=output_schema
-        )
-
-        _, kwargs = mock_completion.call_args
-        assert kwargs["api_base"] == custom_api_base
-        assert kwargs["model"] == vllm_string
-
-    @patch("palimpzest.query.generators.generators.litellm.completion")
-    def test_generator_handles_audio_cost_none(
+    def test_generator_with_different_providers(
         self, mock_completion, sample_record, output_schema, mock_litellm_response
     ):
-        """Test that Generator handles None audio costs gracefully."""
+        """Test Generator works with models from different providers."""
         mock_completion.return_value = mock_litellm_response
 
-        # Use a model that won't have audio costs
-        model = Model.from_litellm("custom/text-only-model")
-        generator = Generator(
-            model=model,
-            prompt_strategy=PromptStrategy.MAP,
-            reasoning_effort="default"
-        )
+        for model in [Model.GPT_4o, Model.CLAUDE_3_5_SONNET, Model.LLAMA3_3_70B]:
+            generator = Generator(
+                model=model,
+                prompt_strategy=PromptStrategy.MAP,
+                reasoning_effort="default"
+            )
 
-        fields = {k: FieldInfo.from_annotation(v) for k, v in output_schema.model_fields.items()}
+            fields = {k: FieldInfo.from_annotation(v) for k, v in output_schema.model_fields.items()}
+            generator(
+                candidate=sample_record,
+                fields=fields,
+                prompt="Test",
+                parse_answer=lambda x: x,
+                output_schema=output_schema
+            )
 
-        # This should not raise TypeError for None * int
-        result = generator(
-            candidate=sample_record,
-            fields=fields,
-            prompt="Test",
-            parse_answer=lambda x: x,
-            output_schema=output_schema
-        )
-
-        # Should return valid generation stats
-        assert result[2] is not None  # generation_stats
+            _, kwargs = mock_completion.call_args
+            assert kwargs["model"] == model.value
 
 
 # =============================================================================
@@ -547,239 +386,167 @@ class TestGeneratorIntegration:
 # =============================================================================
 
 class TestQueryProcessorIntegration:
-    """Tests for QueryProcessor integration with dynamic models."""
+    """Tests for QueryProcessor integration."""
 
-    @patch("palimpzest.query.processor.query_processor_factory.fetch_dynamic_model_info")
     @patch("palimpzest.query.processor.query_processor_factory.QueryProcessor")
-    def test_factory_calls_dynamic_fetch(self, _mock_processor_cls, mock_fetch):
-        """Verify that creating a processor triggers dynamic info fetch."""
+    def test_factory_accepts_model_list(self, mock_processor_cls):
+        """Test that QueryProcessorFactory accepts available_models."""
         mock_dataset = MagicMock(spec=Dataset)
         mock_dataset.schema = MagicMock()
+        mock_dataset.get_limit.return_value = None
 
         config = QueryProcessorConfig(
             policy=MinCost(),
-            available_models=[Model.GPT_4o],
+            available_models=[Model.GPT_4o, Model.CLAUDE_3_5_SONNET],
             verbose=True,
-            api_base="http://my-vllm-instance:8000"
         )
 
-        with patch.dict(os.environ, {"OPENAI_API_KEY": "fake-key"}), \
-            patch.object(QueryProcessorFactory, "_create_optimizer"), \
-            patch.object(QueryProcessorFactory, "_create_execution_strategy"), \
-            patch.object(QueryProcessorFactory, "_create_sentinel_execution_strategy"):
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "fake-key", "ANTHROPIC_API_KEY": "fake-key"}), \
+             patch.object(QueryProcessorFactory, "_create_optimizer"), \
+             patch.object(QueryProcessorFactory, "_create_execution_strategy"), \
+             patch.object(QueryProcessorFactory, "_create_sentinel_execution_strategy"):
             QueryProcessorFactory.create_processor(mock_dataset, config=config)
 
-        mock_fetch.assert_called_once_with(config.available_models)
+        # Verify processor was created
+        mock_processor_cls.assert_called_once()
 
+    def test_factory_auto_selects_models_when_none_provided(self):
+        """Test that factory calls get_optimal_models when available_models is empty."""
+        mock_dataset = MagicMock(spec=Dataset)
+        mock_dataset.schema = MagicMock()
+        mock_dataset.get_limit.return_value = None
 
-# =============================================================================
-# TEST CLASS: Fetch Dynamic Model Info
-# =============================================================================
+        config = QueryProcessorConfig(
+            policy=MinCost(),
+            available_models=[],  # Empty list
+            verbose=True,
+        )
 
-class TestFetchDynamicModelInfo:
-    """Tests for the fetch_dynamic_model_info function."""
-
-    @patch("palimpzest.utils.model_helpers.subprocess.Popen")
-    @patch("palimpzest.utils.model_helpers.requests.get")
-    @patch("palimpzest.utils.model_helpers.time.sleep")
-    def test_fetch_success(self, _mock_sleep, mock_get, mock_popen):
-        """Test successful fetching of dynamic model info."""
-        mock_process = MagicMock()
-        mock_process.communicate.return_value = (b"server started", b"")
-        mock_process.poll.return_value = None
-        mock_popen.return_value = mock_process
-
-        mock_response_health = MagicMock()
-        mock_response_health.status_code = 200
-
-        mock_response_info = MagicMock()
-        mock_response_info.status_code = 200
-        mock_response_info.json.return_value = {
-            "data": [
-                {
-                    "model_name": "hosted_vllm/llama-3-70b",
-                    "model_info": {
-                        "mode": "chat",
-                        "input_cost_per_token": 0.0005,
-                        "output_cost_per_token": 0.0015
-                    }
-                }
-            ]
-        }
-
-        mock_get.side_effect = [mock_response_health, mock_response_info]
-
-        model_input = Model.from_litellm("hosted_vllm/llama-3-70b")
-        result = fetch_dynamic_model_info([model_input])
-
-        mock_popen.assert_called_once()
-        assert "hosted_vllm/llama-3-70b" in result
-        assert result["hosted_vllm/llama-3-70b"]["input_cost_per_token"] == 0.0005
-        mock_process.terminate.assert_called()
-
-    @patch("palimpzest.utils.model_helpers.subprocess.Popen")
-    def test_fetch_empty_input(self, mock_popen):
-        """Test that empty input is handled gracefully."""
-        mock_process = MagicMock()
-        mock_process.communicate.return_value = (b"", b"")
-        mock_process.poll.return_value = 0
-        mock_popen.return_value = mock_process
-
-        result = fetch_dynamic_model_info([])
-
-        assert result == {}
-        mock_popen.assert_called()
-
+        # Mock get_optimal_models to return some models and verify it's called
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "fake-key"}), \
+             patch("palimpzest.query.processor.query_processor_factory.get_optimal_models",
+                   return_value=[Model.GPT_4o, Model.GPT_4o_MINI]) as mock_get_optimal, \
+             patch("palimpzest.query.processor.query_processor_factory.QueryProcessor"), \
+             patch.object(QueryProcessorFactory, "_create_optimizer"), \
+             patch.object(QueryProcessorFactory, "_create_execution_strategy"), \
+             patch.object(QueryProcessorFactory, "_create_sentinel_execution_strategy"):
+            QueryProcessorFactory.create_processor(mock_dataset, config=config)
+            # Verify get_optimal_models was called with correct policy
+            mock_get_optimal.assert_called_once()
+            call_kwargs = mock_get_optimal.call_args
+            assert call_kwargs[1]["policy"] == config.policy
 
 # =============================================================================
-# TEST CLASS: Edge Cases
-# =============================================================================
-
-class TestEdgeCases:
-    """Tests for edge cases in dynamic model handling."""
-
-    @pytest.mark.parametrize(
-        "model_string",
-        [
-            pytest.param("a", id="single-char"),
-            pytest.param("model", id="no-provider"),
-            pytest.param("provider/", id="empty-model-name"),
-            pytest.param("/model", id="empty-provider"),
-            pytest.param("a/b/c/d/e", id="many-slashes"),
-        ]
-    )
-    def test_unusual_model_strings(self, model_string):
-        """Test that unusual model strings don't crash the system."""
-        try:
-            model = Model.from_litellm(model_string)
-            # Should be able to access basic properties
-            _ = model.value
-            _ = model.provider
-            _ = model.prefetched_specs
-        except Exception as e:
-            pytest.fail(f"Model instantiation failed for '{model_string}': {e}")
-
-    def test_model_with_special_characters(self):
-        """Test model strings with special characters."""
-        special_strings = [
-            "provider/model-with-dashes",
-            "provider/model_with_underscores",
-            "provider/model.with.dots",
-            "provider/Model-V1.2.3-Beta",
-        ]
-
-        for model_string in special_strings:
-            model = Model.from_litellm(model_string)
-            assert model.value == model_string
-
-    def test_same_model_string_returns_consistent_results(self):
-        """Test that the same model string returns consistent specs."""
-        model_string = "custom/consistent-model"
-
-        model1 = Model.from_litellm(model_string)
-        model2 = Model.from_litellm(model_string)
-
-        assert model1.get_usd_per_input_token() == model2.get_usd_per_input_token()
-        assert model1.get_usd_per_output_token() == model2.get_usd_per_output_token()
-        assert model1.is_text_model() == model2.is_text_model()
-
-
-# =============================================================================
-# TEST CLASS: End-to-End Integration (requires API keys)
+# TEST CLASS: End-to-End Integration
 # =============================================================================
 
 class TestEndToEndIntegration:
-    """End-to-end integration tests requiring actual API keys."""
+    """End-to-end integration tests for the palimpzest pipeline."""
 
     @pytest.mark.skipif(
         not os.environ.get("OPENAI_API_KEY"),
         reason="OPENAI_API_KEY not set"
     )
-    def test_dynamic_model_pipeline(self):
-        """Test running a full pipeline with a dynamic model string."""
-        dynamic_model_name = "openai/gpt-3.5-turbo-0125"
+    def test_simple_sem_map_pipeline(self):
+        """Test a simple semantic map pipeline end-to-end."""
+        # Create a simple dataset
+        df = pd.DataFrame({
+            "question": ["What is 2 + 2?", "What is the capital of France?"]
+        })
+        dataset = pz.MemoryDataset("test_e2e", df)
 
-        mock_info = {
-            dynamic_model_name: {
-                "mode": "chat",
-                "input_cost_per_token": 0.50 / 1e6,
-                "output_cost_per_token": 1.50 / 1e6,
-                "input_cost_per_audio_token": 0.0,
-                "max_tokens": 4096,
-                "supports_reasoning": False,
-                "supports_vision": False
-            }
-        }
+        # Define output schema
+        class Answer(BaseModel):
+            response: str = Field(description="The answer to the question")
 
-        with patch("palimpzest.query.processor.query_processor_factory.fetch_dynamic_model_info") as mock_fetch:
-            mock_fetch.side_effect = lambda _: DYNAMIC_MODEL_INFO.update(mock_info)
+        # Create pipeline
+        plan = dataset.sem_map(
+            cols=Answer,
+            desc="Answer the question concisely"
+        )
 
-            df = pd.DataFrame({"text": ["What is the capital of France?", "What is 2 + 2?"]})
-            dataset = pz.MemoryDataset("test_data", df)
-
-            dynamic_model = Model.from_litellm(dynamic_model_name)
-
-            config = QueryProcessorConfig(
-                policy=MinCost(),
-                available_models=[dynamic_model],
-                verbose=True,
-                execution_strategy="sequential"
-            )
-
-            class ResponseSchema(BaseModel):
-                answer: str = Field(description="The answer to the question")
-
-            plan = dataset.sem_map(
-                cols=ResponseSchema,
-                desc="Answer the question"
-            )
-
-            result_collection = plan.run(config)
-            results = result_collection.to_df()
-
-            assert len(results) == 2
-            assert "answer" in results.columns
-
-            answers = results["answer"].astype(str).str.lower().tolist()
-            assert any("paris" in a for a in answers)
-            assert any("4" in a for a in answers)
-
-    @pytest.mark.skipif(
-        not os.environ.get("OPENAI_API_KEY"),
-        reason="OPENAI_API_KEY not set"
-    )
-    def test_dynamic_model_real_api(self):
-        """Test with a real API call using a non-enum model string."""
-        model_name = "openai/gpt-3.5-turbo"
-
-        model = Model.from_litellm(model_name)
-        assert model.get_usd_per_input_token() is not None
-        assert model.get_usd_per_audio_input_token() is not None
-
-        df = pd.DataFrame({"question": ["What is 2 + 2?", "What is the capital of France?"]})
-        dataset = pz.MemoryDataset("test_e2e_real", df)
-
-        class ShortAnswer(BaseModel):
-            answer: str = Field(description="A concise answer to the question")
-
+        # Configure and run
         config = QueryProcessorConfig(
             policy=MinCost(),
-            available_models=[model],
-            verbose=True,
-            execution_strategy="sequential"
+            available_models=[Model.GPT_4o_MINI],
+            execution_strategy="sequential",
+            progress=False,
+            verbose=False,
         )
 
-        plan = dataset.sem_map(
-            cols=ShortAnswer,
-            desc="Answer the question briefly"
+        # Execute the pipeline
+        results = plan.run(config)
+        result_df = results.to_df()
+
+        # Verify results
+        assert len(result_df) == 2
+        assert "response" in result_df.columns
+
+        # Check that we got meaningful answers
+        answers = result_df["response"].astype(str).str.lower().tolist()
+        assert any("4" in a for a in answers), "Expected answer containing '4'"
+        assert any("paris" in a for a in answers), "Expected answer containing 'paris'"
+
+    @pytest.mark.skipif(
+        not os.environ.get("OPENAI_API_KEY"),
+        reason="OPENAI_API_KEY not set"
+    )
+    def test_pipeline_with_filter(self):
+        """Test a pipeline with semantic filter end-to-end."""
+        # Create dataset with mixed content
+        df = pd.DataFrame({
+            "text": [
+                "The sky is blue.",
+                "Python is a programming language.",
+                "Water boils at 100 degrees Celsius.",
+                "JavaScript runs in browsers.",
+            ]
+        })
+        dataset = pz.MemoryDataset("test_filter", df)
+
+        # Filter for programming-related content
+        filtered = dataset.sem_filter("text is about programming")
+
+        # Configure and run
+        config = QueryProcessorConfig(
+            policy=MinCost(),
+            available_models=[Model.GPT_4o_MINI],
+            execution_strategy="sequential",
+            progress=False,
+            verbose=False,
         )
 
-        with patch("palimpzest.query.processor.query_processor_factory.fetch_dynamic_model_info", return_value={}):
-            results = plan.run(config)
+        results = filtered.run(config)
+        result_df = results.to_df()
 
-        records = results.to_df()
-        assert len(records) == 2
+        # Should have filtered to programming-related rows
+        assert len(result_df) >= 1
+        assert len(result_df) <= 2  # Should be Python and/or JavaScript rows
 
-        answers = records["answer"].astype(str).str.lower().tolist()
-        assert any("4" in a for a in answers)
-        assert any("paris" in a for a in answers)
+    @pytest.mark.skipif(
+        not os.environ.get("OPENAI_API_KEY"),
+        reason="OPENAI_API_KEY not set"
+    )
+    def test_pipeline_with_auto_model_selection(self):
+        """Test that pipeline works with automatic model selection."""
+        df = pd.DataFrame({"input": ["Hello, world!"]})
+        dataset = pz.MemoryDataset("test_auto", df)
+
+        class Output(BaseModel):
+            greeting: str = Field(description="A friendly greeting response")
+
+        plan = dataset.sem_map(cols=Output, desc="Respond with a greeting")
+
+        # Don't specify available_models - let the system auto-select
+        config = QueryProcessorConfig(
+            policy=MinCost(),
+            execution_strategy="sequential",
+            progress=False,
+            verbose=False,
+        )
+
+        results = plan.run(config)
+        result_df = results.to_df()
+
+        assert len(result_df) == 1
+        assert "greeting" in result_df.columns

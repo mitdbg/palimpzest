@@ -3,7 +3,7 @@ import os
 from copy import deepcopy
 from itertools import combinations
 
-from palimpzest.constants import AggFunc, Model, ModelProvider, PromptStrategy
+from palimpzest.constants import AggFunc, Model, PromptStrategy
 from palimpzest.core.data.context_manager import ContextManager
 from palimpzest.core.lib.schemas import (
     AUDIO_FIELD_TYPES,
@@ -496,7 +496,7 @@ class ImplementationRule(Rule):
             return False
 
         # corner-case: Gemini models cannot handle multiple audio inputs
-        if model.provider == ModelProvider.VERTEX_AI and model.is_audio_model() and (num_audio_fields > 1 or has_list_audio_field):
+        if model.is_provider_vertex_ai() and model.is_audio_model() and (num_audio_fields > 1 or has_list_audio_field):
             return False
 
         # text-only input and text supporting model

@@ -6,13 +6,9 @@ from typing import Any, Dict, Optional
 import requests
 
 LITELLM_MODEL_METRICS = {}
-CURATED_MODEL_METRICS = {}
-
-# TODO: replace with S3 json link (curated_model_info.json)
-MODEL_INFO_URL = "https://raw.githubusercontent.com/mitdbg/palimpzest/GeneralizeLiteLLM-265/src/palimpzest/utils/curated_model_info.json"
 
 def load_known_metrics():
-    global LITELLM_MODEL_METRICS, CURATED_MODEL_METRICS
+    global LITELLM_MODEL_METRICS
     if not LITELLM_MODEL_METRICS:
         try:
             model_prices_and_context_window_url = "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
@@ -21,19 +17,9 @@ def load_known_metrics():
                 LITELLM_MODEL_METRICS = response.json()
         except Exception:
             pass
-            
-    if not CURATED_MODEL_METRICS:
-        curated_model_metrics_path = os.path.join(os.path.dirname(__file__), 'curated_model_info.json')
-        if os.path.exists(curated_model_metrics_path):
-            with open(curated_model_metrics_path) as f:
-                CURATED_MODEL_METRICS = json.load(f)
 
 def get_known_model_info(full_model_id):
     global LITELLM_MODEL_METRICS, CURATED_MODEL_METRICS
-
-    # Lazy-load metrics on first use (avoids network call at import time)
-    if not LITELLM_MODEL_METRICS and not CURATED_MODEL_METRICS:
-        load_known_metrics()
 
     # Initialize the target dictionary with None
     unified_info = {
@@ -72,31 +58,6 @@ def get_known_model_info(full_model_id):
         unified_info["usd_per_cached_input_token"] = data_source_1.get("cached_read_input_token_cost")
         unified_info["usd_per_output_token"] = data_source_1.get("output_cost_per_token")
         unified_info["usd_per_audio_input_token"] = data_source_1.get("input_cost_per_audio_token")
-
-    # search logic: check model_name only
-    data_source_2 = CURATED_MODEL_METRICS.get(model_name)
-
-    if data_source_2:
-        mapping_2 = {
-            "is_reasoning_model": "is_reasoning_model",
-            "is_vision_model": "is_vision_model",
-            "is_text_model": "is_text_model",
-            "is_audio_model": "is_audio_model",
-            "is_embedding_model": "is_embedding_model",
-            "supports_prompt_caching": "supports_prompt_caching",
-            "usd_per_input_token" : "usd_per_input_token",
-            "usd_per_cached_input_token": "usd_per_cached_input_token",
-            "usd_per_output_token": "usd_per_output_token",
-            "usd_per_audio_input_token": "usd_per_audio_input_token",
-            "output_tokens_per_second": "output_tokens_per_second",
-            "overall": "MMLU_Pro_score"
-        }
-        for target_key, source_key in mapping_2.items():
-            # ONLY fill if currently None (do not overwrite)
-            if unified_info[target_key] is None:
-                val = data_source_2.get(source_key)
-                if val is not None:
-                    unified_info[target_key] = val
 
     return unified_info
 

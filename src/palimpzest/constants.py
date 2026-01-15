@@ -6,8 +6,6 @@ from enum import Enum
 
 from palimpzest.utils.model_info_helpers import ModelMetricsManager
 
-DYNAMIC_MODEL_INFO = {}
-
 class PromptStrategy(str, Enum):
     """
     PromptStrategy describes the prompting technique to be used by a Generator when
@@ -184,56 +182,6 @@ NAIVE_PDF_PROCESSOR_TIME_PER_RECORD = 10.0
 # Whether or not to log LLM outputs
 LOG_LLM_OUTPUT = False
 
-class ModelProvider(str, Enum):
-    """
-    Providers define the backend service and credential logic for models.
-    """
-    OPENAI = "openai"
-    ANTHROPIC = "anthropic"
-    GOOGLE = "google"
-    VERTEX_AI = "vertex_ai"
-    TOGETHER_AI = "together_ai"
-    DATABRICKS = "databricks"
-    BEDROCK = "bedrock"
-    COHERE = "cohere"
-    DEEPSEEK = "deepseek"
-    FIREWORKS_AI = "fireworks"
-    GROQ = "groq"
-    MISTRAL = "mistral"
-    AZURE = "azure"
-    XAI = "xai"
-    HUGGINGFACE = "huggingface"
-    VLLM = "hosted_vllm" # needs to be updated after issue 266
-    UNKNOWN = "unknown"
-
-    @property
-    def api_key_env_var(self) -> str | None:
-        """
-        Returns the standard environment variable name for this provider's API key.
-        Incorporates dynamic logic for providers that support multiple keys (like Google).
-        """
-        if self == ModelProvider.GOOGLE:
-            return "GEMINI_API_KEY" if os.getenv("GEMINI_API_KEY") else "GOOGLE_API_KEY"
-        
-        mapping = {
-            ModelProvider.OPENAI: "OPENAI_API_KEY",
-            ModelProvider.VERTEX_AI: "GOOGLE_APPLICATION_CREDENTIALS",
-            ModelProvider.ANTHROPIC: "ANTHROPIC_API_KEY",
-            ModelProvider.TOGETHER_AI: "TOGETHER_API_KEY",
-            ModelProvider.AZURE: "AZURE_OPENAI_API_KEY",
-            ModelProvider.MISTRAL: "MISTRAL_API_KEY",
-            ModelProvider.COHERE: "CO_API_KEY",
-            ModelProvider.GROQ: "GROQ_API_KEY",
-            ModelProvider.HUGGINGFACE: "HF_TOKEN",
-            ModelProvider.DEEPSEEK: "DEEPSEEK_API_KEY",
-            ModelProvider.FIREWORKS_AI: "FIREWORKS_API_KEY",
-            ModelProvider.DATABRICKS: "DATABRICKS_API_TOKEN",
-            ModelProvider.BEDROCK: "AWS_ACCESS_KEY_ID", # Uses AWS Creds
-            ModelProvider.XAI: "XAI_API_KEY",
-            ModelProvider.VLLM: "VLLM_API_KEY"
-        }
-        return mapping.get(self) # if unknown, maps to none
-
 metrics_manager = ModelMetricsManager()
 
 class Model:
@@ -249,6 +197,7 @@ class Model:
         self.model_specs = metrics_manager.get_model_metrics(model_id)
         if not self.model_specs:
             raise ValueError("Palimpzest currently does not contain information about this model.")
+        Model._registry[model_id] = self
 
     def __lt__(self, other):
         if isinstance(other, Model):
@@ -266,40 +215,25 @@ class Model:
         return self.model_id
 
     @property
-    def provider(self) -> ModelProvider:
-        """Determines the provider based on the model string."""
-        val = self.value.lower()
-        # check for explicit prefixes (should suffice for most cases)
-        if "/" in val:
-            provider_str = val.split("/")[0]
-            try:
-                return ModelProvider(provider_str)
-            except ValueError:
-                pass
-        # heuristic checks based on model names
-        if any(x in val for x in ["gpt-", "o1-", "dall-e", "text-embedding", "whisper"]):
-            return ModelProvider.OPENAI
-        if "claude" in val:
-            return ModelProvider.ANTHROPIC
-        if any(x in val for x in ["gemini", "gemma", "palm"]):
-            return ModelProvider.VERTEX_AI if "vertex" in val else ModelProvider.GOOGLE
-        if "clip" in val or "together_ai" in val:
-            return ModelProvider.TOGETHER_AI
-        if "mistral" in val or "mixtral" in val:
-            return ModelProvider.MISTRAL
-        if "command" in val:
-            return ModelProvider.COHERE
-        if "hosted_vllm" in val:
-            return ModelProvider.VLLM
-        if "xai" in val or "grok" in val:
-            return ModelProvider.XAI
-        if "llama" in val:
-            return ModelProvider.TOGETHER_AI
-        return ModelProvider.UNKNOWN
+    def provider(self) -> str | None:
+        """Returns the provider string for this model."""
+        return self.model_specs.get("provider")
 
     @property
     def api_key_env_var(self) -> str | None:
-        return self.provider.api_key_env_var
+        """
+        Returns the standard environment variable name for this provider's API key.
+        """
+        if self.provider == "gemini":
+            return "GEMINI_API_KEY" if os.getenv("GEMINI_API_KEY") else "GOOGLE_API_KEY"
+        mapping = {
+            "openai": "OPENAI_API_KEY",
+            "vertex_ai": "GOOGLE_APPLICATION_CREDENTIALS",
+            "anthropic": "ANTHROPIC_API_KEY",
+            "together_ai": "TOGETHER_API_KEY",
+            "hosted_vllm": "VLLM_API_KEY"
+        }
+        return mapping.get(self.provider)
 
     def __repr__(self) -> str:
         return self.value
@@ -319,7 +253,28 @@ class Model:
 
     def is_llama_model(self) -> bool:
         return self.model_specs.get("is_llama_model", False)
+    
+    def is_vllm_model(self) -> bool:
+        return self.model_specs.get("is_vllm_model", False)
+    
+    def is_embedding_model(self) -> bool:
+        return self.model_specs.get("is_embedding_model", False)
+    
+    def is_provider_vertex_ai(self) -> bool:
+        return self.provider == "vertex_ai"
+    
+    def is_provider_anthropic(self) -> bool:
+        return self.provider == "anthropic"
+    
+    def is_provider_google_ai_studio(self) -> bool:
+        return self.provider == "gemini"
 
+    def is_provider_openai(self) -> bool:
+        return self.provider == "openai"
+    
+    def is_provider_together_ai(self) -> bool:
+        return self.provider == "together_ai"
+    
     def is_o_model(self) -> bool:
         return self.model_specs.get("is_o_model", False)
 
@@ -338,17 +293,11 @@ class Model:
     def is_audio_model(self) -> bool:
         return self.model_specs.get("is_audio_model", False)
 
-    def is_vllm_model(self) -> bool:
-        return self.model_specs.get("is_vllm_model", False)
-
     def is_text_image_multimodal_model(self) -> bool:
         return self.is_text_model() and self.is_vision_model()
 
     def is_text_audio_multimodal_model(self) -> bool:
         return self.is_audio_model() and self.is_text_model()
-
-    def is_embedding_model(self) -> bool:
-        return self.model_specs.get("is_embedding_model", False)
 
     def supports_prompt_caching(self) -> bool:
         return self.model_specs.get("supports_prompt_caching", False)
@@ -374,8 +323,6 @@ class Model:
     def get_overall_score(self) -> float:
         return self.model_specs.get("MMLU_Pro_score", 0.0)
 
-# Define model constants as class attributes
-# These are created using the internal _create factory method
 Model.LLAMA3_2_3B = Model("together_ai/meta-llama/Llama-3.2-3B-Instruct-Turbo")
 Model.LLAMA3_1_8B = Model("together_ai/meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo")
 Model.LLAMA3_3_70B = Model("together_ai/meta-llama/Llama-3.3-70B-Instruct-Turbo")
@@ -399,12 +346,12 @@ Model.CLAUDE_4_5_SONNET = Model("anthropic/claude-sonnet-4-5-20250929")
 Model.CLAUDE_3_5_HAIKU = Model("anthropic/claude-3-5-haiku-20241022")
 Model.CLAUDE_4_5_HAIKU = Model("anthropic/claude-haiku-4-5-20251001")
 Model.GEMINI_3_0_PRO = Model("vertex_ai/gemini-3-pro-preview")  # image
-Model.GEMINI_3_0_FLASH = Model("vertex_ai/gemini-3-flash-12-25")  # Text, Image, Video, Audio, and PDF
+Model.GEMINI_3_0_FLASH = Model("vertex_ai/gemini-3-flash-preview")  # Text, Image, Video, Audio, and PDF
 Model.GEMINI_2_0_FLASH = Model("vertex_ai/gemini-2.0-flash")
 Model.GEMINI_2_5_FLASH = Model("vertex_ai/gemini-2.5-flash")
 Model.GEMINI_2_5_PRO = Model("vertex_ai/gemini-2.5-pro")
 Model.GOOGLE_GEMINI_3_0_PRO = Model("gemini/gemini-3-pro-preview")
-Model.GOOGLE_GEMINI_3_0_FLASH = Model("gemini/gemini-3-flash-12-25")
+Model.GOOGLE_GEMINI_3_0_FLASH = Model("gemini/gemini-3-flash-preview")
 Model.GOOGLE_GEMINI_2_5_FLASH = Model("gemini/gemini-2.5-flash")
 Model.GOOGLE_GEMINI_2_5_FLASH_LITE = Model("gemini/gemini-2.5-flash-lite")
 Model.GOOGLE_GEMINI_2_5_PRO = Model("gemini/gemini-2.5-pro")
@@ -429,76 +376,5 @@ Model.CLIP_VIT_B_32 = Model("clip-ViT-B-32")
 # from the internet for this quick POC, but we can and should do more to model these
 # values more precisely:
 # - https://artificialanalysis.ai/models/llama-3-1-instruct-8b
-#
-
-GEMINI_2_5_FLASH_LITE_MODEL_CARD = {
-    ##### Cost in USD #####
-    "usd_per_input_token": 0.1 / 1e6,
-    "usd_per_output_token": 0.4 / 1e6,
-    "usd_per_audio_input_token": 0.3 / 1e6,
-    ##### Time #####
-    "seconds_per_output_token": 0.0034,
-    ##### Agg. Benchmark #####
-    "overall": 79.1, # NOTE: interpolated between gemini 2.5 flash and gemini 2.0 flash
-}
-GEMINI_2_5_FLASH_MODEL_CARD = {
-    ##### Cost in USD #####
-    "usd_per_input_token": 0.30 / 1e6,
-    "usd_per_output_token": 2.5 / 1e6,
-    "usd_per_audio_input_token": 1.0 / 1e6,
-    "usd_per_cached_input_token": 0.03 / 1e6,
-    ##### Time #####
-    "seconds_per_output_token": 0.0044,
-    ##### Agg. Benchmark #####
-    "overall": 80.75, # NOTE: interpolated between gemini 2.0 flash and gemini 2.5 pro
-}
-GEMINI_2_5_PRO_MODEL_CARD = {
-    ##### Cost in USD #####
-    "usd_per_input_token": 1.25 / 1e6,
-    "usd_per_output_token": 10.0 / 1e6,
-    "usd_per_audio_input_token": 1.25 / 1e6,
-    "usd_per_cached_input_token": 0.125 / 1e6,
-    ##### Time #####
-    "seconds_per_output_token": 0.0072,
-    ##### Agg. Benchmark #####
-    "overall": 84.10,
-}
-GEMINI_3_0_FLASH_MODEL_CARD = {
-    ##### Cost in USD #####
-    "usd_per_input_token": 0.5/1e6,
-    "usd_per_output_token": 3/1e6,
-    "usd_per_audio_input_token": 1.0/1e6,
-    "usd_per_cached_input_token": 0.05 / 1e6,
-    ##### Time #####
-    "seconds_per_output_token": 0.00457247,
-    ##### Agg. Benchmark #####
-    "overall": 87.63,
-}
-GEMINI_3_0_PRO_MODEL_CARD = {
-    ##### Cost in USD #####
-    "usd_per_input_token": 2.0/1e6,
-    "usd_per_output_token": 12.0/1e6,
-    "usd_per_cached_input_token": 0.20 / 1e6,
-    ##### Time #####
-    "seconds_per_output_token": 0.0075758,
-    ##### Agg. Benchmark #####
-    "overall": 90.10,
-}
-LLAMA_4_MAVERICK_MODEL_CARD = {
-    ##### Cost in USD #####
-    "usd_per_input_token": 0.35 / 1e6,
-    "usd_per_output_token": 1.15 / 1e6,
-    ##### Time #####
-    "seconds_per_output_token": 0.0122,
-    ##### Agg. Benchmark #####
-    "overall": 79.4,
-}
-VLLM_QWEN_1_5_0_5B_CHAT_MODEL_CARD = {
-    ##### Cost in USD #####
-    "usd_per_input_token": 0.0 / 1e6,
-    "usd_per_output_token": 0.0 / 1e6,
-    ##### Time #####
-    "seconds_per_output_token": 0.1000, # TODO: fill-in with a better estimate
-    ##### Agg. Benchmark #####
-    "overall": 30.0, # TODO: fill-in with a better estimate
-}
+# 
+# Model metrics now fetched from singular json file curated_model_info.json

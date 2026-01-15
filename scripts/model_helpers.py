@@ -11,18 +11,6 @@ from palimpzest.constants import DYNAMIC_MODEL_INFO, Model, ModelProvider
 from palimpzest.core.models import PlanCost
 from palimpzest.policy import Policy
 
-
-# helper function to select the list of available models based on the
-def get_available_model_from_env(include_embedding: bool = False):
-    available_models = []
-    for model in Model.get_all_models():
-        # Skip embedding models if not requested
-        if not include_embedding and model.is_embedding_model():
-            continue
-        if model.api_key is not None or model.provider == ModelProvider.VLLM:
-            available_models.append(model.value)
-    return available_models
-
 def get_models(include_embedding: bool = False, use_vertex: bool = False, gemini_credentials_path: str | None = None, api_base: str | None = None):
     """
     Return the set of models which the system has access to based on the set environment variables.
