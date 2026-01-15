@@ -4,6 +4,7 @@ from enum import Enum
 
 from dotenv import load_dotenv
 
+from palimpzest.constants import Model
 from palimpzest.core.data.dataset import Dataset
 from palimpzest.core.elements.records import DataRecordCollection
 from palimpzest.query.execution.execution_strategy import ExecutionStrategy, SentinelExecutionStrategy
@@ -63,6 +64,16 @@ class QueryProcessorFactory:
         """
         # 1. Normalize available_models
         current_available_models = getattr(config, 'available_models', [])
+
+        # Allow users to specify models as strings (e.g., "openai/gpt-5.2-2025-12-11")
+        if current_available_models is not None and len(current_available_models) > 0:
+            assert all(
+                isinstance(model, (Model, str)) for model in current_available_models
+            ), "Must provide pz.Model or the model's full string identifier for each element in `available_models`"
+            current_available_models = [
+                Model(model) if isinstance(model, str) else model for model in current_available_models
+            ]
+
         if current_available_models is None or len(current_available_models) == 0:
             # If no models provided, select optimal models based on policy
             current_available_models = get_optimal_models(

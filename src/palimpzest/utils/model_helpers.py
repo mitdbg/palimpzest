@@ -1,7 +1,9 @@
 import os
+
 from palimpzest.constants import Model
 from palimpzest.core.models import PlanCost
 from palimpzest.policy import Policy
+
 
 def get_models(include_embedding: bool = False, use_vertex: bool = False, gemini_credentials_path: str | None = None, api_base: str | None = None) -> list[Model]:
     """
@@ -64,9 +66,13 @@ def get_models(include_embedding: bool = False, use_vertex: bool = False, gemini
 
     return models
 
-def get_optimal_models( policy: Policy, include_embedding: bool = False, use_vertex: bool = False, gemini_credentials_path: str | None = None, api_base: str | None = None):
+def get_optimal_models(policy: Policy, include_embedding: bool = False, use_vertex: bool = False, gemini_credentials_path: str | None = None, api_base: str | None = None) -> list[Model]:
     """
     Selects the top models from the available list based on the user's policy.
+
+    Post-condition: This function will never return an empty list unless there are
+    no available models at all. If policy constraints filter out all models, it
+    falls back to returning the best model(s) based on the policy's primary metric.
     """
     # 1. Gather Available Models
     available_models = get_models(
@@ -79,10 +85,9 @@ def get_optimal_models( policy: Policy, include_embedding: bool = False, use_ver
     if not available_models:
         return []
 
-    # 2. Gather Metrics and Apply Constraints
-    candidates = []
+    # 2. Gather Metrics for all models
+    all_model_metrics = []
     for model in available_models:
-        # Retrieve or predict metrics
         quality_score = model.get_overall_score()
         cost = model.get_usd_per_output_token()
         time_val = model.get_seconds_per_output_token()
@@ -94,24 +99,42 @@ def get_optimal_models( policy: Policy, include_embedding: bool = False, use_ver
         if time_val is None:
             time_val = float("inf")
 
-        # Create proxy plan for constraint checking
-        normalized_quality = quality_score / 100.0
-        proxy_plan = PlanCost(cost=0.0, time=0.0, quality=normalized_quality)
-
-        if not policy.constraint(proxy_plan):
-            continue
-
-        candidates.append({
+        all_model_metrics.append({
             "id": model,
             "quality": quality_score,
             "cost": cost,
             "time": time_val
         })
 
-    if not candidates:
-        return []
+    # 3. Apply Constraints
+    candidates = []
+    for model_data in all_model_metrics:
+        normalized_quality = model_data["quality"] / 100.0
+        proxy_plan = PlanCost(cost=0.0, time=0.0, quality=normalized_quality)
 
-    # 3. Normalize Metrics (Min-Max Normalization)
+        if policy.constraint(proxy_plan):
+            candidates.append(model_data)
+
+    # 4. Fallback: If no models meet constraints, select best model(s) by primary metric
+    if not candidates:
+        primary_metric = policy.get_primary_metric()
+
+        if primary_metric == "quality":
+            # Return the model with the highest quality score
+            best = max(all_model_metrics, key=lambda x: x["quality"])
+        elif primary_metric == "cost":
+            # Return the model with the lowest cost
+            best = min(all_model_metrics, key=lambda x: x["cost"])
+        elif primary_metric == "time":
+            # Return the model with the lowest latency
+            best = min(all_model_metrics, key=lambda x: x["time"])
+        else:
+            # Default to highest quality
+            best = max(all_model_metrics, key=lambda x: x["quality"])
+
+        return [best["id"]]
+
+    # 5. Normalize Metrics (Min-Max Normalization)
     quals = [c["quality"] for c in candidates]
     costs = [c["cost"] for c in candidates]
     times = [c["time"] for c in candidates]
@@ -126,7 +149,7 @@ def get_optimal_models( policy: Policy, include_embedding: bool = False, use_ver
         norm = (val - min_v) / (max_v - min_v)
         return (1.0 - norm) if invert else norm
 
-    # 4. Calculate Scores
+    # 6. Calculate Scores
     weights = policy.get_dict()
     w_q = weights.get("quality", 0.0)
     w_c = weights.get("cost", 0.0)
@@ -142,12 +165,9 @@ def get_optimal_models( policy: Policy, include_embedding: bool = False, use_ver
 
         scored_candidates.append((score, cand["id"]))
 
-    # 5. Select Top 5
+    # 7. Select Top 5
     scored_candidates.sort(key=lambda x: x[0], reverse=True)
-    top_models_ids = [mid for score, mid in scored_candidates[:5]]
-
-    # Return list of Model objects
-    top_models = [mid for mid in top_models_ids]
+    top_models = [model for _, model in scored_candidates[:5]]
 
     return top_models
 

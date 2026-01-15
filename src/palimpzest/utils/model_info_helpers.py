@@ -1,5 +1,6 @@
 import requests
 
+
 class ModelMetricsManager:
     """
     Manages fetching and caching of model metrics from an external source.

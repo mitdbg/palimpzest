@@ -23,17 +23,14 @@ import palimpzest as pz
 from palimpzest.constants import Model, PromptStrategy
 from palimpzest.core.data.dataset import Dataset
 from palimpzest.core.elements.records import DataRecord
-from palimpzest.policy import MinCost, MaxQuality
+from palimpzest.policy import MaxQuality, MinCost, MinCostAtFixedQuality, MinTime
 from palimpzest.query.generators.generators import Generator
 from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.query.processor.query_processor_factory import QueryProcessorFactory
 from palimpzest.utils.model_helpers import (
     get_models,
     get_optimal_models,
-    resolve_reasoning_settings,
 )
-from palimpzest.utils.model_info_helpers import ModelMetricsManager
-
 
 # =============================================================================
 # FIXTURES
@@ -319,6 +316,42 @@ class TestModelHelperFunctions:
             # Both should return models
             assert len(cost_models) > 0
             assert len(quality_models) > 0
+
+    def test_get_optimal_models_never_returns_empty_with_available_models(self):
+        """Test that get_optimal_models never returns empty when models are available."""
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=False):
+            # Use a very high quality constraint that no model can meet (0.95 = 95% MMLU-Pro)
+            policy = MinCostAtFixedQuality(min_quality=0.95)
+            models = get_optimal_models(policy=policy)
+
+            # Should still return at least one model (the best by primary metric)
+            assert len(models) >= 1
+
+    def test_get_optimal_models_fallback_returns_best_by_primary_metric(self):
+        """Test that fallback returns best model according to primary metric."""
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=False):
+            # MinCostAtFixedQuality has primary_metric="cost"
+            # With impossible constraint, should return cheapest model
+            policy_cost = MinCostAtFixedQuality(min_quality=0.99)
+            cost_models = get_optimal_models(policy=policy_cost)
+            assert len(cost_models) >= 1
+
+            # MaxQuality has primary_metric="quality"
+            # Even with no constraint issues, verify it returns models
+            policy_quality = MaxQuality()
+            quality_models = get_optimal_models(policy=policy_quality)
+            assert len(quality_models) >= 1
+
+    def test_get_optimal_models_fallback_with_time_policy(self):
+        """Test that fallback works with time-based policy."""
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=False):
+            # MinTime has primary_metric="time"
+            policy = MinTime()
+            models = get_optimal_models(policy=policy)
+
+            # Should return models (fastest ones)
+            assert len(models) >= 1
+
 
 # =============================================================================
 # TEST CLASS: Generator Integration

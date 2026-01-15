@@ -6,6 +6,7 @@ from enum import Enum
 
 from palimpzest.utils.model_info_helpers import ModelMetricsManager
 
+
 class PromptStrategy(str, Enum):
     """
     PromptStrategy describes the prompting technique to be used by a Generator when
