@@ -1,624 +1,586 @@
 {
-  "gpt-4o-2024-11-20": {
-    "output_tokens_per_second": 193.8,
-    "MMLU_Pro_score": 77.9,
-    "is_reasoning_model": false,
-    "is_vision_model": true,
-    "is_text_model": true,
-    "is_audio_model": true,
-    "is_embedding_model": false,
-    "usd_per_input_token": 2.5e-06,
-    "usd_per_output_token": 1e-05
-  },
-  "gpt-4o-2024-05-13": {
-    "output_tokens_per_second": 121.9,
-    "MMLU_Pro_score": 72.55,
-    "is_reasoning_model": false,
-    "is_vision_model": true,
-    "is_text_model": true,
-    "is_audio_model": true,
-    "is_embedding_model": false,
-    "usd_per_input_token": 5e-06,
-    "usd_per_output_token": 1.5e-05
-  },
-  "gpt-5.2-2025-12-11": {
-    "output_tokens_per_second": 113.0,
-    "MMLU_Pro_score": 86.23,
-    "usd_per_input_token": 1.75e-06,
-    "usd_per_output_token": 1.4e-05,
-    "seconds_per_output_token": 0.01471,
-    "is_reasoning_model": false,
-    "is_vision_model": true,
-    "is_text_model": true,
-    "is_audio_model": false,
-    "is_embedding_model": false
-  },
-  "gpt-5.1-2025-11-13": {
-    "output_tokens_per_second": 164.9,
-    "MMLU_Pro_score": 86.38,
-    "is_reasoning_model": false,
-    "is_vision_model": true,
-    "is_text_model": true,
-    "is_audio_model": false,
-    "is_embedding_model": false,
-    "usd_per_input_token": 1.25e-06,
-    "usd_per_output_token": 1e-05
-  },
-  "gpt-5-2025-08-07": {
-    "output_tokens_per_second": 131.4,
-    "MMLU_Pro_score": 87.0,
-    "usd_per_input_token": 1.25e-06,
-    "usd_per_output_token": 1e-05,
-    "seconds_per_output_token": 0.006,
-    "is_reasoning_model": false,
-    "is_vision_model": true,
-    "is_text_model": true,
-    "is_audio_model": false,
-    "is_embedding_model": false
-  },
-  "gpt-5-mini-2025-08-07": {
-    "output_tokens_per_second": 70.3,
-    "MMLU_Pro_score": 82.5,
-    "usd_per_input_token": 2.5e-07,
-    "usd_per_output_token": 2e-06,
-    "seconds_per_output_token": 0.0135,
-    "is_reasoning_model": false,
-    "is_vision_model": true,
-    "is_text_model": true,
-    "is_audio_model": false,
-    "is_embedding_model": false
-  },
-  "gpt-5-nano-2025-08-07": {
-    "output_tokens_per_second": 126.9,
-    "MMLU_Pro_score": 77.9,
-    "usd_per_input_token": 5e-08,
-    "usd_per_output_token": 4e-07,
-    "seconds_per_output_token": 0.0055,
-    "is_reasoning_model": false,
-    "is_vision_model": true,
-    "is_text_model": true,
-    "is_audio_model": false,
-    "is_embedding_model": false
-  },
-  "gpt-4-turbo-2024-04-09": {
-    "output_tokens_per_second": 35.2,
-    "MMLU_Pro_score": 63.71,
-    "is_reasoning_model": false,
-    "is_vision_model": false,
-    "is_text_model": true,
-    "is_audio_model": false,
-    "is_embedding_model": false,
-    "usd_per_input_token": 1e-05,
-    "usd_per_output_token": 3e-05
-  },
-  "gpt-4o-2024-08-06": {
-    "output_tokens_per_second": 193.8,
-    "MMLU_Pro_score": 74.1,
-    "usd_per_input_token": 2.5e-06,
-    "usd_per_output_token": 1e-05,
-    "seconds_per_output_token": 0.008,
-    "is_reasoning_model": false,
-    "is_vision_model": true,
-    "is_text_model": true,
-    "is_audio_model": true,
-    "is_embedding_model": false
-  },
-  "gpt-4o-mini-2024-07-18": {
-    "output_tokens_per_second": 72.5,
-    "MMLU_Pro_score": 62.7,
-    "usd_per_input_token": 1.5e-07,
-    "usd_per_output_token": 6e-07,
-    "seconds_per_output_token": 0.0159,
-    "is_reasoning_model": false,
-    "is_vision_model": true,
-    "is_text_model": true,
-    "is_audio_model": true,
-    "is_embedding_model": false
-  },
-  "gpt-4.1-2025-04-14": {
-    "output_tokens_per_second": 103.0,
-    "MMLU_Pro_score": 80.5,
-    "usd_per_input_token": 2e-06,
-    "usd_per_output_token": 8e-06,
-    "seconds_per_output_token": 0.0076,
-    "is_reasoning_model": false,
-    "is_vision_model": false,
-    "is_text_model": true,
-    "is_audio_model": false,
-    "is_embedding_model": false
-  },
-  "gpt-4.1-mini-2025-04-14": {
-    "output_tokens_per_second": 66.4,
-    "MMLU_Pro_score": 77.2,
-    "usd_per_input_token": 4e-07,
-    "usd_per_output_token": 1.6e-06,
-    "seconds_per_output_token": 0.0161,
-    "is_reasoning_model": false,
-    "is_vision_model": false,
-    "is_text_model": true,
-    "is_audio_model": false,
-    "is_embedding_model": false
-  },
-  "gpt-4.1-nano-2025-04-14": {
-    "output_tokens_per_second": 165.1,
-    "MMLU_Pro_score": 62.3,
-    "usd_per_input_token": 1e-07,
-    "usd_per_output_token": 4e-07,
-    "seconds_per_output_token": 0.006,
-    "is_reasoning_model": false,
-    "is_vision_model": false,
-    "is_text_model": true,
-    "is_audio_model": false,
-    "is_embedding_model": false
-  },
-  "o1-2024-12-17": {
-    "output_tokens_per_second": 202.0,
-    "MMLU_Pro_score": 89.3,
-    "is_reasoning_model": true,
-    "is_vision_model": false,
-    "is_text_model": true,
-    "is_audio_model": false,
-    "is_embedding_model": false,
-    "usd_per_input_token": 1.5e-05,
-    "usd_per_output_token": 6e-05
-  },
-  "o1-mini-2024-09-12": {
-    "output_tokens_per_second": 72.5,
-    "MMLU_Pro_score": 80.3,
-    "is_reasoning_model": true,
-    "is_vision_model": false,
-    "is_text_model": true,
-    "is_audio_model": false,
-    "is_embedding_model": false,
-    "usd_per_input_token": 3e-06,
-    "usd_per_output_token": 1.2e-05
-  },
-  "o3-2025-04-16": {
-    "output_tokens_per_second": 330.1,
-    "MMLU_Pro_score": 85.0,
-    "is_reasoning_model": true,
-    "is_vision_model": false,
-    "is_text_model": true,
-    "is_audio_model": false,
-    "is_embedding_model": false,
-    "usd_per_input_token": 2e-06,
-    "usd_per_output_token": 8e-06
-  },
-  "o3-mini-2025-01-31": {
-    "output_tokens_per_second": 158.6,
-    "MMLU_Pro_score": 79.4,
-    "is_reasoning_model": true,
-    "is_vision_model": false,
-    "is_text_model": true,
-    "is_audio_model": false,
-    "is_embedding_model": false,
-    "usd_per_input_token": 1.1e-06,
-    "usd_per_output_token": 4.4e-06
-  },
-  "o4-mini-2025-04-16": {
-    "output_tokens_per_second": 76.3,
-    "MMLU_Pro_score": 80.6,
-    "usd_per_input_token": 1.1e-06,
-    "usd_per_output_token": 4.4e-06,
-    "seconds_per_output_token": 0.0092,
-    "is_reasoning_model": false,
-    "is_vision_model": false,
-    "is_text_model": true,
-    "is_audio_model": false,
-    "is_embedding_model": false
-  },
-  "gpt-oss-20b": {
-    "output_tokens_per_second": 317.9,
-    "MMLU_Pro_score": 73.6,
-    "is_reasoning_model": false,
-    "is_vision_model": false,
-    "is_text_model": true,
-    "is_audio_model": false,
-    "is_embedding_model": false,
-    "usd_per_input_token": 0,
-    "usd_per_output_token": 0
-  },
-  "gpt-oss-120b": {
-    "output_tokens_per_second": 257.2,
-    "MMLU_Pro_score": 80.8,
-    "is_reasoning_model": false,
-    "is_vision_model": false,
-    "is_text_model": true,
-    "is_audio_model": false,
-    "is_embedding_model": false,
-    "usd_per_input_token": 0,
-    "usd_per_output_token": 0
-  },
-  "Qwen2.5-1.5B-Instruct": {
-    "output_tokens_per_second": 85,
-    "MMLU_Pro_score": 32.1
-  },
-  "Qwen2.5-72B-Instruct": {
-    "output_tokens_per_second": 45.4,
-    "MMLU_Pro_score": 71.59
-  },
-  "Qwen3-30B-A3B-Thinking-2507": {
-    "output_tokens_per_second": 179.1,
-    "MMLU_Pro_score": 80.9
-  },
-  "Qwen3-235B-A22B-Thinking-2507": {
-    "output_tokens_per_second": 47.0,
-    "MMLU_Pro_score": 84.5
-  },
-  "gemma-3n-E2B-it": {
-    "output_tokens_per_second": 46.8,
-    "MMLU_Pro_score": 15.6,
-    "is_reasoning_model": false,
-    "is_vision_model": false,
-    "is_text_model": true,
-    "is_audio_model": false,
-    "is_embedding_model": false,
-    "usd_per_input_token": 0,
-    "usd_per_output_token": 0
-  },
-  "gemma-3-1b-it": {
-    "output_tokens_per_second": 43.0,
-    "MMLU_Pro_score": 14.7,
-    "is_reasoning_model": false,
-    "is_vision_model": false,
-    "is_text_model": true,
-    "is_audio_model": false,
-    "is_embedding_model": false,
-    "usd_per_input_token": 0,
-    "usd_per_output_token": 0
-  },
-  "gemma-3-4b-it": {
-    "output_tokens_per_second": 44.5,
-    "MMLU_Pro_score": 43.6,
-    "is_reasoning_model": false,
-    "is_vision_model": false,
-    "is_text_model": true,
-    "is_audio_model": false,
-    "is_embedding_model": false,
-    "usd_per_input_token": 0,
-    "usd_per_output_token": 0
-  },
-  "gemma-3-12b-it": {
-    "output_tokens_per_second": 46.8,
-    "MMLU_Pro_score": 60.6,
-    "is_reasoning_model": false,
-    "is_vision_model": false,
-    "is_text_model": true,
-    "is_audio_model": false,
-    "is_embedding_model": false,
-    "usd_per_input_token": 0,
-    "usd_per_output_token": 0
-  },
-  "gemma-3-27b-it": {
-    "output_tokens_per_second": 46.5,
-    "MMLU_Pro_score": 67.5,
-    "is_reasoning_model": false,
-    "is_vision_model": false,
-    "is_text_model": true,
-    "is_audio_model": false,
-    "is_embedding_model": false,
-    "usd_per_input_token": 0,
-    "usd_per_output_token": 0
-  },
-  "gemini-2.0-flash-lite": {
-    "output_tokens_per_second": 589.9,
-    "MMLU_Pro_score": 71.6,
-    "is_reasoning_model": false,
-    "is_vision_model": true,
-    "is_text_model": true,
-    "is_audio_model": true,
-    "is_embedding_model": false,
-    "usd_per_input_token": 7.5e-08,
-    "usd_per_output_token": 3e-07
-  },
-  "gemini-2.0-flash": {
-    "output_tokens_per_second": 185.18,
-    "MMLU_Pro_score": 77.4,
-    "usd_per_input_token": 1e-07,
-    "usd_per_output_token": 4e-07,
-    "usd_per_audio_input_token": 1e-06,
-    "seconds_per_output_token": 0.0054,
-    "is_reasoning_model": false,
-    "is_vision_model": true,
-    "is_text_model": true,
-    "is_audio_model": true,
-    "is_embedding_model": false
-  },
-  "gemini-2.5-pro": {
-    "output_tokens_per_second": 158.9,
-    "MMLU_Pro_score": 84.1,
-    "usd_per_input_token": 1.25e-06,
-    "usd_per_output_token": 1e-05,
-    "usd_per_audio_input_token": 1.25e-06,
-    "seconds_per_output_token": 0.0072,
-    "is_reasoning_model": false,
-    "is_vision_model": true,
-    "is_text_model": true,
-    "is_audio_model": true,
-    "is_embedding_model": false
-  },
-  "gemini-3-flash-12-25": {
-    "output_tokens_per_second": 223.4,
-    "MMLU_Pro_score": 87.63,
-    "usd_per_input_token": 0,
-    "usd_per_output_token": 0,
-    "usd_per_audio_input_token": 1e-06,
-    "seconds_per_output_token": 0.00457247,
-    "is_reasoning_model": false,
-    "is_vision_model": false,
-    "is_text_model": true,
-    "is_audio_model": false,
-    "is_embedding_model": false
-  },
-  "gemini-3-pro-preview": {
-    "output_tokens_per_second": 127.6,
-    "MMLU_Pro_score": 90.1,
-    "usd_per_input_token": 2e-06,
-    "usd_per_output_token": 1.2e-05,
-    "seconds_per_output_token": 0.0075758,
-    "is_reasoning_model": false,
-    "is_vision_model": false,
-    "is_text_model": true,
-    "is_audio_model": false,
-    "is_embedding_model": false
-  },
-  "claude-opus-4-1-20250805": {
-    "output_tokens_per_second": 46.6,
-    "MMLU_Pro_score": 87.92
-  },
-  "claude-sonnet-4-5-20250929": {
-    "output_tokens_per_second": 64.2,
-    "MMLU_Pro_score": 87.36
-  },
-  "claude-haiku-4-5-20251001": {
-    "output_tokens_per_second": 78.72,
-    "MMLU_Pro_score": 87.3
-  },
-  "claude-opus-4-5-20251101": {
-    "output_tokens_per_second": 60.9,
-    "MMLU_Pro_score": 87.3
-  },
-  "Nemotron-Nano-9B-v2": {
-    "output_tokens_per_second": 32.1,
-    "MMLU_Pro_score": 62.78
-  },
-  "Nemotron-H-56B-Base-8K": {
-    "output_tokens_per_second": 32.4,
-    "MMLU_Pro_score": 60.5
-  },
-  "Nemotron-H-8B-Base-8K": {
-    "output_tokens_per_second": 185.0,
-    "MMLU_Pro_score": 44.0
-  },
-  "Llama-3.1-8B": {
-    "output_tokens_per_second": null,
-    "MMLU_Pro_score": 36.6
-  },
-  "Llama-3.1-70B": {
-    "output_tokens_per_second": null,
-    "MMLU_Pro_score": 52.47
-  },
-  "Llama-3.1-405B": {
-    "output_tokens_per_second": null,
-    "MMLU_Pro_score": 61.6
-  },
-  "Llama-3.1-8B-Instruct": {
-    "output_tokens_per_second": 153.3,
-    "MMLU_Pro_score": 44.25,
-    "usd_per_input_token": 1.8e-07,
-    "usd_per_output_token": 1.8e-07,
-    "seconds_per_output_token": 0.005
-  },
-  "Llama-3.1-70B-Instruct": {
-    "output_tokens_per_second": 59.4,
-    "MMLU_Pro_score": 62.84
-  },
-  "Llama-3.1-405B-Instruct": {
-    "output_tokens_per_second": 24.9,
-    "MMLU_Pro_score": 73.3
-  },
-  "Llama-3.2-1B-Instruct": {
-    "output_tokens_per_second": 74.9,
-    "MMLU_Pro_score": 11.95
-  },
-  "Llama-3.2-3B-Instruct": {
-    "output_tokens_per_second": 80.9,
-    "MMLU_Pro_score": 36.5,
-    "usd_per_input_token": 6e-08,
-    "usd_per_output_token": 6e-08,
-    "seconds_per_output_token": 0.0079
-  },
-  "Llama-3.3-70B-Instruct": {
-    "output_tokens_per_second": 115.6,
-    "MMLU_Pro_score": 69.9,
-    "usd_per_input_token": 8.8e-07,
-    "usd_per_output_token": 8.8e-07,
-    "seconds_per_output_token": 0.0122
-  },
-  "Llama-4-Maverick-17B-128E-Instruct": {
-    "output_tokens_per_second": 135.0,
-    "MMLU_Pro_score": 79.4,
-    "usd_per_input_token": 3.5e-07,
-    "usd_per_output_token": 1.15e-06,
-    "seconds_per_output_token": 0.0122
-  },
-  "Llama-4-Scout-17B-16E-Instruct": {
-    "output_tokens_per_second": 116.4,
-    "MMLU_Pro_score": 74.3
-  },
-  "Llama-4-Behemoth-Instruct": {
-    "output_tokens_per_second": null,
-    "MMLU_Pro_score": 82.8
-  },
-  "DeepSeek-V2-Lite-Chat": {
-    "output_tokens_per_second": 160.5,
-    "MMLU_Pro_score": 54.81
-  },
-  "DeepSeek-Coder-V2-Lite-Instruct": {
-    "output_tokens_per_second": 145.2,
-    "MMLU_Pro_score": 41.57
-  },
-  "DeepSeek-V3-0324": {
-    "output_tokens_per_second": 60.0,
-    "MMLU_Pro_score": 73.8,
-    "usd_per_input_token": 1.25e-06,
-    "usd_per_output_token": 1.25e-06,
-    "seconds_per_output_token": 0.0114
-  },
-  "DeepSeek-R1-0528-Qwen3-8B": {
-    "output_tokens_per_second": 38.6,
-    "MMLU_Pro_score": 83.4
-  },
-  "DeepSeek-V3.1-nonthinking": {
-    "output_tokens_per_second": 72.4,
-    "MMLU_Pro_score": 83.7
-  },
-  "DeepSeek-v3.1-thinking": {
-    "output_tokens_per_second": 20.5,
-    "MMLU_Pro_score": 84.8
-  },
-  "MAmmoTH2-7B-Plus": {
-    "output_tokens_per_second": 105.4,
-    "MMLU_Pro_score": 40.85
-  },
-  "MAmmoTH2-8B-Plus": {
-    "output_tokens_per_second": 98.2,
-    "MMLU_Pro_score": 43.35
-  },
-  "MAmmoTH2-8x7B-Plus": {
-    "output_tokens_per_second": 62.5,
-    "MMLU_Pro_score": 50.4
-  },
-  "AI21-Jamba-Large-1.5": {
-    "output_tokens_per_second": 45.8,
-    "MMLU_Pro_score": 49.46
-  },
-  "granite-3.0-8b-base": {
-    "output_tokens_per_second": 118.4,
-    "MMLU_Pro_score": 31.03
-  },
-  "granite-3.0-2b-base": {
-    "output_tokens_per_second": 215.0,
-    "MMLU_Pro_score": 21.72
-  },
-  "granite-3.1-1b-a400m-base": {
-    "output_tokens_per_second": 480.2,
-    "MMLU_Pro_score": 13.27
-  },
-  "granite-3.1-2b-base": {
-    "output_tokens_per_second": 232.5,
-    "MMLU_Pro_score": 23.89
-  },
-  "granite-3.1-2b-instruct": {
-    "output_tokens_per_second": 228.1,
-    "MMLU_Pro_score": 31.97
-  },
-  "granite-3.1-3b-a800m-instruct": {
-    "output_tokens_per_second": 345.6,
-    "MMLU_Pro_score": 25.42
-  },
-  "granite-3.1-8b-base": {
-    "output_tokens_per_second": 124.8,
-    "MMLU_Pro_score": 33.08
-  },
-  "granite-3.1-8b-instruct": {
-    "output_tokens_per_second": 121.3,
-    "MMLU_Pro_score": 41.03
-  },
-  "aya-expanse-8b": {
-    "output_tokens_per_second": 115.4,
-    "MMLU_Pro_score": 33.74
-  },
-  "aya-expanse-32b": {
-    "output_tokens_per_second": 48.2,
-    "MMLU_Pro_score": 45.41
-  },
-  "aya-vision-8b": {
-    "output_tokens_per_second": 92.5,
-    "MMLU_Pro_score": 47.2
-  },
-  "MiniMax-Text-01-hf": {
-    "output_tokens_per_second": 65.8,
-    "MMLU_Pro_score": 75.7
-  },
-  "MiniMax-M1-40k": {
-    "output_tokens_per_second": 12.5,
-    "MMLU_Pro_score": 81.1
-  },
-  "kimi-k2-instruct": {
-    "output_tokens_per_second": 86.0,
-    "MMLU_Pro_score": 81.0
-  },
-  "mistral-small-2506": {
-    "output_tokens_per_second": 145.2,
-    "MMLU_Pro_score": 66.02
-  },
-  "mistral-medium-2508": {
-    "output_tokens_per_second": 92.4,
-    "MMLU_Pro_score": 56.33
-  },
-  "mistral-large-2512": {
-    "output_tokens_per_second": 68.8,
-    "MMLU_Pro_score": 79.82
-  },
-  "magistral-medium-2509": {
-    "output_tokens_per_second": 42.5,
-    "MMLU_Pro_score": 68.66
-  },
-  "magistral-small-2509": {
-    "output_tokens_per_second": 118.3,
-    "MMLU_Pro_score": 62.14
-  },
-  "Phi-3-medium-128k-instruct": {
-    "output_tokens_per_second": 88.5,
-    "MMLU_Pro_score": 51.91
-  },
-  "Phi-3-medium-4k-instruct": {
-    "output_tokens_per_second": 94.2,
-    "MMLU_Pro_score": 55.7
-  },
-  "Phi-3-mini-128k-instruct": {
-    "output_tokens_per_second": 142.1,
-    "MMLU_Pro_score": 43.86
-  },
-  "Phi-3-mini-4k-instruct": {
-    "output_tokens_per_second": 155.4,
-    "MMLU_Pro_score": 52.8
-  },
-  "Phi-3.5-mini-instruct": {
-    "output_tokens_per_second": 148.9,
-    "MMLU_Pro_score": 47.87
-  },
-  "phi-4": {
-    "output_tokens_per_second": 72.3,
-    "MMLU_Pro_score": 70.4
-  },
-  "grok-3-mini": {
-    "output_tokens_per_second": 193.7,
-    "MMLU_Pro_score": 81.37
-  },
-  "grok-3": {
-    "output_tokens_per_second": 39.9,
-    "MMLU_Pro_score": 79.95
-  },
-  "grok-4-0709": {
-    "output_tokens_per_second": 45.9,
-    "MMLU_Pro_score": 85.3
-  },
-  "grok-4-1-fast-reasoning": {
-    "output_tokens_per_second": 166.7,
-    "MMLU_Pro_score": 84.18
-  },
-  "grok-4-1-fast-non-reasoning": {
-    "output_tokens_per_second": 145.7,
-    "MMLU_Pro_score": 75.21
-  },
-  "grok-4-fast-reasoning": {
-    "output_tokens_per_second": 151.4,
-    "MMLU_Pro_score": 79.7
-  },
-  "grok-4-fast-non-reasoning": {
-    "output_tokens_per_second": 153.2,
-    "MMLU_Pro_score": 70.34
-  }
+    "together_ai/meta-llama/Llama-3.2-3B-Instruct-Turbo": {
+        "usd_per_input_token": 6e-08,
+        "usd_per_output_token": 6e-08,
+        "seconds_per_output_token": 0.0079,
+        "MMLU_Pro_score": 36.5,
+        "is_reasoning_model": false,
+        "is_text_model": true,
+        "is_vision_model": false,
+        "is_audio_model": false,
+        "is_llama_model": true,
+        "is_embedding_model": false,
+        "supports_prompt_caching": false,
+        "provider": "together_ai",
+        "sources": [
+            "https://artificialanalysis.ai/models/llama-3-1-instruct-8b",
+            "https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct/discussions/13"
+        ]
+    },
+    "together_ai/meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo": {
+        "usd_per_input_token": 1.8e-07,
+        "usd_per_output_token": 1.8e-07,
+        "seconds_per_output_token": 0.005,
+        "MMLU_Pro_score": 44.25,
+        "is_reasoning_model": false,
+        "is_text_model": true,
+        "is_vision_model": false,
+        "is_audio_model": false,
+        "is_llama_model": true,
+        "is_embedding_model": false,
+        "supports_prompt_caching": false,
+        "provider": "together_ai",
+        "sources": null
+    },
+    "together_ai/meta-llama/Llama-3.3-70B-Instruct-Turbo": {
+        "usd_per_input_token": 8.8e-07,
+        "usd_per_output_token": 8.8e-07,
+        "seconds_per_output_token": 0.0122,
+        "MMLU_Pro_score": 69.9,
+        "is_reasoning_model": false,
+        "is_text_model": true,
+        "is_vision_model": false,
+        "is_audio_model": false,
+        "is_llama_model": true,
+        "is_embedding_model": false,
+        "supports_prompt_caching": false,
+        "provider": "together_ai",
+        "sources": null
+    },
+    "together_ai/meta-llama/Llama-3.2-90B-Vision-Instruct-Turbo": {
+        "usd_per_input_token": 1.2e-06,
+        "usd_per_output_token": 1.2e-06,
+        "seconds_per_output_token": 0.0303,
+        "MMLU_Pro_score": 65.0,
+        "is_reasoning_model": false,
+        "is_text_model": false,
+        "is_vision_model": true,
+        "is_audio_model": false,
+        "is_llama_model": true,
+        "is_embedding_model": false,
+        "supports_prompt_caching": false,
+        "provider": "together_ai",
+        "sources": null
+    },
+    "together_ai/deepseek-ai/DeepSeek-V3": {
+        "usd_per_input_token": 1.25e-06,
+        "usd_per_output_token": 1.25e-06,
+        "seconds_per_output_token": 0.0114,
+        "MMLU_Pro_score": 73.8,
+        "is_reasoning_model": false,
+        "is_text_model": true,
+        "is_vision_model": false,
+        "is_audio_model": false,
+        "is_embedding_model": false,
+        "supports_prompt_caching": false,
+        "provider": "together_ai",
+        "sources": null
+    },
+    "together_ai/deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B": {
+        "usd_per_input_token": 1.8e-07,
+        "usd_per_output_token": 1.8e-07,
+        "seconds_per_output_token": 0.005,
+        "MMLU_Pro_score": 39.9,
+        "is_reasoning_model": false,
+        "is_text_model": true,
+        "is_vision_model": false,
+        "is_audio_model": false,
+        "is_embedding_model": false,
+        "supports_prompt_caching": false,
+        "provider": "together_ai",
+        "sources": null
+    },
+    "openai/gpt-4o-2024-08-06": {
+        "usd_per_input_token": 2.5e-06,
+        "usd_per_output_token": 1e-05,
+        "usd_per_cache_read_token": 1.25e-06,
+        "usd_per_cache_creation_token": 0,
+        "seconds_per_output_token": 0.008,
+        "MMLU_Pro_score": 74.1,
+        "is_reasoning_model": false,
+        "is_text_model": true,
+        "is_vision_model": true,
+        "is_audio_model": false,
+        "is_embedding_model": false,
+        "supports_prompt_caching": true,
+        "provider": "openai",
+        "sources": null
+    },
+    "openai/gpt-4o-mini-2024-07-18": {
+        "usd_per_input_token": 1.5e-07,
+        "usd_per_output_token": 6e-07,
+        "usd_per_cache_read_token": 7.5e-08,
+        "seconds_per_output_token": 0.0159,
+        "MMLU_Pro_score": 62.7,
+        "is_reasoning_model": false,
+        "is_text_model": true,
+        "is_vision_model": true,
+        "is_audio_model": false,
+        "is_embedding_model": false,
+        "supports_prompt_caching": true,
+        "provider": "openai",
+        "sources": null
+    },
+    "openai/gpt-4.1-2025-04-14": {
+        "usd_per_input_token": 2e-06,
+        "usd_per_output_token": 8e-06,
+        "usd_per_cache_read_token": 5e-07,
+        "seconds_per_output_token": 0.0076,
+        "MMLU_Pro_score": 80.5,
+        "is_reasoning_model": false,
+        "is_text_model": true,
+        "is_vision_model": true,
+        "is_audio_model": false,
+        "is_embedding_model": false,
+        "supports_prompt_caching": true,
+        "provider": "openai",
+        "sources": null
+    },
+    "openai/gpt-4.1-mini-2025-04-14": {
+        "usd_per_input_token": 4e-07,
+        "usd_per_output_token": 1.6e-06,
+        "usd_per_cache_read_token": 1.0e-07,
+        "seconds_per_output_token": 0.0161,
+        "MMLU_Pro_score": 77.2,
+        "is_reasoning_model": false,
+        "is_text_model": true,
+        "is_vision_model": true,
+        "is_audio_model": false,
+        "is_embedding_model": false,
+        "supports_prompt_caching": true,
+        "provider": "openai",
+        "sources": null
+    },
+    "openai/gpt-4.1-nano-2025-04-14": {
+        "usd_per_input_token": 1.0e-07,
+        "usd_per_output_token": 4.0e-07,
+        "usd_per_cache_read_token": 2.5e-08,
+        "seconds_per_output_token": 0.006,
+        "MMLU_Pro_score": 62.3,
+        "is_reasoning_model": false,
+        "is_text_model": true,
+        "is_vision_model": true,
+        "is_audio_model": false,
+        "is_embedding_model": false,
+        "supports_prompt_caching": true,
+        "provider": "openai",
+        "sources": null
+    },
+    "openai/gpt-5-2025-08-07": {
+        "usd_per_input_token": 1.25e-06,
+        "usd_per_output_token": 1e-05,
+        "usd_per_cache_read_token": 1.25e-07,
+        "seconds_per_output_token": 0.006,
+        "MMLU_Pro_score": 87.0,
+        "is_reasoning_model": true,
+        "is_text_model": true,
+        "is_vision_model": true,
+        "is_audio_model": false,
+        "is_gpt_5_model": true,
+        "is_embedding_model": false,
+        "supports_prompt_caching": true,
+        "provider": "openai",
+        "sources": null
+    },
+    "openai/gpt-5-mini-2025-08-07": {
+        "usd_per_input_token": 2.5e-07,
+        "usd_per_output_token": 2e-06,
+        "usd_per_audio_input_token": 0,
+        "usd_per_cache_read_token": 2.5e-08,
+        "seconds_per_output_token": 0.0135,
+        "MMLU_Pro_score": 82.5,
+        "is_reasoning_model": true,
+        "is_text_model": true,
+        "is_vision_model": true,
+        "is_audio_model": false,
+        "is_gpt_5_model": true,
+        "is_embedding_model": false,
+        "supports_prompt_caching": true,
+        "provider": "openai",
+        "sources": ["https://platform.openai.com/docs/pricing"]
+    },
+    "openai/gpt-5-nano-2025-08-07": {
+        "usd_per_input_token": 5.0e-08,
+        "usd_per_output_token": 4.0e-07,
+        "usd_per_cache_read_token": 5e-09,
+        "seconds_per_output_token": 0.0055,
+        "MMLU_Pro_score": 77.9,
+        "is_reasoning_model": true,
+        "is_text_model": true,
+        "is_vision_model": true,
+        "is_audio_model": false,
+        "is_gpt_5_model": true,
+        "is_embedding_model": false,
+        "supports_prompt_caching": true,
+        "provider": "openai",
+        "sources": ["https://platform.openai.com/docs/pricing"]
+    },
+    "openai/gpt-5.2-2025-12-11": {
+        "usd_per_input_token": 1.75e-06,
+        "usd_per_output_token": 1.4e-05,
+        "usd_per_audio_input_token": 0,
+        "usd_per_cache_read_token": 1.75e-07,
+        "seconds_per_output_token": 0.01471,
+        "MMLU_Pro_score": 86.23,
+        "is_reasoning_model": true,
+        "is_text_model": true,
+        "is_vision_model": true,
+        "is_audio_model": false,
+        "is_gpt_5_model": true,
+        "is_embedding_model": false,
+        "supports_prompt_caching": true,
+        "provider": "openai",
+        "sources": ["https://platform.openai.com/docs/pricing"]
+    },
+    "openai/o4-mini-2025-04-16": {
+        "usd_per_input_token": 1.1e-06,
+        "usd_per_output_token": 4.4e-06,
+        "usd_per_cache_read_token": 2.75e-07,
+        "seconds_per_output_token": 0.0092,
+        "MMLU_Pro_score": 80.6,
+        "is_reasoning_model": true,
+        "is_text_model": true,
+        "is_vision_model": true,
+        "is_audio_model": false,
+        "is_o_model": true,
+        "is_embedding_model": false,
+        "supports_prompt_caching": true,
+        "provider": "openai",
+        "sources": null
+    },
+    "anthropic/claude-3-5-sonnet-20241022": {
+        "usd_per_input_token": 3e-06,
+        "usd_per_output_token": 1.5e-05,
+        "usd_per_cache_read_token": 3e-07,
+        "usd_per_cache_creation_token": 3.75e-06,
+        "seconds_per_output_token": 0.0154,
+        "MMLU_Pro_score": 78.4,
+        "is_reasoning_model": false,
+        "is_text_model": true,
+        "is_vision_model": false,
+        "is_audio_model": false,
+        "is_embedding_model": false,
+        "supports_prompt_caching": true,
+        "provider": "anthropic",
+        "sources": ["https://platform.claude.com/docs/en/about-claude/pricing"]
+    },
+    "anthropic/claude-3-7-sonnet-20250219": {
+        "usd_per_input_token": 3e-06,
+        "usd_per_output_token": 1.5e-05,
+        "usd_per_cache_read_token": 3e-07,
+        "usd_per_cache_creation_token": 3.75e-06,
+        "seconds_per_output_token": 0.0156,
+        "MMLU_Pro_score": 80.7,
+        "is_reasoning_model": true,
+        "is_text_model": true,
+        "is_vision_model": false,
+        "is_audio_model": false,
+        "is_embedding_model": false,
+        "supports_prompt_caching": false,
+        "provider": "anthropic",
+        "sources": null
+    },
+    "anthropic/claude-sonnet-4-20250514": {
+        "usd_per_input_token": 3e-06,
+        "usd_per_output_token": 1.5e-05,
+        "usd_per_cache_read_token": 3e-07,
+        "usd_per_cache_creation_token": 3.75e-06,
+        "seconds_per_output_token": 0.014025245441795233,
+        "MMLU_Pro_score": 83.87,
+        "is_reasoning_model": true,
+        "is_text_model": true,
+        "is_vision_model": true,
+        "is_audio_model": false,
+        "is_embedding_model": false,
+        "supports_prompt_caching": true,
+        "provider": "anthropic",
+        "sources": null
+    },
+    "anthropic/claude-sonnet-4-5-20250929": {
+        "usd_per_input_token": 3e-06,
+        "usd_per_output_token": 1.5e-05,
+        "usd_per_cache_read_token": 3e-07,
+        "usd_per_cache_creation_token": 3.75e-06,
+        "seconds_per_output_token": 0.012722646310432571,
+        "MMLU_Pro_score": 87.36,
+        "is_reasoning_model": true,
+        "is_text_model": true,
+        "is_vision_model": true,
+        "is_audio_model": false,
+        "is_embedding_model": false,
+        "supports_prompt_caching": true,
+        "provider": "anthropic",
+        "sources": null
+    },
+    "anthropic/claude-3-5-haiku-20241022": {
+        "usd_per_input_token": 8e-07,
+        "usd_per_output_token": 4e-06,
+        "usd_per_cache_read_token": 8e-08,
+        "usd_per_cache_creation_token": 1e-06,
+        "seconds_per_output_token": 0.0189,
+        "MMLU_Pro_score": 64.1,
+        "is_reasoning_model": false,
+        "is_text_model": true,
+        "is_vision_model": false,
+        "is_audio_model": false,
+        "is_embedding_model": false,
+        "supports_prompt_caching": true,
+        "provider": "anthropic",
+        "sources": null
+    },
+    "anthropic/claude-haiku-4-5-20251001": {
+        "usd_per_input_token": 1e-06,
+        "usd_per_output_token": 1.25e-06,
+        "usd_per_cache_read_token": 2e-06,
+        "usd_per_cache_creation_token": 1.25e-06,
+        "seconds_per_output_token": 0.0084530853761623,
+        "MMLU_Pro_score": 78.72,
+        "is_reasoning_model": true,
+        "is_text_model": true,
+        "is_vision_model": true,
+        "is_audio_model": false,
+        "is_embedding_model": false,
+        "supports_prompt_caching": true,
+        "provider": "anthropic",
+        "sources": null
+    },
+    "vertex_ai/gemini-3-pro-preview": {
+        "usd_per_input_token": 2e-06,
+        "usd_per_output_token": 1.2e-05,
+        "usd_per_cache_read_token": 2e-07,
+        "seconds_per_output_token": 0.0075758,
+        "MMLU_Pro_score": 90.1,
+        "is_reasoning_model": true,
+        "is_text_model": true,
+        "is_vision_model": true,
+        "is_audio_model": false,
+        "is_embedding_model": false,
+        "supports_prompt_caching": true,
+        "provider": "vertex_ai",
+        "sources": null
+    },
+    "vertex_ai/gemini-3-flash-12-25": {
+        "usd_per_input_token": 5e-07,
+        "usd_per_output_token": 3e-06,
+        "usd_per_audio_input_token": 1e-06,
+        "usd_per_cache_read_token": 5e-08,
+        "seconds_per_output_token": 0.00457247,
+        "MMLU_Pro_score": 87.63,
+        "is_reasoning_model": true,
+        "is_text_model": true,
+        "is_vision_model": true,
+        "is_audio_model": true,
+        "is_embedding_model": false,
+        "supports_prompt_caching": true,
+        "provider": "vertex_ai",
+        "sources": null
+    },
+    "vertex_ai/gemini-2.0-flash": {
+        "usd_per_input_token": 1.5e-07,
+        "usd_per_output_token": 6e-07,
+        "usd_per_audio_input_token": 1e-06,
+        "usd_per_cache_read_token": 2.5e-08,
+        "seconds_per_output_token": 0.0054,
+        "MMLU_Pro_score": 77.4,
+        "is_reasoning_model": false,
+        "is_text_model": true,
+        "is_vision_model": true,
+        "is_audio_model": true,
+        "is_embedding_model": false,
+        "supports_prompt_caching": true,
+        "provider": "vertex_ai",
+        "sources": null
+    },
+    "vertex_ai/gemini-2.5-flash": {
+        "usd_per_input_token": 3e-07,
+        "usd_per_output_token": 2.5e-06,
+        "usd_per_audio_input_token": 1e-06,
+        "usd_per_cache_read_token": 3e-08,
+        "seconds_per_output_token": 0.0044,
+        "MMLU_Pro_score": 80.75,
+        "is_reasoning_model": true,
+        "is_text_model": true,
+        "is_vision_model": true,
+        "is_audio_model": true,
+        "is_embedding_model": false,
+        "supports_prompt_caching": true,
+        "provider": "vertex_ai",
+        "sources": null
+    },
+    "vertex_ai/gemini-2.5-pro": {
+        "usd_per_input_token": 1.25e-06,
+        "usd_per_output_token": 1e-05,
+        "usd_per_audio_input_token": 1.25e-06,
+        "usd_per_cache_read_token": 1.25e-07,
+        "seconds_per_output_token": 0.0072,
+        "MMLU_Pro_score": 84.1,
+        "is_reasoning_model": true,
+        "is_text_model": true,
+        "is_vision_model": true,
+        "is_audio_model": true,
+        "is_embedding_model": false,
+        "supports_prompt_caching": true,
+        "provider": "vertex_ai",
+        "sources": null
+    },
+    "gemini/gemini-3-pro-preview": {
+        "usd_per_input_token": 2e-06,
+        "usd_per_output_token": 1.2e-05,
+        "usd_per_cache_read_token": 2e-07,
+        "seconds_per_output_token": 0.0075758,
+        "MMLU_Pro_score": 90.1,
+        "is_reasoning_model": true,
+        "is_text_model": true,
+        "is_vision_model": true,
+        "is_audio_model": false,
+        "is_embedding_model": false,
+        "supports_prompt_caching": true,
+        "provider": "gemini",
+        "sources": null
+    },
+    "gemini/gemini-3-flash-12-25": {
+        "usd_per_input_token": 5e-07,
+        "usd_per_output_token": 3e-06,
+        "usd_per_audio_input_token": 1e-06,
+        "usd_per_cache_read_token": 5e-08,
+        "seconds_per_output_token": 0.00457247,
+        "MMLU_Pro_score": 87.63,
+        "is_reasoning_model": true,
+        "is_text_model": true,
+        "is_vision_model": true,
+        "is_audio_model": true,
+        "is_embedding_model": false,
+        "supports_prompt_caching": true,
+        "provider": "gemini",
+        "sources": null
+    },
+    "gemini/gemini-2.5-flash": {
+        "usd_per_input_token": 3e-07,
+        "usd_per_output_token": 2.5e-06,
+        "usd_per_audio_input_token": 1e-06,
+        "usd_per_cache_read_token": 3e-08,
+        "seconds_per_output_token": 0.0044,
+        "MMLU_Pro_score": 80.75,
+        "is_reasoning_model": true,
+        "is_text_model": true,
+        "is_vision_model": true,
+        "is_audio_model": true,
+        "is_embedding_model": false,
+        "supports_prompt_caching": true,
+        "provider": "gemini",
+        "sources": null
+    },
+    "gemini/gemini-2.5-flash-lite": {
+        "usd_per_input_token": 1e-07,
+        "usd_per_output_token": 4e-07,
+        "usd_per_audio_input_token": 3e-07,
+        "seconds_per_output_token": 0.0034,
+        "MMLU_Pro_score": 79.1,
+        "is_reasoning_model": true,
+        "is_text_model": true,
+        "is_vision_model": true,
+        "is_audio_model": true,
+        "is_embedding_model": false,
+        "supports_prompt_caching": true,
+        "provider": "gemini",
+        "sources": null
+    },
+    "gemini/gemini-2.5-pro": {
+        "usd_per_input_token": 1.25e-06,
+        "usd_per_output_token": 1e-05,
+        "usd_per_audio_input_token": 1.25e-06,
+        "usd_per_cache_read_token": 1.25e-07,
+        "seconds_per_output_token": 0.0072,
+        "MMLU_Pro_score": 84.1,
+        "is_reasoning_model": true,
+        "is_text_model": true,
+        "is_vision_model": true,
+        "is_audio_model": true,
+        "is_embedding_model": false,
+        "supports_prompt_caching": true,
+        "provider": "gemini",
+        "sources": null
+    },
+    "vertex_ai/meta/llama-4-maverick-17b-128e-instruct-maas": {
+        "usd_per_input_token": 3.5e-07,
+        "usd_per_output_token": 1.15e-06,
+        "seconds_per_output_token": 0.0122,
+        "MMLU_Pro_score": 79.4,
+        "is_reasoning_model": false,
+        "is_text_model": true,
+        "is_vision_model": true,
+        "is_audio_model": false,
+        "is_embedding_model": false,
+        "supports_prompt_caching": false,
+        "provider": "vertex_ai",
+        "sources": null
+    },
+    "openai/gpt-4o-audio-preview": {
+        "usd_per_output_token": 8e-05,
+        "usd_per_audio_input_token": 4e-05,
+        "seconds_per_output_token": 0.008,
+        "MMLU_Pro_score": 74.1,
+        "is_reasoning_model": false,
+        "is_text_model": false,
+        "is_vision_model": false,
+        "is_audio_model": true,
+        "is_embedding_model": false,
+        "supports_prompt_caching": false,
+        "provider": "openai",
+        "sources": null
+    },
+    "openai/gpt-4o-mini-audio-preview": {
+        "usd_per_output_token": 2e-05,
+        "usd_per_audio_input_token": 1e-05,
+        "seconds_per_output_token": 0.0159,
+        "MMLU_Pro_score": 62.7,
+        "is_reasoning_model": false,
+        "is_text_model": false,
+        "is_vision_model": false,
+        "is_audio_model": true,
+        "is_embedding_model": false,
+        "provider": "openai",
+        "sources": null
+    },
+    "hosted_vllm/qwen/Qwen1.5-0.5B-Chat": {
+        "usd_per_input_token": 0.0,
+        "usd_per_output_token": 0.0,
+        "seconds_per_output_token": 0.1,
+        "MMLU_Pro_score": 30.0,
+        "is_reasoning_model": false,
+        "is_text_model": true,
+        "is_vision_model": false,
+        "is_audio_model": false,
+        "is_vllm_model": true,
+        "is_embedding_model": false,
+        "provider": "hosted_vllm",
+        "sources": null
+    },
+    "text-embedding-3-small": {
+        "usd_per_input_token": 2e-08,
+        "usd_per_output_token": null,
+        "seconds_per_output_token": 0.0098,
+        "MMLU_Pro_score": 63.09,
+        "is_reasoning_model": false,
+        "is_text_model": false,
+        "is_vision_model": false,
+        "is_audio_model": false,
+        "is_embedding_model": true,
+        "provider": "openai",
+        "sources": null
+    },
+    "clip-ViT-B-32": {
+        "usd_per_input_token": 0.0,
+        "usd_per_output_token": null,
+        "seconds_per_output_token": 0.0098,
+        "MMLU_Pro_score": 63.3,
+        "is_reasoning_model": false,
+        "is_text_model": false,
+        "is_vision_model": false,
+        "is_audio_model": false,
+        "is_clip_model": true,
+        "is_embedding_model": true,
+        "provider": "together_ai",
+        "sources": null
+    }
 }

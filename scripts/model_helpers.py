@@ -1,5 +1,13 @@
 import os
-from palimpzest.constants import Model, ModelProvider
+import random
+import socket
+import subprocess
+import time
+
+import requests
+import yaml
+
+from palimpzest.constants import DYNAMIC_MODEL_INFO, Model, ModelProvider
 from palimpzest.core.models import PlanCost
 from palimpzest.policy import Policy
 
@@ -123,6 +131,100 @@ def get_optimal_models( policy: Policy, include_embedding: bool = False, use_ver
     top_models = [mid for mid in top_models_ids]
     
     return top_models
+
+def get_free_port():
+    """Finds a free port on localhost."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(('', 0))
+        return s.getsockname()[1]
+
+def _generate_config_yaml(models: list[Model]):
+    rand_id = random.randint(100000, 999999)
+    config_filename = f"litellm_config_{rand_id}.yaml"
+    config_list = []
+    for model in models:
+        # Use Model property instead of helper function
+        # Ensure 'model' is an instance of Model class
+        model_obj = Model.from_litellm(model) if isinstance(model, str) else model
+            
+        env_var_name = model_obj.api_key_env_var
+        api_key_val = f"os.environ/{env_var_name}" if env_var_name else None
+        
+        entry = {
+            "model_name": model_obj.value,
+            "litellm_params": {
+                "model": model_obj.value,
+                "api_key": api_key_val
+            }
+        }
+        config_list.append(entry)
+    yaml_structure = {"model_list": config_list}
+    with open(config_filename, 'w') as f:
+        yaml.dump(yaml_structure, f, default_flow_style=False, sort_keys=False)
+    return config_filename
+
+def fetch_dynamic_model_info(available_models: list[Model]):
+
+    # only fetch dynamic info for models that have estimated value
+    models = [model for model in available_models if model.use_endpoint]
+
+    port = get_free_port()
+    proxy_url = f"http://127.0.0.1:{port}" 
+    config_filename = _generate_config_yaml(models)
+    server_env = os.environ.copy()
+    process = None
+    dynamic_model_info = {}
+
+    try:
+        process = subprocess.Popen(
+            ["litellm", "--config", config_filename, "--port", str(port)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env=server_env
+        )
+        server_ready = False
+        max_retries = 20
+        for _ in range(max_retries):
+            if process.poll() is not None:
+                stdout, stderr = process.communicate()
+                print(f"LiteLLM process died unexpectedly: {stderr.decode()}")
+                break
+            try:
+                requests.get(f"{proxy_url}/health/readiness", timeout=1)
+                server_ready = True
+                break
+            except (requests.exceptions.ConnectionError, requests.exceptions.ReadTimeout):
+                time.sleep(0.5)  
+        if not server_ready:
+            print("Timeout: LiteLLM server failed to start within the limit.")
+            return {}
+        try: 
+            response = requests.get(f"{proxy_url}/model/info")
+            response.raise_for_status()
+            model_data = response.json()
+        
+            if "data" in model_data and len(model_data["data"]) > 0:
+                for item in model_data["data"]:
+                    model_name = item.get("model_name")
+                    dynamic_model_info[model_name] = item.get("model_info", {})
+        except Exception:
+            pass
+        if not dynamic_model_info:
+            print("WARNING: LiteLLM server started but returned no model info.")
+    
+    finally: # cleanup
+        if process:
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+        
+        if os.path.exists(config_filename):
+            os.remove(config_filename)
+
+    DYNAMIC_MODEL_INFO.update(dynamic_model_info)
+    return dynamic_model_info
 
 def resolve_reasoning_settings(model: Model | None, reasoning_effort: str | None) -> tuple[bool, str]:
     """
