@@ -27,8 +27,12 @@ class GenerationStats(BaseModel):
     # the number of cached tokens
     cache_creation_tokens: int = 0
 
+    audio_cache_creation_tokens: int = 0
+
     # The number of tokens read from the cache (charged at a discount)
     cache_read_tokens: int = 0
+
+    audio_cache_read_tokens: int = 0
 
     # the number of input image tokens
     input_image_tokens: int = 0
@@ -36,6 +40,10 @@ class GenerationStats(BaseModel):
     # the total number of input tokens processed by this operator; None if this operation did not use an LLM
     # typed as a float because GenerationStats may be amortized (i.e. divided) across a number of output records
     total_input_tokens: float = 0.0
+
+    output_audio_tokens: int = 0
+
+    output_text_tokens: int = 0
 
     # the total number of output tokens processed by this operator; None if this operation did not use an LLM
     # typed as a float because GenerationStats may be amortized (i.e. divided) across a number of output records
@@ -50,8 +58,12 @@ class GenerationStats(BaseModel):
     # The cost associated with reading from the cache
     cache_read_cost: float = 0.0
 
+    audio_cache_read_cost: float = 0.0
+
     # The cost associated with writing to the cache
     cache_creation_cost: float = 0.0
+
+    audio_cache_creation_cost: float = 0.0
 
     # the total cost of processing the output tokens; None if this operation did not use an LLM
     total_output_cost: float = 0.0
@@ -78,8 +90,9 @@ class GenerationStats(BaseModel):
         # self.raw_answers.extend(other.raw_answers)
         for model_field in [
             "total_input_tokens",
-            "cache_read_tokens",
-            "cache_creation_tokens",
+            "text_cache_read_tokens",
+            "text_cache_creation_tokens",
+            "audio_cache_read_tokens",
             "total_output_tokens",
             "total_input_cost",
             "cache_read_cost",
