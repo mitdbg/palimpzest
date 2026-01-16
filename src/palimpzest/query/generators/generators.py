@@ -296,7 +296,7 @@ class Generator(Generic[ContextType, InputType]):
 
         return field_answers
 
-    def __call__(self, candidate: DataRecord | list[DataRecord], fields: dict[str, FieldInfo] | None, right_candidate: DataRecord | None = None, json_output: bool=True, **kwargs) -> GenerationOutput:
+    def __call__(self, candidate: DataRecord | list[DataRecord], fields: dict[str, FieldInfo] | None, right_candidate: DataRecord | list[DataRecord] | None = None, json_output: bool=True, **kwargs) -> GenerationOutput:
         """Take the input record(s) (`candidate`), generate the output `fields`, and return the generated output."""
         logger.debug(f"Generating for candidate(s) {candidate} with fields {fields}")
 

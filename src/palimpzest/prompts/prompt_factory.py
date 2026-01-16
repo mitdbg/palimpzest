@@ -761,7 +761,7 @@ class PromptFactory:
         input_fields: list[str],
         input_modalities: set[Modality],
         output_fields: list[str],
-        right_candidate: DataRecord | None,
+        right_candidate: DataRecord | list[DataRecord] | None,
         right_input_fields: list[str],
         right_input_modalities: set[Modality],
         **kwargs,
@@ -796,7 +796,7 @@ class PromptFactory:
         if right_candidate is not None:
             input_format_kwargs.update({
                 "right_context": self._get_context(right_candidate, right_input_fields),
-                "right_input_fields_desc": self._get_input_fields_desc(right_candidate, right_input_fields),
+                "right_input_fields_desc": self._get_input_fields_desc(right_candidate[0] if isinstance(right_candidate, list) else right_candidate, right_input_fields),
             })
 
         # get format kwargs which depend on the prompt strategy
@@ -969,7 +969,7 @@ class PromptFactory:
 
         return base_prompt.format(**format_kwargs)
 
-    def _get_user_messages(self, candidate: DataRecord | list[DataRecord], input_fields: list[str], right_candidate: DataRecord | None, right_input_fields: list[str], **kwargs) -> str:
+    def _get_user_messages(self, candidate: DataRecord | list[DataRecord], input_fields: list[str], right_candidate: DataRecord | list[DataRecord] | None, right_input_fields: list[str], **kwargs) -> str:
         """
         Returns a list of messages for the chat payload based on the prompt strategy.
 
@@ -1063,7 +1063,7 @@ class PromptFactory:
 
         return user_messages
 
-    def create_messages(self, candidate: DataRecord | list[DataRecord], output_fields: list[str], right_candidate: DataRecord | None = None, **kwargs) -> list[dict]:
+    def create_messages(self, candidate: DataRecord | list[DataRecord], output_fields: list[str], right_candidate: DataRecord | list[DataRecord] | None = None, **kwargs) -> list[dict]:
         """
         Creates the messages for the chat payload based on the prompt strategy.
 
@@ -1085,11 +1085,11 @@ class PromptFactory:
         """
         # compute the set of input fields
         input_fields = self._get_input_fields(candidate[0] if isinstance(candidate, list) else candidate, **kwargs)
-        right_input_fields = [] if right_candidate is None else self._get_input_fields(right_candidate, **kwargs)
+        right_input_fields = [] if right_candidate is None else self._get_input_fields(right_candidate[0] if isinstance(right_candidate, list) else right_candidate, **kwargs)
 
         # use input fields to determine the left / right input modalities
         input_modalities = self._get_input_modalities(candidate[0] if isinstance(candidate, list) else candidate, input_fields)
-        right_input_modalities = set() if right_candidate is None else self._get_input_modalities(right_candidate, right_input_fields)
+        right_input_modalities = set() if right_candidate is None else self._get_input_modalities(right_candidate[0] if isinstance(right_candidate, list) else right_candidate, right_input_fields)
 
         # initialize messages
         messages = []

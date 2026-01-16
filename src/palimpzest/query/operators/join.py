@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import regex as re
 import threading
 import time
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+from dotenv import load_dotenv
 
 import numpy as np
 from numpy.linalg import norm
@@ -490,14 +493,150 @@ class NestedLoopsJoin(LLMJoin):
 class BlockNestedLoopsJoin(LLMJoin):
     # Implements block nested loops join with a known selectivity.
     def naive_cost_estimates(self, left_source_op_cost_estimates: OperatorCostEstimates, right_source_op_cost_estimates: OperatorCostEstimates):
+        # TODO: Implement naive cost estimates for block nested loops join.
         pass
 
     def _find_batch_sizes(self):
-        pass
+        # TODO: Implement a method to find optimal batch sizes for left and right tables.
+        # Currently, return batch size of 2 for both sides.
+        return 2, 2
+
+    def _process_join_candidate_pair(
+        self,
+        left_candidate: list[DataRecord],
+        right_candidate: list[DataRecord],
+        gen_kwargs: dict,
+    ) -> list[DataRecord]:
+        # TODO: Output record stats.
+        start_time = time.time()
+
+        # generate output; NOTE: FieldInfo is used to indicate the output type; thus, the desc is not needed
+        # fields = {"all_matches": FieldInfo(annotation=list, description="List of index pairs that satisfy the join condition")}
+        field_answers, _, generation_stats, _ = self.generator(left_candidate, None, right_candidate=right_candidate, **gen_kwargs)
+
+        # handle different join types
+        inner_positives = set()
+        for left_idx, right_idx in field_answers["all_matches"]:
+            left_rec = left_candidate[left_idx - 1]
+            right_rec = right_candidate[right_idx - 1]
+            inner_positives.add((left_rec._id, right_rec._id))
+            if self.how == "left":
+                self._left_joined_record_ids.add(left_rec._id)
+            elif self.how == "right":
+                self._right_joined_record_ids.add(right_rec._id)
+            elif self.how == "outer":
+                self._left_joined_record_ids.add(left_rec._id)
+                self._right_joined_record_ids.add(right_rec._id)
+        
+        # compute output records
+        output_records = []
+        for left_rec in left_candidate:
+            for right_rec in right_candidate:
+                passed_operator = (left_rec._id, right_rec._id) in inner_positives
+                join_dr = DataRecord.from_join_parents(self.output_schema, left_rec, right_rec)
+                join_dr._passed_operator = passed_operator
+
+                output_records.append(join_dr)
+        
+        return output_records
 
     def __call__(self, left_candidates: list[DataRecord], right_candidates: list[DataRecord], final: bool = False) -> tuple[DataRecordSet, int]:
-        pass
+        # TODO: Implement block nested loops join logic.
+        def _find_answer(completion_text: str) -> str:
+            # if the model followed the default instructions, the completion text will place
+            # its answer between "ANSWER:" and "---"
+            regex = re.compile("answer:(.*?)---", re.IGNORECASE | re.DOTALL)
+            matches = regex.findall(completion_text)
+            if len(matches) > 0:
+                return matches[0].strip()
 
+            # if the first regex didn't find an answer, try taking all the text after "ANSWER:"
+            regex = re.compile("answer:(.*)", re.IGNORECASE | re.DOTALL)
+            matches = regex.findall(completion_text)
+            if len(matches) > 0:
+                return matches[0].strip()
+            
+            # if all else fails, return the entire completion text
+            return completion_text.strip()
+        
+        def _parse_answer(completion_text: str) -> dict[str, list]:
+            try:
+                answer_text = _find_answer(completion_text)
+                index_pairs = []
+                for pair_str in answer_text.split(";"):
+                    if "," in pair_str:
+                        left_pair_str, right_pair_str = pair_str.split(",")
+                        index_pairs.append((int(left_pair_str.strip()), int(right_pair_str.strip())))
+                return {"all_matches": index_pairs}
+            except Exception:
+                raise Exception(f"Could not parse answer from completion text: {answer_text}")
+
+        # get batch sizes
+        left_batch_size, right_batch_size = self._find_batch_sizes()
+
+        # get the set of input fields from both records in the join
+        input_fields = self.get_input_fields()
+
+        # construct kwargs for generation
+        gen_kwargs = {"project_cols": input_fields, "join_condition": self.condition, "parse_answer": _parse_answer}
+
+        # create the set of candidates to join
+        join_candidates = []
+        left_candidates_size = len(left_candidates)
+        right_candidates_size = len(right_candidates)
+        left_input_records_size = len(self._left_input_records)
+        right_input_records_size = len(self._right_input_records)
+
+        for left_index in range(0, left_candidates_size, left_batch_size):
+            left_batch = left_candidates[left_index:left_index + left_batch_size]
+            for right_index in range(0, right_candidates_size, right_batch_size):
+                right_batch = right_candidates[right_index:right_index + right_batch_size]
+                join_candidates.append((left_batch, right_batch))
+            for right_index in range(0, right_input_records_size, right_batch_size):
+                right_batch = self._right_input_records[right_index:right_index + right_batch_size]
+                join_candidates.append((left_batch, right_batch))
+        for left_index in range(0, left_input_records_size, left_batch_size):
+            left_batch = self._left_input_records[left_index:left_index + left_batch_size]
+            for right_index in range(0, right_candidates_size, right_batch_size):
+                right_batch = right_candidates[right_index:right_index + right_batch_size]
+                join_candidates.append((left_batch, right_batch))
+
+        # apply the generator to each pair of candidates
+        output_records, output_record_op_stats = [], []
+        with ThreadPoolExecutor(max_workers=self.join_parallelism) as executor:
+            futures = [
+                executor.submit(self._process_join_candidate_pair, candidate, right_candidate, gen_kwargs)
+                for candidate, right_candidate in join_candidates
+            ]
+  
+            # collect results as they complete
+            for future in as_completed(futures):
+                self.join_idx += 1
+                # join_output_record, join_output_record_op_stats = future.result()
+                join_output_records = future.result()
+                for join_output_record in join_output_records:
+                    output_records.append(join_output_record)
+                    # output_record_op_stats.append(join_output_record_op_stats)
+                print(f"{self.join_idx} JOINED")
+
+        # compute the number of inputs processed
+        num_inputs_processed = len(join_candidates)
+
+        # store input records to join with new records added later
+        if self.retain_inputs:
+            self._left_input_records.extend(left_candidates)
+            self._right_input_records.extend(right_candidates)
+
+        # if this is the final call, then add in any left/right/outer join records that did not match
+        if final:
+            return self._compute_unmatched_records(), 0
+
+        # return empty DataRecordSet if no output records were produced
+        if len(output_records) == 0:
+            return DataRecordSet([], []), num_inputs_processed
+
+        return DataRecordSet(output_records, output_record_op_stats), num_inputs_processed
+    
 class EmbeddingJoin(LLMJoin):
     # NOTE: we currently do not support audio joins as embedding models for audio seem to have
     # specialized use cases (e.g., speech-to-text) with strict requirements on things like e.g. sample rate
@@ -599,6 +738,7 @@ class EmbeddingJoin(LLMJoin):
         total_embedding_input_tokens = 0
         embeddings = None
         if self.text_only:
+            load_dotenv()
             client = OpenAI()
             inputs = [dr.to_json_str(bytes_to_str=True, project_cols=input_fields, sorted=True) for dr in candidates]
             response = client.embeddings.create(input=inputs, model=self.embedding_model.value)
