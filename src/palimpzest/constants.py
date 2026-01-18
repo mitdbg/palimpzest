@@ -276,6 +276,9 @@ class Model:
     def is_provider_together_ai(self) -> bool:
         return self.provider == "together_ai"
     
+    def is_deepseek_model(self) -> bool:
+        return "deepseek" in self.model_id.lower()
+
     def is_o_model(self) -> bool:
         return self.model_specs.get("is_o_model", False)
 
