@@ -11,10 +11,10 @@ An example is shown below:
 INPUT FIELDS:
 {example_input_fields}
 
+FILTER CONDITION: {example_filter_condition}
+
 CONTEXT:
 {{{example_context}}}{image_disclaimer}{audio_disclaimer}
-
-FILTER CONDITION: {example_filter_condition}
 
 Let's think step-by-step in order to answer the question.
 
@@ -34,10 +34,10 @@ An example is shown below:
 INPUT FIELDS:
 {example_input_fields}
 
+FILTER CONDITION: {example_filter_condition}
+
 CONTEXT:
 {{{example_context}}}{image_disclaimer}{audio_disclaimer}
-
-FILTER CONDITION: {example_filter_condition}
 
 ANSWER: TRUE
 ---
@@ -51,10 +51,10 @@ Remember, your answer must be TRUE or FALSE. Finish your response with a newline
 INPUT FIELDS:
 {input_fields_desc}
 
-CONTEXT:
-{context}<<image-audio-placeholder>>
-
 FILTER CONDITION: {filter_condition}
+
+<<cache-boundary>>CONTEXT:
+{context}<<image-audio-placeholder>>
 
 Let's think step-by-step in order to answer the question.
 
@@ -68,9 +68,9 @@ Remember, your answer must be TRUE or FALSE. Finish your response with a newline
 INPUT FIELDS:
 {input_fields_desc}
 
-CONTEXT:
-{context}<<image-audio-placeholder>>
-
 FILTER CONDITION: {filter_condition}
+
+<<cache-boundary>>CONTEXT:
+{context}<<image-audio-placeholder>>
 
 ANSWER: """

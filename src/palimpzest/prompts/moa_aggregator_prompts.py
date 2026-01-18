@@ -74,7 +74,7 @@ You will be provided with a description of each input field and each output fiel
 
 {output_format_instruction} Finish your response with a newline character followed by ---
 ---
-{model_responses}
+<<cache-boundary>>{model_responses}
 
 INPUT FIELDS:
 {input_fields_desc}
@@ -94,7 +94,7 @@ You will also be provided with a description of each input field and the filter 
 
 Remember, your answer must be TRUE or FALSE. Finish your response with a newline character followed by ---
 ---
-{model_responses}
+<<cache-boundary>>{model_responses}
 
 INPUT FIELDS:
 {input_fields_desc}

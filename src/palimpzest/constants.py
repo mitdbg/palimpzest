@@ -78,6 +78,9 @@ class Model(str, Enum):
     def is_vllm_model(self):
         return "hosted_vllm" in self.value.lower()
 
+    def is_deepseek_model(self):
+        return "deepseek" in self.value.lower()
+
     def is_reasoning_model(self):
         reasoning_models = [
             Model.GPT_5, Model.GPT_5_MINI, Model.GPT_5_NANO, Model.o4_MINI,
@@ -131,7 +134,7 @@ class Model(str, Enum):
     
     def supports_prompt_caching(self):
         return self in [
-            Model.CLAUDE_3_5_SONNET, Model.CLAUDE_3_5_HAIKU,
+            Model.CLAUDE_3_5_SONNET, Model.CLAUDE_3_5_HAIKU, Model.CLAUDE_3_7_SONNET,
             Model.GPT_4o_MINI, Model.GPT_4o, Model.GPT_4_1, Model.GPT_4_1_MINI, Model.GPT_4_1_NANO,
             Model.o4_MINI, Model.GPT_5_MINI, Model.GPT_5, Model.GPT_5_NANO,
             Model.GEMINI_2_0_FLASH, Model.GEMINI_2_5_FLASH, Model.GEMINI_2_5_PRO,
@@ -533,14 +536,16 @@ CLIP_VIT_B_32_MODEL_CARD = {
     ##### Agg. Benchmark #####
     "overall": 63.3,  # NOTE: imageNet top-1 accuracy
 }
-# TODO: integration into issue #265: Cache read tokens are 0.1 times the base input tokens price
-# 5-minute cache write tokens are 1.25 times the base input tokens price
-# https://platform.claude.com/docs/en/about-claude/pricing
+# Anthropic prompt caching pricing:
+# - Cache read tokens: 0.1x the base input token price
+# - Cache creation tokens: 1.25x the base input token price
+# https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching#pricing
 CLAUDE_3_5_SONNET_MODEL_CARD = {
     ##### Cost in USD #####
     "usd_per_input_token": 3.0 / 1e6,
     "usd_per_output_token": 15.0 / 1e6,
     "usd_per_cache_read_token": 0.30 / 1e6,
+    "usd_per_cache_creation_token": 3.75 / 1e6,  # 1.25x base input price
     ##### Time #####
     "seconds_per_output_token": 0.0154,
     ##### Agg. Benchmark #####
@@ -551,6 +556,7 @@ CLAUDE_3_7_SONNET_MODEL_CARD = {
     "usd_per_input_token": 3.0 / 1e6,
     "usd_per_output_token": 15.0 / 1e6,
     "usd_per_cache_read_token": 0.30 / 1e6,
+    "usd_per_cache_creation_token": 3.75 / 1e6,  # 1.25x base input price
     ##### Time #####
     "seconds_per_output_token": 0.0156,
     ##### Agg. Benchmark #####
@@ -561,6 +567,7 @@ CLAUDE_3_5_HAIKU_MODEL_CARD = {
     "usd_per_input_token": 0.8 / 1e6,
     "usd_per_output_token": 4.0 / 1e6,
     "usd_per_cache_read_token": 0.08 / 1e6,
+    "usd_per_cache_creation_token": 1.0 / 1e6,  # 1.25x base input price
     ##### Time #####
     "seconds_per_output_token": 0.0189,
     ##### Agg. Benchmark #####

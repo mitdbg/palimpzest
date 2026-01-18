@@ -73,7 +73,7 @@ You will be provided with a description of each input field and each output fiel
 
 {output_format_instruction} Finish your response with a newline character followed by ---
 ---
-{chunk_outputs}
+<<cache-boundary>>{chunk_outputs}
 
 INPUT FIELDS:
 {input_fields_desc}
@@ -93,7 +93,7 @@ You will be provided with a description of each input field and the filter condi
 
 Remember, your answer must be TRUE or FALSE. Finish your response with a newline character followed by ---
 ---
-{chunk_outputs}
+<<cache-boundary>>{chunk_outputs}
 
 INPUT FIELDS:
 {input_fields_desc}
