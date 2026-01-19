@@ -406,6 +406,9 @@ class Generator(Generic[ContextType, InputType]):
             total_input_cost = non_cached_text_tokens * usd_per_input_token + non_cached_audio_tokens * usd_per_audio_input_token
             total_output_cost = output_tokens * usd_per_output_token
 
+            # Compute total cached tokens (both text and audio)
+            total_cached_tokens = cache_read_tokens + cache_creation_tokens + audio_cache_read_tokens + audio_cache_creation_tokens
+
             generation_stats = GenerationStats(
                 model_name=self.model_name,
                 llm_call_duration_secs=end_time - start_time,
@@ -419,6 +422,7 @@ class Generator(Generic[ContextType, InputType]):
                 cache_read_tokens=cache_read_tokens,
                 audio_cache_creation_tokens=audio_cache_creation_tokens,
                 audio_cache_read_tokens=audio_cache_read_tokens,
+                total_cached_tokens=total_cached_tokens,
                 total_cache_read_cost=total_cache_read_cost,
                 total_cache_creation_cost=total_cache_creation_cost,
                 total_input_cost=total_input_cost,
