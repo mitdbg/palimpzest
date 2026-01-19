@@ -316,10 +316,16 @@ class Model:
         return self.model_specs.get("usd_per_audio_input_token", 0.0)
 
     def get_usd_per_cache_read_token(self) -> float:
-        return self.model_specs.get("usd_per_cache_read_token", 0.0)
+        return self.model_specs.get("usd_per_cache_read_token", self.get_usd_per_cache_read_token())
+    
+    def get_usd_per_audio_cache_read_token(self) -> float:
+        return self.model_specs.get("usd_per_audio_cache_read_token", self.get_usd_per_audio_cache_read_token())
     
     def get_usd_per_cache_creation_token(self) -> float:
-        return self.model_specs.get("usd_per_cache_creation_token", self.get_usd_per_input_token())
+        return self.model_specs.get("usd_per_cache_creation_token", 0.0)
+    
+    def get_usd_per_audio_cache_creation_token(self) -> float:
+        return self.model_specs.get("usd_per_audio_cache_creation_token", 0.0)
     
     def get_seconds_per_output_token(self) -> float:
         return self.model_specs.get("seconds_per_output_token", 0.0)
