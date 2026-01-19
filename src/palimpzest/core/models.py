@@ -181,7 +181,7 @@ class GenerationStats(BaseModel):
             for field in [
                 "total_input_tokens",
                 "total_cache_read_tokens",
-                "total_cache_creation_toknes",
+                "total_cache_creation_tokens",
                 "total_output_tokens",
                 "total_input_cost",
                 "total_output_cost",

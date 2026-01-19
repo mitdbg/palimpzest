@@ -13,234 +13,168 @@ from typing import Any
 
 from palimpzest.constants import Model
 
-# Session-level cache key for OpenAI sticky routing
-# This ensures requests within the same session are routed to the same cache shard
-_OPENAI_CACHE_KEY: str | None = None
-
-
-def _get_openai_cache_key() -> str:
-    """Get or create a session-level cache key for OpenAI."""
-    global _OPENAI_CACHE_KEY
-    if _OPENAI_CACHE_KEY is None:
-        _OPENAI_CACHE_KEY = f"pz-cache-{uuid.uuid4().hex[:12]}"
-    return _OPENAI_CACHE_KEY
-
-
-def get_cache_kwargs(model: Model, messages: list[dict]) -> dict[str, Any]:
+class PromptCacheManager:
     """
-    Get provider-specific cache configuration kwargs for litellm.completion().
-
-    This function may modify the messages list in-place to add cache control
-    markers for providers that require explicit cache annotations (Anthropic).
-
-    Args:
-        model: The Model enum representing the LLM being used
-        messages: The list of messages being sent to the model (may be modified in-place)
-
-    Returns:
-        A dictionary of kwargs to pass to litellm.completion() for enabling caching
+    Manages prompt caching configurations and message transformations for LLM providers.
+    
+    This class handles:
+    1. Session-level state (e.g., OpenAI cache keys).
+    2. Provider-specific request arguments (headers, extra_body).
+    3. In-place modification of messages for providers requiring explicit markers (Anthropic).
+    4. Normalization of usage statistics.
     """
-    if not model.supports_prompt_caching():
+    
+    CACHE_BOUNDARY_MARKER = "<<cache-boundary>>"
+
+    def __init__(self, model: Model):
+        self.model = model
+        # Instance-level state ensures thread safety if we use one manager per plan/execution
+        self.openai_cache_key = f"pz-cache-{uuid.uuid4().hex[:12]}" if self.model.is_openai_model() else None
+
+    def get_cache_kwargs(self, messages: list[dict]) -> dict[str, Any]:
+        """
+        Get provider-specific cache configuration kwargs for litellm.completion().
+
+        This function may modify the messages list in-place to add cache control
+        markers for providers that require explicit cache annotations (Anthropic).
+
+        Args:
+            model: The Model enum representing the LLM being used
+            messages: The list of messages being sent to the model (may be modified in-place)
+
+        Returns:
+            A dictionary of kwargs to pass to litellm.completion() for enabling caching
+        """
+        if not self.model.supports_prompt_caching():
+            return {}
+        # TODO: Update with changes from #265
+        if self.model.is_anthropic_model():
+            # Anthropic: Explicit cache_control with ephemeral type
+            # https://platform.claude.com/docs/en/build-with-claude/prompt-caching
+            # Mark system messages with cache_control (modifies messages in-place)
+            self._transform_messages_for_anthropic(messages)
+            return {}
+        # implicit caching for Deepseek/Gemini/Openai Models that current support caching
+        elif self.model.is_openai_model():
+            # OpenAI: Automatic prefix caching based on matching prefixes
+            # Use prompt_cache_key for sticky routing to the same cache shard
+            # https://platform.openai.com/docs/guides/prompt-caching
+            self._remove_cache_boundary_markers(messages)
+            return {"extra_body": {"prompt_cache_key": self.openai_cache_key}}
+        elif self.model.is_google_ai_studio_model() or self.model.is_vertex_model():
+            # Gemini: Implicit caching (automatic prefix matching)
+            # No additional kwargs needed - caching is automatic
+            # https://ai.google.dev/gemini-api/docs/caching
+            self._remove_cache_boundary_markers(messages)
+            return {}
+        elif self.model.is_deepseek_model():
+            # DeepSeek: Automatic context caching (enabled by default)
+            # No special parameters needed - caching happens automatically
+            # Minimum cacheable unit is 64 tokens
+            # https://api-docs.deepseek.com/guides/kv_cache
+            self._remove_cache_boundary_markers(messages)
+            return {}
         return {}
 
-    cache_kwargs = {}
 
-    if model.is_openai_model():
-        # OpenAI: Automatic prefix caching based on matching prefixes
-        # Use prompt_cache_key for sticky routing to the same cache shard
-        # https://platform.openai.com/docs/guides/prompt-caching
-        cache_kwargs["extra_body"] = {"prompt_cache_key": _get_openai_cache_key()}
-        # Clean up cache boundary markers from user messages (not used by OpenAI)
-        _remove_cache_boundary_markers(messages)
-
-    elif model.is_anthropic_model():
-        # Anthropic: Explicit cache_control with ephemeral type
-        # We need to:
-        # 1. Add the anthropic-beta header to enable prompt caching
-        # 2. Mark system message content with cache_control
-        # https://platform.claude.com/docs/en/build-with-claude/prompt-caching
-        cache_kwargs["extra_headers"] = {
-            "anthropic-beta": "prompt-caching-2024-07-31"
+    def extract_cache_stats(self, usage: Dict, model: Model) -> Dict[str, int]:
+        """
+        Normalize cache statistics from provider-specific response formats.
+        """
+        stats = {
+            "cache_creation_tokens": 0,
+            "cache_read_tokens": 0,
+            "audio_cache_creation_tokens": 0,
+            "audio_cache_read_tokens": 0,
         }
-        # Mark system messages with cache_control (modifies messages in-place)
-        _add_anthropic_cache_control(messages)
 
-    elif model.is_vertex_model() or model.is_google_ai_studio_model():
-        # Gemini: Implicit caching (automatic prefix matching)
-        # No additional kwargs needed - caching is automatic
-        # https://ai.google.dev/gemini-api/docs/caching
-        # Clean up cache boundary markers from user messages (not used by Gemini)
-        _remove_cache_boundary_markers(messages)
+        if not model.supports_prompt_caching() or not usage:
+            return stats
 
-    elif model.is_deepseek_model():
-        # DeepSeek: Automatic context caching (enabled by default)
-        # No special parameters needed - caching happens automatically
-        # Minimum cacheable unit is 64 tokens
-        # https://api-docs.deepseek.com/guides/kv_cache
-        # Clean up cache boundary markers from user messages (not used by DeepSeek)
-        _remove_cache_boundary_markers(messages)
+        if model.is_openai_model():
+            details = usage.get("prompt_tokens_details", {}) or {}
+            stats["cache_read_tokens"] = details.get("cached_tokens", 0)
+            stats["audio_cache_read_tokens"] = details.get("audio_cached_tokens", 0)
 
-    return cache_kwargs
+        elif model.is_anthropic_model():
+            stats["cache_creation_tokens"] = usage.get("cache_creation_input_tokens", 0)
+            stats["cache_read_tokens"] = usage.get("cache_read_input_tokens", 0)
 
+        elif model.is_vertex_model() or model.is_google_ai_studio_model():
+            stats["cache_read_tokens"] = usage.get("cached_content_token_count", 0)
 
-# Marker used to identify the boundary between static and dynamic content in user prompts
-CACHE_BOUNDARY_MARKER = "<<cache-boundary>>"
+        elif model.is_deepseek_model():
+            stats["cache_read_tokens"] = usage.get("prompt_cache_hit_tokens", 0)
+            stats["cache_creation_tokens"] = 0
+
+        return stats
 
 
-def _add_anthropic_cache_control(messages: list[dict]) -> None:
-    """
-    Add cache_control markers to system messages and user prompt prefixes for Anthropic models.
+    def _remove_cache_boundary_markers(self, messages: List[Dict]) -> None:
+        """
+        Remove <<cache-boundary>> markers from user messages.
 
-    This modifies the messages list in-place to:
-    1. Add cache_control to system message content blocks
-    2. Convert user messages with <<cache-boundary>> marker into content blocks,
-       with cache_control on the static prefix
+        For providers with automatic (implicit) caching (OpenAI, Gemini, DeepSeek), we don't need
+        explicit cache markers. This function cleans up the markers from prompts.
 
-    Args:
-        messages: The list of messages to modify (modified in-place)
-    """
-    # Handle system messages - add cache_control
-    for message in messages:
-        if message.get("role") == "system":
+        Args:
+            messages: The list of messages to modify (modified in-place)
+        """
+        for message in messages:
+            if message.get("role") == "user":
+                content = message.get("content", "")
+                if isinstance(content, str) and self.CACHE_BOUNDARY_MARKER in content:
+                    message["content"] = content.replace(self.CACHE_BOUNDARY_MARKER, "")
+
+
+    def _transform_messages_for_anthropic(self, messages: List[Dict]) -> None:
+        """
+        Add cache_control markers to system messages and user prompt prefixes for Anthropic models.
+
+        This modifies the messages list in-place to:
+        1. Add cache_control to system message content blocks
+        2. Convert user messages with <<cache-boundary>> marker into a single message with multiple content blocks:
+            a. Static prefix block (with cache_control) - cacheable across records
+            b. Dynamic content block (without cache_control) - changes per record
+
+        Args:
+            messages: The list of messages to modify (modified in-place)     
+        """
+        for message in messages:
+            role = message.get("role")
             content = message.get("content", "")
-            if isinstance(content, str) and content:
-                # Convert string content to content block with cache_control
-                message["content"] = [
-                    {
-                        "type": "text",
-                        "text": content,
+
+            # 1. Handle System Messages
+            if role == "system":
+                if isinstance(content, str) and content:
+                    message["content"] = [{
+                        "type": "text", 
+                        "text": content, 
                         "cache_control": {"type": "ephemeral"}
-                    }
-                ]
-            elif isinstance(content, list) and content:
-                # Add cache_control to the last content block
-                last_block = content[-1]
-                if isinstance(last_block, dict) and last_block.get("type") == "text":
-                    last_block["cache_control"] = {"type": "ephemeral"}
+                    }]
+                elif isinstance(content, list) and content:
+                    # Apply to last block if it's text
+                    last_block = content[-1]
+                    if isinstance(last_block, dict) and last_block.get("type") == "text":
+                        last_block["cache_control"] = {"type": "ephemeral"}
 
-    # Handle user messages - convert to content blocks with cache_control on static prefix
-    _convert_user_messages_to_content_blocks(messages)
-
-
-def _convert_user_messages_to_content_blocks(messages: list[dict]) -> None:
-    """
-    Convert user messages with cache boundary markers into content blocks for Anthropic.
-
-    For Anthropic, we want to cache the static prefix of user prompts. This function
-    converts user messages containing the <<cache-boundary>> marker into a single message
-    with multiple content blocks:
-    1. Static prefix block (with cache_control) - cacheable across records
-    2. Dynamic content block (without cache_control) - changes per record
-
-    This matches Anthropic's expected format where a single message can have multiple
-    content blocks with different cache settings.
-
-    Args:
-        messages: The list of messages to modify (modified in-place)
-    """
-    for message in messages:
-        if message.get("role") == "user":
-            content = message.get("content", "")
-            if isinstance(content, str) and CACHE_BOUNDARY_MARKER in content:
-                # Split at the cache boundary marker
-                static_prefix, dynamic_content = content.split(CACHE_BOUNDARY_MARKER, 1)
-
-                # Create content blocks within a single message
-                content_blocks = []
-
-                if static_prefix.strip():
-                    # Static prefix block with cache_control
-                    content_blocks.append({
-                        "type": "text",
-                        "text": static_prefix,
-                        "cache_control": {"type": "ephemeral"}
-                    })
-
-                if dynamic_content.strip():
-                    # Dynamic content block without cache_control
-                    content_blocks.append({
-                        "type": "text",
-                        "text": dynamic_content
-                    })
-
-                # Update message content to use content blocks
-                if content_blocks:
-                    message["content"] = content_blocks
-                else:
-                    # Fallback: remove the marker if both parts are empty
-                    message["content"] = ""
-
-
-def _remove_cache_boundary_markers(messages: list[dict]) -> None:
-    """
-    Remove <<cache-boundary>> markers from user messages.
-
-    For providers with automatic caching (OpenAI, Gemini, DeepSeek), we don't need
-    explicit cache markers. This function cleans up the markers from prompts.
-
-    Args:
-        messages: The list of messages to modify (modified in-place)
-    """
-    for message in messages:
-        if message.get("role") == "user":
-            content = message.get("content", "")
-            if isinstance(content, str) and CACHE_BOUNDARY_MARKER in content:
-                message["content"] = content.replace(CACHE_BOUNDARY_MARKER, "")
-
-
-def extract_cache_stats_from_usage(usage: dict, model: Model) -> dict[str, int]:
-    """
-    Extract cache-related statistics from the LiteLLM usage response.
-
-    Different providers return cache stats in different formats:
-    - OpenAI: cached_tokens in prompt_tokens_details
-    - Anthropic: cache_creation_input_tokens, cache_read_input_tokens
-    - Gemini: cached_content_token_count
-    - DeepSeek: prompt_cache_hit_tokens, prompt_cache_miss_tokens
-
-    Args:
-        usage: The usage dictionary from litellm completion response
-        model: The Model enum representing the LLM being used
-
-    Returns:
-        A dictionary with cache_creation_tokens and cache_read_tokens
-    """
-    cache_stats = {
-        "cache_creation_tokens": 0,
-        "cache_read_tokens": 0,
-        "audio_cache_creation_tokens": 0,
-        "audio_cache_read_tokens": 0,
-    }
-
-    if not model.supports_prompt_caching():
-        return cache_stats
-
-    # Try to extract cache stats from various provider formats
-    prompt_tokens_details = usage.get("prompt_tokens_details", {}) or {}
-
-    if model.is_openai_model():
-        # OpenAI returns cached_tokens in prompt_tokens_details
-        cache_stats["cache_read_tokens"] = prompt_tokens_details.get("cached_tokens", 0)
-        # OpenAI doesn't charge separately for cache creation
-        cache_stats["cache_creation_tokens"] = 0
-        # Audio cache tokens (if present)
-        cache_stats["audio_cache_read_tokens"] = prompt_tokens_details.get("audio_cached_tokens", 0)
-
-    elif model.is_anthropic_model():
-        # Anthropic returns cache_creation_input_tokens and cache_read_input_tokens
-        cache_stats["cache_creation_tokens"] = usage.get("cache_creation_input_tokens", 0)
-        cache_stats["cache_read_tokens"] = usage.get("cache_read_input_tokens", 0)
-
-    elif model.is_vertex_model() or model.is_google_ai_studio_model():
-        # Gemini returns cached_content_token_count
-        cache_stats["cache_read_tokens"] = usage.get("cached_content_token_count", 0)
-        # Gemini's implicit caching doesn't have separate creation tokens
-        cache_stats["cache_creation_tokens"] = 0
-
-    elif model.is_deepseek_model():
-        # DeepSeek returns prompt_cache_hit_tokens and prompt_cache_miss_tokens
-        cache_stats["cache_read_tokens"] = usage.get("prompt_cache_hit_tokens", 0)
-        # DeepSeek's automatic caching doesn't have separate creation tokens
-        cache_stats["cache_creation_tokens"] = 0
-
-    return cache_stats
+            # 2. Handle User Messages (The Split Logic)
+            elif role == "user":
+                if isinstance(content, str) and self.CACHE_BOUNDARY_MARKER in content:
+                    static, dynamic = content.split(self.CACHE_BOUNDARY_MARKER, 1)
+                    
+                    new_blocks = []
+                    if static.strip():
+                        new_blocks.append({
+                            "type": "text", 
+                            "text": static, 
+                            "cache_control": {"type": "ephemeral"}
+                        })
+                    
+                    if dynamic.strip():
+                        new_blocks.append({"type": "text", "text": dynamic})
+                    
+                    if new_blocks:
+                        message["content"] = new_blocks
+                    else:
+                        message["content"] = "" # Handle empty case gracefully

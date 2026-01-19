@@ -26,7 +26,7 @@ from palimpzest.constants import (
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.models import GenerationStats
 from palimpzest.prompts import PromptFactory
-from palimpzest.utils.prompt_cache import extract_cache_stats_from_usage, get_cache_kwargs
+from palimpzest.utils.prompt_cache import PromptCacheManager
 
 # DEFINITIONS
 GenerationOutput = tuple[dict, str | None, GenerationStats, list[dict]]
@@ -124,6 +124,7 @@ class Generator(Generic[ContextType, InputType]):
         self.desc = desc
         self.verbose = verbose
         self.prompt_factory = PromptFactory(prompt_strategy, model, cardinality, desc)
+        self.cache_manager = PromptCacheManager(model)
 
     def _parse_reasoning(self, completion_text: str, **kwargs) -> str:
         """Extract the reasoning for the generated output from the completion object."""
@@ -330,7 +331,7 @@ class Generator(Generic[ContextType, InputType]):
             if self.model.is_vllm_model():
                 completion_kwargs = {"api_base": self.api_base, "api_key": os.environ.get("VLLM_API_KEY", "fake-api-key"), **completion_kwargs}
             # Add prompt caching kwargs (provider-specific)
-            cache_kwargs = get_cache_kwargs(self.model, messages)
+            cache_kwargs = self.cache_manager.get_cache_kwargs(messages)
             completion_kwargs = {**completion_kwargs, **cache_kwargs}
             completion = litellm.completion(model=self.model_name, messages=messages, **completion_kwargs)
             end_time = time.time()
@@ -358,12 +359,14 @@ class Generator(Generic[ContextType, InputType]):
         if completion is not None:
             usage = completion.usage.model_dump()
 
-            # get cost per input/output token for the model
+            # TODO: update with changes from #265
             usd_per_input_token = MODEL_CARDS[self.model_name].get("usd_per_input_token", 0.0)
             usd_per_audio_input_token = MODEL_CARDS[self.model_name].get("usd_per_audio_input_token", 0.0)
-            usd_per_output_token = MODEL_CARDS[self.model_name]["usd_per_output_token"]
-            usd_per_cache_read_token = MODEL_CARDS[self.model_name].get("usd_per_cache_read_token", 0.0)
+            usd_per_output_token = MODEL_CARDS[self.model_name].get("usd_per_output_token", 0.0)
+            usd_per_cache_read_token = MODEL_CARDS[self.model_name].get("usd_per_cache_read_token", usd_per_input_token * 0.1)
             usd_per_cache_creation_token = MODEL_CARDS[self.model_name].get("usd_per_cache_creation_token", 0.0)
+            usd_per_audio_cache_read_token = MODEL_CARDS[self.model_name].get("usd_per_audio_cache_read_token", usd_per_audio_input_token * 0.1)
+            usd_per_audio_cache_creation_token = MODEL_CARDS[self.model_name].get("usd_per_audio_cache_creation_token", 0.0)
 
             # TODO: for some models (e.g. GPT-5) we cannot separate text from image prompt tokens yet;
             #       for now, we only use tokens from prompt_token_details if it's an audio prompt
@@ -377,57 +380,55 @@ class Generator(Generic[ContextType, InputType]):
                 input_audio_tokens = 0
                 input_text_tokens = usage["prompt_tokens"]
                 input_image_tokens = 0
-            input_tokens = input_audio_tokens + input_text_tokens + input_image_tokens
 
-            # extract cache statistics from usage
-            cache_stats = extract_cache_stats_from_usage(usage, self.model)
-            cache_creation_tokens = cache_stats["cache_creation_tokens"]
-            cache_read_tokens = cache_stats["cache_read_tokens"]
-            audio_cache_creation_tokens = cache_stats["audio_cache_creation_tokens"]
-            audio_cache_read_tokens = cache_stats["audio_cache_read_tokens"]
+            total_input_tokens = input_audio_tokens + input_text_tokens + input_image_tokens
 
-            # compute cache costs
-            # - Cache read tokens: charged at discounted cache_read rate
-            # - Cache creation tokens: charged at cache_creation rate (falls back to input rate if not specified)
-            effective_cache_creation_rate = usd_per_cache_creation_token if usd_per_cache_creation_token > 0 else usd_per_input_token
-            text_cache_read_cost = cache_read_tokens * usd_per_cache_read_token
-            text_cache_creation_cost = cache_creation_tokens * effective_cache_creation_rate
-            # Use same rates for audio cache (no separate audio cache rates defined)
-            audio_cache_read_cost = audio_cache_read_tokens * usd_per_cache_read_token
-            audio_cache_creation_cost = audio_cache_creation_tokens * effective_cache_creation_rate
-            # Aggregate into total cache costs
-            total_cache_read_cost = text_cache_read_cost + audio_cache_read_cost
-            total_cache_creation_cost = text_cache_creation_cost + audio_cache_creation_cost
+            cache_stats = self.cache_manager.extract_cache_stats(usage, self.model)
+            text_cache_read_tokens = cache_stats.get("cache_read_tokens", 0.0)
+            text_cache_creation_tokens = cache_stats.get("cache_creation_tokens", 0.0)
+            if is_audio_op:
+                audio_cache_read_tokens = cache_stats.get("audio_cache_read_tokens", 0.0)
+                audio_cache_creation_tokens = cache_stats.get("audio_cache_creation_tokens", 0.0)
+            else:
+                audio_cache_read_tokens = 0
+                audio_cache_creation_tokens = 0
 
-            # compute the input and output token costs
-            # Non-cached tokens (total input minus cached tokens) are charged at full input rate
-            non_cached_text_tokens = max(0, input_text_tokens - cache_read_tokens - cache_creation_tokens)
-            non_cached_audio_tokens = max(0, input_audio_tokens - audio_cache_read_tokens - audio_cache_creation_tokens)
-            total_input_cost = non_cached_text_tokens * usd_per_input_token + non_cached_audio_tokens * usd_per_audio_input_token
+            total_cache_read_tokens = text_cache_read_tokens + audio_cache_read_tokens
+            total_cache_creation_tokens = text_cache_creation_tokens + audio_cache_creation_tokens
+            total_cache_read_cost = text_cache_read_tokens * usd_per_cache_read_token + audio_cache_read_tokens * usd_per_audio_cache_read_token
+            total_cache_creation_cost = text_cache_creation_tokens * usd_per_cache_creation_token + audio_cache_creation_tokens * usd_per_audio_cache_creation_token
+
+            # the result will never be negative; max(0, *) for extra safety
+            regular_text_tokens = max(0, input_text_tokens - text_cache_read_tokens - text_cache_creation_tokens) 
+            regular_audio_tokens = max(0, input_audio_tokens - audio_cache_read_tokens - audio_cache_creation_tokens)
+            total_input_cost = regular_text_tokens * usd_per_input_token + regular_audio_tokens * usd_per_audio_input_token
+
             total_output_cost = output_tokens * usd_per_output_token
-
-            # Compute total cached tokens (both text and audio)
-            total_cached_tokens = cache_read_tokens + cache_creation_tokens + audio_cache_read_tokens + audio_cache_creation_tokens
+            total_cost = total_input_cost + total_cache_read_cost + total_cache_creation_cost + total_output_cost
 
             generation_stats = GenerationStats(
                 model_name=self.model_name,
                 llm_call_duration_secs=end_time - start_time,
                 fn_call_duration_secs=0.0,
-                input_audio_tokens=input_audio_tokens,
+                # Raw token counts by modality
                 input_text_tokens=input_text_tokens,
+                input_audio_tokens=input_audio_tokens,
                 input_image_tokens=input_image_tokens,
-                total_input_tokens=input_tokens,
+                total_input_tokens=total_input_tokens,
                 total_output_tokens=output_tokens,
-                cache_creation_tokens=cache_creation_tokens,
-                cache_read_tokens=cache_read_tokens,
-                audio_cache_creation_tokens=audio_cache_creation_tokens,
+                # Cache token breakdown
+                text_cache_read_tokens=text_cache_read_tokens,
+                text_cache_creation_tokens=text_cache_creation_tokens,
                 audio_cache_read_tokens=audio_cache_read_tokens,
-                total_cached_tokens=total_cached_tokens,
+                audio_cache_creation_tokens=audio_cache_creation_tokens,
+                total_cache_read_tokens=total_cache_read_tokens,
+                total_cache_creation_tokens=total_cache_creation_tokens,
+                # Costs
+                total_input_cost=total_input_cost,
                 total_cache_read_cost=total_cache_read_cost,
                 total_cache_creation_cost=total_cache_creation_cost,
-                total_input_cost=total_input_cost,
                 total_output_cost=total_output_cost,
-                cost_per_record=total_input_cost + total_output_cost + total_cache_read_cost + total_cache_creation_cost,
+                cost_per_record=total_cost,
                 total_llm_calls=1,
             )
 
