@@ -19,7 +19,6 @@ Supported caching providers:
 - DeepSeek: Context caching
 """
 import argparse
-import json
 import os
 import time
 from typing import List
@@ -240,15 +239,17 @@ def main():
 
     # Validate env vars (Simplified for brevity)
     if model.is_openai_model() and not os.getenv("OPENAI_API_KEY"):
-        print("ERROR: OPENAI_API_KEY not set"); return
+        print("ERROR: OPENAI_API_KEY not set")
+        return
     if model.is_anthropic_model() and not os.getenv("ANTHROPIC_API_KEY"):
-        print("ERROR: ANTHROPIC_API_KEY not set"); return
+        print("ERROR: ANTHROPIC_API_KEY not set")
+        return
     if (model.is_google_ai_studio_model() or model.is_vertex_model()) and not os.getenv("GOOGLE_API_KEY"):
         print("ERROR: GOOGLE_API_KEY not set")
         return
 
     print("=" * 60)
-    print(f" PZ CACHING DEMO: CORPORATE AUDIT")
+    print(" PZ CACHING DEMO: CORPORATE AUDIT")
     print("=" * 60)
     print(f"Model: {model.value}")
     print(f"Policy Context Size: ~{len(CORPORATE_TRAVEL_POLICY.split())} words (~{int(len(CORPORATE_TRAVEL_POLICY.split()) * 1.3)} tokens)")
