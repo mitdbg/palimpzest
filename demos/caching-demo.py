@@ -197,42 +197,35 @@ def print_cache_stats(execution_stats):
     print(" CACHE STATISTICS & COST ANALYSIS")
     print("=" * 60)
 
-    total_cache_read = 0
-    total_cache_creation = 0
-    
-    # Iterate through stats to find cache metrics
-    # Note: These attributes (cache_read_tokens) are dynamically populated
-    # by the execution layer for supported backends.
-    for plan_id, plan_stats in execution_stats.plan_stats.items():
-        for op_id, op_stats in plan_stats.operator_stats.items():
-            for record in op_stats.record_op_stats_lst:
-                total_cache_read += getattr(record, "cache_read_tokens", 0)
-                total_cache_creation += getattr(record, "cache_creation_tokens", 0)
-                # Check for audio cache stats if they exist
-                total_cache_read += getattr(record, "audio_cache_read_tokens", 0)
-                total_cache_creation += getattr(record, "audio_cache_creation_tokens", 0)
-
+    # Use the properly propagated cache token stats from ExecutionStats
+    total_cache_read = execution_stats.total_cache_read_tokens
+    total_cache_creation = execution_stats.total_cache_creation_tokens
     total_input = execution_stats.total_input_tokens
-    regular_input = total_input - total_cache_read - total_cache_creation
-    
-    print(f"{'Metric':<30} | {'Count':<15}")
-    print("-" * 50)
-    print(f"{'Total Input Tokens':<30} | {total_input:,}")
-    print(f"{'  - Regular Input':<30} | {regular_input:,}")
-    print(f"{'  - Cache Creation (Write)':<30} | {total_cache_creation:,}")
-    print(f"{'  - Cache Read (Hit)':<30} | {total_cache_read:,}")
-    print("-" * 50)
-    print(f"{'Total Output Tokens':<30} | {execution_stats.total_output_tokens:,}")
-    print(f"{'Total Execution Cost':<30} | ${execution_stats.total_execution_cost:.6f}")
-    
-    if total_input > 0:
-        hit_rate = (total_cache_read / total_input) * 100
+    total_output = execution_stats.total_output_tokens
+    total_embedding = execution_stats.total_embedding_input_tokens
+
+    # Regular input = total input - cache read tokens
+    # (cache creation tokens are separate from input tokens)
+    regular_input = total_input - total_cache_read
+
+    print(f"{'Metric':<35} | {'Count':<15}")
+    print("-" * 55)
+    print(f"{'Total Input Tokens':<35} | {total_input:,}")
+    print(f"{'  - Regular Input (non-cached)':<35} | {regular_input:,}")
+    print(f"{'  - Cache Read (hits)':<35} | {total_cache_read:,}")
+    print(f"{'Cache Creation Tokens (writes)':<35} | {total_cache_creation:,}")
+    print("-" * 55)
+    print(f"{'Total Output Tokens':<35} | {total_output:,}")
+    if total_embedding > 0:
+        print(f"{'Total Embedding Input Tokens':<35} | {total_embedding:,}")
+    print("-" * 55)
+    print(f"{'Total Execution Cost':<35} | ${execution_stats.total_execution_cost:.6f}")
+
+    # Calculate and display cache hit rate
+    total_cacheable = total_cache_read + regular_input
+    if total_cacheable > 0:
+        hit_rate = (total_cache_read / total_cacheable) * 100
         print(f"\nCache Hit Rate: {hit_rate:.1f}%")
-        
-        # Heuristic check for the user
-        if hit_rate < 1.0 and total_input > 2000:
-             print("\n[!] Low cache hit rate detected.")
-             print("    Ensure the model supports caching and the prompt structure allows prefix reuse.")
 
 def main():
     parser = argparse.ArgumentParser(description="Realistic Demo showcasing prompt caching in Palimpzest")

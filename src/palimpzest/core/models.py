@@ -296,6 +296,20 @@ class RecordOpStats(BaseModel):
     # the (possibly amortized) cost of generating embeddings for this record; None if this operation did not use an embedding LLM
     total_embedding_cost: float = 0.0
 
+    # the total number of tokens read from cache
+    # typed as a float because GenerationStats may be amortized (i.e. divided) across a number of output records
+    total_cache_read_tokens: float = 0.0
+
+    # the total number of tokens written to the cache (Anthropic only)
+    # typed as a float because GenerationStats may be amortized (i.e. divided) across a number of output records
+    total_cache_creation_tokens: float = 0.0
+
+    # the total cost associated with reading tokens from the cache
+    total_cache_read_cost: float = 0.0
+
+    # the total cost associated with writing tokens to the cache
+    total_cache_creation_cost: float = 0.0
+
     # (if applicable) the filter text (or a string representation of the filter function) applied to this record
     filter_str: str | None = None
 
@@ -351,6 +365,12 @@ class OperatorStats(BaseModel):
     #the total embedding input tokens processed by this operation
     total_embedding_input_tokens: int = 0
 
+    # the total tokens read from cache by this operation
+    total_cache_read_tokens: int = 0
+
+    # the total tokens written to cache by this operation
+    total_cache_creation_tokens: int = 0
+
     # a list of RecordOpStats processed by the operation
     record_op_stats_lst: list[RecordOpStats] = Field(default_factory=list)
 
@@ -383,6 +403,8 @@ class OperatorStats(BaseModel):
             self.total_input_tokens += stats.total_input_tokens
             self.total_output_tokens += stats.total_output_tokens
             self.total_embedding_input_tokens += stats.total_embedding_input_tokens
+            self.total_cache_read_tokens += stats.total_cache_read_tokens
+            self.total_cache_creation_tokens += stats.total_cache_creation_tokens
             self.record_op_stats_lst.extend(stats.record_op_stats_lst)
 
         elif isinstance(stats, RecordOpStats):
@@ -394,6 +416,8 @@ class OperatorStats(BaseModel):
             self.total_input_tokens += stats.total_input_tokens
             self.total_output_tokens += stats.total_output_tokens
             self.total_embedding_input_tokens += stats.total_embedding_input_tokens
+            self.total_cache_read_tokens += stats.total_cache_read_tokens
+            self.total_cache_creation_tokens += stats.total_cache_creation_tokens
 
         else:
             raise TypeError(f"Cannot add {type(stats)} to OperatorStats")
@@ -448,6 +472,12 @@ class BasePlanStats(BaseModel):
     # total embedding input tokens processed by this plan
     total_embedding_input_tokens: int = 0
 
+    # total tokens read from cache by this plan
+    total_cache_read_tokens: int = 0
+
+    # total tokens written to cache by this plan
+    total_cache_creation_tokens: int = 0
+
     # start time for the plan execution; should be set by calling PlanStats.start()
     start_time: float | None = None
 
@@ -464,6 +494,8 @@ class BasePlanStats(BaseModel):
         self.total_input_tokens = self.sum_input_tokens() + self.sum_validation_input_tokens()
         self.total_output_tokens = self.sum_output_tokens() + self.sum_validation_output_tokens()
         self.total_embedding_input_tokens = self.sum_embedding_input_tokens() + self.sum_validation_embedding_input_tokens()
+        self.total_cache_read_tokens = self.sum_cache_read_tokens() + self.sum_validation_cache_read_tokens()
+        self.total_cache_creation_tokens = self.sum_cache_creation_tokens() + self.sum_validation_cache_creation_tokens()
 
     @staticmethod
     @abstractmethod
@@ -498,6 +530,20 @@ class BasePlanStats(BaseModel):
     def sum_embedding_input_tokens(self) -> int:
         """
         Sum the input embedding tokens processed by all operators in this plan.
+        """
+        pass
+
+    @abstractmethod
+    def sum_cache_read_tokens(self) -> int:
+        """
+        Sum the tokens read from cache by all operators in this plan.
+        """
+        pass
+
+    @abstractmethod
+    def sum_cache_creation_tokens(self) -> int:
+        """
+        Sum the tokens written to cache by all operators in this plan.
         """
         pass
 
@@ -545,6 +591,18 @@ class BasePlanStats(BaseModel):
         Sum the input embedding tokens processed by all validation generations in this plan.
         """
         return sum([gen_stats.total_embedding_input_tokens for _, gen_stats in self.validation_gen_stats.items()])
+
+    def sum_validation_cache_read_tokens(self) -> int:
+        """
+        Sum the tokens read from cache by all validation generations in this plan.
+        """
+        return sum([gen_stats.total_cache_read_tokens for _, gen_stats in self.validation_gen_stats.items()])
+
+    def sum_validation_cache_creation_tokens(self) -> int:
+        """
+        Sum the tokens written to cache by all validation generations in this plan.
+        """
+        return sum([gen_stats.total_cache_creation_tokens for _, gen_stats in self.validation_gen_stats.items()])
 
     def get_total_cost_so_far(self) -> float:
         """
@@ -600,6 +658,18 @@ class PlanStats(BasePlanStats):
         """
         return sum([op_stats.total_embedding_input_tokens for _, op_stats in self.operator_stats.items()])
 
+    def sum_cache_read_tokens(self) -> int:
+        """
+        Sum the tokens read from cache by all operators in this plan.
+        """
+        return sum([op_stats.total_cache_read_tokens for _, op_stats in self.operator_stats.items()])
+
+    def sum_cache_creation_tokens(self) -> int:
+        """
+        Sum the tokens written to cache by all operators in this plan.
+        """
+        return sum([op_stats.total_cache_creation_tokens for _, op_stats in self.operator_stats.items()])
+
     def add_record_op_stats(self, unique_full_op_id: str, record_op_stats: RecordOpStats | list[RecordOpStats]) -> None:
         """
         Add the given RecordOpStats to this plan's operator stats for the given operator id.
@@ -627,6 +697,8 @@ class PlanStats(BasePlanStats):
         self.total_input_tokens += plan_stats.total_input_tokens
         self.total_output_tokens += plan_stats.total_output_tokens
         self.total_embedding_input_tokens += plan_stats.total_embedding_input_tokens
+        self.total_cache_read_tokens += plan_stats.total_cache_read_tokens
+        self.total_cache_creation_tokens += plan_stats.total_cache_creation_tokens
         for unique_full_op_id, op_stats in plan_stats.operator_stats.items():
             if unique_full_op_id in self.operator_stats:
                 self.operator_stats[unique_full_op_id] += op_stats
@@ -639,6 +711,8 @@ class PlanStats(BasePlanStats):
         stats += f"total_input_tokens={self.total_input_tokens} \n"
         stats += f"total_output_tokens={self.total_output_tokens} \n"
         stats += f"total_embedding_input_tokens={self.total_embedding_input_tokens} \n"
+        stats += f"total_cache_read_tokens={self.total_cache_read_tokens} \n"
+        stats += f"total_cache_creation_tokens={self.total_cache_creation_tokens} \n"
         for idx, op_stats in enumerate(self.operator_stats.values()):
             stats += f"{idx}. {op_stats.op_name} time={op_stats.total_op_time} cost={op_stats.total_op_cost} \n"
         return stats
@@ -693,6 +767,18 @@ class SentinelPlanStats(BasePlanStats):
         """
         return sum(sum([op_stats.total_embedding_input_tokens for _, op_stats in phys_op_stats.items()]) for _, phys_op_stats in self.operator_stats.items())
 
+    def sum_cache_read_tokens(self) -> int:
+        """
+        Sum the tokens read from cache by all operators in this plan.
+        """
+        return sum(sum([op_stats.total_cache_read_tokens for _, op_stats in phys_op_stats.items()]) for _, phys_op_stats in self.operator_stats.items())
+
+    def sum_cache_creation_tokens(self) -> int:
+        """
+        Sum the tokens written to cache by all operators in this plan.
+        """
+        return sum(sum([op_stats.total_cache_creation_tokens for _, op_stats in phys_op_stats.items()]) for _, phys_op_stats in self.operator_stats.items())
+
     def add_record_op_stats(self, unique_logical_op_id: str, record_op_stats: RecordOpStats | list[RecordOpStats]) -> None:
         """
         Add the given RecordOpStats to this plan's operator stats for the given operator set id.
@@ -734,6 +820,8 @@ class SentinelPlanStats(BasePlanStats):
         self.total_input_tokens += plan_stats.total_input_tokens
         self.total_output_tokens += plan_stats.total_output_tokens
         self.total_embedding_input_tokens += plan_stats.total_embedding_input_tokens
+        self.total_cache_read_tokens += plan_stats.total_cache_read_tokens
+        self.total_cache_creation_tokens += plan_stats.total_cache_creation_tokens
         for unique_logical_op_id, physical_op_stats in plan_stats.operator_stats.items():
             for full_op_id, op_stats in physical_op_stats.items():
                 if unique_logical_op_id in self.operator_stats:
@@ -756,6 +844,8 @@ class SentinelPlanStats(BasePlanStats):
         stats += f"total_input_tokens={self.total_input_tokens} \n"
         stats += f"total_output_tokens={self.total_output_tokens} \n"
         stats += f"total_embedding_input_tokens={self.total_embedding_input_tokens} \n"
+        stats += f"total_cache_read_tokens={self.total_cache_read_tokens} \n"
+        stats += f"total_cache_creation_tokens={self.total_cache_creation_tokens} \n"
         for outer_idx, physical_op_stats in enumerate(self.operator_stats.values()):
             total_time = sum([op_stats.total_op_time for op_stats in physical_op_stats.values()])
             total_cost = sum([op_stats.total_op_cost for op_stats in physical_op_stats.values()])
@@ -805,6 +895,12 @@ class ExecutionStats(BaseModel):
 
      # total number of embedding input tokens processed
     total_embedding_input_tokens: int = 0
+
+    # total number of tokens read from cache
+    total_cache_read_tokens: int = 0
+
+    # total number of tokens written to cache
+    total_cache_creation_tokens: int = 0
 
     # total number of tokens processed
     total_tokens: int = 0
@@ -860,6 +956,8 @@ class ExecutionStats(BaseModel):
         self.total_input_tokens = self.sum_input_tokens()
         self.total_output_tokens = self.sum_output_tokens()
         self.total_embedding_input_tokens = self.sum_embedding_input_tokens()
+        self.total_cache_read_tokens = self.sum_cache_read_tokens()
+        self.total_cache_creation_tokens = self.sum_cache_creation_tokens()
         self.total_tokens = self.total_input_tokens + self.total_output_tokens + self.total_embedding_input_tokens
 
         # compute plan_strs
@@ -901,6 +999,22 @@ class ExecutionStats(BaseModel):
         sentinel_plan_embedding_input_tokens = sum([plan_stats.sum_embedding_input_tokens() for _, plan_stats in self.sentinel_plan_stats.items()])
         plan_embedding_input_tokens = sum([plan_stats.sum_embedding_input_tokens() for _, plan_stats in self.plan_stats.items()])
         return plan_embedding_input_tokens + sentinel_plan_embedding_input_tokens
+
+    def sum_cache_read_tokens(self) -> int:
+        """
+        Sum the tokens read from cache in this execution
+        """
+        sentinel_plan_cache_read_tokens = sum([plan_stats.sum_cache_read_tokens() for _, plan_stats in self.sentinel_plan_stats.items()])
+        plan_cache_read_tokens = sum([plan_stats.sum_cache_read_tokens() for _, plan_stats in self.plan_stats.items()])
+        return plan_cache_read_tokens + sentinel_plan_cache_read_tokens
+
+    def sum_cache_creation_tokens(self) -> int:
+        """
+        Sum the tokens written to cache in this execution
+        """
+        sentinel_plan_cache_creation_tokens = sum([plan_stats.sum_cache_creation_tokens() for _, plan_stats in self.sentinel_plan_stats.items()])
+        plan_cache_creation_tokens = sum([plan_stats.sum_cache_creation_tokens() for _, plan_stats in self.plan_stats.items()])
+        return plan_cache_creation_tokens + sentinel_plan_cache_creation_tokens
 
     def add_plan_stats(self, plan_stats: PlanStats | SentinelPlanStats | list[PlanStats] | list[SentinelPlanStats]) -> None:
         """
