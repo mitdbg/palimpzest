@@ -491,6 +491,7 @@ class NestedLoopsJoin(LLMJoin):
         return DataRecordSet(output_records, output_record_op_stats), num_inputs_processed
 
 class BlockNestedLoopsJoin(LLMJoin):
+    # Implements block nested loops join with a known selectivity.
     def __init__(
         self,
         *args,
@@ -498,15 +499,96 @@ class BlockNestedLoopsJoin(LLMJoin):
     ):
         kwargs['prompt_strategy'] = PromptStrategy.JOIN_BLOCK
         super().__init__(*args, **kwargs)
-    # Implements block nested loops join with a known selectivity.
-    def naive_cost_estimates(self, left_source_op_cost_estimates: OperatorCostEstimates, right_source_op_cost_estimates: OperatorCostEstimates):
+    
+    def naive_cost_estimates(
+        self,
+        left_source_op_cost_estimates: OperatorCostEstimates,
+        right_source_op_cost_estimates: OperatorCostEstimates
+    ):
         # TODO: Implement naive cost estimates for block nested loops join.
         pass
 
-    def _find_batch_sizes(self):
+    def _find_batch_sizes(
+        self,
+        left_candidates: list[DataRecord],
+        right_candidates: list[DataRecord]
+    ) -> tuple[int, int]:
         # TODO: Implement a method to find optimal batch sizes for left and right tables.
         # Currently, return batch size of 2 for both sides.
         return 2, 2
+
+    def _add_indices_to_records(
+        self,
+        left_candidates: list[DataRecord],
+        right_candidates: list[DataRecord],
+        left_batch_size: int,
+        right_batch_size: int,
+    ):
+        left_candidates_size = len(left_candidates)
+        right_candidates_size = len(right_candidates)
+        left_input_records_size = len(self._left_input_records)
+        right_input_records_size = len(self._right_input_records)
+
+        # add indices to records
+        def _helper(records: list[DataRecord]):
+            for i, record in enumerate(records):
+                record._index = str(i + 1)
+        
+        for left_index in range(0, left_candidates_size, left_batch_size):
+            left_batch = left_candidates[left_index:left_index + left_batch_size]
+            _helper(left_batch)
+        for left_index in range(0, left_input_records_size, left_batch_size):
+            left_batch = self._left_input_records[left_index:left_index + left_batch_size]
+            _helper(left_batch)
+        for right_index in range(0, right_candidates_size, right_batch_size):
+            right_batch = right_candidates[right_index:right_index + right_batch_size]
+            _helper(right_batch)
+        for right_index in range(0, right_input_records_size, right_batch_size):
+            right_batch = self._right_input_records[right_index:right_index + right_batch_size]
+            _helper(right_batch)
+
+    def _del_indices_from_records(
+        self,
+        left_candidates: list[DataRecord],
+        right_candidates: list[DataRecord]
+    ):
+        for record in left_candidates:
+            del record._index
+        for record in self._left_input_records:
+            del record._index
+        for record in right_candidates:
+            del record._index
+        for record in self._right_input_records:
+            del record._index
+
+    def _create_join_candidates(
+        self,
+        left_candidates: list[DataRecord],
+        right_candidates: list[DataRecord],
+        left_batch_size: int,
+        right_batch_size: int
+    ) -> list:
+        left_candidates_size = len(left_candidates)
+        right_candidates_size = len(right_candidates)
+        left_input_records_size = len(self._left_input_records)
+        right_input_records_size = len(self._right_input_records)
+
+        join_candidates = []
+        for left_index in range(0, left_candidates_size, left_batch_size):
+            left_batch = left_candidates[left_index:left_index + left_batch_size]
+            for right_index in range(0, right_candidates_size, right_batch_size):
+                right_batch = right_candidates[right_index:right_index + right_batch_size]
+                join_candidates.append((left_batch, right_batch))
+            for right_index in range(0, right_input_records_size, right_batch_size):
+                right_batch = self._right_input_records[right_index:right_index + right_batch_size]
+                join_candidates.append((left_batch, right_batch))
+        for left_index in range(0, left_input_records_size, left_batch_size):
+            left_batch = self._left_input_records[left_index:left_index + left_batch_size]
+            for right_index in range(0, right_candidates_size, right_batch_size):
+                right_batch = right_candidates[right_index:right_index + right_batch_size]
+                join_candidates.append((left_batch, right_batch))
+        
+        return join_candidates
 
     def _process_join_candidate_pair(
         self,
@@ -579,34 +661,19 @@ class BlockNestedLoopsJoin(LLMJoin):
                 raise Exception(f"Could not parse answer from completion text: {answer_text}")
 
         # get batch sizes
-        left_batch_size, right_batch_size = self._find_batch_sizes()
+        left_batch_size, right_batch_size = self._find_batch_sizes(left_candidates, right_candidates)
+
+        # add indices to records
+        self._add_indices_to_records(left_candidates, right_candidates, left_batch_size, right_batch_size)
+        
+        # create the set of candidates to join
+        join_candidates = self._create_join_candidates(left_candidates, right_candidates, left_batch_size, right_batch_size)
 
         # get the set of input fields from both records in the join
         input_fields = self.get_input_fields()
 
         # construct kwargs for generation
         gen_kwargs = {"project_cols": input_fields, "join_condition": self.condition, "parse_answer": _parse_answer}
-
-        # create the set of candidates to join
-        join_candidates = []
-        left_candidates_size = len(left_candidates)
-        right_candidates_size = len(right_candidates)
-        left_input_records_size = len(self._left_input_records)
-        right_input_records_size = len(self._right_input_records)
-
-        for left_index in range(0, left_candidates_size, left_batch_size):
-            left_batch = left_candidates[left_index:left_index + left_batch_size]
-            for right_index in range(0, right_candidates_size, right_batch_size):
-                right_batch = right_candidates[right_index:right_index + right_batch_size]
-                join_candidates.append((left_batch, right_batch))
-            for right_index in range(0, right_input_records_size, right_batch_size):
-                right_batch = self._right_input_records[right_index:right_index + right_batch_size]
-                join_candidates.append((left_batch, right_batch))
-        for left_index in range(0, left_input_records_size, left_batch_size):
-            left_batch = self._left_input_records[left_index:left_index + left_batch_size]
-            for right_index in range(0, right_candidates_size, right_batch_size):
-                right_batch = right_candidates[right_index:right_index + right_batch_size]
-                join_candidates.append((left_batch, right_batch))
 
         # apply the generator to each pair of candidates
         output_records, output_record_op_stats = [], []
@@ -633,6 +700,9 @@ class BlockNestedLoopsJoin(LLMJoin):
         if self.retain_inputs:
             self._left_input_records.extend(left_candidates)
             self._right_input_records.extend(right_candidates)
+
+        # delete indices from records
+        self._del_indices_from_records(left_candidates, right_candidates)
 
         # if this is the final call, then add in any left/right/outer join records that did not match
         if final:

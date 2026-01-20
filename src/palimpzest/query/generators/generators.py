@@ -440,4 +440,7 @@ class Generator(Generic[ContextType, InputType]):
                 f.write(f"{str(e)}\n")
 
         logger.debug(f"Generated field answers: {field_answers}")
+
+        import pdb; pdb.set_trace()
+
         return field_answers, reasoning, generation_stats, messages

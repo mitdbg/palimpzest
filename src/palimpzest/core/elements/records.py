@@ -96,6 +96,13 @@ class DataRecord:
     def __getattr__(self, name: str) -> Any:
         return getattr(self._data_item, name)
 
+    # TODO: refactor code to distinguish between internal, operator-specific, and data fields
+    def __delattr__(self, name: str) -> None:
+        # only allow deleting operator-specific fields
+        if name in ["_index"]:
+            delattr(self._data_item, name)
+        else:
+            raise AttributeError(f"Cannot delete attribute {name} from DataRecord")
 
     def __getitem__(self, field: str) -> Any:
         return getattr(self._data_item, field)
@@ -246,6 +253,10 @@ class DataRecord:
         )
         left_copy_field_names = [field.split(".")[-1] for field in left_copy_field_names]
         right_copy_field_names = [field.split(".")[-1] for field in right_copy_field_names]
+
+        # remove operator-specific fields from field names
+        left_copy_field_names = [field for field in left_copy_field_names if field not in ["_index"]]
+        right_copy_field_names = [field for field in right_copy_field_names if field not in ["_index"]]
 
         # copy fields from the parents
         data_item = {field_name: left_parent_record[field_name] for field_name in left_copy_field_names}

@@ -47,12 +47,12 @@ RIGHT_AUDIO_EXAMPLE_INPUT_FIELDS = """
 - podcast: an audio recording of a podcast about historic scientists
 """
 TEXT_COLLECTION_EXAMPLE_INPUT_FIELDS = """
-- index: the index of the record in the collection
+- _index: the index of the record in the collection
 - text: a text passage describing a scientist
 - birthday: the scientist's birthday
 """
 RIGHT_TEXT_COLLECTION_EXAMPLE_INPUT_FIELDS = """
-- index: the index of the record in the collection
+- _index: the index of the record in the collection
 - content: the contents of a text file
 """
 
@@ -111,32 +111,32 @@ THIRD_AUDIO_EXAMPLE_CONTEXT = """
 """
 TEXT_COLLECTION_EXAMPLE_CONTEXT = """
   {
-    "index": 1,
+    "_index": 1,
     "text": "Augusta Ada King, Countess of Lovelace, also known as Ada Lovelace, was an English mathematician and writer chiefly known for her work on Charles Babbage's proposed mechanical general-purpose computer, the Analytical Engine. She was the first to recognise that the machine had applications beyond pure calculation.",
     "birthday": "December 10, 1815"
   },
   {
-    "index": 2,
+    "_index": 2,
     "text": "Claude Elwood Shannon was an American mathematician, electrical engineer, computer scientist, cryptographer and inventor known as the \"father of information theory\" and the man who laid the foundations of the Information Age.",
     "birthday": "April 30, 1916"
   },
   {
-    "index": 3,
+    "_index": 3,
     "text": "Antonie Philips van Leeuwenhoek was a Dutch microbiologist and microscopist in the Golden Age of Dutch art, science and technology. A largely self-taught man in science, he is commonly known as \"the Father of Microbiology\", and one of the first microscopists and microbiologists.",
     "birthday": "October 24, 1632"
   }
 """
 RIGHT_TEXT_COLLECTION_EXAMPLE_CONTEXT = """
   {
-    "index": 1,
+    "_index": 1,
     "content": "Alan Turing was a pioneering computer scientist and mathematician. He is widely considered to be the father of theoretical computer science and artificial intelligence."
   },
   {
-    "index": 2,
+    "_index": 2,
     "content": "Louis Pasteur was a French chemist, pharmacist, and microbiologist renowned for his discoveries of the principles of vaccination, microbial fermentation, and pasteurization, the last of which was named after him."
   },
   {
-    "index": 3,
+    "_index": 3,
     "content": "Sigmund Freud was an Austrian neurologist and the founder of psychoanalysis, a clinical method for evaluating and treating pathologies seen as originating from conflicts in the psyche, through dialogue between patient and psychoanalyst, and the distinctive theory of mind and human agency derived from it."
   }
 """
