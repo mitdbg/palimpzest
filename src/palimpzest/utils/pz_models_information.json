@@ -110,6 +110,23 @@
             "https://artificialanalysis.ai/models/deepseek-r1-qwen3-8b"
         ]
     },
+    "deepseek-chat": {
+        "usd_per_input_token": 0.28e-06,
+        "usd_per_output_token": 0.42e-06,
+        "seconds_per_output_token": 0,
+        "MMLU_Pro_score": 0,
+        "is_reasoning_model": true,
+        "is_text_model": false,
+        "is_audio_model": true,
+        "is_vision_model": false,
+        "supports_prompt_caching": true,
+        "provider": "deepseek",
+        "sources": [
+            "https://api-docs.deepseek.com/quick_start/pricing",
+            "https://artificialanalysis.ai/models/deepseek-v3-2-reasoning"
+        ],
+        "note": "needs update when the newer deepseek-chat model comes out"
+    },
     "openai/gpt-4o-2024-08-06": {
         "usd_per_input_token": 2.5e-06,
         "usd_per_output_token": 1e-05,
