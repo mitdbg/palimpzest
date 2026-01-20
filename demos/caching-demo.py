@@ -178,9 +178,10 @@ MODEL_MAPPING = {
     "gpt-4o": Model.GPT_4o,
     "gpt-4o-mini": Model.GPT_4o_MINI,
     "claude-4-0-sonnet": Model.CLAUDE_4_0_SONNET,
+    "claude-3-7-sonnet": Model.CLAUDE_3_7_SONNET, # deprecated model testing
     "claude-3-5-haiku": Model.CLAUDE_3_5_HAIKU,
-    "gemini-2.5-flash": Model.GEMINI_2_5_FLASH,
-    "deepseek-v3": Model.DEEPSEEK_V3,
+    "gemini-2.5-flash": Model.GOOGLE_GEMINI_2_5_FLASH,
+    # "deepseek-v3": Model.DEEPSEEK_V3, # TODO: test with changes from 265
 }
 
 def get_model_from_string(model_str: str) -> Model:
@@ -242,6 +243,9 @@ def main():
         print("ERROR: OPENAI_API_KEY not set"); return
     if model.is_anthropic_model() and not os.getenv("ANTHROPIC_API_KEY"):
         print("ERROR: ANTHROPIC_API_KEY not set"); return
+    if (model.is_google_ai_studio_model() or model.is_vertex_model()) and not os.getenv("GOOGLE_API_KEY"):
+        print("ERROR: GOOGLE_API_KEY not set")
+        return
 
     print("=" * 60)
     print(f" PZ CACHING DEMO: CORPORATE AUDIT")

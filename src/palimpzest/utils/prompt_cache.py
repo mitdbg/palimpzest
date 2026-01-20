@@ -94,16 +94,21 @@ class PromptCacheManager:
             return stats
 
         if model.is_openai_model():
-            details = usage.get("prompt_tokens_details", {}) or {}
-            stats["cache_read_tokens"] = details.get("cached_tokens", 0)
-            stats["audio_cache_read_tokens"] = details.get("audio_cached_tokens", 0)
+            details = usage.get("prompt_tokens_details") or {}
+            stats["cache_read_tokens"] = details.get("cached_tokens") or 0
+            stats["audio_cache_read_tokens"] = details.get("audio_cached_tokens") or 0
 
         elif model.is_anthropic_model():
             stats["cache_creation_tokens"] = usage.get("cache_creation_input_tokens", 0)
             stats["cache_read_tokens"] = usage.get("cache_read_input_tokens", 0)
 
         elif model.is_vertex_model() or model.is_google_ai_studio_model():
-            stats["cache_read_tokens"] = usage.get("cached_content_token_count", 0)
+            # Try Gemini native field first, then litellm normalized field as fallback
+            stats["cache_read_tokens"] = usage.get("cached_content_token_count") or 0
+            if stats["cache_read_tokens"] == 0:
+                # litellm may normalize Gemini responses to use prompt_tokens_details
+                details = usage.get("prompt_tokens_details") or {}
+                stats["cache_read_tokens"] = details.get("cached_tokens") or 0
 
         elif model.is_deepseek_model():
             stats["cache_read_tokens"] = usage.get("prompt_cache_hit_tokens", 0)
@@ -179,4 +184,4 @@ class PromptCacheManager:
                     if new_blocks:
                         message["content"] = new_blocks
                     else:
-                        message["content"] = "" # Handle empty case gracefully
+                        message["content"] = ""
