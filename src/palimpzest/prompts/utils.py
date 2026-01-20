@@ -53,7 +53,7 @@ TEXT_COLLECTION_EXAMPLE_INPUT_FIELDS = """
 """
 RIGHT_TEXT_COLLECTION_EXAMPLE_INPUT_FIELDS = """
 - index: the index of the record in the collection
-- contents: the contents of a text file
+- content: the contents of a text file
 """
 
 ### EXAMPLE OUTPUT FIELDS ###
@@ -110,39 +110,35 @@ THIRD_AUDIO_EXAMPLE_CONTEXT = """
   "speaker": "Anderson Cooper"
 """
 TEXT_COLLECTION_EXAMPLE_CONTEXT = """
-  [
-    {
-      "index": 1,
-      "text": "Augusta Ada King, Countess of Lovelace, also known as Ada Lovelace, was an English mathematician and writer chiefly known for her work on Charles Babbage's proposed mechanical general-purpose computer, the Analytical Engine. She was the first to recognise that the machine had applications beyond pure calculation.",
-      "birthday": "December 10, 1815"
-    },
-    {
-      "index": 2,
-      "text": "Claude Elwood Shannon was an American mathematician, electrical engineer, computer scientist, cryptographer and inventor known as the \"father of information theory\" and the man who laid the foundations of the Information Age.",
-      "birthday": "April 30, 1916"
-    },
-    {
-      "index": 3,
-      "text": "Antonie Philips van Leeuwenhoek was a Dutch microbiologist and microscopist in the Golden Age of Dutch art, science and technology. A largely self-taught man in science, he is commonly known as \"the Father of Microbiology\", and one of the first microscopists and microbiologists.",
-      "birthday": "October 24, 1632"
-    }
-  ]
+  {
+    "index": 1,
+    "text": "Augusta Ada King, Countess of Lovelace, also known as Ada Lovelace, was an English mathematician and writer chiefly known for her work on Charles Babbage's proposed mechanical general-purpose computer, the Analytical Engine. She was the first to recognise that the machine had applications beyond pure calculation.",
+    "birthday": "December 10, 1815"
+  },
+  {
+    "index": 2,
+    "text": "Claude Elwood Shannon was an American mathematician, electrical engineer, computer scientist, cryptographer and inventor known as the \"father of information theory\" and the man who laid the foundations of the Information Age.",
+    "birthday": "April 30, 1916"
+  },
+  {
+    "index": 3,
+    "text": "Antonie Philips van Leeuwenhoek was a Dutch microbiologist and microscopist in the Golden Age of Dutch art, science and technology. A largely self-taught man in science, he is commonly known as \"the Father of Microbiology\", and one of the first microscopists and microbiologists.",
+    "birthday": "October 24, 1632"
+  }
 """
 RIGHT_TEXT_COLLECTION_EXAMPLE_CONTEXT = """
-  [
-    {
-      "index": 1,
-      "content": "Alan Turing was a pioneering computer scientist and mathematician. He is widely considered to be the father of theoretical computer science and artificial intelligence."
-    },
-    {
-      "index": 2,
-      "content": "Louis Pasteur was a French chemist, pharmacist, and microbiologist renowned for his discoveries of the principles of vaccination, microbial fermentation, and pasteurization, the last of which was named after him."
-    },
-    {
-      "index": 3,
-      "content": "Sigmund Freud was an Austrian neurologist and the founder of psychoanalysis, a clinical method for evaluating and treating pathologies seen as originating from conflicts in the psyche, through dialogue between patient and psychoanalyst, and the distinctive theory of mind and human agency derived from it."
-    }
-  ]
+  {
+    "index": 1,
+    "content": "Alan Turing was a pioneering computer scientist and mathematician. He is widely considered to be the father of theoretical computer science and artificial intelligence."
+  },
+  {
+    "index": 2,
+    "content": "Louis Pasteur was a French chemist, pharmacist, and microbiologist renowned for his discoveries of the principles of vaccination, microbial fermentation, and pasteurization, the last of which was named after him."
+  },
+  {
+    "index": 3,
+    "content": "Sigmund Freud was an Austrian neurologist and the founder of psychoanalysis, a clinical method for evaluating and treating pathologies seen as originating from conflicts in the psyche, through dialogue between patient and psychoanalyst, and the distinctive theory of mind and human agency derived from it."
+  }
 """
 
 ### DISCLAIMERS ###
@@ -172,7 +168,7 @@ AUDIO_EXAMPLE_REASONING = """The newscast recording discusses Ada Lovelace's upb
 AGG_EXAMPLE_REASONING = """The input contains two distinct scientists: "Augusta Ada King" and "Alan Turing". Although "Ada Lovelace" is mentioned twice, she should only be counted once. Therefore, the number of distinct scientists mentioned in the input is 2."""
 FILTER_EXAMPLE_REASONING = """Ada Lovelace is a foundational computer scientist, therefore the answer is TRUE."""
 JOIN_EXAMPLE_REASONING = """The subject of the left record is Ada Lovelace and the subject of the right record is Alan Turing. Since both inputs are about computer scientists, they satisfy the join condition. Therefore, the answer is TRUE."""
-BLOCK_JOIN_EXAMPLE_REASONING = """In the left collections, the subjects are computer scientist Ada Lovelace, computer scientist Claude Shannon, and biologist Antonie van Leeuwenhoek, respectively. In the right collection, the subjects are computer scientist Alan Turing, biologist Louis Pasteur, and psychologist Sigmund Freud, respectively. Pairs of scientists satisfy the join condition if they are in the same academic field. These pairs are computer scientists Ada Lovelace and Alan Turing, computer scientists Claude Shannon and Alan Turing, and biologists Antonie van Leeuwenhoek and Louis Pasteur. These pairs correspond to index pairs 1,1;2,1;3,2;"""
+BLOCK_JOIN_EXAMPLE_REASONING = """In the left collections, the subjects are computer scientist Ada Lovelace, computer scientist Claude Shannon, and biologist Antonie van Leeuwenhoek, respectively. In the right collection, the subjects are computer scientist Alan Turing, biologist Louis Pasteur, and psychologist Sigmund Freud, respectively. Pairs of scientists satisfy the join condition if they are in the same academic field. These pairs are computer scientists Ada Lovelace and Alan Turing, computer scientists Claude Shannon and Alan Turing, and biologists Antonie van Leeuwenhoek and Louis Pasteur. These pairs correspond to index pairs (1,1), (2,1), and (3,2)."""
 
 ### EXAMPLE ANSWERS ###
 AGG_EXAMPLE_ANSWER = """

@@ -491,6 +491,13 @@ class NestedLoopsJoin(LLMJoin):
         return DataRecordSet(output_records, output_record_op_stats), num_inputs_processed
 
 class BlockNestedLoopsJoin(LLMJoin):
+    def __init__(
+        self,
+        *args,
+        **kwargs
+    ):
+        kwargs['prompt_strategy'] = PromptStrategy.JOIN_BLOCK
+        super().__init__(*args, **kwargs)
     # Implements block nested loops join with a known selectivity.
     def naive_cost_estimates(self, left_source_op_cost_estimates: OperatorCostEstimates, right_source_op_cost_estimates: OperatorCostEstimates):
         # TODO: Implement naive cost estimates for block nested loops join.

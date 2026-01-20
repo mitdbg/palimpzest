@@ -605,7 +605,11 @@ class PromptFactory:
             str: The example input fields.
         """
         input_modality_to_example_input_fields = {
-            Modality.TEXT: RIGHT_TEXT_EXAMPLE_INPUT_FIELDS if right else TEXT_EXAMPLE_INPUT_FIELDS,
+            Modality.TEXT: (
+                (RIGHT_TEXT_COLLECTION_EXAMPLE_INPUT_FIELDS if self.prompt_strategy.is_block_join_prompt() else RIGHT_TEXT_EXAMPLE_INPUT_FIELDS)
+                if right else 
+                (TEXT_COLLECTION_EXAMPLE_INPUT_FIELDS if self.prompt_strategy.is_block_join_prompt() else TEXT_EXAMPLE_INPUT_FIELDS)
+            ),
             Modality.IMAGE: RIGHT_IMAGE_EXAMPLE_INPUT_FIELDS if right else IMAGE_EXAMPLE_INPUT_FIELDS,
             Modality.AUDIO: RIGHT_AUDIO_EXAMPLE_INPUT_FIELDS if right else AUDIO_EXAMPLE_INPUT_FIELDS,
         }
@@ -662,7 +666,11 @@ class PromptFactory:
             audio_example_context = THIRD_AUDIO_EXAMPLE_CONTEXT
 
         input_modality_to_example_context = {
-            Modality.TEXT: RIGHT_TEXT_EXAMPLE_CONTEXT if right else text_example_context,
+            Modality.TEXT: (
+                (RIGHT_TEXT_COLLECTION_EXAMPLE_CONTEXT if self.prompt_strategy.is_block_join_prompt() else RIGHT_TEXT_EXAMPLE_CONTEXT)
+                if right else
+                (TEXT_COLLECTION_EXAMPLE_CONTEXT if self.prompt_strategy.is_block_join_prompt() else text_example_context)
+            ),
             Modality.IMAGE: RIGHT_IMAGE_EXAMPLE_CONTEXT if right else image_example_context,
             Modality.AUDIO: RIGHT_AUDIO_EXAMPLE_CONTEXT if right else audio_example_context,
         }
@@ -741,7 +749,9 @@ class PromptFactory:
 
         use_sentence_answers = self.prompt_strategy.is_split_proposer_prompt() or self.prompt_strategy.is_moa_proposer_prompt()
         input_modality_to_example_answer = {
-            Modality.TEXT: TEXT_SENTENCE_EXAMPLE_ANSWER if use_sentence_answers else TEXT_EXAMPLE_ANSWER,
+            Modality.TEXT: TEXT_SENTENCE_EXAMPLE_ANSWER if use_sentence_answers else (
+                BLOCK_JOIN_EXAMPLE_ANSWER if self.prompt_strategy.is_block_join_prompt() else TEXT_EXAMPLE_ANSWER
+            ),
             Modality.IMAGE: IMAGE_SENTENCE_EXAMPLE_ANSWER if use_sentence_answers else IMAGE_EXAMPLE_ANSWER,
             Modality.AUDIO: AUDIO_SENTENCE_EXAMPLE_ANSWER if use_sentence_answers else AUDIO_EXAMPLE_ANSWER,
         }

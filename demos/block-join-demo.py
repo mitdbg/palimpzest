@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 import pandas as pd
 import palimpzest as pz
-from palimpzest.query.operators.join import YourJoinOp
+from palimpzest.query.operators.join import BlockNestedLoopsJoin
 
 # datasets of movie reviews and actor descriptions
 movie_reviews = [
@@ -34,7 +34,7 @@ class JoinSchema(BaseModel):
     review: str = Field(description="A movie review")
     actor: str = Field(description="A sentence about an actor")
 
-join_op = YourJoinOp(
+join_op = BlockNestedLoopsJoin(
     input_schema=JoinSchema,
     output_schema=JoinSchema,
     model=pz.Model.GPT_4o_MINI,
