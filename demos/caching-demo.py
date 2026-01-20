@@ -178,7 +178,7 @@ MODEL_MAPPING = {
     "gpt-4o": Model.GPT_4o,
     "gpt-4o-mini": Model.GPT_4o_MINI,
     "claude-4-0-sonnet": Model.CLAUDE_4_0_SONNET,
-    "claude-3-7-sonnet": Model.CLAUDE_3_7_SONNET, # deprecated model testing
+    # "claude-3-7-sonnet": Model.CLAUDE_3_7_SONNET, # deprecated model testing
     "claude-3-5-haiku": Model.CLAUDE_3_5_HAIKU,
     "gemini-2.5-flash": Model.GOOGLE_GEMINI_2_5_FLASH,
     # "deepseek-v3": Model.DEEPSEEK_V3, # TODO: test with changes from 265
