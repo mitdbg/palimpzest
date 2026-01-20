@@ -27,6 +27,7 @@ class Model(str, Enum):
     o4_MINI = "openai/o4-mini-2025-04-16"  # noqa: N815
     CLAUDE_3_5_SONNET = "anthropic/claude-3-5-sonnet-20241022"
     CLAUDE_3_7_SONNET = "anthropic/claude-3-7-sonnet-20250219"
+    CLAUDE_4_0_SONNET = "anthropic/claude-sonnet-4-20250514"
     CLAUDE_3_5_HAIKU = "anthropic/claude-3-5-haiku-20241022"
     GEMINI_2_0_FLASH = "vertex_ai/gemini-2.0-flash"
     GEMINI_2_5_FLASH = "vertex_ai/gemini-2.5-flash"
@@ -86,7 +87,7 @@ class Model(str, Enum):
             Model.GPT_5, Model.GPT_5_MINI, Model.GPT_5_NANO, Model.o4_MINI,
             Model.GEMINI_2_5_PRO, Model.GEMINI_2_5_FLASH,
             Model.GOOGLE_GEMINI_2_5_PRO, Model.GOOGLE_GEMINI_2_5_FLASH, Model.GOOGLE_GEMINI_2_5_FLASH_LITE,
-            Model.CLAUDE_3_7_SONNET,
+            Model.CLAUDE_3_7_SONNET, Model.CLAUDE_4_0_SONNET
         ]
         return self in reasoning_models
 
@@ -105,6 +106,7 @@ class Model(str, Enum):
             Model.GPT_4o, Model.GPT_4o_MINI, Model.GPT_4_1, Model.GPT_4_1_MINI, Model.GPT_4_1_NANO, Model.o4_MINI, Model.GPT_5, Model.GPT_5_MINI, Model.GPT_5_NANO,
             Model.GEMINI_2_0_FLASH, Model.GEMINI_2_5_FLASH, Model.GEMINI_2_5_PRO,
             Model.GOOGLE_GEMINI_2_5_PRO, Model.GOOGLE_GEMINI_2_5_FLASH, Model.GOOGLE_GEMINI_2_5_FLASH_LITE,
+            Model.CLAUDE_4_0_SONNET
         ]
 
     def is_audio_model(self):
@@ -134,7 +136,7 @@ class Model(str, Enum):
     
     def supports_prompt_caching(self):
         return self in [
-            Model.CLAUDE_3_5_SONNET, Model.CLAUDE_3_5_HAIKU, Model.CLAUDE_3_7_SONNET,
+            Model.CLAUDE_3_5_HAIKU, Model.CLAUDE_3_7_SONNET, Model.CLAUDE_4_0_SONNET,
             Model.GPT_4o_MINI, Model.GPT_4o, Model.GPT_4_1, Model.GPT_4_1_MINI, Model.GPT_4_1_NANO,
             Model.o4_MINI, Model.GPT_5_MINI, Model.GPT_5, Model.GPT_5_NANO,
             Model.GEMINI_2_0_FLASH, Model.GEMINI_2_5_FLASH, Model.GEMINI_2_5_PRO,
@@ -551,6 +553,14 @@ CLAUDE_3_5_SONNET_MODEL_CARD = {
     ##### Agg. Benchmark #####
     "overall": 78.4,
 }
+CLAUDE_4_0_SONNET_MODEL_CARD = {
+    "usd_per_input_token": 3e-06,
+    "usd_per_output_token": 1.5e-05,
+    "usd_per_cache_read_token": 3e-07,
+    "usd_per_cache_creation_token": 3.75e-06,
+    "seconds_per_output_token": 0.014025245441795233,
+    "overall": 83.87
+}
 CLAUDE_3_7_SONNET_MODEL_CARD = {
     ##### Cost in USD #####
     "usd_per_input_token": 3.0 / 1e6,
@@ -660,6 +670,7 @@ MODEL_CARDS = {
     Model.CLAUDE_3_5_SONNET.value: CLAUDE_3_5_SONNET_MODEL_CARD,
     Model.CLAUDE_3_7_SONNET.value: CLAUDE_3_7_SONNET_MODEL_CARD,
     Model.CLAUDE_3_5_HAIKU.value: CLAUDE_3_5_HAIKU_MODEL_CARD,
+    Model.CLAUDE_4_0_SONNET.value: CLAUDE_4_0_SONNET_MODEL_CARD,
     Model.GEMINI_2_0_FLASH.value: GEMINI_2_0_FLASH_MODEL_CARD,
     Model.GEMINI_2_5_FLASH.value: GEMINI_2_5_FLASH_MODEL_CARD,
     Model.GEMINI_2_5_PRO.value: GEMINI_2_5_PRO_MODEL_CARD,
