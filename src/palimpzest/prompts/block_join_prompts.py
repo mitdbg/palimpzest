@@ -20,7 +20,7 @@ RIGHT INPUT FIELDS:
 RIGHT CONTEXT:
 {{{right_example_context}}}{right_image_disclaimer}{right_audio_disclaimer}
 
-JOIN CONDITION: {example_join_condition}
+JOIN CONDITION: {example_block_join_condition}
 
 Let's think step-by-step in order to evaluate the join condition.
 
@@ -49,7 +49,7 @@ RIGHT INPUT FIELDS:
 RIGHT CONTEXT:
 {{{right_example_context}}}{right_image_disclaimer}{right_audio_disclaimer}
 
-JOIN CONDITION: {example_join_condition}
+JOIN CONDITION: {example_block_join_condition}
 
 ANSWER: {example_answer}
 ---
