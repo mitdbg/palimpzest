@@ -671,6 +671,7 @@ class BlockNestedLoopsJoin(LLMJoin):
 
         # get the set of input fields from both records in the join
         input_fields = self.get_input_fields()
+        input_fields.append("_index")
 
         # construct kwargs for generation
         gen_kwargs = {"project_cols": input_fields, "join_condition": self.condition, "parse_answer": _parse_answer}

@@ -87,11 +87,10 @@ class DataRecord:
     # - put these in a constant list up top
     # - import the constant list in Dataset (if possible) and check at plan creation time
     def __setattr__(self, name: str, value: Any, /) -> None:
-        if name in ["_data_item", "_source_indices", "_parent_ids", "_cardinality_idx", "_passed_operator", "_id"]:
+        if name in ["_data_item", "_source_indices", "_parent_ids", "_cardinality_idx", "_passed_operator", "_id", "_index"]:
             super().__setattr__(name, value)
         else:
             setattr(self._data_item, name, value)
-
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self._data_item, name)
@@ -100,12 +99,18 @@ class DataRecord:
     def __delattr__(self, name: str) -> None:
         # only allow deleting operator-specific fields
         if name in ["_index"]:
-            delattr(self._data_item, name)
+            try:
+                super().__delattr__(name)
+            except AttributeError:
+                delattr(self._data_item, name)
         else:
             raise AttributeError(f"Cannot delete attribute {name} from DataRecord")
 
     def __getitem__(self, field: str) -> Any:
-        return getattr(self._data_item, field)
+        try:
+            return getattr(self._data_item, field)
+        except AttributeError:
+            return super().__getattribute__(field)
 
 
     def __setitem__(self, field: str, value: Any) -> None:
@@ -137,10 +142,15 @@ class DataRecord:
 
 
     def get_field_names(self):
-        return list(type(self._data_item).model_fields.keys())
-
+        data_fields = list(type(self._data_item).model_fields.keys())
+        for operator_field in ["_index"]:
+            if operator_field not in data_fields:
+                data_fields.append(operator_field)
+        return data_fields
 
     def get_field_type(self, field_name: str) -> FieldInfo:
+        if field_name in ["_index"]:
+            return FieldInfo(description="The index of the record in the collection")
         return type(self._data_item).model_fields[field_name]
 
     @property
@@ -319,6 +329,10 @@ class DataRecord:
             for k, v in self._data_item.model_dump().items()
         }
         dct = pd.Series(field_values).to_dict()
+
+        for attr in ["_index"]:
+            if hasattr(self, attr):
+                dct[attr] = getattr(self, attr)
 
         if project_cols is not None and len(project_cols) > 0:
             project_field_names = set(field.split(".")[-1] for field in project_cols)
