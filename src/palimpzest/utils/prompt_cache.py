@@ -31,7 +31,7 @@ class PromptCacheManager:
         # Instance-level state ensures thread safety if we use one manager per plan/execution
         self.openai_cache_key = f"pz-cache-{uuid.uuid4().hex[:12]}" if self.model.is_openai_model() else None
 
-    def get_cache_kwargs(self, messages: list[dict]) -> dict[str, Any]:
+    def get_cache_kwargs(self) -> dict[str, Any]:
         """
         Get provider-specific cache configuration kwargs for litellm.completion().
 
@@ -45,7 +45,6 @@ class PromptCacheManager:
         Returns:
             A dictionary of kwargs to pass to litellm.completion() for enabling caching
         """
-        print("!!!get_cache_kwargs!!!")
         if not self.model.supports_prompt_caching():
             return {}
         # OpenAI: https://platform.openai.com/docs/guides/prompt-caching
@@ -84,7 +83,6 @@ class PromptCacheManager:
         """
         Normalize cache statistics from provider-specific response formats.
         """
-        print("!!!extract_cache_stats!!!")
         stats = {
             "cache_creation_tokens": 0,
             "cache_read_tokens": 0,
@@ -99,12 +97,10 @@ class PromptCacheManager:
             details = usage.get("prompt_tokens_details", {}) or {}
             stats["cache_read_tokens"] = details.get("cached_tokens", 0)
             stats["audio_cache_read_tokens"] = details.get("audio_cached_tokens", 0)
-            print("read: " + str(stats["cache_read_tokens"]))
 
         elif model.is_anthropic_model():
             stats["cache_creation_tokens"] = usage.get("cache_creation_input_tokens", 0)
             stats["cache_read_tokens"] = usage.get("cache_read_input_tokens", 0)
-            print("read: " + str(stats["cache_read_tokens"]))
 
         elif model.is_vertex_model() or model.is_google_ai_studio_model():
             stats["cache_read_tokens"] = usage.get("cached_content_token_count", 0)

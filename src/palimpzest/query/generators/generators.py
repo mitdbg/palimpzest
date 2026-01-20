@@ -331,7 +331,7 @@ class Generator(Generic[ContextType, InputType]):
             if self.model.is_vllm_model():
                 completion_kwargs = {"api_base": self.api_base, "api_key": os.environ.get("VLLM_API_KEY", "fake-api-key"), **completion_kwargs}
             
-            cache_kwargs = self.cache_manager.get_cache_kwargs(messages)
+            cache_kwargs = self.cache_manager.get_cache_kwargs()
             self.cache_manager.update_message_for_caching(messages)
             
             completion_kwargs = {**completion_kwargs, **cache_kwargs}
@@ -343,7 +343,6 @@ class Generator(Generic[ContextType, InputType]):
         # and can only account for the time spent performing the failed generation
         except Exception as e:
             logger.error(f"Error generating completion: {e}")
-            print(f"Error generating completion: {e}")
             field_answers = (
                 {"passed_operator": False}
                 if self.prompt_strategy.is_filter_prompt() or self.prompt_strategy.is_join_prompt()
@@ -441,14 +440,29 @@ class Generator(Generic[ContextType, InputType]):
         prompt, system_prompt = "", ""
         for message in messages:
             if message["role"] == "system":
-                system_prompt += message["content"] + "\n"
+                content = message["content"]
+                if isinstance(content, str):
+                    system_prompt += content + "\n"
+                elif isinstance(content, list):
+                    # Handle Anthropic-style content blocks
+                    for block in content:
+                        if isinstance(block, dict) and block.get("type") == "text":
+                            system_prompt += block.get("text", "") + "\n"
             if message["role"] == "user":
-                if message["type"] == "text":
-                    prompt += message["content"] + "\n"
-                elif message["type"] == "image":
-                    prompt += "<image>\n" * len(message["content"])
-                elif message["type"] == "input_audio":
-                    prompt += "<audio>\n" * len(message["content"])
+                content = message.get("content", "")
+                msg_type = message.get("type", "text")
+                if msg_type == "text":
+                    if isinstance(content, str):
+                        prompt += content + "\n"
+                    elif isinstance(content, list):
+                        # Handle Anthropic-style content blocks
+                        for block in content:
+                            if isinstance(block, dict) and block.get("type") == "text":
+                                prompt += block.get("text", "") + "\n"
+                elif msg_type == "image":
+                    prompt += "<image>\n" * len(content)
+                elif msg_type == "input_audio":
+                    prompt += "<audio>\n" * len(content)
         logger.debug(f"PROMPT:\n{prompt}")
         logger.debug(Fore.GREEN + f"{completion_text}\n" + Style.RESET_ALL)
 
