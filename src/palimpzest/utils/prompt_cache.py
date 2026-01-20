@@ -13,6 +13,7 @@ from typing import Any
 
 from palimpzest.constants import Model
 
+
 class PromptCacheManager:
     """
     Manages prompt caching configurations and message transformations for LLM providers.
@@ -34,13 +35,6 @@ class PromptCacheManager:
     def get_cache_kwargs(self) -> dict[str, Any]:
         """
         Get provider-specific cache configuration kwargs for litellm.completion().
-
-        This function may modify the messages list in-place to add cache control
-        markers for providers that require explicit cache annotations (Anthropic).
-
-        Args:
-            model: The Model enum representing the LLM being used
-            messages: The list of messages being sent to the model (may be modified in-place)
 
         Returns:
             A dictionary of kwargs to pass to litellm.completion() for enabling caching
@@ -166,22 +160,21 @@ class PromptCacheManager:
                         last_block["cache_control"] = {"type": "ephemeral"}
 
             # 2. Handle User Messages (The Split Logic)
-            elif role == "user":
-                if isinstance(content, str) and self.CACHE_BOUNDARY_MARKER in content:
-                    static, dynamic = content.split(self.CACHE_BOUNDARY_MARKER, 1)
+            elif role == "user" and isinstance(content, str) and self.CACHE_BOUNDARY_MARKER in content:
+                static, dynamic = content.split(self.CACHE_BOUNDARY_MARKER, 1)
                     
-                    new_blocks = []
-                    if static.strip():
-                        new_blocks.append({
-                            "type": "text", 
-                            "text": static, 
-                            "cache_control": {"type": "ephemeral"}
-                        })
+                new_blocks = []
+                if static.strip():
+                    new_blocks.append({
+                        "type": "text", 
+                        "text": static, 
+                        "cache_control": {"type": "ephemeral"}
+                    })
                     
-                    if dynamic.strip():
-                        new_blocks.append({"type": "text", "text": dynamic})
+                if dynamic.strip():
+                    new_blocks.append({"type": "text", "text": dynamic})
                     
-                    if new_blocks:
-                        message["content"] = new_blocks
-                    else:
-                        message["content"] = ""
+                if new_blocks:
+                    message["content"] = new_blocks
+                else:
+                    message["content"] = ""
