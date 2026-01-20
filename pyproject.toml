@@ -64,8 +64,7 @@ where = ["src"]
 namespaces = false
 
 [tool.setuptools.package-data]
-"*" = ["*.txt", "*.rst", "*.md"]
-
+"*" = ["*.txt", "*.rst", "*.md", "*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests/pytest"]
