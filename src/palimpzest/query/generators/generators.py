@@ -330,16 +330,20 @@ class Generator(Generic[ContextType, InputType]):
                 completion_kwargs = {"reasoning_effort": self.reasoning_effort, **completion_kwargs}
             if self.model.is_vllm_model():
                 completion_kwargs = {"api_base": self.api_base, "api_key": os.environ.get("VLLM_API_KEY", "fake-api-key"), **completion_kwargs}
-            # Add prompt caching kwargs (provider-specific)
+            
             cache_kwargs = self.cache_manager.get_cache_kwargs(messages)
+            self.cache_manager.update_message_for_caching(messages)
+            
             completion_kwargs = {**completion_kwargs, **cache_kwargs}
             completion = litellm.completion(model=self.model_name, messages=messages, **completion_kwargs)
             end_time = time.time()
             logger.debug(f"Generated completion in {end_time - start_time:.2f} seconds")
+
         # if there's an error generating the completion, we have to return an empty answer
         # and can only account for the time spent performing the failed generation
         except Exception as e:
             logger.error(f"Error generating completion: {e}")
+            print(f"Error generating completion: {e}")
             field_answers = (
                 {"passed_operator": False}
                 if self.prompt_strategy.is_filter_prompt() or self.prompt_strategy.is_join_prompt()

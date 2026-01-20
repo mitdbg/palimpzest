@@ -45,42 +45,46 @@ class PromptCacheManager:
         Returns:
             A dictionary of kwargs to pass to litellm.completion() for enabling caching
         """
+        print("!!!get_cache_kwargs!!!")
         if not self.model.supports_prompt_caching():
             return {}
-        # TODO: Update with changes from #265
-        if self.model.is_anthropic_model():
-            # Anthropic: Explicit cache_control with ephemeral type
-            # https://platform.claude.com/docs/en/build-with-claude/prompt-caching
-            # Mark system messages with cache_control (modifies messages in-place)
-            self._transform_messages_for_anthropic(messages)
-            return {}
-        # implicit caching for Deepseek/Gemini/Openai Models that current support caching
-        elif self.model.is_openai_model():
-            # OpenAI: Automatic prefix caching based on matching prefixes
-            # Use prompt_cache_key for sticky routing to the same cache shard
-            # https://platform.openai.com/docs/guides/prompt-caching
-            self._remove_cache_boundary_markers(messages)
+        # OpenAI: https://platform.openai.com/docs/guides/prompt-caching
+        # Use prompt_cache_key for sticky routing to the same cache shard
+        if self.model.is_openai_model():
             return {"extra_body": {"prompt_cache_key": self.openai_cache_key}}
-        elif self.model.is_google_ai_studio_model() or self.model.is_vertex_model():
-            # Gemini: Implicit caching (automatic prefix matching)
-            # No additional kwargs needed - caching is automatic
-            # https://ai.google.dev/gemini-api/docs/caching
-            self._remove_cache_boundary_markers(messages)
+        else:
             return {}
-        elif self.model.is_deepseek_model():
-            # DeepSeek: Automatic context caching (enabled by default)
-            # No special parameters needed - caching happens automatically
-            # Minimum cacheable unit is 64 tokens
-            # https://api-docs.deepseek.com/guides/kv_cache
+    
+    def update_message_for_caching(self, messages: list[dict]) -> None:
+        """
+        Modify the messages list in-place to conform to provider-specific caching requirements.
+        
+        - Anthropic: Adds explicit cache_control markers.
+        - Others: Removes the generic cache boundary markers.
+        """
+        if not self.model.supports_prompt_caching():
+            return
+        
+        # TODO: Update with changes from #265
+        # Anthropic: Explicit cache_control with ephemeral type
+        # https://platform.claude.com/docs/en/build-with-claude/prompt-caching
+        if self.model.is_anthropic_model():
+            self._transform_messages_for_anthropic(messages)
+        # implicit caching for Deepseek/Gemini/Openai Models that current support caching
+        # OpenAI: https://platform.openai.com/docs/guides/prompt-caching
+        # Gemini: https://ai.google.dev/gemini-api/docs/caching
+        # DeepSeek: https://api-docs.deepseek.com/guides/kv_cache
+        elif (self.model.is_openai_model() or
+              self.model.is_google_ai_studio_model() or self.model.is_vertex_model() or
+              self.model.is_deepseek_model()):
             self._remove_cache_boundary_markers(messages)
-            return {}
-        return {}
 
 
-    def extract_cache_stats(self, usage: Dict, model: Model) -> Dict[str, int]:
+    def extract_cache_stats(self, usage: dict, model: Model) -> dict[str, int]:
         """
         Normalize cache statistics from provider-specific response formats.
         """
+        print("!!!extract_cache_stats!!!")
         stats = {
             "cache_creation_tokens": 0,
             "cache_read_tokens": 0,
@@ -95,10 +99,12 @@ class PromptCacheManager:
             details = usage.get("prompt_tokens_details", {}) or {}
             stats["cache_read_tokens"] = details.get("cached_tokens", 0)
             stats["audio_cache_read_tokens"] = details.get("audio_cached_tokens", 0)
+            print("read: " + str(stats["cache_read_tokens"]))
 
         elif model.is_anthropic_model():
             stats["cache_creation_tokens"] = usage.get("cache_creation_input_tokens", 0)
             stats["cache_read_tokens"] = usage.get("cache_read_input_tokens", 0)
+            print("read: " + str(stats["cache_read_tokens"]))
 
         elif model.is_vertex_model() or model.is_google_ai_studio_model():
             stats["cache_read_tokens"] = usage.get("cached_content_token_count", 0)
@@ -110,7 +116,7 @@ class PromptCacheManager:
         return stats
 
 
-    def _remove_cache_boundary_markers(self, messages: List[Dict]) -> None:
+    def _remove_cache_boundary_markers(self, messages: list[dict]) -> None:
         """
         Remove <<cache-boundary>> markers from user messages.
 
@@ -127,7 +133,7 @@ class PromptCacheManager:
                     message["content"] = content.replace(self.CACHE_BOUNDARY_MARKER, "")
 
 
-    def _transform_messages_for_anthropic(self, messages: List[Dict]) -> None:
+    def _transform_messages_for_anthropic(self, messages: list[dict]) -> None:
         """
         Add cache_control markers to system messages and user prompt prefixes for Anthropic models.
 
