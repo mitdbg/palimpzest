@@ -102,7 +102,10 @@ class DataRecord:
             try:
                 super().__delattr__(name)
             except AttributeError:
-                delattr(self._data_item, name)
+                try:
+                    delattr(self._data_item, name)
+                except AttributeError:
+                    pass
         else:
             raise AttributeError(f"Cannot delete attribute {name} from DataRecord")
 
