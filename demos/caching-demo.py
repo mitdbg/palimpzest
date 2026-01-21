@@ -197,23 +197,25 @@ def print_cache_stats(execution_stats):
     print(" CACHE STATISTICS & COST ANALYSIS")
     print("=" * 60)
 
-    # Use the properly propagated cache token stats from ExecutionStats
-    total_cache_read = execution_stats.total_cache_read_tokens
-    total_cache_creation = execution_stats.total_cache_creation_tokens
-    total_input = execution_stats.total_input_tokens
+    # Token counts are now disjoint:
+    # - total_input_tokens: regular (non-cached) input tokens
+    # - total_cache_read_tokens: tokens read from cache (hits)
+    # - total_cache_creation_tokens: tokens written to cache
+    regular_input = execution_stats.total_input_tokens
+    cache_read = execution_stats.total_cache_read_tokens
+    cache_creation = execution_stats.total_cache_creation_tokens
     total_output = execution_stats.total_output_tokens
     total_embedding = execution_stats.total_embedding_input_tokens
 
-    # Regular input = total input - cache read tokens
-    # (cache creation tokens are separate from input tokens)
-    regular_input = total_input - total_cache_read
+    # Logical total = regular + cache read + cache creation
+    logical_total_input = regular_input + cache_read + cache_creation
 
     print(f"{'Metric':<35} | {'Count':<15}")
     print("-" * 55)
-    print(f"{'Total Input Tokens':<35} | {total_input:,}")
-    print(f"{'  - Regular Input (non-cached)':<35} | {regular_input:,}")
-    print(f"{'  - Cache Read (hits)':<35} | {total_cache_read:,}")
-    print(f"{'Cache Creation Tokens (writes)':<35} | {total_cache_creation:,}")
+    print(f"{'Logical Total Input Tokens':<35} | {logical_total_input:,}")
+    print(f"{'  - Regular Input (full rate)':<35} | {regular_input:,}")
+    print(f"{'  - Cache Read (discounted)':<35} | {cache_read:,}")
+    print(f"{'  - Cache Creation':<35} | {cache_creation:,}")
     print("-" * 55)
     print(f"{'Total Output Tokens':<35} | {total_output:,}")
     if total_embedding > 0:
@@ -222,9 +224,10 @@ def print_cache_stats(execution_stats):
     print(f"{'Total Execution Cost':<35} | ${execution_stats.total_execution_cost:.6f}")
 
     # Calculate and display cache hit rate
-    total_cacheable = total_cache_read + regular_input
+    # Hit rate = cache_read / (regular_input + cache_read)
+    total_cacheable = regular_input + cache_read
     if total_cacheable > 0:
-        hit_rate = (total_cache_read / total_cacheable) * 100
+        hit_rate = (cache_read / total_cacheable) * 100
         print(f"\nCache Hit Rate: {hit_rate:.1f}%")
 
 def main():
