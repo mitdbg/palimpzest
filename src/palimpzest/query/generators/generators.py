@@ -375,35 +375,39 @@ class Generator(Generic[ContextType, InputType]):
             #       for now, we only use tokens from prompt_token_details if it's an audio prompt
             # get output tokens (all text) and input tokens by modality
             output_tokens = usage["completion_tokens"]
+            cache_stats = self.cache_manager.extract_cache_stats(usage, self.model)
+            text_cache_read_tokens = cache_stats.get("cache_read_tokens", 0.0)
+            text_cache_creation_tokens = cache_stats.get("cache_creation_tokens", 0.0)
+
             if is_audio_op:
                 input_audio_tokens = usage["prompt_tokens_details"].get("audio_tokens", 0)
                 input_text_tokens = usage["prompt_tokens_details"].get("text_tokens", 0)
                 input_image_tokens = 0
+                audio_cache_read_tokens = cache_stats.get("audio_cache_read_tokens", 0.0)
+                audio_cache_creation_tokens = cache_stats.get("audio_cache_creation_tokens", 0.0)
             else:
                 input_audio_tokens = 0
                 input_text_tokens = usage["prompt_tokens"]
                 input_image_tokens = 0
-
-            total_input_tokens = input_audio_tokens + input_text_tokens + input_image_tokens
-
-            cache_stats = self.cache_manager.extract_cache_stats(usage, self.model)
-            text_cache_read_tokens = cache_stats.get("cache_read_tokens", 0.0)
-            text_cache_creation_tokens = cache_stats.get("cache_creation_tokens", 0.0)
-            if is_audio_op:
-                audio_cache_read_tokens = cache_stats.get("audio_cache_read_tokens", 0.0)
-                audio_cache_creation_tokens = cache_stats.get("audio_cache_creation_tokens", 0.0)
-            else:
                 audio_cache_read_tokens = 0
                 audio_cache_creation_tokens = 0
 
             total_cache_read_tokens = text_cache_read_tokens + audio_cache_read_tokens
             total_cache_creation_tokens = text_cache_creation_tokens + audio_cache_creation_tokens
+
             total_cache_read_cost = text_cache_read_tokens * usd_per_cache_read_token + audio_cache_read_tokens * usd_per_audio_cache_read_token
             total_cache_creation_cost = text_cache_creation_tokens * usd_per_cache_creation_token + audio_cache_creation_tokens * usd_per_audio_cache_creation_token
 
             # the result will never be negative; max(0, *) for extra safety
-            regular_text_tokens = max(0, input_text_tokens - text_cache_read_tokens - text_cache_creation_tokens) 
-            regular_audio_tokens = max(0, input_audio_tokens - audio_cache_read_tokens - audio_cache_creation_tokens)
+            # anthropic exludes cache tokens from its input tokens
+            if not self.model.is_anthropic_model():
+                regular_text_tokens = max(0, input_text_tokens - text_cache_read_tokens - text_cache_creation_tokens) 
+                regular_audio_tokens = max(0, input_audio_tokens - audio_cache_read_tokens - audio_cache_creation_tokens)
+            else:
+                regular_text_tokens = input_text_tokens
+                regular_audio_tokens = input_audio_tokens
+
+            total_input_tokens = regular_text_tokens + regular_audio_tokens
             total_input_cost = regular_text_tokens * usd_per_input_token + regular_audio_tokens * usd_per_audio_input_token
 
             total_output_cost = output_tokens * usd_per_output_token
