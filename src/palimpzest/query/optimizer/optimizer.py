@@ -3,9 +3,22 @@ from __future__ import annotations
 import logging
 from copy import deepcopy
 
+import torch
+from botorch.models import SingleTaskGP
+from gpytorch.kernels import RBFKernel, ScaleKernel
+from gpytorch.means import ConstantMean
+from gpytorch.priors import LogNormalPrior, GammaPrior, NormalPrior
+from botorch.models.transforms import Normalize, Standardize
+from gpytorch.mlls import ExactMarginalLogLikelihood
+from botorch.fit import fit_gpytorch_mll
+from botorch.optim.optimize import optimize_acqf
+from botorch.acquisition import logExpectedImprovement
+
+
 from pydantic.fields import FieldInfo
 
-from palimpzest.constants import Model
+from palimpzest.validator.validator import Validator
+from palimpzest.constants import Model, MODEL_CARDS
 from palimpzest.core.data.dataset import Dataset
 from palimpzest.core.lib.schemas import get_schema_field_names
 from palimpzest.policy import Policy
@@ -44,6 +57,137 @@ from palimpzest.query.optimizer.tasks import (
 )
 
 logger = logging.getLogger(__name__)
+
+class BayesianOptimizer:
+    def __init__(
+            self,
+            initial_dataset, # ex. [(model_name_1, (0.2, 0.01, 0.05)), (model_name_2, (0.6, 0.005, 0.1))]
+            policy: Policy,
+            validator: Validator,
+            cost_budget: float,
+            cost_model,
+            acq_func: str = "EI"
+            ):
+        '''
+        :cost_budget: budget in dollars which will determine when we stop optimization
+        :policy: policy we are trying to optimize for (e.g. MaxQuality, MinCost, MaxQuality@Cost<$1, etc.)
+        '''
+        self.policy = policy #assumed to be a single-objective policy for now
+        primary_metric = self.policy.get_primary_metric()
+
+        # class which will be used to assess the quality of outputs produced by a given physical plan
+        self.validator = validator
+
+        # dataset of (input, observation) pairs; initialized to be empty, but in theory we could initialize this
+        # with past observations from the same (or a different) workload; corresponds to D in Algorithm 1.1 of BOpt textbook
+        self.X, self.Y_quality, self.Y_latency, self.Y_cost = self.format_dataset(initial_dataset)
+        if primary_metric == "quality": self.Y = self.Y_quality
+        elif primary_metric == "latency": self.Y = self.Y_latency
+        elif primary_metric == "cost": self.Y = self.Y_cost
+
+        # budget in dollars which will determine when we stop optimization
+        self.cost_budget = cost_budget
+        self.cost_so_far = 0.0
+        self.cost_model = cost_model #later: add this to the utility function
+
+        self.acq_func = acq_func
+
+    def format_dataset(self, initial_dataset):
+        '''
+        format starting dataset into tensors for GP training
+        '''
+        X = []
+        Y_quality = []
+        Y_latency = []
+        Y_cost = []
+        for model_name, (quality, latency, cost) in initial_dataset:
+            model_card = MODEL_CARDS[model_name]
+            x = [
+                model_card["overall"],
+                model_card["seconds_per_output_token"],
+                model_card["usd_per_input_token"] + model_card["usd_per_output_token"]
+            ]
+            X.append(x)
+            Y_quality.append(quality)
+            Y_latency.append(latency)
+            Y_cost.append(cost)
+        return torch.tensor(X), torch.tensor(Y_quality), torch.tensor(Y_latency), torch.tensor(Y_cost)
+
+    def prior_mean(self):
+        # TODO: make prior input query and input data dependent
+        if self.dataset == []:
+            # use MMLU Pro average values as prior
+            return {
+                "quality": 0.5, #placeholders
+                "latency": 1.0,
+                "cost": 0.1
+            }
+        return {
+            "quality": torch.mean(self.Y_quality).item(),
+            "latency": torch.mean(self.Y_latency).item(),
+            "cost": torch.mean(self.Y_cost).item()
+        }
+
+    def terminate(self) -> bool:
+        """
+        Returns True when we've exceeded our cost budget and returns False otherwise.
+        """
+        return self.cost_so_far >= self.cost_budget
+
+    def policy(self) -> list[PhysicalPlan]:
+        """
+        Returns a list of physical plans to run. These lists could be singletons.
+        """
+        mean_value = self.prior_mean()[self.policy.get_primary_metric()]
+        self.mean = ConstantMean(prior=NormalPrior(mean_value, 1.0))
+        self.covariance = ScaleKernel(RBFKernel(ard_num_dims=3, lengthscale_prior=LogNormalPrior(0.0, 1.0)),
+                            outputscale_prior=LogNormalPrior(0.0, 1.0)) #placeholder
+        gp = SingleTaskGP(
+            self.X,
+            self.Y,
+            covar_module=self.covariance,
+            mean_module=self.mean,
+            input_transform=Normalize(self.X.shape),
+            outcome_transform=Standardize(m=self.Y.shape[-1]),
+        )
+
+        mll = ExactMarginalLogLikelihood(gp.likelihood, gp)
+        fit_gpytorch_mll(mll)
+
+        next_point, _  = optimize_acqf(
+            acq_function=logExpectedImprovement(gp, best_f=self.Y.max()),
+            q=1, num_restarts=10, raw_samples=20
+        ) #can also add bounds = torch.tensor([l_bounds, u_bounds])
+        return  [next_point,]
+
+    def get_optimal_plan(self) -> PhysicalPlan:
+        """
+        A function that, given our entire dataset of observations, returns the plan which is Pareto Optimal
+        for the given self.policy.
+        """
+        # sample across all physical operators (to ensure valid plan), select the best one
+        pass
+    def point_to_plan(self, point):
+        '''
+        point: tensor of shape (1, 3) corresponding to (quality, latency, cost) in domain space
+        '''
+        # Convert point to a physical plan (closest match?)
+        pass
+
+    def optimize(self) -> PhysicalPlan:
+        """Run the sequential optimization algorithm (Algorithm 1.1) from the BOpt textbook."""
+        while not self.terminate():
+            point = self.policy()
+            physical_plans = self.point_to_plan(point)
+            for physical_plan in physical_plans:
+                # NOTE: this exact syntax is not supported yet, but we can implement it
+                output, cost = physical_plan(self.input) #TODO: define self.input
+                self.cost_so_far += cost
+
+                self.X = torch.cat([self.X, point])
+                self.Y = torch.cat([self.Y, output])
+
+        return self.get_optimal_plan()
 
 
 class Optimizer:
