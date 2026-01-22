@@ -40,6 +40,6 @@ join_op = BlockNestedLoopsJoin(
     model=pz.Model.GPT_4o_MINI,
     condition="The actor appears in the movie being reviewed",
 )
-output, _ = join_op(left_candidates, right_candidates, final=True)
-output_df = pd.DataFrame([dr.to_dict() for dr in output])
+output, _ = join_op(left_candidates, right_candidates)
+output_df = pd.DataFrame([dr.to_dict() for dr in output if dr._passed_operator])
 print(output_df)

@@ -639,7 +639,13 @@ class BlockNestedLoopsJoin(LLMJoin):
             if len(matches) > 0:
                 return matches[0].strip()
 
-            # if the first regex didn't find an answer, try taking all the text after "ANSWER:"
+            # if the first regex didn't find an answer, try testing between "answer is:" and "---"
+            regex = re.compile("answer is:(.*?)---", re.IGNORECASE | re.DOTALL)
+            matches = regex.findall(completion_text)
+            if len(matches) > 0:
+                return matches[0].strip()
+
+            # if the second regex didn't find an answer, try taking all the text after "ANSWER:"
             regex = re.compile("answer:(.*)", re.IGNORECASE | re.DOTALL)
             matches = regex.findall(completion_text)
             if len(matches) > 0:
