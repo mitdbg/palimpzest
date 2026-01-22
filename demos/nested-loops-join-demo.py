@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 import pandas as pd
 import palimpzest as pz
-from palimpzest.query.operators.join import BlockNestedLoopsJoin
+from palimpzest.query.operators.join import NestedLoopsJoin
 
 # datasets of movie reviews and actor descriptions
 movie_reviews = [
@@ -34,16 +34,12 @@ class JoinSchema(BaseModel):
     review: str = Field(description="A movie review")
     actor: str = Field(description="A sentence about an actor")
 
-join_op = BlockNestedLoopsJoin(
+join_op = NestedLoopsJoin(
     input_schema=JoinSchema,
     output_schema=JoinSchema,
     model=pz.Model.GPT_4o_MINI,
     condition="The actor appears in the movie being reviewed",
 )
-output, _ = join_op(left_candidates, right_candidates)
-output_df = pd.DataFrame([dr.to_dict() for dr in output if dr._passed_operator])
-
-# output, _ = join_op(left_candidates, right_candidates, final=True)
-# output_df = pd.DataFrame([dr.to_dict() for dr in output])
-
+output, _ = join_op(left_candidates, right_candidates, final=True)
+output_df = pd.DataFrame([dr.to_dict() for dr in output])
 print(output_df)
