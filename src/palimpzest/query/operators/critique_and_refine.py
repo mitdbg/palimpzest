@@ -4,7 +4,7 @@ from typing import Any
 
 from pydantic.fields import FieldInfo
 
-from palimpzest.constants import MODEL_CARDS, Cardinality, Model, PromptStrategy
+from palimpzest.constants import Cardinality, Model, PromptStrategy
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.models import GenerationStats, OperatorCostEstimates
 from palimpzest.query.generators.generators import Generator
@@ -71,7 +71,7 @@ class CritiqueAndRefineConvert(LLMConvert):
         naive_op_cost_estimates = 3 * super().naive_cost_estimates(source_op_cost_estimates)
 
         # for naive setting, estimate quality as quality of refine model
-        model_quality = MODEL_CARDS[self.refine_model.value]["overall"] / 100.0
+        model_quality = self.refine_model.get_overall_score() / 100.0
         naive_op_cost_estimates.quality = model_quality
         naive_op_cost_estimates.quality_lower_bound = naive_op_cost_estimates.quality
         naive_op_cost_estimates.quality_upper_bound = naive_op_cost_estimates.quality
@@ -159,7 +159,7 @@ class CritiqueAndRefineFilter(LLMFilter):
         naive_op_cost_estimates = 3 * super().naive_cost_estimates(source_op_cost_estimates)
 
         # for naive setting, estimate quality as quality of refine model
-        model_quality = MODEL_CARDS[self.refine_model.value]["overall"] / 100.0
+        model_quality = self.refine_model.get_overall_score() / 100.0
         naive_op_cost_estimates.quality = model_quality
         naive_op_cost_estimates.quality_lower_bound = naive_op_cost_estimates.quality
         naive_op_cost_estimates.quality_upper_bound = naive_op_cost_estimates.quality

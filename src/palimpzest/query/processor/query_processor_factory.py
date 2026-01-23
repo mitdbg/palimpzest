@@ -4,6 +4,7 @@ from enum import Enum
 
 from dotenv import load_dotenv
 
+from palimpzest.constants import Model
 from palimpzest.core.data.dataset import Dataset
 from palimpzest.core.elements.records import DataRecordCollection
 from palimpzest.query.execution.execution_strategy import ExecutionStrategy, SentinelExecutionStrategy
@@ -13,7 +14,7 @@ from palimpzest.query.optimizer.optimizer import Optimizer
 from palimpzest.query.optimizer.optimizer_strategy_type import OptimizationStrategyType
 from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.query.processor.query_processor import QueryProcessor
-from palimpzest.utils.model_helpers import get_models
+from palimpzest.utils.model_helpers import get_optimal_models
 from palimpzest.validator.validator import Validator
 
 logger = logging.getLogger(__name__)
@@ -54,6 +55,53 @@ class QueryProcessorFactory:
             logger.debug(f"Normalized {strategy}: {strategy_enum}")
 
         return config
+    
+    @classmethod
+    def _normalize_models(cls, config: QueryProcessorConfig) -> QueryProcessorConfig:
+        """
+        Validate and normalize available_models and remove_models; converts all model strings to Model objects.
+        """
+        # get the current set of available_models (if provided by the user's config)
+        current_available_models = getattr(config, 'available_models', [])
+
+        # normalize all models to be pz.Model objects
+        if current_available_models is not None and len(current_available_models) > 0:
+            assert all(
+                isinstance(model, (Model, str)) for model in current_available_models
+            ), "Must provide pz.Model or the model's full string identifier for each element in `available_models`"
+            current_available_models = [
+                Model(model) if isinstance(model, str) else model for model in current_available_models
+            ]
+
+        # if the user does not explicitly set the available models, select the optimal models based on policy
+        if current_available_models is None or len(current_available_models) == 0:
+            current_available_models = get_optimal_models(
+                policy = config.policy,
+                use_vertex = config.use_vertex,
+                gemini_credentials_path = config.gemini_credentials_path,
+                api_base = config.api_base
+            )
+
+        # get the list of models to remove (if provided by the user's config)
+        remove_models = getattr(config, 'remove_models', [])
+
+        # remove any models specified in the config
+        if remove_models is not None and len(remove_models) > 0:
+            assert all(
+                isinstance(model, (Model, str)) for model in remove_models
+            ), "Must provide pz.Model or the model's full string identifier for each element in `remove_models`"
+            remove_models = [
+                Model(model) if isinstance(model, str) else model for model in remove_models
+            ]
+
+            # filter remove_models out of current_available_models
+            current_available_models = [model for model in current_available_models if model not in remove_models]
+
+        logger.info(f"Final set of available models: {current_available_models}")
+        config.available_models = current_available_models
+        config.remove_models = remove_models
+
+        return config
 
     @classmethod
     def _config_validation_and_normalization(cls, config: QueryProcessorConfig, train_dataset: dict[str, Dataset] | None, validator : Validator | None):
@@ -79,20 +127,7 @@ class QueryProcessorFactory:
 
         # convert the config values for processing, execution, and optimization strategies to enums
         config = cls._normalize_strategies(config)
-
-        # get available models
-        available_models = getattr(config, 'available_models', [])
-        if available_models is None or len(available_models) == 0:
-            available_models = get_models(use_vertex=config.use_vertex, gemini_credentials_path=config.gemini_credentials_path, api_base=config.api_base)
-
-        # remove any models specified in the config
-        remove_models = getattr(config, 'remove_models', [])
-        if remove_models is not None and len(remove_models) > 0:
-            available_models = [model for model in available_models if model not in remove_models]
-            logger.info(f"Removed models from available models based on config: {remove_models}")
-
-        # set the final set of available models in the config
-        config.available_models = available_models
+        config = cls._normalize_models(config)
 
         if len(config.available_models) == 0:
             raise ValueError("No available models found.")
@@ -104,17 +139,16 @@ class QueryProcessorFactory:
         google_key = os.getenv("GOOGLE_API_KEY")
 
         for model in config.available_models:
-            if model.is_openai_model() and not openai_key:
+            if model.is_provider_openai() and not openai_key:
                 raise ValueError("OPENAI_API_KEY must be set to use OpenAI models.")
-            if model.is_anthropic_model() and not anthropic_key:
+            if model.is_provider_anthropic() and not anthropic_key:
                 raise ValueError("ANTHROPIC_API_KEY must be set to use Anthropic models.")
-            if model.is_together_model() and not together_key:
+            if model.is_provider_together_ai() and not together_key:
                 raise ValueError("TOGETHER_API_KEY must be set to use Together models.")
-            if model.is_google_ai_studio_model() and not (gemini_key or google_key or config.gemini_credentials_path):
+            if model.is_provider_google_ai_studio() and not (gemini_key or google_key or config.gemini_credentials_path):
                 raise ValueError("GEMINI_API_KEY, GOOGLE_API_KEY, or gemini_credentials path must be set to use Google Gemini models.")
             if model.is_vllm_model() and config.api_base is None:
                 raise ValueError("api_base must be set to use vLLM models.")
-
         return config, validator
 
     @classmethod

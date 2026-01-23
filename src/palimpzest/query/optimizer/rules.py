@@ -496,7 +496,7 @@ class ImplementationRule(Rule):
             return False
 
         # corner-case: Gemini models cannot handle multiple audio inputs
-        if model.is_vertex_model() and model.is_audio_model() and (num_audio_fields > 1 or has_list_audio_field):
+        if model.is_provider_vertex_ai() and model.is_audio_model() and (num_audio_fields > 1 or has_list_audio_field):
             return False
 
         # text-only input and text supporting model

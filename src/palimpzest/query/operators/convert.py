@@ -7,7 +7,6 @@ from typing import Callable
 from pydantic.fields import FieldInfo
 
 from palimpzest.constants import (
-    MODEL_CARDS,
     NAIVE_EST_NUM_INPUT_TOKENS,
     NAIVE_EST_NUM_OUTPUT_TOKENS,
     NAIVE_EST_ONE_TO_MANY_SELECTIVITY,
@@ -322,17 +321,16 @@ class LLMConvert(ConvertOp):
         est_num_output_tokens = NAIVE_EST_NUM_OUTPUT_TOKENS
 
         # get est. of conversion time per record from model card;
-        model_name = self.model.value
-        model_conversion_time_per_record = MODEL_CARDS[model_name]["seconds_per_output_token"] * est_num_output_tokens
+        model_conversion_time_per_record = self.model.get_seconds_per_output_token() * est_num_output_tokens
 
         # get est. of conversion cost (in USD) per record from model card
-        usd_per_input_token = MODEL_CARDS[model_name].get("usd_per_input_token")
+        usd_per_input_token = self.model.get_usd_per_input_token()
         if getattr(self, "prompt_strategy", None) is not None and self.is_audio_op():
-            usd_per_input_token = MODEL_CARDS[model_name]["usd_per_audio_input_token"]
+            usd_per_input_token = self.model.get_usd_per_audio_input_token()
 
         model_conversion_usd_per_record = (
             usd_per_input_token * est_num_input_tokens
-            + MODEL_CARDS[model_name]["usd_per_output_token"] * est_num_output_tokens
+            + self.model.get_usd_per_output_token() * est_num_output_tokens
         )
 
         # estimate cardinality and selectivity given the "cardinality" set by the user
@@ -340,7 +338,7 @@ class LLMConvert(ConvertOp):
         cardinality = selectivity * source_op_cost_estimates.cardinality
 
         # estimate quality of output based on the strength of the model being used
-        quality = (MODEL_CARDS[model_name]["overall"] / 100.0)
+        quality = (self.model.get_overall_score() / 100.0)
 
         return OperatorCostEstimates(
             cardinality=cardinality,
