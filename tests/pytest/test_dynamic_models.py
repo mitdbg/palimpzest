@@ -70,52 +70,6 @@ def mock_litellm_response():
     mock_response.choices[0].message.content = '{"result": "Test Answer"}'
     return mock_response
 
-
-@pytest.fixture
-def mock_model_metrics():
-    """Mock model metrics data for testing."""
-    return {
-        "openai/gpt-4o-2024-08-06": {
-            "usd_per_input_token": 2.5e-06,
-            "usd_per_output_token": 1e-05,
-            "seconds_per_output_token": 0.008,
-            "MMLU_Pro_score": 74.1,
-            "is_reasoning_model": False,
-            "is_text_model": True,
-            "is_vision_model": True,
-            "is_audio_model": False,
-            "is_embedding_model": False,
-            "supports_prompt_caching": True,
-            "provider": "openai",
-        },
-        "anthropic/claude-3-5-sonnet-20241022": {
-            "usd_per_input_token": 3e-06,
-            "usd_per_output_token": 1.5e-05,
-            "seconds_per_output_token": 0.0154,
-            "MMLU_Pro_score": 78.4,
-            "is_reasoning_model": False,
-            "is_text_model": True,
-            "is_vision_model": False,
-            "is_audio_model": False,
-            "is_embedding_model": False,
-            "supports_prompt_caching": True,
-            "provider": "anthropic",
-        },
-        "text-embedding-3-small": {
-            "usd_per_input_token": 2e-08,
-            "usd_per_output_token": None,
-            "seconds_per_output_token": 0.0098,
-            "MMLU_Pro_score": 63.09,
-            "is_reasoning_model": False,
-            "is_text_model": False,
-            "is_vision_model": False,
-            "is_audio_model": False,
-            "is_embedding_model": True,
-            "provider": "openai",
-        },
-    }
-
-
 # =============================================================================
 # TEST CLASS: Model Class Instantiation
 # =============================================================================
@@ -155,7 +109,7 @@ class TestModelInstantiation:
         model = Model.GPT_4o
         assert model.provider == "openai"
 
-        model_anthropic = Model.CLAUDE_3_5_SONNET
+        model_anthropic = Model.CLAUDE_3_7_SONNET
         assert model_anthropic.provider == "anthropic"
 
     def test_model_local_url_parameter(self):
@@ -196,7 +150,7 @@ class TestModelRegistry:
         # Check for some expected models
         expected_models = [
             "openai/gpt-4o-2024-08-06",
-            "anthropic/claude-3-5-sonnet-20241022",
+            "anthropic/claude-3-7-sonnet-20250219",
             "together_ai/meta-llama/Llama-3.3-70B-Instruct-Turbo",
         ]
         for expected in expected_models:
@@ -227,7 +181,7 @@ class TestModelEqualityAndHashing:
 
     def test_model_inequality(self):
         """Test that different models are not equal."""
-        assert Model.GPT_4o != Model.CLAUDE_3_5_SONNET
+        assert Model.GPT_4o != Model.CLAUDE_3_7_SONNET
 
     def test_model_hash_consistency(self):
         """Test that model hash is consistent."""
@@ -237,12 +191,12 @@ class TestModelEqualityAndHashing:
 
     def test_model_usable_in_set(self):
         """Test that models can be used in sets."""
-        model_set = {Model.GPT_4o, Model.GPT_4o, Model.CLAUDE_3_5_SONNET}
+        model_set = {Model.GPT_4o, Model.GPT_4o, Model.CLAUDE_3_7_SONNET}
         assert len(model_set) == 2
 
     def test_model_usable_as_dict_key(self):
         """Test that models can be used as dictionary keys."""
-        model_dict = {Model.GPT_4o: "gpt4", Model.CLAUDE_3_5_SONNET: "claude"}
+        model_dict = {Model.GPT_4o: "gpt4", Model.CLAUDE_3_7_SONNET: "claude"}
         assert model_dict[Model.GPT_4o] == "gpt4"
 
     def test_model_str_repr(self):
@@ -253,7 +207,7 @@ class TestModelEqualityAndHashing:
 
     def test_model_lt_comparison(self):
         """Test less-than comparison for sorting."""
-        models = [Model.GPT_4o, Model.CLAUDE_3_5_SONNET, Model.LLAMA3_1_8B]
+        models = [Model.GPT_4o, Model.CLAUDE_3_7_SONNET, Model.LLAMA3_1_8B]
         sorted_models = sorted(models)
         # Should be sortable without error
         assert len(sorted_models) == 3
@@ -394,7 +348,7 @@ class TestGeneratorIntegration:
         """Test Generator works with models from different providers."""
         mock_completion.return_value = mock_litellm_response
 
-        for model in [Model.GPT_4o, Model.CLAUDE_3_5_SONNET, Model.LLAMA3_3_70B]:
+        for model in [Model.GPT_4o, Model.CLAUDE_3_7_SONNET, Model.LLAMA3_3_70B]:
             generator = Generator(
                 model=model,
                 prompt_strategy=PromptStrategy.MAP,
@@ -430,7 +384,7 @@ class TestQueryProcessorIntegration:
 
         config = QueryProcessorConfig(
             policy=MinCost(),
-            available_models=[Model.GPT_4o, Model.CLAUDE_3_5_SONNET],
+            available_models=[Model.GPT_4o, Model.CLAUDE_3_7_SONNET],
             verbose=True,
         )
 
