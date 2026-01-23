@@ -1,6 +1,6 @@
 import os
 
-from palimpzest.constants import Model
+from palimpzest.constants import MAX_AVAILABLE_MODELS, Model
 from palimpzest.core.models import PlanCost
 from palimpzest.policy import Policy
 
@@ -13,7 +13,7 @@ def get_models(include_embedding: bool = False, use_vertex: bool = False, gemini
     all_models = Model.get_all_models()
 
     if os.getenv("OPENAI_API_KEY") not in [None, ""]:
-        openai_models = [model for model in all_models if model.provider == "openai"]
+        openai_models = [model for model in all_models if model.is_provider_openai()]
         if not include_embedding:
             openai_models = [
                 model for model in openai_models if not model.is_embedding_model()
@@ -21,7 +21,7 @@ def get_models(include_embedding: bool = False, use_vertex: bool = False, gemini
         models.extend(openai_models)
 
     if os.getenv("TOGETHER_API_KEY") not in [None, ""]:
-        together_models = [model for model in all_models if model.is_provider_openai()]
+        together_models = [model for model in all_models if model.is_provider_together_ai()]
         if not include_embedding:
             together_models = [
                 model for model in together_models if not model.is_embedding_model()
@@ -29,7 +29,7 @@ def get_models(include_embedding: bool = False, use_vertex: bool = False, gemini
         models.extend(together_models)
 
     if os.getenv("ANTHROPIC_API_KEY") not in [None, ""]:
-        anthropic_models = [model for model in all_models if model.is_provider_anthropic == "anthropic"]
+        anthropic_models = [model for model in all_models if model.is_provider_anthropic()]
         if not include_embedding:
             anthropic_models = [
                 model for model in anthropic_models if not model.is_embedding_model()
@@ -42,7 +42,7 @@ def get_models(include_embedding: bool = False, use_vertex: bool = False, gemini
         else gemini_credentials_path
     )
     if os.getenv("GEMINI_API_KEY") not in [None, ""] or (use_vertex and os.path.exists(gemini_credentials_path)):
-        vertex_models = [model for model in all_models if model.is_provider_anthropic()]
+        vertex_models = [model for model in all_models if model.is_provider_vertex_ai()]
         google_ai_studio_models = [model for model in all_models if model.is_provider_google_ai_studio()]
         if not include_embedding:
             vertex_models = [
@@ -74,7 +74,7 @@ def get_optimal_models(policy: Policy, include_embedding: bool = False, use_vert
     no available models at all. If policy constraints filter out all models, it
     falls back to returning the best model(s) based on the policy's primary metric.
     """
-    # 1. Gather Available Models
+    # gather available models
     available_models = get_models(
         include_embedding=include_embedding,
         use_vertex=use_vertex,
@@ -85,7 +85,7 @@ def get_optimal_models(policy: Policy, include_embedding: bool = False, use_vert
     if not available_models:
         return []
 
-    # 2. Gather Metrics for all models
+    # gather metrics for all models
     all_model_metrics = []
     for model in available_models:
         quality_score = model.get_overall_score()
@@ -106,7 +106,7 @@ def get_optimal_models(policy: Policy, include_embedding: bool = False, use_vert
             "time": time_val
         })
 
-    # 3. Apply Constraints
+    # apply constraints
     candidates = []
     for model_data in all_model_metrics:
         normalized_quality = model_data["quality"] / 100.0
@@ -115,26 +115,26 @@ def get_optimal_models(policy: Policy, include_embedding: bool = False, use_vert
         if policy.constraint(proxy_plan):
             candidates.append(model_data)
 
-    # 4. Fallback: If no models meet constraints, select best model(s) by primary metric
+    # fallback: If no models meet constraints, select best model(s) by primary metric
     if not candidates:
         primary_metric = policy.get_primary_metric()
 
         if primary_metric == "quality":
-            # Return the model with the highest quality score
+            # return the model with the highest quality score
             best = max(all_model_metrics, key=lambda x: x["quality"])
         elif primary_metric == "cost":
-            # Return the model with the lowest cost
+            # return the model with the lowest cost
             best = min(all_model_metrics, key=lambda x: x["cost"])
         elif primary_metric == "time":
-            # Return the model with the lowest latency
+            # return the model with the lowest latency
             best = min(all_model_metrics, key=lambda x: x["time"])
         else:
-            # Default to highest quality
+            # default to highest quality
             best = max(all_model_metrics, key=lambda x: x["quality"])
 
         return [best["id"]]
 
-    # 5. Normalize Metrics (Min-Max Normalization)
+    # normalize metrics using min-max normalization
     quals = [c["quality"] for c in candidates]
     costs = [c["cost"] for c in candidates]
     times = [c["time"] for c in candidates]
@@ -149,7 +149,7 @@ def get_optimal_models(policy: Policy, include_embedding: bool = False, use_vert
         norm = (val - min_v) / (max_v - min_v)
         return (1.0 - norm) if invert else norm
 
-    # 6. Calculate Scores
+    # get weight for each metric based on policy
     weights = policy.get_dict()
     w_q = weights.get("quality", 0.0)
     w_c = weights.get("cost", 0.0)
@@ -165,9 +165,9 @@ def get_optimal_models(policy: Policy, include_embedding: bool = False, use_vert
 
         scored_candidates.append((score, cand["id"]))
 
-    # 7. Select Top 5
+    # select the top-k candidates based on score
     scored_candidates.sort(key=lambda x: x[0], reverse=True)
-    top_models = [model for _, model in scored_candidates[:5]]
+    top_models = [model for _, model in scored_candidates[:MAX_AVAILABLE_MODELS]]
 
     return top_models
 
@@ -188,12 +188,12 @@ def resolve_reasoning_settings(model: Model | None, reasoning_effort: str | None
 
     # translate reasoning_effort into model-specific settings
     if model is not None and model.is_reasoning_model():
-        if model.provider == "vertex_ai" or model.provider == "google":
+        if model.is_provider_vertex_ai() or model.is_provider_google_ai_studio():
             if reasoning_effort is None and model in [Model.GEMINI_2_5_PRO, Model.GOOGLE_GEMINI_2_5_PRO]:
                 reasoning_effort = "low"
             elif reasoning_effort is None:
                 reasoning_effort = "disable"
-        elif model.provider == "openai":
+        elif model.is_provider_openai():
             reasoning_effort = "minimal" if reasoning_effort in [None, "disable", "minimal", "low"] else reasoning_effort
 
     return use_reasoning_prompt, reasoning_effort

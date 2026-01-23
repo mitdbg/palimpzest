@@ -59,13 +59,12 @@ class QueryProcessorFactory:
     @classmethod
     def _normalize_models(cls, config: QueryProcessorConfig) -> QueryProcessorConfig:
         """
-        Validate and normalize available_models and remove_models.
-        Converts strings to Model objects and fetches dynamic model info.
+        Validate and normalize available_models and remove_models; converts all model strings to Model objects.
         """
-        # 1. Normalize available_models
+        # get the current set of available_models (if provided by the user's config)
         current_available_models = getattr(config, 'available_models', [])
 
-        # Allow users to specify models as strings (e.g., "openai/gpt-5.2-2025-12-11")
+        # normalize all models to be pz.Model objects
         if current_available_models is not None and len(current_available_models) > 0:
             assert all(
                 isinstance(model, (Model, str)) for model in current_available_models
@@ -74,8 +73,8 @@ class QueryProcessorFactory:
                 Model(model) if isinstance(model, str) else model for model in current_available_models
             ]
 
+        # if the user does not explicitly set the available models, select the optimal models based on policy
         if current_available_models is None or len(current_available_models) == 0:
-            # If no models provided, select optimal models based on policy
             current_available_models = get_optimal_models(
                 policy = config.policy,
                 use_vertex = config.use_vertex,
@@ -83,14 +82,22 @@ class QueryProcessorFactory:
                 api_base = config.api_base
             )
 
-        # 1. Normalize remove_models
+        # get the list of models to remove (if provided by the user's config)
         remove_models = getattr(config, 'remove_models', [])
 
         # remove any models specified in the config
         if remove_models is not None and len(remove_models) > 0:
-            current_available_models = [model for model in current_available_models if model.value not in remove_models]
-            logger.info(f"Removed models from available models based on config: {remove_models}")
-        
+            assert all(
+                isinstance(model, (Model, str)) for model in remove_models
+            ), "Must provide pz.Model or the model's full string identifier for each element in `remove_models`"
+            remove_models = [
+                Model(model) if isinstance(model, str) else model for model in remove_models
+            ]
+
+            # filter remove_models out of current_available_models
+            current_available_models = [model for model in current_available_models if model not in remove_models]
+
+        logger.info(f"Final set of available models: {current_available_models}")
         config.available_models = current_available_models
         config.remove_models = remove_models
 
@@ -124,7 +131,7 @@ class QueryProcessorFactory:
 
         if len(config.available_models) == 0:
             raise ValueError("No available models found.")
-        
+
         openai_key = os.getenv("OPENAI_API_KEY")
         anthropic_key = os.getenv("ANTHROPIC_API_KEY")
         together_key = os.getenv("TOGETHER_API_KEY")

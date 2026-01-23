@@ -254,7 +254,7 @@ class TopKOp(PhysicalOperator):
                 embed_total_time = time.time() - embed_start_time
 
                 # compute cost of embedding(s)
-                emb_model = Model.from_litellm(model_name)
+                emb_model = Model(model_name)
                 total_input_cost = emb_model.get_usd_per_input_token() * total_input_tokens
                 gen_stats = GenerationStats(
                     model_name=model_name,

@@ -1,27 +1,43 @@
+import logging
+from typing import Any
+
 import requests
 
+logger = logging.getLogger(__name__)
+
+PZ_MODEL_DATA_URL = "https://palimpzest-research.s3.us-east-1.amazonaws.com/pz_models_information.json"
 
 class ModelMetricsManager:
     """
     Manages fetching and caching of model metrics from an external source.
     """
+    _instance = None
+
+    def __new__(cls, *args, **kwargs):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
     def __init__(self):
-        self.data_url = "https://raw.githubusercontent.com/mitdbg/palimpzest/GeneralizeLiteLLM-265/src/palimpzest/utils/pz_models_information.json" # TODO: replace with S3 json link (curated_model_info.json)
-        self._metrics_cache = None  # Initialize as None (empty)
+        if getattr(self, "_initialized", False):
+            return
+        self.data_url = PZ_MODEL_DATA_URL
+        self._metrics_cache = None
+        self._initialized = True
 
     def _load_data(self):
         if self._metrics_cache is None:
-            print(f"Fetching data from URL: {self.data_url}")
+            logger.info(f"Fetching data from URL: {self.data_url}")
             try:
                 self._metrics_cache = requests.get(self.data_url).json()
             except Exception as e:
-                print(f"Error fetching data: {e}")
+                logger.error(f"Error fetching data: {e}")
                 self._metrics_cache = {}
 
-    def get_model_metrics(self, model_name):
+    def get_model_metrics(self, model_name) -> dict[str, Any]:
         self._load_data()
         return self._metrics_cache.get(model_name, {})
 
-    def refresh_data(self):
+    def refresh_data(self) -> None:
         self._metrics_cache = None
         self._load_data()

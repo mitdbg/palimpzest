@@ -138,19 +138,19 @@ def log_attempt_number(retry_state):
 # Palimpzest root directory
 PZ_DIR = os.path.join(os.path.expanduser("~"), ".palimpzest")
 
-# Assume 500 MB/sec for local SSD scan time
+# assume 500 MB/sec for local SSD scan time
 LOCAL_SCAN_TIME_PER_KB = 1 / (float(500) * 1024)
 
-# Assume 30 GB/sec for sequential access of memory
+# assume 30 GB/sec for sequential access of memory
 MEMORY_SCAN_TIME_PER_KB = 1 / (float(30) * 1024 * 1024)
 
-# Assume 1 KB per record
+# assume 1 KB per record
 NAIVE_BYTES_PER_RECORD = 1024
 
-# Rough conversion from # of characters --> # of tokens; assumes 1 token ~= 4 chars
+# rough conversion from # of characters --> # of tokens; assumes 1 token ~= 4 chars
 TOKENS_PER_CHARACTER = 0.25
 
-# Rough estimate of the number of tokens the context is allowed to take up for LLAMA3 models
+# rough estimate of the number of tokens the context is allowed to take up for LLAMA3 models
 LLAMA_CONTEXT_TOKENS_LIMIT = 6000
 
 # a naive estimate for the input record size
@@ -180,10 +180,11 @@ NAIVE_IMAGE_TO_EQUATION_LATEX_TIME_PER_RECORD = 10.0
 # a naive estimate of the time it takes to extract the text from a PDF using a PDF processor
 NAIVE_PDF_PROCESSOR_TIME_PER_RECORD = 10.0
 
-# Whether or not to log LLM outputs
+# whether or not to log LLM outputs
 LOG_LLM_OUTPUT = False
 
-metrics_manager = ModelMetricsManager()
+# maximum number of models to use when user does not narrow optimization space
+MAX_AVAILABLE_MODELS = 5
 
 class Model:
     """
@@ -193,9 +194,10 @@ class Model:
     # Registry of known models (maps value string to Model instance)
     _registry: dict[str, Model] = {}
 
-    def __init__(self, model_id: str, local_model_url : str | None = None):
+    def __init__(self, model_id: str, local_model_url: str | None = None):
+        self.metrics_manager = ModelMetricsManager()
         self.model_id = model_id
-        self.model_specs = metrics_manager.get_model_metrics(model_id)
+        self.model_specs = self.metrics_manager.get_model_metrics(model_id)
         if not self.model_specs:
             raise ValueError("Palimpzest currently does not contain information about this model.")
         Model._registry[model_id] = self

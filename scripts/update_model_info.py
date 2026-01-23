@@ -15,11 +15,10 @@ Usage:
 import argparse
 import json
 import os
-import random
 import socket
 import subprocess
 import time
-from typing import Any, Dict, Set, Tuple
+from typing import Any
 
 import requests
 import yaml
@@ -248,10 +247,12 @@ def get_api_key_env_var(provider: str) -> str | None:
 
 
 def generate_config_yaml(model_ids: list[str]) -> str:
-    rand_id = random.randint(100000, 999999)
-    config_filename = f"litellm_config_{rand_id}.yaml"
-    config_list = []
+    config_id = 0
+    config_filename = f"litellm_config_{config_id}.yaml"
+    while not os.path.exists(config_filename):
+        config_id += 1
 
+    config_list = []
     for model_id in model_ids:
         provider = extract_provider(model_id)
         env_var_name = get_api_key_env_var(provider)
@@ -273,7 +274,7 @@ def generate_config_yaml(model_ids: list[str]) -> str:
     return config_filename
 
 
-def fetch_dynamic_model_info(model_ids: list[str]) -> Dict[str, Any]:
+def fetch_dynamic_model_info(model_ids: list[str]) -> dict[str, Any]:
     if not model_ids:
         return {}
 
@@ -347,7 +348,7 @@ def fetch_dynamic_model_info(model_ids: list[str]) -> Dict[str, Any]:
 # Data Fetching Functions
 # =============================================================================
 
-def fetch_litellm_data() -> Dict[str, Any]:
+def fetch_litellm_data() -> dict[str, Any]:
     print(f"Fetching LiteLLM data from {LITELLM_URL}...")
     try:
         response = requests.get(LITELLM_URL, timeout=30)
@@ -360,14 +361,14 @@ def fetch_litellm_data() -> Dict[str, Any]:
         return {}
 
 
-def load_existing_data() -> Dict[str, Any]:
+def load_existing_data() -> dict[str, Any]:
     if os.path.exists(PZ_MODELS_PATH):
         with open(PZ_MODELS_PATH) as f:
             return json.load(f)
     return {}
 
 
-def save_data(data: Dict[str, Any]) -> None:
+def save_data(data: dict[str, Any]) -> None:
     with open(PZ_MODELS_PATH, "w") as f:
         json.dump(data, f, indent=4)
     print(f"  [System] Successfully saved to {PZ_MODELS_PATH}")
@@ -377,7 +378,7 @@ def save_data(data: Dict[str, Any]) -> None:
 # Matching and Conversion Functions
 # =============================================================================
 
-def fuzzy_match_score(model_id: str, scores_dict: Dict[str, float]) -> float | None:
+def fuzzy_match_score(model_id: str, scores_dict: dict[str, float]) -> float | None:
     model_lower = model_id.lower()
     model_name = model_lower.split("/")[-1] if "/" in model_lower else model_lower
 
@@ -393,7 +394,7 @@ def fuzzy_match_score(model_id: str, scores_dict: Dict[str, float]) -> float | N
     return None
 
 
-def derive_model_flags(model_id: str, provider: str) -> Dict[str, bool]:
+def derive_model_flags(model_id: str, provider: str) -> dict[str, bool]:
     model_lower = model_id.lower()
     flags = {}
 
@@ -448,7 +449,7 @@ def review_field(
     from_endpoint: bool,
     interactive: bool = True,
     value_type: str = "any"
-) -> Tuple[Any, bool]:
+) -> tuple[Any, bool]:
     """
     Review a single field.
     Logic:
@@ -481,11 +482,11 @@ def review_field(
 
 def convert_and_review_model(
     model_id: str,
-    litellm_static: Dict[str, Any] | None,
-    litellm_dynamic: Dict[str, Any] | None,
-    existing_entry: Dict[str, Any] | None,
+    litellm_static: dict[str, Any] | None,
+    litellm_dynamic: dict[str, Any] | None,
+    existing_entry: dict[str, Any] | None,
     interactive: bool = True,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     1. Aggregates all data into a Draft Entry.
     2. Displays the Draft Entry (User can see Current State).
@@ -497,8 +498,8 @@ def convert_and_review_model(
 
     # --- PHASE 1: Build Draft Entry & Source Map ---
     
-    endpoint_fields: Set[str] = set()
-    raw_data: Dict[str, Any] = {}
+    endpoint_fields: set[str] = set()
+    raw_data: dict[str, Any] = {}
 
     # 1. Base: Static Data
     if litellm_static:
@@ -511,7 +512,7 @@ def convert_and_review_model(
                 raw_data[key] = val
                 endpoint_fields.add(key)
 
-    # 3. Construct Candidate Dictionary
+    # 3. Construct Candidate dictionary
     candidate = {}
     source_map = {} # Map field -> is_from_endpoint
 
@@ -652,11 +653,11 @@ def convert_and_review_model(
 
 def update_model(
     model_id: str,
-    existing_data: Dict[str, Any],
-    litellm_static: Dict[str, Any],
-    litellm_dynamic: Dict[str, Any] | None = None,
+    existing_data: dict[str, Any],
+    litellm_static: dict[str, Any],
+    litellm_dynamic: dict[str, Any] | None = None,
     interactive: bool = True,
-) -> Dict[str, Any] | None:
+) -> dict[str, Any] | None:
     static_entry = None
     if model_id in litellm_static:
         static_entry = litellm_static[model_id]
@@ -685,14 +686,14 @@ def update_model(
 
 def process_models(
     model_ids: list[str],
-    existing_data: Dict[str, Any],
-    litellm_static: Dict[str, Any],
+    existing_data: dict[str, Any],
+    litellm_static: dict[str, Any],
     use_endpoint: bool = False,
     interactive: bool = True,
     skip_existing: bool = False,
 ) -> None:
     """
-    Process models and ask user whether to write each one to file.
+    Process models and (if interactive is True) ask user whether to write each one to file.
     """
     litellm_dynamic = None
     if use_endpoint:
@@ -711,7 +712,7 @@ def process_models(
             model_id, current_data_state, litellm_static, litellm_dynamic,
             interactive=interactive
         )
-        
+
         if new_entry:
             # Display Final Result
             print("\n" + "-"*30)
@@ -724,7 +725,7 @@ def process_models(
             if interactive:
                 confirm = input(f"Write '{model_id}' to json file? [y/N]: ").strip().lower()
                 should_save = confirm == 'y'
-            
+
             if should_save:
                 current_data_state[model_id] = new_entry
                 save_data(current_data_state)
@@ -743,9 +744,7 @@ def main():
     )
     parser.add_argument("model_ids", nargs="*", help="Model IDs to update")
     parser.add_argument("--use-endpoint", action="store_true", help="Fetch dynamic info")
-    parser.add_argument("--non-interactive", action="store_true", help="Skip review and auto-save")
-    parser.add_argument("--list-available", action="store_true", help="List LiteLLM models")
-    parser.add_argument("--provider", type=str, help="Filter provider")
+    parser.add_argument("--interactive", action="store_false", help="Skip review and auto-save")
     parser.add_argument("--update-all", action="store_true", help="Update all existing")
 
     args = parser.parse_args()
@@ -754,27 +753,20 @@ def main():
     if not litellm_static:
         return
 
-    if args.list_available:
-        # (Listing code omitted for brevity)
-        print("List functionality available (omitted for brevity).") 
-        return
-
     existing_data = load_existing_data()
-    
-    skip_existing = False
 
+    skip_existing = False
     if args.update_all:
         model_ids = list(existing_data.keys())
-        skip_existing = False # Explicitly requested update
     elif args.model_ids:
         model_ids = args.model_ids
-        skip_existing = True # Default behavior for adding models
+        skip_existing = True
     else:
         parser.print_help()
         return
 
     interactive = not args.non_interactive
-    
+
     # Run the main processing loop
     process_models(
         model_ids,
