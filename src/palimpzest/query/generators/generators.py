@@ -17,12 +17,7 @@ import regex as re  # Use regex instead of re to used variable length lookbehind
 from colorama import Fore, Style
 from pydantic.fields import FieldInfo
 
-from palimpzest.constants import (
-    MODEL_CARDS,
-    Cardinality,
-    Model,
-    PromptStrategy,
-)
+from palimpzest.constants import Cardinality, Model, PromptStrategy
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.models import GenerationStats
 from palimpzest.prompts import PromptFactory
@@ -362,14 +357,14 @@ class Generator(Generic[ContextType, InputType]):
         if completion is not None:
             usage = completion.usage.model_dump()
 
-            # TODO: update with changes from #265
-            usd_per_input_token = MODEL_CARDS[self.model_name].get("usd_per_input_token", 0.0)
-            usd_per_audio_input_token = MODEL_CARDS[self.model_name].get("usd_per_audio_input_token", 0.0)
-            usd_per_output_token = MODEL_CARDS[self.model_name].get("usd_per_output_token", 0.0)
-            usd_per_cache_read_token = MODEL_CARDS[self.model_name].get("usd_per_cache_read_token", usd_per_input_token * 0.1)
-            usd_per_cache_creation_token = MODEL_CARDS[self.model_name].get("usd_per_cache_creation_token", 0.0)
-            usd_per_audio_cache_read_token = MODEL_CARDS[self.model_name].get("usd_per_audio_cache_read_token", usd_per_audio_input_token * 0.1)
-            usd_per_audio_cache_creation_token = MODEL_CARDS[self.model_name].get("usd_per_audio_cache_creation_token", 0.0)
+            # get cost per input/output token for the model
+            usd_per_input_token = self.model.get_usd_per_input_token()
+            usd_per_audio_input_token = self.model.get_usd_per_audio_input_token()
+            usd_per_output_token = self.model.get_usd_per_output_token()
+            usd_per_cache_read_token = self.model.get_usd_per_cache_read_token()
+            usd_per_cache_creation_token = self.model.get_usd_per_cache_creation_token()
+            usd_per_audio_cache_read_token = self.model.get_usd_per_audio_cache_read_token()
+            usd_per_audio_cache_creation_token = self.model.get_usd_per_audio_cache_creation_token()
 
             # TODO: for some models (e.g. GPT-5) we cannot separate text from image prompt tokens yet;
             #       for now, we only use tokens from prompt_token_details if it's an audio prompt

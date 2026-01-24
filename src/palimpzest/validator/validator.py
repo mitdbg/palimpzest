@@ -4,7 +4,7 @@ import time
 import litellm
 
 # from colorama import Fore, Style
-from palimpzest.constants import MODEL_CARDS, Cardinality, Model, PromptStrategy
+from palimpzest.constants import Cardinality, Model, PromptStrategy
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.models import GenerationStats
 from palimpzest.prompts import (
@@ -57,8 +57,8 @@ class Validator:
         usage = completion.usage.model_dump()
 
         # get cost per input/output token for the model and parse number of input and output tokens
-        usd_per_input_token = MODEL_CARDS[self.model.value]["usd_per_input_token"]
-        usd_per_output_token = MODEL_CARDS[self.model.value]["usd_per_output_token"]
+        usd_per_input_token = self.model.get_usd_per_input_token()
+        usd_per_output_token = self.model.get_usd_per_output_token()
         input_tokens = usage["prompt_tokens"]
         output_tokens = usage["completion_tokens"]
 

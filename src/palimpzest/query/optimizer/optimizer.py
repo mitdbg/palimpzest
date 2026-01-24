@@ -59,14 +59,6 @@ class Optimizer:
     - Andy Pavlo lecture with walkthrough example: https://www.youtube.com/watch?v=PXS49-tFLcI
 
     - Original Paper: https://www.cse.iitb.ac.in/infolab/Data/Courses/CS632/2015/Papers/Cascades-graefe.pdf
-
-    Notably, this optimization framework has served as the backbone of Microsoft SQL Server, CockroachDB,
-    and a few other important DBMS systems.
-
-    NOTE: the optimizer currently assumes that field names are unique across schemas; we do try to enforce
-          this by rewriting field names underneath-the-hood to be "{schema_name}.{field_name}", but this still
-          does not solve a situation in which -- for example -- a user uses the pz.URL schema twice in the same
-          program. In order to address that situation, we will need to augment our renaming scheme.
     """
 
     def __init__(
@@ -85,7 +77,7 @@ class Optimizer:
         allow_split_merge: bool = False,
         optimizer_strategy: OptimizationStrategyType = OptimizationStrategyType.PARETO,
         execution_strategy: ExecutionStrategyType = ExecutionStrategyType.PARALLEL,
-        use_final_op_quality: bool = False, # TODO: make this func(plan) -> final_quality
+        use_final_op_quality: bool = False,
         **kwargs,
     ):
         # store the policy

@@ -8,11 +8,7 @@ from numpy.linalg import norm
 from openai import OpenAI
 from pydantic.fields import FieldInfo
 
-from palimpzest.constants import (
-    MODEL_CARDS,
-    NAIVE_EST_NUM_OUTPUT_TOKENS,
-    Model,
-)
+from palimpzest.constants import NAIVE_EST_NUM_OUTPUT_TOKENS, Model
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.models import GenerationStats, OperatorCostEstimates
 from palimpzest.query.operators.convert import LLMConvert
@@ -62,8 +58,8 @@ class RAGConvert(LLMConvert):
         est_num_input_tokens = self.num_chunks_per_field * self.chunk_size
         est_num_output_tokens = NAIVE_EST_NUM_OUTPUT_TOKENS
         model_conversion_usd_per_record = (
-            MODEL_CARDS[self.model.value]["usd_per_input_token"] * est_num_input_tokens
-            + MODEL_CARDS[self.model.value]["usd_per_output_token"] * est_num_output_tokens
+            self.model.get_usd_per_input_token() * est_num_input_tokens
+            + self.model.get_usd_per_output_token() * est_num_output_tokens
         )
 
         # set refined estimate of cost per record
@@ -108,9 +104,8 @@ class RAGConvert(LLMConvert):
         embedding = response.data[0].embedding
 
         # compute the generation stats object
-        model_card = MODEL_CARDS[model_name]
         total_embedding_input_tokens = response.usage.total_tokens
-        total_embedding_cost = model_card["usd_per_input_token"] * total_embedding_input_tokens
+        total_embedding_cost = self.embedding_model.get_usd_per_input_token() * total_embedding_input_tokens
         embed_stats = GenerationStats(
             model_name=model_name,  # NOTE: this should be overwritten by generation model in convert()
             total_input_tokens=0.0,
@@ -273,8 +268,8 @@ class RAGFilter(LLMFilter):
         est_num_input_tokens = self.num_chunks_per_field * self.chunk_size
         est_num_output_tokens = NAIVE_EST_NUM_OUTPUT_TOKENS
         model_conversion_usd_per_record = (
-            MODEL_CARDS[self.model.value]["usd_per_input_token"] * est_num_input_tokens
-            + MODEL_CARDS[self.model.value]["usd_per_output_token"] * est_num_output_tokens
+            self.model.get_usd_per_input_token() * est_num_input_tokens
+            + self.model.get_usd_per_output_token() * est_num_output_tokens
         )
 
         # set refined estimate of cost per record
@@ -319,9 +314,8 @@ class RAGFilter(LLMFilter):
         embedding = response.data[0].embedding
 
         # compute the generation stats object
-        model_card = MODEL_CARDS[model_name]
         total_embedding_input_tokens = response.usage.total_tokens
-        total_embedding_cost = model_card["usd_per_input_token"] * total_embedding_input_tokens
+        total_embedding_cost = self.embedding_model.get_usd_per_input_token() * total_embedding_input_tokens
         embed_stats = GenerationStats(
             model_name=model_name,  # NOTE: this should be overwritten by generation model in filter()
             total_input_tokens=0.0,

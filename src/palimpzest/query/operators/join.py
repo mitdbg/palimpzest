@@ -13,7 +13,6 @@ from pydantic.fields import FieldInfo
 from sentence_transformers import SentenceTransformer
 
 from palimpzest.constants import (
-    MODEL_CARDS,
     NAIVE_EST_JOIN_SELECTIVITY,
     NAIVE_EST_NUM_INPUT_TOKENS,
     Cardinality,
@@ -411,18 +410,19 @@ class NestedLoopsJoin(LLMJoin):
 
         # get est. of conversion time per record from model card;
         model_conversion_time_per_record = (
-            MODEL_CARDS[self.model.value]["seconds_per_output_token"] * est_num_output_tokens
+            self.model.get_seconds_per_output_token() * est_num_output_tokens
         )
 
         # get est. of conversion cost (in USD) per record from model card
         usd_per_input_token = (
-            MODEL_CARDS[self.model.value]["usd_per_audio_input_token"]
+            self.model.get_usd_per_audio_input_token()
             if self.is_audio_op()
-            else MODEL_CARDS[self.model.value]["usd_per_input_token"]
+            else self.model.get_usd_per_input_token()
         )
+
         model_conversion_usd_per_record = (
             usd_per_input_token * est_num_input_tokens
-            + MODEL_CARDS[self.model.value]["usd_per_output_token"] * est_num_output_tokens
+            + self.model.get_usd_per_output_token * est_num_output_tokens
         )
 
         # estimate output cardinality using a constant assumption of the filter selectivity
@@ -430,7 +430,7 @@ class NestedLoopsJoin(LLMJoin):
         cardinality = selectivity * (left_source_op_cost_estimates.cardinality * right_source_op_cost_estimates.cardinality)
 
         # estimate quality of output based on the strength of the model being used
-        quality = (MODEL_CARDS[self.model.value]["overall"] / 100.0)
+        quality = (self.model.get_overall_score() / 100.0)
 
         return OperatorCostEstimates(
             cardinality=cardinality,
@@ -564,18 +564,18 @@ class EmbeddingJoin(LLMJoin):
 
         # get est. of conversion time per record from model card;
         model_conversion_time_per_record = (
-            MODEL_CARDS[self.embedding_model.value]["seconds_per_output_token"] * est_num_output_tokens
+            self.embedding_model.get_seconds_per_output_token() * est_num_output_tokens
         )
 
         # get est. of conversion cost (in USD) per record from model card
-        model_conversion_usd_per_record = MODEL_CARDS[self.embedding_model.value]["usd_per_input_token"] * est_num_input_tokens
+        model_conversion_usd_per_record = self.embedding_model.get_usd_per_input_token() * est_num_input_tokens
 
         # estimate output cardinality using a constant assumption of the filter selectivity
         selectivity = NAIVE_EST_JOIN_SELECTIVITY
         cardinality = selectivity * (left_source_op_cost_estimates.cardinality * right_source_op_cost_estimates.cardinality)
 
         # estimate quality of output based on the strength of the model being used
-        quality = (MODEL_CARDS[self.model.value]["overall"] / 100.0) * self.naive_quality_adjustment
+        quality = (self.model.get_overall_score() / 100.0) * self.naive_quality_adjustment
 
         return OperatorCostEstimates(
             cardinality=cardinality,
@@ -621,8 +621,7 @@ class EmbeddingJoin(LLMJoin):
             embeddings /= num_input_fields_present
 
         # compute cost of embedding(s)
-        model_card = MODEL_CARDS[self.embedding_model.value]
-        total_embedding_cost = model_card["usd_per_input_token"] * total_embedding_input_tokens
+        total_embedding_cost = self.embedding_model.get_usd_per_input_token() * total_embedding_input_tokens
         embedding_gen_stats = GenerationStats(
             model_name=self.embedding_model.value,
             total_input_tokens=0.0,
