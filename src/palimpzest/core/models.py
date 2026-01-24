@@ -451,7 +451,7 @@ class BasePlanStats(BaseModel):
     # dictionary whose values are OperatorStats objects;
     # PlanStats maps {full_op_id -> OperatorStats}
     # SentinelPlanStats maps {logical_op_id -> {full_op_id -> OperatorStats}}
-    operator_stats: dict = Field(default_factory=dict)
+    operator_stats: dict[str, OperatorStats | dict[str | OperatorStats]] = Field(default_factory=dict)
 
     # dictionary whose values are GenerationStats objects for validation;
     # only used by SentinelPlanStats
@@ -490,12 +490,12 @@ class BasePlanStats(BaseModel):
         if self.start_time is None:
             raise RuntimeError("PlanStats.start() must be called before PlanStats.finish()")
         self.total_plan_time = time.time() - self.start_time
-        self.total_plan_cost = self.sum_op_costs() + self.sum_validation_costs()
-        self.total_input_tokens = self.sum_input_tokens() + self.sum_validation_input_tokens()
-        self.total_output_tokens = self.sum_output_tokens() + self.sum_validation_output_tokens()
-        self.total_embedding_input_tokens = self.sum_embedding_input_tokens() + self.sum_validation_embedding_input_tokens()
-        self.total_cache_read_tokens = self.sum_cache_read_tokens() + self.sum_validation_cache_read_tokens()
-        self.total_cache_creation_tokens = self.sum_cache_creation_tokens() + self.sum_validation_cache_creation_tokens()
+        self.total_plan_cost = self.sum_op_stats_field("total_op_cost") + self.sum_validation_stats_field("cost_per_record")
+        self.total_input_tokens = self.sum_op_stats_field("total_input_tokens") + self.sum_validation_stats_field("total_input_tokens")
+        self.total_output_tokens = self.sum_op_stats_field("total_output_tokens") + self.sum_validation_stats_field("total_output_tokens")
+        self.total_embedding_input_tokens = self.sum_op_stats_field("total_embedding_input_tokens") + self.sum_validation_stats_field("total_embedding_input_tokens")
+        self.total_cache_read_tokens = self.sum_op_stats_field("total_cache_read_tokens") + self.sum_validation_stats_field("total_cache_read_tokens")
+        self.total_cache_creation_tokens = self.sum_op_stats_field("total_cache_creation_tokens") + self.sum_validation_stats_field("total_cache_creation_tokens")
 
     @staticmethod
     @abstractmethod
@@ -506,46 +506,13 @@ class BasePlanStats(BaseModel):
         pass
 
     @abstractmethod
-    def sum_op_costs(self) -> float:
-        """
-        Sum the costs of all operators in this plan.
-        """
+    def sum_op_stats_field(self, field_name: str) -> float | int:
+        """Sum a given field across all operator stats in this plan."""
         pass
 
-    @abstractmethod
-    def sum_input_tokens(self) -> int:
-        """
-        Sum the input tokens processed by all operators in this plan.
-        """
-        pass
-
-    @abstractmethod
-    def sum_output_tokens(self) -> int:
-        """
-        Sum the output tokens processed by all operators in this plan.
-        """
-        pass
-
-    @abstractmethod
-    def sum_embedding_input_tokens(self) -> int:
-        """
-        Sum the input embedding tokens processed by all operators in this plan.
-        """
-        pass
-
-    @abstractmethod
-    def sum_cache_read_tokens(self) -> int:
-        """
-        Sum the tokens read from cache by all operators in this plan.
-        """
-        pass
-
-    @abstractmethod
-    def sum_cache_creation_tokens(self) -> int:
-        """
-        Sum the tokens written to cache by all operators in this plan.
-        """
-        pass
+    def sum_validation_stats_field(self, field_name: str) -> float | int:
+        """Sum a given field across all validation generation stats in this plan."""
+        return sum([getattr(gen_stats, field_name) for _, gen_stats in self.validation_gen_stats.items()])
 
     @abstractmethod
     def add_record_op_stats(self, unique_full_op_id: str, record_op_stats: RecordOpStats | list[RecordOpStats]) -> None:
@@ -568,47 +535,11 @@ class BasePlanStats(BaseModel):
         """
         pass
 
-    def sum_validation_costs(self) -> float:
-        """
-        Sum the costs of all validation generations in this plan.
-        """
-        return sum([gen_stats.cost_per_record for _, gen_stats in self.validation_gen_stats.items()])
-
-    def sum_validation_input_tokens(self) -> int:
-        """
-        Sum the input tokens processed by all validation generations in this plan.
-        """
-        return sum([gen_stats.total_input_tokens for _, gen_stats in self.validation_gen_stats.items()])
-
-    def sum_validation_output_tokens(self) -> int:
-        """
-        Sum the output tokens processed by all validation generations in this plan.
-        """
-        return sum([gen_stats.total_output_tokens for _, gen_stats in self.validation_gen_stats.items()])
-    
-    def sum_validation_embedding_input_tokens(self) -> int:
-        """
-        Sum the input embedding tokens processed by all validation generations in this plan.
-        """
-        return sum([gen_stats.total_embedding_input_tokens for _, gen_stats in self.validation_gen_stats.items()])
-
-    def sum_validation_cache_read_tokens(self) -> int:
-        """
-        Sum the tokens read from cache by all validation generations in this plan.
-        """
-        return sum([gen_stats.total_cache_read_tokens for _, gen_stats in self.validation_gen_stats.items()])
-
-    def sum_validation_cache_creation_tokens(self) -> int:
-        """
-        Sum the tokens written to cache by all validation generations in this plan.
-        """
-        return sum([gen_stats.total_cache_creation_tokens for _, gen_stats in self.validation_gen_stats.items()])
-
     def get_total_cost_so_far(self) -> float:
         """
         Get the total cost incurred so far in this plan execution.
         """
-        return self.sum_op_costs() + self.sum_validation_costs()
+        return self.sum_op_stats_field("total_op_cost") + self.sum_validation_stats_field("cost_per_record")
 
 
 class PlanStats(BasePlanStats):
@@ -634,41 +565,9 @@ class PlanStats(BasePlanStats):
 
         return PlanStats(plan_id=plan.plan_id, plan_str=str(plan), operator_stats=operator_stats)
  
-    def sum_op_costs(self) -> float:
-        """
-        Sum the costs of all operators in this plan.
-        """
-        return sum([op_stats.total_op_cost for _, op_stats in self.operator_stats.items()])
-
-    def sum_input_tokens(self) -> int:
-        """
-        Sum the input tokens processed by all operators in this plan.
-        """
-        return sum([op_stats.total_input_tokens for _, op_stats in self.operator_stats.items()])
-
-    def sum_output_tokens(self) -> int:
-        """
-        Sum the output tokens processed by all operators in this plan.
-        """
-        return sum([op_stats.total_output_tokens for _, op_stats in self.operator_stats.items()])
-    
-    def sum_embedding_input_tokens(self) -> int:
-        """
-        Sum the input embedding tokens processed by all operators in this plan.
-        """
-        return sum([op_stats.total_embedding_input_tokens for _, op_stats in self.operator_stats.items()])
-
-    def sum_cache_read_tokens(self) -> int:
-        """
-        Sum the tokens read from cache by all operators in this plan.
-        """
-        return sum([op_stats.total_cache_read_tokens for _, op_stats in self.operator_stats.items()])
-
-    def sum_cache_creation_tokens(self) -> int:
-        """
-        Sum the tokens written to cache by all operators in this plan.
-        """
-        return sum([op_stats.total_cache_creation_tokens for _, op_stats in self.operator_stats.items()])
+    def sum_op_stats_field(self, field_name: str) -> float | int:
+        """Sum a given field across all operator stats in this plan."""
+        return sum([getattr(op_stats, field_name) for _, op_stats in self.operator_stats.items()])
 
     def add_record_op_stats(self, unique_full_op_id: str, record_op_stats: RecordOpStats | list[RecordOpStats]) -> None:
         """
@@ -743,41 +642,9 @@ class SentinelPlanStats(BasePlanStats):
 
         return SentinelPlanStats(plan_id=plan.plan_id, plan_str=str(plan), operator_stats=operator_stats)
 
-    def sum_op_costs(self) -> float:
-        """
-        Sum the costs of all operators in this plan.
-        """
-        return sum(sum([op_stats.total_op_cost for _, op_stats in phys_op_stats.items()]) for _, phys_op_stats in self.operator_stats.items())
-
-    def sum_input_tokens(self) -> int:
-        """
-        Sum the input tokens processed by all operators in this plan.
-        """
-        return sum(sum([op_stats.total_input_tokens for _, op_stats in phys_op_stats.items()]) for _, phys_op_stats in self.operator_stats.items())
-
-    def sum_output_tokens(self) -> int:
-        """
-        Sum the output tokens processed by all operators in this plan.
-        """
-        return sum(sum([op_stats.total_output_tokens for _, op_stats in phys_op_stats.items()]) for _, phys_op_stats in self.operator_stats.items())
-    
-    def sum_embedding_input_tokens(self) -> int:
-        """
-        Sum the output tokens processed by all operators in this plan.
-        """
-        return sum(sum([op_stats.total_embedding_input_tokens for _, op_stats in phys_op_stats.items()]) for _, phys_op_stats in self.operator_stats.items())
-
-    def sum_cache_read_tokens(self) -> int:
-        """
-        Sum the tokens read from cache by all operators in this plan.
-        """
-        return sum(sum([op_stats.total_cache_read_tokens for _, op_stats in phys_op_stats.items()]) for _, phys_op_stats in self.operator_stats.items())
-
-    def sum_cache_creation_tokens(self) -> int:
-        """
-        Sum the tokens written to cache by all operators in this plan.
-        """
-        return sum(sum([op_stats.total_cache_creation_tokens for _, op_stats in phys_op_stats.items()]) for _, phys_op_stats in self.operator_stats.items())
+    def sum_op_stats_field(self, field_name: str) -> float | int:
+        """Sum a given field across all operator stats in this plan."""
+        return sum(sum([getattr(op_stats, field_name) for _, op_stats in phys_op_stats.items()]) for _, phys_op_stats in self.operator_stats.items())
 
     def add_record_op_stats(self, unique_logical_op_id: str, record_op_stats: RecordOpStats | list[RecordOpStats]) -> None:
         """
@@ -805,7 +672,6 @@ class SentinelPlanStats(BasePlanStats):
             self.validation_gen_stats[unique_logical_op_id] += gen_stats
         else:
             self.validation_gen_stats[unique_logical_op_id] = gen_stats
-
 
     def __iadd__(self, plan_stats: SentinelPlanStats) -> None:
         """
@@ -902,9 +768,6 @@ class ExecutionStats(BaseModel):
     # total number of tokens written to cache
     total_cache_creation_tokens: int = 0
 
-    # total number of tokens processed
-    total_tokens: int = 0
-
     # dictionary of sentinel plan strings; useful for printing executed sentinel plans in demos
     sentinel_plan_strs: dict[str, str] = Field(default_factory=dict)
 
@@ -953,68 +816,37 @@ class ExecutionStats(BaseModel):
         self.total_execution_cost = self.optimization_cost + self.plan_execution_cost
 
         # compute the tokens for total execution
-        self.total_input_tokens = self.sum_input_tokens()
-        self.total_output_tokens = self.sum_output_tokens()
-        self.total_embedding_input_tokens = self.sum_embedding_input_tokens()
-        self.total_cache_read_tokens = self.sum_cache_read_tokens()
-        self.total_cache_creation_tokens = self.sum_cache_creation_tokens()
-        self.total_tokens = self.total_input_tokens + self.total_output_tokens + self.total_embedding_input_tokens
+        self.total_input_tokens = self.sum_plan_stats_field("total_input_tokens")
+        self.total_output_tokens = self.sum_plan_stats_field("total_output_tokens")
+        self.total_embedding_input_tokens = self.sum_plan_stats_field("total_embedding_input_tokens")
+        self.total_cache_read_tokens = self.sum_plan_stats_field("total_cache_read_tokens")
+        self.total_cache_creation_tokens = self.sum_plan_stats_field("total_cache_creation_tokens")
 
         # compute plan_strs
         self.plan_strs = {plan_id: plan_stats.plan_str for plan_id, plan_stats in self.plan_stats.items()}
+
+    def sum_plan_stats_field(self, field_name: str) -> float | int:
+        """
+        Sum a given field across all PlanStats in this execution.
+        """
+        sentinel_plan_field_sum = sum([plan_stats.sum_op_stats_field(field_name) + plan_stats.sum_validation_stats_field(field_name) for _, plan_stats in self.sentinel_plan_stats.items()])
+        plan_field_sum = sum([plan_stats.sum_op_stats_field(field_name) for _, plan_stats in self.plan_stats.items()])
+        return plan_field_sum + sentinel_plan_field_sum
 
     def sum_sentinel_plan_costs(self) -> float:
         """
         Sum the costs of all SentinelPlans in this execution.
         """
-        return sum([plan_stats.sum_op_costs() + plan_stats.sum_validation_costs() for _, plan_stats in self.sentinel_plan_stats.items()])
+        return sum([
+            plan_stats.sum_op_stats_field("total_op_cost") + plan_stats.sum_validation_stats_field("cost_per_record")
+            for _, plan_stats in self.sentinel_plan_stats.items()
+        ])
 
     def sum_plan_costs(self) -> float:
         """
         Sum the costs of all PhysicalPlans in this execution.
         """
-        return sum([plan_stats.sum_op_costs() for _, plan_stats in self.plan_stats.items()])
-
-    def sum_input_tokens(self) -> int:
-        """
-        Sum the input tokens processed in this execution
-        """
-        sentinel_plan_input_tokens = sum([plan_stats.sum_input_tokens() for _, plan_stats in self.sentinel_plan_stats.items()])
-        plan_input_tokens = sum([plan_stats.sum_input_tokens() for _, plan_stats in self.plan_stats.items()])
-        return plan_input_tokens + sentinel_plan_input_tokens
-
-    def sum_output_tokens(self) -> int:
-        """
-        Sum the output tokens processed in this execution
-        """
-        sentinel_plan_output_tokens = sum([plan_stats.sum_output_tokens() for _, plan_stats in self.sentinel_plan_stats.items()])
-        plan_output_tokens = sum([plan_stats.sum_output_tokens() for _, plan_stats in self.plan_stats.items()])
-        return plan_output_tokens + sentinel_plan_output_tokens
-    
-
-    def sum_embedding_input_tokens(self) -> int:
-        """
-        Sum the embedding input tokens processed in this execution
-        """
-        sentinel_plan_embedding_input_tokens = sum([plan_stats.sum_embedding_input_tokens() for _, plan_stats in self.sentinel_plan_stats.items()])
-        plan_embedding_input_tokens = sum([plan_stats.sum_embedding_input_tokens() for _, plan_stats in self.plan_stats.items()])
-        return plan_embedding_input_tokens + sentinel_plan_embedding_input_tokens
-
-    def sum_cache_read_tokens(self) -> int:
-        """
-        Sum the tokens read from cache in this execution
-        """
-        sentinel_plan_cache_read_tokens = sum([plan_stats.sum_cache_read_tokens() for _, plan_stats in self.sentinel_plan_stats.items()])
-        plan_cache_read_tokens = sum([plan_stats.sum_cache_read_tokens() for _, plan_stats in self.plan_stats.items()])
-        return plan_cache_read_tokens + sentinel_plan_cache_read_tokens
-
-    def sum_cache_creation_tokens(self) -> int:
-        """
-        Sum the tokens written to cache in this execution
-        """
-        sentinel_plan_cache_creation_tokens = sum([plan_stats.sum_cache_creation_tokens() for _, plan_stats in self.sentinel_plan_stats.items()])
-        plan_cache_creation_tokens = sum([plan_stats.sum_cache_creation_tokens() for _, plan_stats in self.plan_stats.items()])
-        return plan_cache_creation_tokens + sentinel_plan_cache_creation_tokens
+        return sum([plan_stats.sum_op_stats_field("total_op_cost") for _, plan_stats in self.plan_stats.items()])
 
     def add_plan_stats(self, plan_stats: PlanStats | SentinelPlanStats | list[PlanStats] | list[SentinelPlanStats]) -> None:
         """
