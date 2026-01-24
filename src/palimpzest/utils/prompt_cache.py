@@ -30,7 +30,7 @@ class PromptCacheManager:
     def __init__(self, model: Model):
         self.model = model
         # Instance-level state ensures thread safety if we use one manager per plan/execution
-        self.openai_cache_key = f"pz-cache-{uuid.uuid4().hex[:12]}" if self.model.is_openai_model() else None
+        self.openai_cache_key = f"pz-cache-{uuid.uuid4().hex[:12]}" if self.model.is_provider_openai() else None
 
     def get_cache_kwargs(self) -> dict[str, Any]:
         """
@@ -43,7 +43,7 @@ class PromptCacheManager:
             return {}
         # OpenAI: https://platform.openai.com/docs/guides/prompt-caching
         # Use prompt_cache_key for sticky routing to the same cache shard
-        if self.model.is_openai_model():
+        if self.model.is_provider_openai():
             return {"extra_body": {"prompt_cache_key": self.openai_cache_key}}
         else:
             return {}
@@ -61,15 +61,15 @@ class PromptCacheManager:
         # TODO: Update with changes from #265
         # Anthropic: Explicit cache_control with ephemeral type
         # https://platform.claude.com/docs/en/build-with-claude/prompt-caching
-        if self.model.is_anthropic_model():
+        if self.model.is_provider_anthropic():
             self._transform_messages_for_anthropic(messages)
         # implicit caching for Deepseek/Gemini/Openai Models that current support caching
         # OpenAI: https://platform.openai.com/docs/guides/prompt-caching
         # Gemini: https://ai.google.dev/gemini-api/docs/caching
         # DeepSeek: https://api-docs.deepseek.com/guides/kv_cache
-        elif (self.model.is_openai_model() or
-              self.model.is_google_ai_studio_model() or self.model.is_vertex_model() or
-              self.model.is_deepseek_model()):
+        elif (self.model.is_provider_openai() or
+              self.model.is_provider_google_ai_studio() or self.model.is_provider_vertex_ai() or
+              self.model.is_provider_deepseek()):
             self._remove_cache_boundary_markers(messages)
 
 
@@ -87,16 +87,16 @@ class PromptCacheManager:
         if not model.supports_prompt_caching() or not usage:
             return stats
 
-        if model.is_openai_model():
+        if model.is_provider_openai():
             details = usage.get("prompt_tokens_details") or {}
             stats["cache_read_tokens"] = details.get("cached_tokens") or 0
             stats["audio_cache_read_tokens"] = details.get("audio_cached_tokens") or 0
 
-        elif model.is_anthropic_model():
+        elif model.is_provider_anthropic():
             stats["cache_creation_tokens"] = usage.get("cache_creation_input_tokens", 0)
             stats["cache_read_tokens"] = usage.get("cache_read_input_tokens", 0)
 
-        elif model.is_vertex_model() or model.is_google_ai_studio_model():
+        elif model.is_provider_vertex_ai() or model.is_provider_google_ai_studio():
             # Try Gemini native field first, then litellm normalized field as fallback
             stats["cache_read_tokens"] = usage.get("cached_content_token_count") or 0
             if stats["cache_read_tokens"] == 0:
@@ -104,7 +104,7 @@ class PromptCacheManager:
                 details = usage.get("prompt_tokens_details") or {}
                 stats["cache_read_tokens"] = details.get("cached_tokens") or 0
 
-        elif model.is_deepseek_model():
+        elif model.is_provider_deepseek():
             stats["cache_read_tokens"] = usage.get("prompt_cache_hit_tokens", 0)
             stats["cache_creation_tokens"] = 0
 

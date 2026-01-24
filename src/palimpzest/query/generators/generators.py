@@ -395,7 +395,7 @@ class Generator(Generic[ContextType, InputType]):
 
             # the result will never be negative; max(0, *) for extra safety
             # anthropic exludes cache tokens from its input tokens
-            if not self.model.is_anthropic_model():
+            if not self.model.is_provider_anthropic():
                 regular_text_tokens = max(0, input_text_tokens - text_cache_read_tokens - text_cache_creation_tokens) 
                 regular_audio_tokens = max(0, input_audio_tokens - audio_cache_read_tokens - audio_cache_creation_tokens)
             else:

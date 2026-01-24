@@ -241,13 +241,13 @@ def main():
     model = get_model_from_string(args.model)
 
     # Validate env vars (Simplified for brevity)
-    if model.is_openai_model() and not os.getenv("OPENAI_API_KEY"):
+    if model.is_provider_openai() and not os.getenv("OPENAI_API_KEY"):
         print("ERROR: OPENAI_API_KEY not set")
         return
-    if model.is_anthropic_model() and not os.getenv("ANTHROPIC_API_KEY"):
+    if model.is_provider_anthropic() and not os.getenv("ANTHROPIC_API_KEY"):
         print("ERROR: ANTHROPIC_API_KEY not set")
         return
-    if (model.is_google_ai_studio_model() or model.is_vertex_model()) and not os.getenv("GOOGLE_API_KEY"):
+    if (model.is_provider_google_ai_studio() or model.is_provider_vertex_ai()) and not os.getenv("GOOGLE_API_KEY"):
         print("ERROR: GOOGLE_API_KEY not set")
         return
 
