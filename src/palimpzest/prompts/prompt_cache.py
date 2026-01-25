@@ -8,6 +8,7 @@ This module provides provider-specific prompt caching configurations:
 - DeepSeek: Automatic context caching (enabled by default, 64 token minimum)
 """
 
+import copy
 import uuid
 from typing import Any
 
@@ -17,11 +18,11 @@ from palimpzest.constants import Model
 class PromptCacheManager:
     """
     Manages prompt caching configurations and message transformations for LLM providers.
-    
+
     This class handles:
     1. Session-level state (e.g., OpenAI cache keys).
     2. Provider-specific request arguments (headers, extra_body).
-    3. In-place modification of messages for providers requiring explicit markers (Anthropic).
+    3. Transformation of messages for providers requiring explicit markers (Anthropic).
     4. Normalization of usage statistics.
     """
     
@@ -48,21 +49,24 @@ class PromptCacheManager:
         else:
             return {}
     
-    def update_message_for_caching(self, messages: list[dict]) -> None:
+    def update_messages_for_caching(self, messages: list[dict]) -> list[dict]:
         """
-        Modify the messages list in-place to conform to provider-specific caching requirements.
-        
+        Transform messages to conform to provider-specific caching requirements.
+
         - Anthropic: Adds explicit cache_control markers.
         - Others: Removes the generic cache boundary markers.
+
+        Returns:
+            The transformed messages list.
         """
         if not self.model.supports_prompt_caching():
-            return
-        
+            return messages
+
         # TODO: Update with changes from #265
         # Anthropic: Explicit cache_control with ephemeral type
         # https://platform.claude.com/docs/en/build-with-claude/prompt-caching
         if self.model.is_provider_anthropic():
-            self._transform_messages_for_anthropic(messages)
+            return self._transform_messages_for_anthropic(messages)
         # implicit caching for Deepseek/Gemini/Openai Models that current support caching
         # OpenAI: https://platform.openai.com/docs/guides/prompt-caching
         # Gemini: https://ai.google.dev/gemini-api/docs/caching
@@ -70,10 +74,12 @@ class PromptCacheManager:
         elif (self.model.is_provider_openai() or
               self.model.is_provider_google_ai_studio() or self.model.is_provider_vertex_ai() or
               self.model.is_provider_deepseek()):
-            self._remove_cache_boundary_markers(messages)
+            return self._remove_cache_boundary_markers(messages)
+
+        return messages
 
 
-    def extract_cache_stats(self, usage: dict, model: Model) -> dict[str, int]:
+    def extract_cache_stats(self, usage: dict) -> dict[str, int]:
         """
         Normalize cache statistics from provider-specific response formats.
         """
@@ -82,36 +88,39 @@ class PromptCacheManager:
             "cache_read_tokens": 0,
             "audio_cache_creation_tokens": 0,
             "audio_cache_read_tokens": 0,
+            "image_cache_creation_tokens": 0,
+            "image_cache_read_tokens": 0
         }
 
-        if not model.supports_prompt_caching() or not usage:
+        if not self.model.supports_prompt_caching() or not usage:
             return stats
 
-        if model.is_provider_openai():
+        if self.model.is_provider_openai():
             details = usage.get("prompt_tokens_details") or {}
             stats["cache_read_tokens"] = details.get("cached_tokens") or 0
             stats["audio_cache_read_tokens"] = details.get("audio_cached_tokens") or 0
 
-        elif model.is_provider_anthropic():
+        elif self.model.is_provider_anthropic():
             stats["cache_creation_tokens"] = usage.get("cache_creation_input_tokens", 0)
             stats["cache_read_tokens"] = usage.get("cache_read_input_tokens", 0)
 
-        elif model.is_provider_vertex_ai() or model.is_provider_google_ai_studio():
+        elif self.model.is_provider_vertex_ai() or self.model.is_provider_google_ai_studio():
             # Try Gemini native field first, then litellm normalized field as fallback
             stats["cache_read_tokens"] = usage.get("cached_content_token_count") or 0
             if stats["cache_read_tokens"] == 0:
                 # litellm may normalize Gemini responses to use prompt_tokens_details
                 details = usage.get("prompt_tokens_details") or {}
                 stats["cache_read_tokens"] = details.get("cached_tokens") or 0
+                stats["audio_cache_read_tokens"] = details.get("audio_cached_tokens") or 0
 
-        elif model.is_provider_deepseek():
+        elif self.model.is_provider_deepseek():
             stats["cache_read_tokens"] = usage.get("prompt_cache_hit_tokens", 0)
             stats["cache_creation_tokens"] = 0
 
         return stats
 
 
-    def _remove_cache_boundary_markers(self, messages: list[dict]) -> None:
+    def _remove_cache_boundary_markers(self, messages: list[dict]) -> list[dict]:
         """
         Remove <<cache-boundary>> markers from user messages.
 
@@ -119,62 +128,77 @@ class PromptCacheManager:
         explicit cache markers. This function cleans up the markers from prompts.
 
         Args:
-            messages: The list of messages to modify (modified in-place)
+            messages: The list of messages to transform.
+
+        Returns:
+            A new list of messages with cache boundary markers removed.
         """
+        result = []
         for message in messages:
-            if message.get("role") == "user":
-                content = message.get("content", "")
+            new_message = message.copy()
+            if new_message.get("role") == "user":
+                content = new_message.get("content", "")
                 if isinstance(content, str) and self.CACHE_BOUNDARY_MARKER in content:
-                    message["content"] = content.replace(self.CACHE_BOUNDARY_MARKER, "")
+                    new_message["content"] = content.replace(self.CACHE_BOUNDARY_MARKER, "")
+            result.append(new_message)
+        return result
 
 
-    def _transform_messages_for_anthropic(self, messages: list[dict]) -> None:
+    def _transform_messages_for_anthropic(self, messages: list[dict]) -> list[dict]:
         """
         Add cache_control markers to system messages and user prompt prefixes for Anthropic models.
 
-        This modifies the messages list in-place to:
+        This transforms messages to:
         1. Add cache_control to system message content blocks
         2. Convert user messages with <<cache-boundary>> marker into a single message with multiple content blocks:
             a. Static prefix block (with cache_control) - cacheable across records
             b. Dynamic content block (without cache_control) - changes per record
 
         Args:
-            messages: The list of messages to modify (modified in-place)     
+            messages: The list of messages to transform.
+
+        Returns:
+            A new list of messages with cache_control markers added.
         """
+        result = []
         for message in messages:
-            role = message.get("role")
-            content = message.get("content", "")
+            new_message = copy.deepcopy(message)
+            role = new_message.get("role")
+            content = new_message.get("content", "")
 
             # 1. Handle System Messages
             if role == "system":
                 if isinstance(content, str) and content:
-                    message["content"] = [{
-                        "type": "text", 
-                        "text": content, 
+                    new_message["content"] = [{
+                        "type": "text",
+                        "text": content,
                         "cache_control": {"type": "ephemeral"}
                     }]
                 elif isinstance(content, list) and content:
                     # Apply to last block if it's text
-                    last_block = content[-1]
+                    last_block = new_message["content"][-1]
                     if isinstance(last_block, dict) and last_block.get("type") == "text":
                         last_block["cache_control"] = {"type": "ephemeral"}
 
             # 2. Handle User Messages (The Split Logic)
             elif role == "user" and isinstance(content, str) and self.CACHE_BOUNDARY_MARKER in content:
                 static, dynamic = content.split(self.CACHE_BOUNDARY_MARKER, 1)
-                    
+
                 new_blocks = []
                 if static.strip():
                     new_blocks.append({
-                        "type": "text", 
-                        "text": static, 
+                        "type": "text",
+                        "text": static,
                         "cache_control": {"type": "ephemeral"}
                     })
-                    
+
                 if dynamic.strip():
                     new_blocks.append({"type": "text", "text": dynamic})
-                    
+
                 if new_blocks:
-                    message["content"] = new_blocks
+                    new_message["content"] = new_blocks
                 else:
-                    message["content"] = ""
+                    new_message["content"] = ""
+
+            result.append(new_message)
+        return result

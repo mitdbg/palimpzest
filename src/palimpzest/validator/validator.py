@@ -66,10 +66,8 @@ class Validator:
             model_name=self.model.value,
             llm_call_duration_secs=time.time() - start_time,
             fn_call_duration_secs=0.0,
-            total_input_tokens=input_tokens,
-            total_output_tokens=output_tokens,
-            total_input_cost=input_tokens * usd_per_input_token,
-            total_output_cost=output_tokens * usd_per_output_token,
+            input_text_tokens=input_tokens,
+            output_text_tokens=output_tokens,
             cost_per_record=input_tokens * usd_per_input_token + output_tokens * usd_per_output_token,
             total_llm_calls=1,
         )
@@ -167,14 +165,23 @@ class Validator:
                 record_op_stats = target_record_set.record_op_stats[0]
                 gen_stats = GenerationStats(
                     model_name=self.model.value,
-                    total_input_tokens=record_op_stats.total_input_tokens,
-                    total_output_tokens=record_op_stats.total_output_tokens,
-                    total_input_cost=record_op_stats.total_input_cost,
-                    total_output_cost=record_op_stats.total_output_cost,
+                    input_text_tokens=record_op_stats.input_text_tokens,
+                    input_audio_tokens=record_op_stats.input_audio_tokens,
+                    input_image_tokens=record_op_stats.input_image_tokens,
+                    text_cache_read_tokens=record_op_stats.text_cache_read_tokens,
+                    audio_cache_read_tokens=record_op_stats.audio_cache_read_tokens,
+                    image_cache_read_tokens=record_op_stats.image_cache_read_tokens,
+                    text_cache_creation_tokens=record_op_stats.text_cache_creation_tokens,
+                    audio_cache_creation_tokens=record_op_stats.audio_cache_creation_tokens,
+                    image_cache_creation_tokens=record_op_stats.image_cache_creation_tokens,
+                    output_audio_tokens=record_op_stats.output_audio_tokens,
+                    output_text_tokens=record_op_stats.output_text_tokens,
+                    embedding_input_tokens=record_op_stats.embedding_input_tokens,
                     cost_per_record=record_op_stats.cost_per_record,
                     llm_call_duration_secs=record_op_stats.llm_call_duration_secs,
                     fn_call_duration_secs=record_op_stats.fn_call_duration_secs,
                     total_llm_calls=record_op_stats.total_llm_calls,
+                    total_embedding_llm_calls=record_op_stats.total_embedding_llm_calls,
                 )
 
             except Exception:
@@ -200,14 +207,23 @@ class Validator:
                 record_op_stats = target_record_set.record_op_stats[0]
                 gen_stats = GenerationStats(
                     model_name=self.model.value,
-                    total_input_tokens=record_op_stats.total_input_tokens,
-                    total_output_tokens=record_op_stats.total_output_tokens,
-                    total_input_cost=record_op_stats.total_input_cost,
-                    total_output_cost=record_op_stats.total_output_cost,
+                    input_text_tokens=record_op_stats.input_text_tokens,
+                    input_audio_tokens=record_op_stats.input_audio_tokens,
+                    input_image_tokens=record_op_stats.input_image_tokens,
+                    text_cache_read_tokens=record_op_stats.text_cache_read_tokens,
+                    audio_cache_read_tokens=record_op_stats.audio_cache_read_tokens,
+                    image_cache_read_tokens=record_op_stats.image_cache_read_tokens,
+                    text_cache_creation_tokens=record_op_stats.text_cache_creation_tokens,
+                    audio_cache_creation_tokens=record_op_stats.audio_cache_creation_tokens,
+                    image_cache_creation_tokens=record_op_stats.image_cache_creation_tokens,
+                    output_audio_tokens=record_op_stats.output_audio_tokens,
+                    output_text_tokens=record_op_stats.output_text_tokens,
+                    embedding_input_tokens=record_op_stats.embedding_input_tokens,
                     cost_per_record=record_op_stats.cost_per_record,
                     llm_call_duration_secs=record_op_stats.llm_call_duration_secs,
                     fn_call_duration_secs=record_op_stats.fn_call_duration_secs,
                     total_llm_calls=record_op_stats.total_llm_calls,
+                    total_embedding_llm_calls=record_op_stats.total_embedding_llm_calls,
                 )
 
             except Exception:

@@ -373,16 +373,18 @@ class LLMJoin(JoinOp):
             cost_per_record=generation_stats.cost_per_record,
             model_name=self.get_model_name(),
             join_condition=self.condition,
-            total_input_tokens=generation_stats.total_input_tokens,
-            total_output_tokens=generation_stats.total_output_tokens,
-            total_embedding_input_tokens=generation_stats.total_embedding_input_tokens,
-            total_input_cost=generation_stats.total_input_cost,
-            total_output_cost=generation_stats.total_output_cost,
-            total_embedding_cost=generation_stats.total_embedding_cost,
-            total_cache_read_tokens=generation_stats.total_cache_read_tokens,
-            total_cache_creation_tokens=generation_stats.total_cache_creation_tokens,
-            total_cache_read_cost=generation_stats.total_cache_read_cost,
-            total_cache_creation_cost=generation_stats.total_cache_creation_cost,
+            input_text_tokens=generation_stats.input_text_tokens,
+            input_audio_tokens=generation_stats.input_audio_tokens,
+            input_image_tokens=generation_stats.input_image_tokens,
+            text_cache_read_tokens=generation_stats.text_cache_read_tokens,
+            audio_cache_read_tokens=generation_stats.audio_cache_read_tokens,
+            image_cache_read_tokens=generation_stats.image_cache_read_tokens,
+            text_cache_creation_tokens=generation_stats.text_cache_creation_tokens,
+            audio_cache_creation_tokens=generation_stats.audio_cache_creation_tokens,
+            image_cache_creation_tokens=generation_stats.image_cache_creation_tokens,
+            output_audio_tokens=generation_stats.output_audio_tokens,
+            output_text_tokens=generation_stats.output_text_tokens,
+            embedding_input_tokens=generation_stats.embedding_input_tokens,
             llm_call_duration_secs=generation_stats.llm_call_duration_secs,
             fn_call_duration_secs=generation_stats.fn_call_duration_secs,
             total_llm_calls=generation_stats.total_llm_calls,
@@ -624,12 +626,7 @@ class EmbeddingJoin(LLMJoin):
         total_embedding_cost = self.embedding_model.get_usd_per_input_token() * total_embedding_input_tokens
         embedding_gen_stats = GenerationStats(
             model_name=self.embedding_model.value,
-            total_input_tokens=0.0,
-            total_output_tokens=0.0,
-            total_embedding_input_tokens=total_embedding_input_tokens,
-            total_input_cost=0.0,
-            total_output_cost=0.0,
-            total_embedding_cost=total_embedding_cost,
+            embedding_input_tokens=total_embedding_input_tokens,
             cost_per_record=total_embedding_cost,
             llm_call_duration_secs=time.time() - start_time,
             total_llm_calls=1,
@@ -809,7 +806,6 @@ class EmbeddingJoin(LLMJoin):
         amortized_embedding_cost = total_embedding_cost / len(output_record_op_stats) if len(output_record_op_stats) > 0 else 0.0
         for record_op_stats in output_record_op_stats:
             record_op_stats.cost_per_record += amortized_embedding_cost
-            record_op_stats.total_embedding_cost = amortized_embedding_cost
 
         # store input records to join with new records added later
         if self.retain_inputs:

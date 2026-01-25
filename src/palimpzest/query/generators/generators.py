@@ -21,7 +21,7 @@ from palimpzest.constants import Cardinality, Model, PromptStrategy
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.models import GenerationStats
 from palimpzest.prompts import PromptFactory
-from palimpzest.utils.prompt_cache import PromptCacheManager
+from palimpzest.prompts import PromptCacheManager
 
 # DEFINITIONS
 GenerationOutput = tuple[dict, str | None, GenerationStats, list[dict]]
@@ -327,7 +327,7 @@ class Generator(Generic[ContextType, InputType]):
                 completion_kwargs = {"api_base": self.api_base, "api_key": os.environ.get("VLLM_API_KEY", "fake-api-key"), **completion_kwargs}
             
             cache_kwargs = self.cache_manager.get_cache_kwargs()
-            self.cache_manager.update_message_for_caching(messages)
+            messages = self.cache_manager.update_messages_for_caching(messages)
             
             completion_kwargs = {**completion_kwargs, **cache_kwargs}
             completion = litellm.completion(model=self.model_name, messages=messages, **completion_kwargs)
@@ -360,76 +360,67 @@ class Generator(Generic[ContextType, InputType]):
             # get cost per input/output token for the model
             usd_per_input_token = self.model.get_usd_per_input_token()
             usd_per_audio_input_token = self.model.get_usd_per_audio_input_token()
+            usd_per_image_input_token = self.model.get_usd_per_image_input_token()
             usd_per_output_token = self.model.get_usd_per_output_token()
             usd_per_cache_read_token = self.model.get_usd_per_cache_read_token()
             usd_per_cache_creation_token = self.model.get_usd_per_cache_creation_token()
             usd_per_audio_cache_read_token = self.model.get_usd_per_audio_cache_read_token()
             usd_per_audio_cache_creation_token = self.model.get_usd_per_audio_cache_creation_token()
+            usd_per_image_cache_read_token = self.model.get_usd_per_image_cache_read_token()
+            usd_per_image_cache_creation_token = self.model.get_usd_per_image_cache_creation_token()
 
             # TODO: for some models (e.g. GPT-5) we cannot separate text from image prompt tokens yet;
             #       for now, we only use tokens from prompt_token_details if it's an audio prompt
             # get output tokens (all text) and input tokens by modality
             output_tokens = usage["completion_tokens"]
-            cache_stats = self.cache_manager.extract_cache_stats(usage, self.model)
+            
+            input_audio_tokens = usage["prompt_tokens_details"].get("audio_tokens", 0)
+            input_text_tokens = usage["prompt_tokens_details"].get("text_tokens", 0)
+            input_image_tokens = usage["prompt_tokens_details"].get("image_tokens", 0)
+
+            cache_stats = self.cache_manager.extract_cache_stats(usage)
             text_cache_read_tokens = cache_stats.get("cache_read_tokens", 0.0)
             text_cache_creation_tokens = cache_stats.get("cache_creation_tokens", 0.0)
+            audio_cache_read_tokens = cache_stats.get("audio_cache_read_tokens", 0.0)
+            audio_cache_creation_tokens = cache_stats.get("audio_cache_creation_tokens", 0.0)
+            image_cache_read_tokens = cache_stats.get("image_cache_read_tokens", 0.0)
+            image_cache_creation_tokens = cache_stats.get("image_cache_creation_tokens", 0.0)
 
-            if is_audio_op:
-                input_audio_tokens = usage["prompt_tokens_details"].get("audio_tokens", 0)
-                input_text_tokens = usage["prompt_tokens_details"].get("text_tokens", 0)
-                input_image_tokens = 0
-                audio_cache_read_tokens = cache_stats.get("audio_cache_read_tokens", 0.0)
-                audio_cache_creation_tokens = cache_stats.get("audio_cache_creation_tokens", 0.0)
+            if self.model.is_provider_anthropic():
+                # anthropic exludes cache tokens from its input tokens
+                regular_input_text_tokens = input_text_tokens
+                regular_input_audio_tokens = input_audio_tokens
+                regular_input_image_tokens = input_image_tokens
             else:
-                input_audio_tokens = 0
-                input_text_tokens = usage["prompt_tokens"]
-                input_image_tokens = 0
-                audio_cache_read_tokens = 0
-                audio_cache_creation_tokens = 0
+                # the result will never be negative; max(0, *) for extra safety
+                regular_input_text_tokens = max(0, input_text_tokens - text_cache_read_tokens - text_cache_creation_tokens) 
+                regular_input_audio_tokens = max(0, input_audio_tokens - audio_cache_read_tokens - audio_cache_creation_tokens)
+                regular_input_image_tokens = max(0, input_image_tokens - image_cache_read_tokens - image_cache_creation_tokens)
 
-            total_cache_read_tokens = text_cache_read_tokens + audio_cache_read_tokens
-            total_cache_creation_tokens = text_cache_creation_tokens + audio_cache_creation_tokens
-
-            total_cache_read_cost = text_cache_read_tokens * usd_per_cache_read_token + audio_cache_read_tokens * usd_per_audio_cache_read_token
-            total_cache_creation_cost = text_cache_creation_tokens * usd_per_cache_creation_token + audio_cache_creation_tokens * usd_per_audio_cache_creation_token
-
-            # the result will never be negative; max(0, *) for extra safety
-            # anthropic exludes cache tokens from its input tokens
-            if not self.model.is_provider_anthropic():
-                regular_text_tokens = max(0, input_text_tokens - text_cache_read_tokens - text_cache_creation_tokens) 
-                regular_audio_tokens = max(0, input_audio_tokens - audio_cache_read_tokens - audio_cache_creation_tokens)
-            else:
-                regular_text_tokens = input_text_tokens
-                regular_audio_tokens = input_audio_tokens
-
-            total_input_tokens = regular_text_tokens + regular_audio_tokens
-            total_input_cost = regular_text_tokens * usd_per_input_token + regular_audio_tokens * usd_per_audio_input_token
-
-            total_output_cost = output_tokens * usd_per_output_token
-            total_cost = total_input_cost + total_cache_read_cost + total_cache_creation_cost + total_output_cost
+            total_cost = (
+                regular_input_text_tokens * usd_per_input_token + regular_input_audio_tokens * usd_per_audio_input_token + regular_input_image_tokens * usd_per_image_input_token
+                + text_cache_creation_tokens * usd_per_cache_creation_token + audio_cache_creation_tokens * usd_per_audio_cache_creation_token + image_cache_creation_tokens * usd_per_image_cache_creation_token
+                + text_cache_read_tokens * usd_per_cache_read_token + audio_cache_read_tokens * usd_per_audio_cache_read_token + image_cache_read_tokens * usd_per_image_cache_read_token
+                + output_tokens * usd_per_output_token
+            )
 
             generation_stats = GenerationStats(
                 model_name=self.model_name,
                 llm_call_duration_secs=end_time - start_time,
                 fn_call_duration_secs=0.0,
                 # Raw token counts by modality
-                input_text_tokens=input_text_tokens,
-                input_audio_tokens=input_audio_tokens,
-                input_image_tokens=input_image_tokens,
-                total_input_tokens=total_input_tokens,
-                total_output_tokens=output_tokens,
+                input_text_tokens=regular_input_text_tokens,
+                input_audio_tokens=regular_input_audio_tokens,
+                input_image_tokens=regular_input_image_tokens,
+                output_text_tokens=output_tokens,
                 # Cache token breakdown
                 text_cache_read_tokens=text_cache_read_tokens,
                 text_cache_creation_tokens=text_cache_creation_tokens,
                 audio_cache_read_tokens=audio_cache_read_tokens,
                 audio_cache_creation_tokens=audio_cache_creation_tokens,
-                total_cache_read_tokens=total_cache_read_tokens,
-                total_cache_creation_tokens=total_cache_creation_tokens,
-                # Costs
-                total_input_cost=total_input_cost,
-                total_cache_read_cost=total_cache_read_cost,
-                total_cache_creation_cost=total_cache_creation_cost,
-                total_output_cost=total_output_cost,
+                image_cache_read_tokens=image_cache_read_tokens,
+                image_cache_creation_tokens=image_cache_creation_tokens,
+                # Cost
                 cost_per_record=total_cost,
                 total_llm_calls=1,
             )
