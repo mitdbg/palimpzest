@@ -329,6 +329,10 @@ class Generator(Generic[ContextType, InputType]):
             cache_kwargs = self.cache_manager.get_cache_kwargs()
             messages = self.cache_manager.update_messages_for_caching(messages)
             
+            # added for testing purpose, may be removed if needed
+            if "generating_messages_only" in kwargs and kwargs["generating_messages_only"]:
+                return messages
+
             completion_kwargs = {**completion_kwargs, **cache_kwargs}
             completion = litellm.completion(model=self.model_name, messages=messages, **completion_kwargs)
             end_time = time.time()

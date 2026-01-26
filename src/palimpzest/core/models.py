@@ -401,7 +401,7 @@ class BasePlanStats(BaseModel):
     # dictionary whose values are OperatorStats objects;
     # PlanStats maps {full_op_id -> OperatorStats}
     # SentinelPlanStats maps {logical_op_id -> {full_op_id -> OperatorStats}}
-    operator_stats: dict[str, OperatorStats | dict[str | OperatorStats]] = Field(default_factory=dict)
+    operator_stats: dict[str, OperatorStats | dict[str, OperatorStats]] = Field(default_factory=dict)
 
     # dictionary whose values are GenerationStats objects for validation;
     # only used by SentinelPlanStats

@@ -2,11 +2,9 @@
 """
 Script to generate test messages for each provider/modality combination.
 
-This script creates messages using the Generator's prompt factory for each supported
-provider/modality cross product and saves them to JSON files for use in provider testing.
-
-The messages include a static context that is just long enough to trigger caching
-(~1200 tokens, above the 1024 token threshold for OpenAI/Gemini).
+This script uses the Generator class directly to create message payloads.
+It uses the 'generating_messages_only' flag to retrieve the exact messages
+that would be sent to the provider without making an actual API call.
 
 Supported provider/modality combinations:
 - Anthropic: text-only, image-only, text-image (no audio support)
@@ -107,10 +105,6 @@ You are an AI Research Assistant for the PSRC. Your job is to analyze data input
 Analyze the input and provide the requested identification details.
 """
 
-
-# =============================================================================
-# INPUT SCHEMAS
-# =============================================================================
 class TextInputSchema(BaseModel):
     """Schema for text-only input."""
     text: str = Field(description="Description of an animal")
@@ -232,13 +226,47 @@ PROVIDER_CONFIGS = {
     },
 }
 
+
+def save_messages(modality: str, provider: str, messages: list[dict], output_dir: str) -> str:
+    """
+    Save messages to a JSON file.
+
+    Args:
+        modality: Modality name
+        provider: Provider name
+        messages: List of message dicts
+        output_dir: Directory to save files
+
+    Returns:
+        Path to the saved file
+    """
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, f"{modality}_{provider}.json")
+
+    # Convert messages to JSON-serializable format
+    serializable_messages = []
+    for msg in messages:
+        serializable_msg = msg.copy()
+        serializable_messages.append(serializable_msg)
+
+    with open(output_path, "w") as f:
+        json.dump(serializable_messages, f, indent=2, default=str)
+
+    return output_path
+
+
 def main():
     """Generate and save messages for all provider/modality combinations."""
-    display_output_dir = "tests/pytest/data/generator_messages/"
-    total_combinations = sum(
-        len(provider_config["supported_modalities"])
-        for provider_config in PROVIDER_CONFIGS.values()
+    # Ensure the output directory follows the repository structure
+    output_dir = os.path.join(
+        os.path.dirname(__file__),
+        "..",
+        "tests",
+        "pytest",
+        "data",
+        "generator_messages",
     )
+    output_dir = os.path.abspath(output_dir)
 
     # Count total combinations
     total_combinations = sum(
@@ -247,7 +275,8 @@ def main():
     )
 
     print(f"Generating test messages for {total_combinations} provider/modality combinations...")
-    print(f"Output directory: {display_output_dir}")
+    print(f"Output directory: {output_dir}")
+    print(f"Static context length: ~{len(STATIC_CONTEXT.split())} words\n")
 
     generated_count = 0
 
@@ -263,21 +292,30 @@ def main():
             print(f"  Generating: {modality}_{provider}")
 
             try:
+                # Prepare input record
                 input_schema = config["input_schema"]
                 data_item = config["data_item"]
                 input_record = DataRecord(input_schema(**data_item), source_indices=[0])
 
-                # instantiate Generator
+                # Instantiate Generator
                 generator = Generator(
                     model=model,
                     prompt_strategy=PromptStrategy.MAP,
                     reasoning_effort=None,
-                    desc=STATIC_CONTEXT
+                    desc=STATIC_CONTEXT,
                 )
 
-                # call generator
-                generator
+                # Call the generator with the new flag
+                # This returns only the messages list, without calling LLM
+                messages = generator(
+                    candidate=input_record,
+                    fields=OutputSchema.model_fields,
+                    generating_messages_only=True
+                )
+
+                # Manually save the messages using local helper
                 output_path = save_messages(modality, provider, messages, output_dir)
+                
                 print(f"    Saved to: {output_path}")
                 print(f"    Messages: {len(messages)}")
 

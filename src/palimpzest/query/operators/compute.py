@@ -173,10 +173,8 @@ class SmolAgentsCompute(PhysicalOperator):
         output_cost = output_tokens * cost_per_output_token
         generation_stats = GenerationStats(
             model_name=self.model_id,
-            total_input_tokens=input_tokens,
-            total_output_tokens=output_tokens,
-            total_input_cost=input_cost,
-            total_output_cost=output_cost,
+            input_text_tokens=input_tokens,
+            output_text_tokens=output_tokens,
             cost_per_record=input_cost + output_cost,
             llm_call_duration_secs=time.time() - start_time,
         )
