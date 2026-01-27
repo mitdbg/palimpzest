@@ -758,7 +758,7 @@ class BlockNestedLoopsJoin(LLMJoin):
         ) -> tuple[DataRecordSet, int]:
         def _find_answer(completion_text: str) -> str:
             # list of indicators to try
-            indicators = ["answer:", "answer is:", "index pairs is:"]
+            indicators = ["answer:", "answer is:", "index pairs is:", "index pairs are:", "join condition are:"]
             for indicator in indicators:
                 regex = re.compile(f"{indicator}(.*?)---", re.IGNORECASE | re.DOTALL)
                 matches = regex.findall(completion_text)
