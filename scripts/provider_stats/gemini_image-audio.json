@@ -1,0 +1,231 @@
+{
+  "provider": "gemini",
+  "model": "gemini-2.5-flash",
+  "modality": "image-audio",
+  "first_request": {
+    "provider": "gemini",
+    "model": "gemini-2.5-flash",
+    "usage": {
+      "cache_tokens_details": null,
+      "cached_content_token_count": null,
+      "candidates_token_count": 123,
+      "candidates_tokens_details": null,
+      "prompt_token_count": 2564,
+      "prompt_tokens_details": [
+        {
+          "modality": "TEXT",
+          "token_count": 2206
+        },
+        {
+          "modality": "IMAGE",
+          "token_count": 258
+        },
+        {
+          "modality": "AUDIO",
+          "token_count": 100
+        }
+      ],
+      "thoughts_token_count": 517,
+      "tool_use_prompt_token_count": null,
+      "tool_use_prompt_tokens_details": null,
+      "total_token_count": 3204,
+      "traffic_type": null
+    },
+    "response_content": "The image displays a large elephant with very large ears that resemble the shape of Africa, and a concave back. The audio recording features a distinct trumpeting sound. According to Section 2.1 of th",
+    "raw_response": {
+      "sdk_http_response": {
+        "headers": {
+          "content-type": "application/json; charset=UTF-8",
+          "vary": "Origin, X-Origin, Referer",
+          "content-encoding": "gzip",
+          "date": "Mon, 26 Jan 2026 22:46:08 GMT",
+          "server": "scaffolding on HTTPServer2",
+          "x-xss-protection": "0",
+          "x-frame-options": "SAMEORIGIN",
+          "x-content-type-options": "nosniff",
+          "server-timing": "gfet4t7; dur=4843",
+          "alt-svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+          "transfer-encoding": "chunked"
+        },
+        "body": null
+      },
+      "candidates": [
+        {
+          "content": {
+            "parts": [
+              {
+                "media_resolution": null,
+                "code_execution_result": null,
+                "executable_code": null,
+                "file_data": null,
+                "function_call": null,
+                "function_response": null,
+                "inline_data": null,
+                "text": "The image displays a large elephant with very large ears that resemble the shape of Africa, and a concave back. The audio recording features a distinct trumpeting sound. According to Section 2.1 of the manual, \"African Savanna Elephant\" is characterized by \"Larger ears (shaped like Africa), concave back,\" and their vocalizations include \"Trumpeting (alarm/excitement).\" The estimated height of 304.5 cm is consistent with a large elephant species like the African Savanna Elephant.\n\nANSWER:\n{\n  \"animal\": \"African Savanna Elephant\"\n}\n---",
+                "thought": null,
+                "thought_signature": null,
+                "video_metadata": null
+              }
+            ],
+            "role": "model"
+          },
+          "citation_metadata": null,
+          "finish_message": null,
+          "token_count": null,
+          "finish_reason": "STOP",
+          "avg_logprobs": null,
+          "grounding_metadata": null,
+          "index": 0,
+          "logprobs_result": null,
+          "safety_ratings": null,
+          "url_context_metadata": null
+        }
+      ],
+      "create_time": null,
+      "model_version": "gemini-2.5-flash",
+      "prompt_feedback": null,
+      "response_id": "sO53afSeHdqsz7IPzf3Q0As",
+      "usage_metadata": {
+        "cache_tokens_details": null,
+        "cached_content_token_count": null,
+        "candidates_token_count": 123,
+        "candidates_tokens_details": null,
+        "prompt_token_count": 2564,
+        "prompt_tokens_details": [
+          {
+            "modality": "TEXT",
+            "token_count": 2206
+          },
+          {
+            "modality": "IMAGE",
+            "token_count": 258
+          },
+          {
+            "modality": "AUDIO",
+            "token_count": 100
+          }
+        ],
+        "thoughts_token_count": 517,
+        "tool_use_prompt_token_count": null,
+        "tool_use_prompt_tokens_details": null,
+        "total_token_count": 3204,
+        "traffic_type": null
+      },
+      "automatic_function_calling_history": [],
+      "parsed": null
+    }
+  },
+  "second_request": {
+    "provider": "gemini",
+    "model": "gemini-2.5-flash",
+    "usage": {
+      "cache_tokens_details": null,
+      "cached_content_token_count": null,
+      "candidates_token_count": 123,
+      "candidates_tokens_details": null,
+      "prompt_token_count": 2564,
+      "prompt_tokens_details": [
+        {
+          "modality": "TEXT",
+          "token_count": 2206
+        },
+        {
+          "modality": "IMAGE",
+          "token_count": 258
+        },
+        {
+          "modality": "AUDIO",
+          "token_count": 100
+        }
+      ],
+      "thoughts_token_count": 517,
+      "tool_use_prompt_token_count": null,
+      "tool_use_prompt_tokens_details": null,
+      "total_token_count": 3204,
+      "traffic_type": null
+    },
+    "response_content": "The image displays a large elephant with very large ears that resemble the shape of Africa, and a concave back. The audio recording features a distinct trumpeting sound. According to Section 2.1 of th",
+    "raw_response": {
+      "sdk_http_response": {
+        "headers": {
+          "content-type": "application/json; charset=UTF-8",
+          "vary": "Origin, X-Origin, Referer",
+          "content-encoding": "gzip",
+          "date": "Mon, 26 Jan 2026 22:46:33 GMT",
+          "server": "scaffolding on HTTPServer2",
+          "x-xss-protection": "0",
+          "x-frame-options": "SAMEORIGIN",
+          "x-content-type-options": "nosniff",
+          "server-timing": "gfet4t7; dur=5247",
+          "alt-svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+          "transfer-encoding": "chunked"
+        },
+        "body": null
+      },
+      "candidates": [
+        {
+          "content": {
+            "parts": [
+              {
+                "media_resolution": null,
+                "code_execution_result": null,
+                "executable_code": null,
+                "file_data": null,
+                "function_call": null,
+                "function_response": null,
+                "inline_data": null,
+                "text": "The image displays a large elephant with very large ears that resemble the shape of Africa, and a concave back. The audio recording features a distinct trumpeting sound. According to Section 2.1 of the manual, \"African Savanna Elephant\" is characterized by \"Larger ears (shaped like Africa), concave back,\" and their vocalizations include \"Trumpeting (alarm/excitement).\" The estimated height of 304.5 cm is consistent with a large elephant species like the African Savanna Elephant.\n\nANSWER:\n{\n  \"animal\": \"African Savanna Elephant\"\n}\n---",
+                "thought": null,
+                "thought_signature": null,
+                "video_metadata": null
+              }
+            ],
+            "role": "model"
+          },
+          "citation_metadata": null,
+          "finish_message": null,
+          "token_count": null,
+          "finish_reason": "STOP",
+          "avg_logprobs": null,
+          "grounding_metadata": null,
+          "index": 0,
+          "logprobs_result": null,
+          "safety_ratings": null,
+          "url_context_metadata": null
+        }
+      ],
+      "create_time": null,
+      "model_version": "gemini-2.5-flash",
+      "prompt_feedback": null,
+      "response_id": "ye53aaKBObDmz7IPotDZ4A4",
+      "usage_metadata": {
+        "cache_tokens_details": null,
+        "cached_content_token_count": null,
+        "candidates_token_count": 123,
+        "candidates_tokens_details": null,
+        "prompt_token_count": 2564,
+        "prompt_tokens_details": [
+          {
+            "modality": "TEXT",
+            "token_count": 2206
+          },
+          {
+            "modality": "IMAGE",
+            "token_count": 258
+          },
+          {
+            "modality": "AUDIO",
+            "token_count": 100
+          }
+        ],
+        "thoughts_token_count": 517,
+        "tool_use_prompt_token_count": null,
+        "tool_use_prompt_tokens_details": null,
+        "total_token_count": 3204,
+        "traffic_type": null
+      },
+      "automatic_function_calling_history": [],
+      "parsed": null
+    }
+  }
+}

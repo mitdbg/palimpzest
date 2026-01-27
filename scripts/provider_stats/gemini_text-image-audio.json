@@ -1,0 +1,257 @@
+{
+  "provider": "gemini",
+  "model": "gemini-2.5-flash",
+  "modality": "text-image-audio",
+  "first_request": {
+    "provider": "gemini",
+    "model": "gemini-2.5-flash",
+    "usage": {
+      "cache_tokens_details": null,
+      "cached_content_token_count": null,
+      "candidates_token_count": 118,
+      "candidates_tokens_details": null,
+      "prompt_token_count": 2620,
+      "prompt_tokens_details": [
+        {
+          "modality": "TEXT",
+          "token_count": 2262
+        },
+        {
+          "modality": "IMAGE",
+          "token_count": 258
+        },
+        {
+          "modality": "AUDIO",
+          "token_count": 100
+        }
+      ],
+      "thoughts_token_count": 427,
+      "tool_use_prompt_token_count": null,
+      "tool_use_prompt_tokens_details": null,
+      "total_token_count": 3165,
+      "traffic_type": null
+    },
+    "response_content": "The text describes an elephant with big ears and a trumpeting sound. The image shows an elephant with very large ears that are distinctly shaped like the continent of Africa. The audio recording conta",
+    "raw_response": {
+      "sdk_http_response": {
+        "headers": {
+          "content-type": "application/json; charset=UTF-8",
+          "vary": "Origin, X-Origin, Referer",
+          "content-encoding": "gzip",
+          "date": "Mon, 26 Jan 2026 22:46:39 GMT",
+          "server": "scaffolding on HTTPServer2",
+          "x-xss-protection": "0",
+          "x-frame-options": "SAMEORIGIN",
+          "x-content-type-options": "nosniff",
+          "server-timing": "gfet4t7; dur=5215",
+          "alt-svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+          "transfer-encoding": "chunked"
+        },
+        "body": null
+      },
+      "candidates": [
+        {
+          "content": {
+            "parts": [
+              {
+                "media_resolution": null,
+                "code_execution_result": null,
+                "executable_code": null,
+                "file_data": null,
+                "function_call": null,
+                "function_response": null,
+                "inline_data": null,
+                "text": "The text describes an elephant with big ears and a trumpeting sound. The image shows an elephant with very large ears that are distinctly shaped like the continent of Africa. The audio recording contains a clear trumpeting sound. According to the WCRC Species Identification Manual, Section 2.1 Elephants, the African Savanna Elephant is characterized by \"Larger ears (shaped like Africa)\" and \"Trumpeting (alarm/excitement)\" vocalizations. These characteristics match all the provided inputs.\n\n```json\n{\n  \"animal\": \"African Savanna Elephant\"\n}\n```",
+                "thought": null,
+                "thought_signature": null,
+                "video_metadata": null
+              }
+            ],
+            "role": "model"
+          },
+          "citation_metadata": null,
+          "finish_message": null,
+          "token_count": null,
+          "finish_reason": "STOP",
+          "avg_logprobs": null,
+          "grounding_metadata": null,
+          "index": 0,
+          "logprobs_result": null,
+          "safety_ratings": null,
+          "url_context_metadata": null
+        }
+      ],
+      "create_time": null,
+      "model_version": "gemini-2.5-flash",
+      "prompt_feedback": null,
+      "response_id": "z-53aeuoD5uhz7IP1Pu0wQs",
+      "usage_metadata": {
+        "cache_tokens_details": null,
+        "cached_content_token_count": null,
+        "candidates_token_count": 118,
+        "candidates_tokens_details": null,
+        "prompt_token_count": 2620,
+        "prompt_tokens_details": [
+          {
+            "modality": "TEXT",
+            "token_count": 2262
+          },
+          {
+            "modality": "IMAGE",
+            "token_count": 258
+          },
+          {
+            "modality": "AUDIO",
+            "token_count": 100
+          }
+        ],
+        "thoughts_token_count": 427,
+        "tool_use_prompt_token_count": null,
+        "tool_use_prompt_tokens_details": null,
+        "total_token_count": 3165,
+        "traffic_type": null
+      },
+      "automatic_function_calling_history": [],
+      "parsed": null
+    }
+  },
+  "second_request": {
+    "provider": "gemini",
+    "model": "gemini-2.5-flash",
+    "usage": {
+      "cache_tokens_details": [
+        {
+          "modality": "AUDIO",
+          "token_count": 77
+        },
+        {
+          "modality": "TEXT",
+          "token_count": 1746
+        },
+        {
+          "modality": "IMAGE",
+          "token_count": 199
+        }
+      ],
+      "cached_content_token_count": 2022,
+      "candidates_token_count": 118,
+      "candidates_tokens_details": null,
+      "prompt_token_count": 2620,
+      "prompt_tokens_details": [
+        {
+          "modality": "TEXT",
+          "token_count": 2262
+        },
+        {
+          "modality": "IMAGE",
+          "token_count": 258
+        },
+        {
+          "modality": "AUDIO",
+          "token_count": 100
+        }
+      ],
+      "thoughts_token_count": 427,
+      "tool_use_prompt_token_count": null,
+      "tool_use_prompt_tokens_details": null,
+      "total_token_count": 3165,
+      "traffic_type": null
+    },
+    "response_content": "The text describes an elephant with big ears and a trumpeting sound. The image shows an elephant with very large ears that are distinctly shaped like the continent of Africa. The audio recording conta",
+    "raw_response": {
+      "sdk_http_response": {
+        "headers": {
+          "content-type": "application/json; charset=UTF-8",
+          "vary": "Origin, X-Origin, Referer",
+          "content-encoding": "gzip",
+          "date": "Mon, 26 Jan 2026 22:47:03 GMT",
+          "server": "scaffolding on HTTPServer2",
+          "x-xss-protection": "0",
+          "x-frame-options": "SAMEORIGIN",
+          "x-content-type-options": "nosniff",
+          "server-timing": "gfet4t7; dur=4041",
+          "alt-svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+          "transfer-encoding": "chunked"
+        },
+        "body": null
+      },
+      "candidates": [
+        {
+          "content": {
+            "parts": [
+              {
+                "media_resolution": null,
+                "code_execution_result": null,
+                "executable_code": null,
+                "file_data": null,
+                "function_call": null,
+                "function_response": null,
+                "inline_data": null,
+                "text": "The text describes an elephant with big ears and a trumpeting sound. The image shows an elephant with very large ears that are distinctly shaped like the continent of Africa. The audio recording contains a clear trumpeting sound. According to the WCRC Species Identification Manual, Section 2.1 Elephants, the African Savanna Elephant is characterized by \"Larger ears (shaped like Africa)\" and \"Trumpeting (alarm/excitement)\" vocalizations. These characteristics match all the provided inputs.\n\n```json\n{\n  \"animal\": \"African Savanna Elephant\"\n}\n```",
+                "thought": null,
+                "thought_signature": null,
+                "video_metadata": null
+              }
+            ],
+            "role": "model"
+          },
+          "citation_metadata": null,
+          "finish_message": null,
+          "token_count": null,
+          "finish_reason": "STOP",
+          "avg_logprobs": null,
+          "grounding_metadata": null,
+          "index": 0,
+          "logprobs_result": null,
+          "safety_ratings": null,
+          "url_context_metadata": null
+        }
+      ],
+      "create_time": null,
+      "model_version": "gemini-2.5-flash",
+      "prompt_feedback": null,
+      "response_id": "5-53aaeQGMnrz7IPtcXDwA4",
+      "usage_metadata": {
+        "cache_tokens_details": [
+          {
+            "modality": "AUDIO",
+            "token_count": 77
+          },
+          {
+            "modality": "TEXT",
+            "token_count": 1746
+          },
+          {
+            "modality": "IMAGE",
+            "token_count": 199
+          }
+        ],
+        "cached_content_token_count": 2022,
+        "candidates_token_count": 118,
+        "candidates_tokens_details": null,
+        "prompt_token_count": 2620,
+        "prompt_tokens_details": [
+          {
+            "modality": "TEXT",
+            "token_count": 2262
+          },
+          {
+            "modality": "IMAGE",
+            "token_count": 258
+          },
+          {
+            "modality": "AUDIO",
+            "token_count": 100
+          }
+        ],
+        "thoughts_token_count": 427,
+        "tool_use_prompt_token_count": null,
+        "tool_use_prompt_tokens_details": null,
+        "total_token_count": 3165,
+        "traffic_type": null
+      },
+      "automatic_function_calling_history": [],
+      "parsed": null
+    }
+  }
+}

@@ -1,0 +1,135 @@
+{
+  "provider": "openai-audio",
+  "model": "gpt-4o-audio-preview",
+  "modality": "audio-only",
+  "first_request": {
+    "provider": "openai",
+    "model": "gpt-4o-audio-preview",
+    "usage": {
+      "completion_tokens": 99,
+      "prompt_tokens": 2005,
+      "total_tokens": 2104,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": 0,
+        "audio_tokens": 0,
+        "reasoning_tokens": 0,
+        "rejected_prediction_tokens": 0,
+        "text_tokens": 99
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": 31,
+        "cached_tokens": 0,
+        "text_tokens": 1974,
+        "image_tokens": 0
+      }
+    },
+    "response_content": "1. The audio recording features a distinct trumpeting sound.\n2. According to the species identification manual, elephants are known for their trumpeting vocalizations, especially in situations of alar",
+    "raw_response": {
+      "id": "chatcmpl-D2PKs8so6a8qk1aQGS2UYQLEKBNH1",
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "logprobs": null,
+          "message": {
+            "content": "1. The audio recording features a distinct trumpeting sound.\n2. According to the species identification manual, elephants are known for their trumpeting vocalizations, especially in situations of alarm or excitement.\n3. Other animals listed in the manual, such as big cats, bears, primates, birds, and reptiles, do not produce a trumpeting sound.\n4. Therefore, the animal in the recording is most likely an elephant.\n\nANSWER:\n{\n  \"animal\": \"Elephant\"\n}\n---",
+            "refusal": null,
+            "role": "assistant",
+            "annotations": [],
+            "audio": null,
+            "function_call": null,
+            "tool_calls": null
+          }
+        }
+      ],
+      "created": 1769466418,
+      "model": "gpt-4o-audio-preview-2025-06-03",
+      "object": "chat.completion",
+      "service_tier": "default",
+      "system_fingerprint": "fp_9711714198",
+      "usage": {
+        "completion_tokens": 99,
+        "prompt_tokens": 2005,
+        "total_tokens": 2104,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": 0,
+          "audio_tokens": 0,
+          "reasoning_tokens": 0,
+          "rejected_prediction_tokens": 0,
+          "text_tokens": 99
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": 31,
+          "cached_tokens": 0,
+          "text_tokens": 1974,
+          "image_tokens": 0
+        }
+      }
+    }
+  },
+  "second_request": {
+    "provider": "openai",
+    "model": "gpt-4o-audio-preview",
+    "usage": {
+      "completion_tokens": 99,
+      "prompt_tokens": 2005,
+      "total_tokens": 2104,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": 0,
+        "audio_tokens": 0,
+        "reasoning_tokens": 0,
+        "rejected_prediction_tokens": 0,
+        "text_tokens": 99
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": 31,
+        "cached_tokens": 0,
+        "text_tokens": 1974,
+        "image_tokens": 0
+      }
+    },
+    "response_content": "1. The audio recording features a distinct trumpeting sound.\n2. According to the species identification manual, elephants are known for their trumpeting vocalizations, especially in situations of alar",
+    "raw_response": {
+      "id": "chatcmpl-D2PLEfPTw4vNonsqWowPKPf9q7fQy",
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "logprobs": null,
+          "message": {
+            "content": "1. The audio recording features a distinct trumpeting sound.\n2. According to the species identification manual, elephants are known for their trumpeting vocalizations, especially in situations of alarm or excitement.\n3. Other animals listed in the manual, such as big cats, bears, primates, birds, and reptiles, do not produce a trumpeting sound.\n4. Therefore, the animal in the recording is most likely an elephant.\n\nANSWER:\n{\n  \"animal\": \"Elephant\"\n}\n---",
+            "refusal": null,
+            "role": "assistant",
+            "annotations": [],
+            "audio": null,
+            "function_call": null,
+            "tool_calls": null
+          }
+        }
+      ],
+      "created": 1769466440,
+      "model": "gpt-4o-audio-preview-2025-06-03",
+      "object": "chat.completion",
+      "service_tier": "default",
+      "system_fingerprint": "fp_9711714198",
+      "usage": {
+        "completion_tokens": 99,
+        "prompt_tokens": 2005,
+        "total_tokens": 2104,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": 0,
+          "audio_tokens": 0,
+          "reasoning_tokens": 0,
+          "rejected_prediction_tokens": 0,
+          "text_tokens": 99
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": 31,
+          "cached_tokens": 0,
+          "text_tokens": 1974,
+          "image_tokens": 0
+        }
+      }
+    }
+  }
+}

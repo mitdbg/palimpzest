@@ -1,0 +1,143 @@
+{
+  "provider": "gemini",
+  "model": "gemini/gemini-2.5-flash",
+  "modality": "audio-only",
+  "first_request": {
+    "provider": "gemini",
+    "model": "gemini/gemini-2.5-flash",
+    "usage": {
+      "completion_tokens": 1051,
+      "prompt_tokens": 2139,
+      "total_tokens": 3190,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 926,
+        "rejected_prediction_tokens": null,
+        "text_tokens": 125,
+        "image_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": 100,
+        "cached_tokens": null,
+        "text_tokens": 2039,
+        "image_tokens": null
+      }
+    },
+    "response_content": "The audio recording contains a distinct roaring sound. According to the \"WILDLIFE CONSERVATION & RESEARCH CENTER: SPECIES IDENTIFICATION MANUAL (v2025.1)\", under Section 2.2 BIG CATS (Family Felidae),",
+    "raw_response": {
+      "id": "Ret3aaz6OZ_Y_uMP44K1iAY",
+      "created": 1769466687,
+      "model": "gemini-2.5-flash",
+      "object": "chat.completion",
+      "system_fingerprint": null,
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "message": {
+            "content": "The audio recording contains a distinct roaring sound. According to the \"WILDLIFE CONSERVATION & RESEARCH CENTER: SPECIES IDENTIFICATION MANUAL (v2025.1)\", under Section 2.2 BIG CATS (Family Felidae), it states that \"Lions, Tigers, and Leopards\" produce roaring vocalizations. While elephants and bears are also listed as roaring, the specific quality of the roar in the audio is characteristic of a big cat. Among the big cats that roar, the sound is most commonly associated with a lion.\n\n{\n  \"animal\": \"Lion\"\n}\n---",
+            "role": "assistant",
+            "tool_calls": null,
+            "function_call": null,
+            "images": [],
+            "thinking_blocks": [],
+            "provider_specific_fields": null
+          }
+        }
+      ],
+      "usage": {
+        "completion_tokens": 1051,
+        "prompt_tokens": 2139,
+        "total_tokens": 3190,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": null,
+          "audio_tokens": null,
+          "reasoning_tokens": 926,
+          "rejected_prediction_tokens": null,
+          "text_tokens": 125,
+          "image_tokens": null
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": 100,
+          "cached_tokens": null,
+          "text_tokens": 2039,
+          "image_tokens": null
+        }
+      },
+      "vertex_ai_grounding_metadata": [],
+      "vertex_ai_url_context_metadata": [],
+      "vertex_ai_safety_results": [],
+      "vertex_ai_citation_metadata": []
+    }
+  },
+  "second_request": {
+    "provider": "gemini",
+    "model": "gemini/gemini-2.5-flash",
+    "usage": {
+      "completion_tokens": 1051,
+      "prompt_tokens": 2139,
+      "total_tokens": 3190,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 926,
+        "rejected_prediction_tokens": null,
+        "text_tokens": 125,
+        "image_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": 100,
+        "cached_tokens": 2016,
+        "text_tokens": 2039,
+        "image_tokens": null
+      }
+    },
+    "response_content": "The audio recording contains a distinct roaring sound. According to the \"WILDLIFE CONSERVATION & RESEARCH CENTER: SPECIES IDENTIFICATION MANUAL (v2025.1)\", under Section 2.2 BIG CATS (Family Felidae),",
+    "raw_response": {
+      "id": "YOt3afXhCoSL-sAPmM79gAI",
+      "created": 1769466714,
+      "model": "gemini-2.5-flash",
+      "object": "chat.completion",
+      "system_fingerprint": null,
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "message": {
+            "content": "The audio recording contains a distinct roaring sound. According to the \"WILDLIFE CONSERVATION & RESEARCH CENTER: SPECIES IDENTIFICATION MANUAL (v2025.1)\", under Section 2.2 BIG CATS (Family Felidae), it states that \"Lions, Tigers, and Leopards\" produce roaring vocalizations. While elephants and bears are also listed as roaring, the specific quality of the roar in the audio is characteristic of a big cat. Among the big cats that roar, the sound is most commonly associated with a lion.\n\n{\n  \"animal\": \"Lion\"\n}\n---",
+            "role": "assistant",
+            "tool_calls": null,
+            "function_call": null,
+            "images": [],
+            "thinking_blocks": [],
+            "provider_specific_fields": null
+          }
+        }
+      ],
+      "usage": {
+        "completion_tokens": 1051,
+        "prompt_tokens": 2139,
+        "total_tokens": 3190,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": null,
+          "audio_tokens": null,
+          "reasoning_tokens": 926,
+          "rejected_prediction_tokens": null,
+          "text_tokens": 125,
+          "image_tokens": null
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": 100,
+          "cached_tokens": 2016,
+          "text_tokens": 2039,
+          "image_tokens": null
+        }
+      },
+      "vertex_ai_grounding_metadata": [],
+      "vertex_ai_url_context_metadata": [],
+      "vertex_ai_safety_results": [],
+      "vertex_ai_citation_metadata": []
+    }
+  }
+}

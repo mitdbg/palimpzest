@@ -1,0 +1,481 @@
+{
+  "gemini_text-only": {
+    "provider": "gemini",
+    "model": "gemini/gemini-2.5-flash",
+    "modality": "text-only",
+    "first_request": {
+      "provider": "gemini",
+      "model": "gemini/gemini-2.5-flash",
+      "usage": {
+        "completion_tokens": 195,
+        "prompt_tokens": 1922,
+        "total_tokens": 2117,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": null,
+          "audio_tokens": null,
+          "reasoning_tokens": 121,
+          "rejected_prediction_tokens": null,
+          "text_tokens": 74,
+          "image_tokens": null
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cached_tokens": null,
+          "text_tokens": 1922,
+          "image_tokens": null
+        }
+      },
+      "response_content": "The text describes an animal that is an \"elephant\" and makes a \"trumpeting sound\". Section 2.1 of the manual, \"ELEPHANTS (Family Elephantidae)\", lists \"Trumpeting\" as a vocalization for elephants. The",
+      "raw_response": {
+        "id": "swh4abekI_7jz7IP4Nb4qAU",
+        "created": 1769474226,
+        "model": "gemini-2.5-flash",
+        "object": "chat.completion",
+        "system_fingerprint": null,
+        "choices": [
+          {
+            "finish_reason": "stop",
+            "index": 0,
+            "message": {
+              "content": "The text describes an animal that is an \"elephant\" and makes a \"trumpeting sound\". Section 2.1 of the manual, \"ELEPHANTS (Family Elephantidae)\", lists \"Trumpeting\" as a vocalization for elephants. Therefore, the animal is an elephant.\n\nANSWER:\n{\n  \"animal\": \"elephant\"\n}\n---",
+              "role": "assistant",
+              "tool_calls": null,
+              "function_call": null,
+              "images": [],
+              "thinking_blocks": [],
+              "provider_specific_fields": null
+            }
+          }
+        ],
+        "usage": {
+          "completion_tokens": 195,
+          "prompt_tokens": 1922,
+          "total_tokens": 2117,
+          "completion_tokens_details": {
+            "accepted_prediction_tokens": null,
+            "audio_tokens": null,
+            "reasoning_tokens": 121,
+            "rejected_prediction_tokens": null,
+            "text_tokens": 74,
+            "image_tokens": null
+          },
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cached_tokens": null,
+            "text_tokens": 1922,
+            "image_tokens": null
+          }
+        },
+        "vertex_ai_grounding_metadata": [],
+        "vertex_ai_url_context_metadata": [],
+        "vertex_ai_safety_results": [],
+        "vertex_ai_citation_metadata": []
+      }
+    },
+    "second_request": {
+      "provider": "gemini",
+      "model": "gemini/gemini-2.5-flash",
+      "usage": {
+        "completion_tokens": 195,
+        "prompt_tokens": 1922,
+        "total_tokens": 2117,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": null,
+          "audio_tokens": null,
+          "reasoning_tokens": 121,
+          "rejected_prediction_tokens": null,
+          "text_tokens": 74,
+          "image_tokens": null
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cached_tokens": 1009,
+          "text_tokens": 913,
+          "image_tokens": null
+        }
+      },
+      "response_content": "The text describes an animal that is an \"elephant\" and makes a \"trumpeting sound\". Section 2.1 of the manual, \"ELEPHANTS (Family Elephantidae)\", lists \"Trumpeting\" as a vocalization for elephants. The",
+      "raw_response": {
+        "id": "yQh4aYHgApqHz7IP2772oQw",
+        "created": 1769474247,
+        "model": "gemini-2.5-flash",
+        "object": "chat.completion",
+        "system_fingerprint": null,
+        "choices": [
+          {
+            "finish_reason": "stop",
+            "index": 0,
+            "message": {
+              "content": "The text describes an animal that is an \"elephant\" and makes a \"trumpeting sound\". Section 2.1 of the manual, \"ELEPHANTS (Family Elephantidae)\", lists \"Trumpeting\" as a vocalization for elephants. Therefore, the animal is an elephant.\n\nANSWER:\n{\n  \"animal\": \"elephant\"\n}\n---",
+              "role": "assistant",
+              "tool_calls": null,
+              "function_call": null,
+              "images": [],
+              "thinking_blocks": [],
+              "provider_specific_fields": null
+            }
+          }
+        ],
+        "usage": {
+          "completion_tokens": 195,
+          "prompt_tokens": 1922,
+          "total_tokens": 2117,
+          "completion_tokens_details": {
+            "accepted_prediction_tokens": null,
+            "audio_tokens": null,
+            "reasoning_tokens": 121,
+            "rejected_prediction_tokens": null,
+            "text_tokens": 74,
+            "image_tokens": null
+          },
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cached_tokens": 1009,
+            "text_tokens": 913,
+            "image_tokens": null
+          }
+        },
+        "vertex_ai_grounding_metadata": [],
+        "vertex_ai_url_context_metadata": [],
+        "vertex_ai_safety_results": [],
+        "vertex_ai_citation_metadata": []
+      }
+    }
+  },
+  "gemini_text-image": {
+    "provider": "gemini",
+    "model": "gemini/gemini-2.5-flash",
+    "modality": "text-image",
+    "first_request": {
+      "provider": "gemini",
+      "model": "gemini/gemini-2.5-flash",
+      "usage": {
+        "completion_tokens": 770,
+        "prompt_tokens": 2354,
+        "total_tokens": 3124,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": null,
+          "audio_tokens": null,
+          "reasoning_tokens": 573,
+          "rejected_prediction_tokens": null,
+          "text_tokens": 197,
+          "image_tokens": null
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cached_tokens": null,
+          "text_tokens": 2096,
+          "image_tokens": null
+        }
+      },
+      "response_content": "The input text describes an elephant that makes a trumpeting sound and has big ears. The image clearly shows an elephant. According to the \"WILDLIFE CONSERVATION & RESEARCH CENTER: SPECIES IDENTIFICAT",
+      "litellm_response": {
+        "id": "3w14acjRA7vSz7IPkuOugA0",
+        "created": 1769475546,
+        "model": "gemini-2.5-flash",
+        "object": "chat.completion",
+        "system_fingerprint": null,
+        "choices": [
+          {
+            "finish_reason": "stop",
+            "index": 0,
+            "message": {
+              "content": "The input text describes an elephant that makes a trumpeting sound and has big ears. The image clearly shows an elephant. According to the \"WILDLIFE CONSERVATION & RESEARCH CENTER: SPECIES IDENTIFICATION MANUAL (v2025.1)\", Section 2.1 Elephants, the \"African Savanna Elephant\" is characterized by \"Larger ears (shaped like Africa), concave back, two fingers on trunk tip.\" The elephant in the image has very large ears that are distinctly shaped like the continent of Africa. This characteristic strongly identifies it as an African Savanna Elephant, differentiating it from African Forest Elephants (smaller, oval-shaped ears) and Asian Elephants (smaller ears, convex back). The height of 304.5 cm (approximately 10 feet) is consistent with a large elephant species.\n\nThe final answer is in the form of a JSON object.\n{\n  \"animal\": \"African Savanna Elephant\"\n}",
+              "role": "assistant",
+              "tool_calls": null,
+              "function_call": null,
+              "images": [],
+              "thinking_blocks": [],
+              "provider_specific_fields": null
+            }
+          }
+        ],
+        "usage": {
+          "completion_tokens": 770,
+          "prompt_tokens": 2354,
+          "total_tokens": 3124,
+          "completion_tokens_details": {
+            "accepted_prediction_tokens": null,
+            "audio_tokens": null,
+            "reasoning_tokens": 573,
+            "rejected_prediction_tokens": null,
+            "text_tokens": 197,
+            "image_tokens": null
+          },
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cached_tokens": null,
+            "text_tokens": 2096,
+            "image_tokens": null
+          }
+        },
+        "vertex_ai_grounding_metadata": [],
+        "vertex_ai_url_context_metadata": [],
+        "vertex_ai_safety_results": [],
+        "vertex_ai_citation_metadata": []
+      },
+      "raw_provider_response": null
+    },
+    "second_request": {
+      "provider": "gemini",
+      "model": "gemini/gemini-2.5-flash",
+      "usage": {
+        "completion_tokens": 770,
+        "prompt_tokens": 2354,
+        "total_tokens": 3124,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": null,
+          "audio_tokens": null,
+          "reasoning_tokens": 573,
+          "rejected_prediction_tokens": null,
+          "text_tokens": 197,
+          "image_tokens": null
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cached_tokens": 2023,
+          "text_tokens": 73,
+          "image_tokens": null
+        }
+      },
+      "response_content": "The input text describes an elephant that makes a trumpeting sound and has big ears. The image clearly shows an elephant. According to the \"WILDLIFE CONSERVATION & RESEARCH CENTER: SPECIES IDENTIFICAT",
+      "litellm_response": {
+        "id": "9w14afkY4OPPsg_F4o2ACA",
+        "created": 1769475571,
+        "model": "gemini-2.5-flash",
+        "object": "chat.completion",
+        "system_fingerprint": null,
+        "choices": [
+          {
+            "finish_reason": "stop",
+            "index": 0,
+            "message": {
+              "content": "The input text describes an elephant that makes a trumpeting sound and has big ears. The image clearly shows an elephant. According to the \"WILDLIFE CONSERVATION & RESEARCH CENTER: SPECIES IDENTIFICATION MANUAL (v2025.1)\", Section 2.1 Elephants, the \"African Savanna Elephant\" is characterized by \"Larger ears (shaped like Africa), concave back, two fingers on trunk tip.\" The elephant in the image has very large ears that are distinctly shaped like the continent of Africa. This characteristic strongly identifies it as an African Savanna Elephant, differentiating it from African Forest Elephants (smaller, oval-shaped ears) and Asian Elephants (smaller ears, convex back). The height of 304.5 cm (approximately 10 feet) is consistent with a large elephant species.\n\nThe final answer is in the form of a JSON object.\n{\n  \"animal\": \"African Savanna Elephant\"\n}",
+              "role": "assistant",
+              "tool_calls": null,
+              "function_call": null,
+              "images": [],
+              "thinking_blocks": [],
+              "provider_specific_fields": null
+            }
+          }
+        ],
+        "usage": {
+          "completion_tokens": 770,
+          "prompt_tokens": 2354,
+          "total_tokens": 3124,
+          "completion_tokens_details": {
+            "accepted_prediction_tokens": null,
+            "audio_tokens": null,
+            "reasoning_tokens": 573,
+            "rejected_prediction_tokens": null,
+            "text_tokens": 197,
+            "image_tokens": null
+          },
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cached_tokens": 2023,
+            "text_tokens": 73,
+            "image_tokens": null
+          }
+        },
+        "vertex_ai_grounding_metadata": [],
+        "vertex_ai_url_context_metadata": [],
+        "vertex_ai_safety_results": [],
+        "vertex_ai_citation_metadata": []
+      },
+      "raw_provider_response": null
+    }
+  },
+  "gemini_text-audio": {
+    "provider": "gemini",
+    "model": "gemini/gemini-2.5-flash",
+    "modality": "text-audio",
+    "first_request": {
+      "provider": "gemini",
+      "model": "gemini/gemini-2.5-flash",
+      "usage": {
+        "completion_tokens": 247,
+        "prompt_tokens": 2193,
+        "total_tokens": 2440,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": null,
+          "audio_tokens": null,
+          "reasoning_tokens": 165,
+          "rejected_prediction_tokens": null,
+          "text_tokens": 82,
+          "image_tokens": null
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": 100,
+          "cached_tokens": null,
+          "text_tokens": 2093,
+          "image_tokens": null
+        }
+      },
+      "usage_raw": null,
+      "response_content": "The text explicitly states \"An elephant is a large gray animal with a trunk and big ears. It makes a trumpeting sound.\" The audio recording provided also contains a trumpeting sound, which is listed a",
+      "raw_response": {
+        "id": "bTx4afW0Gc7Oz7IPs9abuAc",
+        "created": 1769487466,
+        "model": "gemini-2.5-flash",
+        "object": "chat.completion",
+        "system_fingerprint": null,
+        "choices": [
+          {
+            "finish_reason": "stop",
+            "index": 0,
+            "message": {
+              "content": "The text explicitly states \"An elephant is a large gray animal with a trunk and big ears. It makes a trumpeting sound.\" The audio recording provided also contains a trumpeting sound, which is listed as a vocalization for elephants in Section 2.1 of the manual. Based on this information, the animal is an elephant.\n\nANSWER:\n{\n  \"animal\": \"Elephant\"\n}",
+              "role": "assistant",
+              "tool_calls": null,
+              "function_call": null,
+              "images": [],
+              "thinking_blocks": [],
+              "provider_specific_fields": null
+            }
+          }
+        ],
+        "usage": {
+          "completion_tokens": 247,
+          "prompt_tokens": 2193,
+          "total_tokens": 2440,
+          "completion_tokens_details": {
+            "accepted_prediction_tokens": null,
+            "audio_tokens": null,
+            "reasoning_tokens": 165,
+            "rejected_prediction_tokens": null,
+            "text_tokens": 82,
+            "image_tokens": null
+          },
+          "prompt_tokens_details": {
+            "audio_tokens": 100,
+            "cached_tokens": null,
+            "text_tokens": 2093,
+            "image_tokens": null
+          }
+        },
+        "vertex_ai_grounding_metadata": [],
+        "vertex_ai_url_context_metadata": [],
+        "vertex_ai_safety_results": [],
+        "vertex_ai_citation_metadata": []
+      },
+      "hidden_params": {
+        "custom_llm_provider": "gemini",
+        "region_name": null,
+        "vertex_ai_grounding_metadata": [],
+        "vertex_ai_url_context_metadata": [],
+        "vertex_ai_safety_results": [],
+        "vertex_ai_citation_metadata": [],
+        "optional_params": {
+          "temperature": 0.0
+        },
+        "litellm_call_id": "7008377a-e175-487a-aca0-ea1e26686286",
+        "api_base": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        "model_id": null,
+        "response_cost": 0.0013454,
+        "additional_headers": {},
+        "litellm_model_name": "gemini/gemini-2.5-flash",
+        "_response_ms": 2821.6549999999997
+      },
+      "callback_data": {
+        "raw_provider_response": null,
+        "raw_provider_usage": null,
+        "detected_provider": null
+      }
+    },
+    "second_request": {
+      "provider": "gemini",
+      "model": "gemini/gemini-2.5-flash",
+      "usage": {
+        "completion_tokens": 279,
+        "prompt_tokens": 2193,
+        "total_tokens": 2472,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": null,
+          "audio_tokens": null,
+          "reasoning_tokens": 182,
+          "rejected_prediction_tokens": null,
+          "text_tokens": 97,
+          "image_tokens": null
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": 100,
+          "cached_tokens": null,
+          "text_tokens": 2093,
+          "image_tokens": null
+        }
+      },
+      "usage_raw": null,
+      "response_content": "The text describes \"An elephant is a large gray animal with a trunk and big ears. It makes a trumpeting sound.\" The audio recording contains a clear trumpeting sound. According to Section 2.1 of the m",
+      "raw_response": {
+        "id": "hDx4aeWII92Cz7IPnYrXkAs",
+        "created": 1769487489,
+        "model": "gemini-2.5-flash",
+        "object": "chat.completion",
+        "system_fingerprint": null,
+        "choices": [
+          {
+            "finish_reason": "stop",
+            "index": 0,
+            "message": {
+              "content": "The text describes \"An elephant is a large gray animal with a trunk and big ears. It makes a trumpeting sound.\" The audio recording contains a clear trumpeting sound. According to Section 2.1 of the manual, \"ELEPHANTS (Family Elephantidae)\" are known for \"Trumpeting (alarm/excitement)\" vocalizations. Both pieces of evidence consistently point to an elephant.\n\nANSWER:\n{\n  \"animal\": \"Elephant\"\n}\n---",
+              "role": "assistant",
+              "tool_calls": null,
+              "function_call": null,
+              "images": [],
+              "thinking_blocks": [],
+              "provider_specific_fields": null
+            }
+          }
+        ],
+        "usage": {
+          "completion_tokens": 279,
+          "prompt_tokens": 2193,
+          "total_tokens": 2472,
+          "completion_tokens_details": {
+            "accepted_prediction_tokens": null,
+            "audio_tokens": null,
+            "reasoning_tokens": 182,
+            "rejected_prediction_tokens": null,
+            "text_tokens": 97,
+            "image_tokens": null
+          },
+          "prompt_tokens_details": {
+            "audio_tokens": 100,
+            "cached_tokens": null,
+            "text_tokens": 2093,
+            "image_tokens": null
+          }
+        },
+        "vertex_ai_grounding_metadata": [],
+        "vertex_ai_url_context_metadata": [],
+        "vertex_ai_safety_results": [],
+        "vertex_ai_citation_metadata": []
+      },
+      "hidden_params": {
+        "custom_llm_provider": "gemini",
+        "region_name": null,
+        "vertex_ai_grounding_metadata": [],
+        "vertex_ai_url_context_metadata": [],
+        "vertex_ai_safety_results": [],
+        "vertex_ai_citation_metadata": [],
+        "optional_params": {
+          "temperature": 0.0
+        },
+        "litellm_call_id": "c05b9ec0-2aab-44be-8110-56c034e97bb7",
+        "api_base": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        "model_id": null,
+        "response_cost": 0.0014253999999999998,
+        "additional_headers": {},
+        "litellm_model_name": "gemini/gemini-2.5-flash",
+        "_response_ms": 3038.581
+      },
+      "callback_data": {
+        "raw_provider_response": null,
+        "raw_provider_usage": null,
+        "detected_provider": null
+      }
+    }
+  }
+}

@@ -312,6 +312,21 @@ class Generator(Generic[ContextType, InputType]):
         messages = self.prompt_factory.create_messages(candidate, fields, right_candidate, **kwargs)
         is_audio_op = any(msg.get("type") == "input_audio" for msg in messages)
 
+        # inject cache isolation ID if provided (for testing cache behavior per-modality)
+        # This must happen BEFORE update_messages_for_caching so the ID becomes part of cached content
+        if "cache_isolation_id" in kwargs:
+            session_id = kwargs["cache_isolation_id"]
+            is_anthropic = self.model.is_provider_anthropic()
+            for msg in messages:
+                role = msg.get("role")
+                content = msg.get("content")
+                # Prepend to system message for all providers
+                if role == "system" and isinstance(content, str):
+                    msg["content"] = f"[{session_id}] " + content
+                # For Anthropic, also prepend to user text messages (since user content is cached separately)
+                elif role == "user" and is_anthropic and msg.get("type") == "text" and isinstance(content, str):
+                    msg["content"] = f"[{session_id}] " + content
+
         # generate the text completion
         start_time = time.time()
         completion = None
@@ -325,7 +340,7 @@ class Generator(Generic[ContextType, InputType]):
                 completion_kwargs = {"reasoning_effort": self.reasoning_effort, **completion_kwargs}
             if self.model.is_vllm_model():
                 completion_kwargs = {"api_base": self.api_base, "api_key": os.environ.get("VLLM_API_KEY", "fake-api-key"), **completion_kwargs}
-            
+
             cache_kwargs = self.cache_manager.get_cache_kwargs()
             messages = self.cache_manager.update_messages_for_caching(messages)
             

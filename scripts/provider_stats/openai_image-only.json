@@ -1,0 +1,123 @@
+{
+  "provider": "openai",
+  "model": "gpt-4o-2024-08-06",
+  "modality": "image-only",
+  "first_request": {
+    "provider": "openai",
+    "model": "gpt-4o-2024-08-06",
+    "usage": {
+      "completion_tokens": 76,
+      "prompt_tokens": 2220,
+      "total_tokens": 2296,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": 0,
+        "audio_tokens": 0,
+        "reasoning_tokens": 0,
+        "rejected_prediction_tokens": 0
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": 0,
+        "cached_tokens": 0
+      }
+    },
+    "response_content": "The image shows an elephant with large ears and a concave back, which are characteristics of the African Savanna Elephant. The estimated height of 304.5 cm (approximately 10 feet) is consistent with t",
+    "raw_response": {
+      "id": "chatcmpl-D2PJu6kYVW6zdK07spLuSZB3I6kjA",
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "logprobs": null,
+          "message": {
+            "content": "The image shows an elephant with large ears and a concave back, which are characteristics of the African Savanna Elephant. The estimated height of 304.5 cm (approximately 10 feet) is consistent with the size of an African Savanna Elephant, which can be quite large. \n\nANSWER:\n```json\n{\n  \"animal\": \"African Savanna Elephant\"\n}\n```",
+            "refusal": null,
+            "role": "assistant",
+            "annotations": [],
+            "audio": null,
+            "function_call": null,
+            "tool_calls": null
+          }
+        }
+      ],
+      "created": 1769466358,
+      "model": "gpt-4o-2024-08-06",
+      "object": "chat.completion",
+      "service_tier": "default",
+      "system_fingerprint": "fp_deacdd5f6f",
+      "usage": {
+        "completion_tokens": 76,
+        "prompt_tokens": 2220,
+        "total_tokens": 2296,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": 0,
+          "audio_tokens": 0,
+          "reasoning_tokens": 0,
+          "rejected_prediction_tokens": 0
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cached_tokens": 0
+        }
+      }
+    }
+  },
+  "second_request": {
+    "provider": "openai",
+    "model": "gpt-4o-2024-08-06",
+    "usage": {
+      "completion_tokens": 78,
+      "prompt_tokens": 2220,
+      "total_tokens": 2298,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": 0,
+        "audio_tokens": 0,
+        "reasoning_tokens": 0,
+        "rejected_prediction_tokens": 0
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": 0,
+        "cached_tokens": 1792
+      }
+    },
+    "response_content": "The image shows an elephant with large ears and a concave back, which are characteristics of the African Savanna Elephant. The estimated height of 304.5 cm (approximately 10 feet) is consistent with t",
+    "raw_response": {
+      "id": "chatcmpl-D2PKIyiF5YNrtMHTOpn8vCFNn2cmX",
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "logprobs": null,
+          "message": {
+            "content": "The image shows an elephant with large ears and a concave back, which are characteristics of the African Savanna Elephant. The estimated height of 304.5 cm (approximately 10 feet) is consistent with the size of an African Savanna Elephant, which is larger than the other elephant species.\n\nANSWER:\n```json\n{\n  \"animal\": \"African Savanna Elephant\"\n}\n```",
+            "refusal": null,
+            "role": "assistant",
+            "annotations": [],
+            "audio": null,
+            "function_call": null,
+            "tool_calls": null
+          }
+        }
+      ],
+      "created": 1769466382,
+      "model": "gpt-4o-2024-08-06",
+      "object": "chat.completion",
+      "service_tier": "default",
+      "system_fingerprint": "fp_deacdd5f6f",
+      "usage": {
+        "completion_tokens": 78,
+        "prompt_tokens": 2220,
+        "total_tokens": 2298,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": 0,
+          "audio_tokens": 0,
+          "reasoning_tokens": 0,
+          "rejected_prediction_tokens": 0
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cached_tokens": 1792
+        }
+      }
+    }
+  }
+}

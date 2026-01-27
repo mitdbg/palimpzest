@@ -1,0 +1,143 @@
+{
+  "provider": "gemini",
+  "model": "gemini/gemini-2.5-flash",
+  "modality": "text-image-audio",
+  "first_request": {
+    "provider": "gemini",
+    "model": "gemini/gemini-2.5-flash",
+    "usage": {
+      "completion_tokens": 552,
+      "prompt_tokens": 2619,
+      "total_tokens": 3171,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 448,
+        "rejected_prediction_tokens": null,
+        "text_tokens": 104,
+        "image_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": 100,
+        "cached_tokens": null,
+        "text_tokens": 2261,
+        "image_tokens": null
+      }
+    },
+    "response_content": "The text describes an elephant that makes a trumpeting sound. The image shows an elephant with very large ears, which are characteristic of African elephants, specifically the African Savanna Elephant",
+    "raw_response": {
+      "id": "vut3ab3CCvrVz7IPvYjIyAs",
+      "created": 1769466807,
+      "model": "gemini-2.5-flash",
+      "object": "chat.completion",
+      "system_fingerprint": null,
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "message": {
+            "content": "The text describes an elephant that makes a trumpeting sound. The image shows an elephant with very large ears, which are characteristic of African elephants, specifically the African Savanna Elephant, whose ears are described as \"shaped like Africa\" in the manual. The audio recording clearly contains a trumpeting sound, which is a known vocalization for elephants according to the manual. Combining these observations, the animal is an African Savanna Elephant.\n\nANSWER:\n{\n  \"animal\": \"African Savanna Elephant\"\n}",
+            "role": "assistant",
+            "tool_calls": null,
+            "function_call": null,
+            "images": [],
+            "thinking_blocks": [],
+            "provider_specific_fields": null
+          }
+        }
+      ],
+      "usage": {
+        "completion_tokens": 552,
+        "prompt_tokens": 2619,
+        "total_tokens": 3171,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": null,
+          "audio_tokens": null,
+          "reasoning_tokens": 448,
+          "rejected_prediction_tokens": null,
+          "text_tokens": 104,
+          "image_tokens": null
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": 100,
+          "cached_tokens": null,
+          "text_tokens": 2261,
+          "image_tokens": null
+        }
+      },
+      "vertex_ai_grounding_metadata": [],
+      "vertex_ai_url_context_metadata": [],
+      "vertex_ai_safety_results": [],
+      "vertex_ai_citation_metadata": []
+    }
+  },
+  "second_request": {
+    "provider": "gemini",
+    "model": "gemini/gemini-2.5-flash",
+    "usage": {
+      "completion_tokens": 552,
+      "prompt_tokens": 2619,
+      "total_tokens": 3171,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 448,
+        "rejected_prediction_tokens": null,
+        "text_tokens": 104,
+        "image_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": 100,
+        "cached_tokens": 2022,
+        "text_tokens": 2261,
+        "image_tokens": null
+      }
+    },
+    "response_content": "The text describes an elephant that makes a trumpeting sound. The image shows an elephant with very large ears, which are characteristic of African elephants, specifically the African Savanna Elephant",
+    "raw_response": {
+      "id": "2ut3aYeEMZuhz7IP1Pu0wQs",
+      "created": 1769466834,
+      "model": "gemini-2.5-flash",
+      "object": "chat.completion",
+      "system_fingerprint": null,
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "message": {
+            "content": "The text describes an elephant that makes a trumpeting sound. The image shows an elephant with very large ears, which are characteristic of African elephants, specifically the African Savanna Elephant, whose ears are described as \"shaped like Africa\" in the manual. The audio recording clearly contains a trumpeting sound, which is a known vocalization for elephants according to the manual. Combining these observations, the animal is an African Savanna Elephant.\n\nANSWER:\n{\n  \"animal\": \"African Savanna Elephant\"\n}",
+            "role": "assistant",
+            "tool_calls": null,
+            "function_call": null,
+            "images": [],
+            "thinking_blocks": [],
+            "provider_specific_fields": null
+          }
+        }
+      ],
+      "usage": {
+        "completion_tokens": 552,
+        "prompt_tokens": 2619,
+        "total_tokens": 3171,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": null,
+          "audio_tokens": null,
+          "reasoning_tokens": 448,
+          "rejected_prediction_tokens": null,
+          "text_tokens": 104,
+          "image_tokens": null
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": 100,
+          "cached_tokens": 2022,
+          "text_tokens": 2261,
+          "image_tokens": null
+        }
+      },
+      "vertex_ai_grounding_metadata": [],
+      "vertex_ai_url_context_metadata": [],
+      "vertex_ai_safety_results": [],
+      "vertex_ai_citation_metadata": []
+    }
+  }
+}

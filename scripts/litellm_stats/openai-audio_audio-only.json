@@ -1,0 +1,141 @@
+{
+  "provider": "openai-audio",
+  "model": "openai/gpt-4o-audio-preview",
+  "modality": "audio-only",
+  "first_request": {
+    "provider": "openai-audio",
+    "model": "openai/gpt-4o-audio-preview",
+    "usage": {
+      "completion_tokens": 100,
+      "prompt_tokens": 2005,
+      "total_tokens": 2105,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": 0,
+        "audio_tokens": 0,
+        "reasoning_tokens": 0,
+        "rejected_prediction_tokens": 0,
+        "text_tokens": 100,
+        "image_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": 31,
+        "cached_tokens": 0,
+        "text_tokens": 1974,
+        "image_tokens": 0
+      }
+    },
+    "response_content": "1. The audio recording features a loud, trumpeting sound.\n2. According to the species identification manual, elephants are known for their trumpeting vocalizations, especially in situations of alarm o",
+    "raw_response": {
+      "id": "chatcmpl-D2Ph0yjPv2gO80i13SYCHWqwdgzXT",
+      "created": 1769467790,
+      "model": "gpt-4o-audio-preview-2025-06-03",
+      "object": "chat.completion",
+      "system_fingerprint": "fp_9711714198",
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "message": {
+            "content": "1. The audio recording features a loud, trumpeting sound.\n2. According to the species identification manual, elephants are known for their trumpeting vocalizations, especially in situations of alarm or excitement.\n3. Other animals listed in the manual, such as big cats, bears, primates, birds, and reptiles, do not produce a trumpeting sound.\n4. Therefore, the most likely animal producing this sound is an elephant.\n\nANSWER:\n{\n  \"animal\": \"Elephant\"\n}\n---",
+            "role": "assistant",
+            "tool_calls": null,
+            "function_call": null,
+            "provider_specific_fields": {
+              "refusal": null
+            },
+            "annotations": []
+          },
+          "provider_specific_fields": {}
+        }
+      ],
+      "usage": {
+        "completion_tokens": 100,
+        "prompt_tokens": 2005,
+        "total_tokens": 2105,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": 0,
+          "audio_tokens": 0,
+          "reasoning_tokens": 0,
+          "rejected_prediction_tokens": 0,
+          "text_tokens": 100,
+          "image_tokens": null
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": 31,
+          "cached_tokens": 0,
+          "text_tokens": 1974,
+          "image_tokens": 0
+        }
+      },
+      "service_tier": "default"
+    }
+  },
+  "second_request": {
+    "provider": "openai-audio",
+    "model": "openai/gpt-4o-audio-preview",
+    "usage": {
+      "completion_tokens": 100,
+      "prompt_tokens": 2005,
+      "total_tokens": 2105,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": 0,
+        "audio_tokens": 0,
+        "reasoning_tokens": 0,
+        "rejected_prediction_tokens": 0,
+        "text_tokens": 100,
+        "image_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": 31,
+        "cached_tokens": 0,
+        "text_tokens": 1974,
+        "image_tokens": 0
+      }
+    },
+    "response_content": "1. The audio recording features a loud, trumpeting sound.\n2. According to the species identification manual, elephants are known for their trumpeting vocalizations, especially in situations of alarm o",
+    "raw_response": {
+      "id": "chatcmpl-D2PhMa7xHCNfwXXr01odSm8zBifVk",
+      "created": 1769467812,
+      "model": "gpt-4o-audio-preview-2025-06-03",
+      "object": "chat.completion",
+      "system_fingerprint": "fp_9711714198",
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "message": {
+            "content": "1. The audio recording features a loud, trumpeting sound.\n2. According to the species identification manual, elephants are known for their trumpeting vocalizations, especially in situations of alarm or excitement.\n3. Other animals listed in the manual, such as big cats, bears, primates, birds, and reptiles, do not produce a trumpeting sound.\n4. Therefore, the most likely animal producing this sound is an elephant.\n\nANSWER:\n{\n  \"animal\": \"Elephant\"\n}\n---",
+            "role": "assistant",
+            "tool_calls": null,
+            "function_call": null,
+            "provider_specific_fields": {
+              "refusal": null
+            },
+            "annotations": []
+          },
+          "provider_specific_fields": {}
+        }
+      ],
+      "usage": {
+        "completion_tokens": 100,
+        "prompt_tokens": 2005,
+        "total_tokens": 2105,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": 0,
+          "audio_tokens": 0,
+          "reasoning_tokens": 0,
+          "rejected_prediction_tokens": 0,
+          "text_tokens": 100,
+          "image_tokens": null
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": 31,
+          "cached_tokens": 0,
+          "text_tokens": 1974,
+          "image_tokens": 0
+        }
+      },
+      "service_tier": "default"
+    }
+  }
+}

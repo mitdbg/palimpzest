@@ -1,0 +1,191 @@
+{
+  "provider": "gemini",
+  "model": "gemini/gemini-2.5-flash",
+  "modality": "text-audio",
+  "first_request": {
+    "provider": "gemini",
+    "model": "gemini/gemini-2.5-flash",
+    "usage": {
+      "completion_tokens": 247,
+      "prompt_tokens": 2193,
+      "total_tokens": 2440,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 165,
+        "rejected_prediction_tokens": null,
+        "text_tokens": 82,
+        "image_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": 100,
+        "cached_tokens": null,
+        "text_tokens": 2093,
+        "image_tokens": null
+      }
+    },
+    "usage_raw": null,
+    "response_content": "The text explicitly states \"An elephant is a large gray animal with a trunk and big ears. It makes a trumpeting sound.\" The audio recording provided also contains a trumpeting sound, which is listed a",
+    "raw_response": {
+      "id": "bTx4afW0Gc7Oz7IPs9abuAc",
+      "created": 1769487466,
+      "model": "gemini-2.5-flash",
+      "object": "chat.completion",
+      "system_fingerprint": null,
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "message": {
+            "content": "The text explicitly states \"An elephant is a large gray animal with a trunk and big ears. It makes a trumpeting sound.\" The audio recording provided also contains a trumpeting sound, which is listed as a vocalization for elephants in Section 2.1 of the manual. Based on this information, the animal is an elephant.\n\nANSWER:\n{\n  \"animal\": \"Elephant\"\n}",
+            "role": "assistant",
+            "tool_calls": null,
+            "function_call": null,
+            "images": [],
+            "thinking_blocks": [],
+            "provider_specific_fields": null
+          }
+        }
+      ],
+      "usage": {
+        "completion_tokens": 247,
+        "prompt_tokens": 2193,
+        "total_tokens": 2440,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": null,
+          "audio_tokens": null,
+          "reasoning_tokens": 165,
+          "rejected_prediction_tokens": null,
+          "text_tokens": 82,
+          "image_tokens": null
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": 100,
+          "cached_tokens": null,
+          "text_tokens": 2093,
+          "image_tokens": null
+        }
+      },
+      "vertex_ai_grounding_metadata": [],
+      "vertex_ai_url_context_metadata": [],
+      "vertex_ai_safety_results": [],
+      "vertex_ai_citation_metadata": []
+    },
+    "hidden_params": {
+      "custom_llm_provider": "gemini",
+      "region_name": null,
+      "vertex_ai_grounding_metadata": [],
+      "vertex_ai_url_context_metadata": [],
+      "vertex_ai_safety_results": [],
+      "vertex_ai_citation_metadata": [],
+      "optional_params": {
+        "temperature": 0.0
+      },
+      "litellm_call_id": "7008377a-e175-487a-aca0-ea1e26686286",
+      "api_base": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+      "model_id": null,
+      "response_cost": 0.0013454,
+      "additional_headers": {},
+      "litellm_model_name": "gemini/gemini-2.5-flash",
+      "_response_ms": 2821.6549999999997
+    },
+    "callback_data": {
+      "raw_provider_response": null,
+      "raw_provider_usage": null,
+      "detected_provider": null
+    }
+  },
+  "second_request": {
+    "provider": "gemini",
+    "model": "gemini/gemini-2.5-flash",
+    "usage": {
+      "completion_tokens": 279,
+      "prompt_tokens": 2193,
+      "total_tokens": 2472,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 182,
+        "rejected_prediction_tokens": null,
+        "text_tokens": 97,
+        "image_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": 100,
+        "cached_tokens": null,
+        "text_tokens": 2093,
+        "image_tokens": null
+      }
+    },
+    "usage_raw": null,
+    "response_content": "The text describes \"An elephant is a large gray animal with a trunk and big ears. It makes a trumpeting sound.\" The audio recording contains a clear trumpeting sound. According to Section 2.1 of the m",
+    "raw_response": {
+      "id": "hDx4aeWII92Cz7IPnYrXkAs",
+      "created": 1769487489,
+      "model": "gemini-2.5-flash",
+      "object": "chat.completion",
+      "system_fingerprint": null,
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "message": {
+            "content": "The text describes \"An elephant is a large gray animal with a trunk and big ears. It makes a trumpeting sound.\" The audio recording contains a clear trumpeting sound. According to Section 2.1 of the manual, \"ELEPHANTS (Family Elephantidae)\" are known for \"Trumpeting (alarm/excitement)\" vocalizations. Both pieces of evidence consistently point to an elephant.\n\nANSWER:\n{\n  \"animal\": \"Elephant\"\n}\n---",
+            "role": "assistant",
+            "tool_calls": null,
+            "function_call": null,
+            "images": [],
+            "thinking_blocks": [],
+            "provider_specific_fields": null
+          }
+        }
+      ],
+      "usage": {
+        "completion_tokens": 279,
+        "prompt_tokens": 2193,
+        "total_tokens": 2472,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": null,
+          "audio_tokens": null,
+          "reasoning_tokens": 182,
+          "rejected_prediction_tokens": null,
+          "text_tokens": 97,
+          "image_tokens": null
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": 100,
+          "cached_tokens": null,
+          "text_tokens": 2093,
+          "image_tokens": null
+        }
+      },
+      "vertex_ai_grounding_metadata": [],
+      "vertex_ai_url_context_metadata": [],
+      "vertex_ai_safety_results": [],
+      "vertex_ai_citation_metadata": []
+    },
+    "hidden_params": {
+      "custom_llm_provider": "gemini",
+      "region_name": null,
+      "vertex_ai_grounding_metadata": [],
+      "vertex_ai_url_context_metadata": [],
+      "vertex_ai_safety_results": [],
+      "vertex_ai_citation_metadata": [],
+      "optional_params": {
+        "temperature": 0.0
+      },
+      "litellm_call_id": "c05b9ec0-2aab-44be-8110-56c034e97bb7",
+      "api_base": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+      "model_id": null,
+      "response_cost": 0.0014253999999999998,
+      "additional_headers": {},
+      "litellm_model_name": "gemini/gemini-2.5-flash",
+      "_response_ms": 3038.581
+    },
+    "callback_data": {
+      "raw_provider_response": null,
+      "raw_provider_usage": null,
+      "detected_provider": null
+    }
+  }
+}

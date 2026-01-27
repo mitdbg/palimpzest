@@ -31,78 +31,97 @@ from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.lib.schemas import AudioFilepath, ImageFilepath, union_schemas
 from palimpzest.query.generators.generators import Generator
 
+def generate_session_id(provider: str, modality: str) -> str:
+    """
+    Generate a unique 12-character session ID for a provider/modality combination.
+    This ensures each modality test has a unique prompt prefix, preventing cross-modality cache hits.
+    The ID is deterministic based on provider+modality so regenerating produces consistent results.
+    """
+    import hashlib
+    hash_input = f"{provider}_{modality}"
+    hash_hex = hashlib.md5(hash_input.encode()).hexdigest()
+    return hash_hex[:12].upper()
+
 STATIC_CONTEXT = """
-PACHYDERM SANCTUARY & RESEARCH CENTER: OPERATIONS MANUAL (v2025.1)
+WILDLIFE CONSERVATION & RESEARCH CENTER: SPECIES IDENTIFICATION MANUAL (v2025.1)
 
 SECTION 1: INTRODUCTION AND MISSION
-The Pachyderm Sanctuary & Research Center (PSRC) is dedicated to the preservation, study, and rehabilitation of elephant species.
-All staff members, researchers, and volunteers must adhere to these protocols to ensure the safety of both the animals and human personnel.
-Our mission combines advanced veterinary science with compassionate care to support endangered populations.
+The Wildlife Conservation & Research Center (WCRC) is dedicated to the preservation, study, and rehabilitation of diverse wildlife species.
+All staff members, researchers, and volunteers must adhere to these protocols for accurate species identification and data collection.
+Our mission combines advanced biological sciences with conservation efforts to protect endangered and threatened populations worldwide.
 
-SECTION 2: SPECIES IDENTIFICATION PROTOCOLS
-2.1 African Savanna Elephant (Loxodonta africana):
-    - Characteristics: Larger ears (shaped like Africa), concave back, two fingers on trunk tip.
-    - Identification: Staff must document tusk shape, ear notch patterns, and tail hair density.
-2.2 African Forest Elephant (Loxodonta cyclotis):
-    - Characteristics: Smaller stature, oval-shaped ears, straighter tusks pointing downward.
-    - Identification: specialized genetic sampling required for distinct lineage verification.
-2.3 Asian Elephant (Elephas maximus):
-    - Characteristics: Smaller ears, convex or level back, one finger on trunk tip, twin domes on head.
-    - Subspecies: Indian, Sri Lankan, Sumatran, and Borneo Pygmy.
+SECTION 2: MAMMAL IDENTIFICATION PROTOCOLS
 
-SECTION 3: NUTRITIONAL REQUIREMENTS AND FEEDING
-3.1 Daily Intake:
-    - Adult males: 200-300 kg of forage per day.
-    - Adult females: 150-200 kg of forage per day.
-    - Water: 100-200 liters per day, depending on ambient temperature.
-3.2 Approved Forage:
-    - Grasses: Timothy, Bermuda, Napier.
-    - Browse: Acacia branches, Bamboo, Ficus leaves.
-    - Supplements: Mineral blocks, specialized pellets (Protocol 3.2.A).
-3.3 Prohibited Items:
-    - High sugar fruits (limited to training rewards).
-    - Fermented grains.
-    - Toxic plants: Oleander, Rhododendron, Lantana.
+2.1 ELEPHANTS (Family Elephantidae):
+    - African Savanna Elephant: Larger ears (shaped like Africa), concave back, two fingers on trunk tip. Weight: 5,000-14,000 lbs.
+    - African Forest Elephant: Smaller stature, oval-shaped ears, straighter tusks pointing downward.
+    - Asian Elephant: Smaller ears, convex back, one finger on trunk tip, twin domes on head. Weight: 4,000-11,000 lbs.
+    - Vocalizations: Trumpeting (alarm/excitement), rumbling (long-distance communication), roaring (distress).
 
-SECTION 4: MEDICAL AND HUSBANDRY PROCEDURES
-4.1 Routine Examinations:
-    - Foot care: Daily inspection of pads and nails. Weekly trimming required.
-    - Skin care: Daily dust baths or mud wallows to prevent sunburn and insect bites.
-    - Musth Management: Adult males in musth must be isolated in reinforced enclosures (Zone C).
-4.2 Emergency Protocols:
-    - Colic: Immediate veterinary notification. Monitor behavior for lethargy or rolling.
-    - Trauma: Isolate injured animal. Prepare mobile X-ray unit.
-    - Anesthesia: Only senior veterinarians may administer etorphine. Reversal agent (diprenorphine) must be on hand.
+2.2 BIG CATS (Family Felidae):
+    - Lion (Panthera leo): Tawny coat, males have distinctive mane. Social, live in prides. Height: 3.5-4 ft at shoulder.
+    - Tiger (Panthera tigris): Orange coat with black stripes, white underbelly. Solitary hunters. Largest cat species.
+    - Leopard (Panthera pardus): Golden-yellow coat with rosette patterns. Excellent climbers, often cache prey in trees.
+    - Cheetah (Acinonyx jubatus): Spotted coat, black "tear marks" from eyes to mouth. Fastest land animal (70 mph).
+    - Vocalizations: Roaring (lions, tigers, leopards), chirping/purring (cheetahs cannot roar).
 
-SECTION 5: SOCIAL STRUCTURE AND ENRICHMENT
-5.1 Herd Dynamics:
-    - Matriarchal groups must not be disrupted. New introductions require a 30-day fence-line integration period.
-    - Bull groups (bachelor herds) require larger ranging areas (Zone B).
-5.2 Cognitive Enrichment:
-    - Puzzle feeders must be rotated daily.
-    - Sensory enrichment (scents, sounds) applied twice weekly.
-    - Social play: Monitoring required during pool sessions.
+2.3 BEARS (Family Ursidae):
+    - Brown Bear (Ursus arctos): Large shoulder hump, dish-shaped face, long claws. Includes grizzly subspecies.
+    - Black Bear (Ursus americanus): Straight facial profile, no shoulder hump, shorter claws. Most common North American bear.
+    - Polar Bear (Ursus maritimus): White fur, longer neck, smaller ears. Marine mammal adapted to Arctic conditions.
+    - Giant Panda (Ailuropoda melanoleuca): Black and white coloring, feeds almost exclusively on bamboo.
+    - Vocalizations: Roaring, growling, huffing, jaw-popping (threat displays).
 
-SECTION 6: RESEARCH DATA COLLECTION
-6.1 Vocalization Analysis:
-    - Infrasound (< 20 Hz) recording devices active 24/7 in Sector 4.
-    - Trumpets, rumbles, and roars must be tagged with behavioral context (e.g., "greeting", "distress").
-6.2 Biometrics:
-    - Shoulder height recorded quarterly.
-    - Body condition scoring (1-5 scale) performed monthly.
-    - Tusk length and circumference measured annually.
+2.4 PRIMATES (Order Primates):
+    - Gorilla: Largest primate, silver-back males, knuckle-walking locomotion. Vocalizations include chest-beating, hooting.
+    - Chimpanzee: Highly intelligent, uses tools, complex social structures. Vocalizations: pant-hoots, screams.
+    - Orangutan: Red-orange fur, arboreal lifestyle, solitary. Long calls can travel over 1 km.
+    - Gibbon: Smaller apes, brachiation locomotion, distinctive whooping songs for territorial marking.
 
-SECTION 7: HUMAN-ANIMAL INTERACTION
-7.1 Protected Contact (PC):
-    - All interactions occur through a protective barrier. No free contact permitted.
-    - Staff must maintain a 2-meter safety zone from the barrier when not actively training.
-7.2 Training:
-    - Positive reinforcement (operant conditioning) only.
-    - Bullhooks (ankus) are strictly prohibited on sanctuary grounds.
-    - Targets and whistles used for medical behaviors (trunk lift, ear presentation).
+SECTION 3: BIRD IDENTIFICATION PROTOCOLS
 
-You are an AI Research Assistant for the PSRC. Your job is to analyze data inputs regarding elephant specimens and determine if they match specific biological criteria or sanctuary records.
-Analyze the input and provide the requested identification details.
+3.1 RAPTORS (Order Accipitriformes/Falconiformes):
+    - Bald Eagle: White head and tail, yellow beak. Wingspan: 6-7.5 ft. Call: high-pitched chattering.
+    - Golden Eagle: Dark brown plumage, golden nape. Powerful hunters of small mammals.
+    - Peregrine Falcon: Blue-gray back, barred underparts. Fastest bird in dive (240+ mph).
+    - Red-tailed Hawk: Brown back, pale underparts, distinctive red tail. Most common North American hawk.
+
+3.2 PARROTS (Order Psittaciformes):
+    - Macaw: Large, colorful, long tail feathers. Powerful curved beaks. Highly social and vocal.
+    - African Grey: Gray plumage, red tail. Exceptional mimicry and cognitive abilities.
+    - Cockatoo: White or pink plumage, distinctive crest. Loud screeching vocalizations.
+
+SECTION 4: REPTILE IDENTIFICATION PROTOCOLS
+
+4.1 CROCODILIANS (Order Crocodilia):
+    - American Alligator: Broad, U-shaped snout, dark coloration. Freshwater habitats.
+    - Nile Crocodile: V-shaped snout, aggressive. Can reach 16-18 ft in length.
+    - Gharial: Extremely narrow snout, fish-eating specialist. Critically endangered.
+
+4.2 LARGE SNAKES (Families Pythonidae/Boidae):
+    - Reticulated Python: Longest snake species (up to 23 ft), complex geometric patterns.
+    - Green Anaconda: Heaviest snake species, olive-green with black spots. Semi-aquatic.
+    - King Cobra: Longest venomous snake (up to 18 ft), distinctive hood when threatened.
+
+SECTION 5: DATA COLLECTION AND ANALYSIS
+
+5.1 Visual Identification:
+    - Document body shape, size, coloration, and distinctive markings.
+    - Note behavioral characteristics and habitat context.
+    - Use standardized photography protocols for pattern matching.
+
+5.2 Audio Identification:
+    - Record vocalizations with frequency analysis equipment.
+    - Tag recordings with behavioral context (territorial, mating, alarm, social).
+    - Cross-reference with vocalization databases for species confirmation.
+
+5.3 Biometric Data:
+    - Record body measurements according to species-specific protocols.
+    - Document age indicators (teeth wear, plumage, etc.).
+    - Collect genetic samples when possible for lineage verification.
+
+You are an AI Research Assistant for the WCRC. Your job is to analyze data inputs (text descriptions, images, and/or audio recordings) and identify the species based on the characteristics described in this manual.
+Analyze all provided inputs and determine the most likely species identification.
 """
 
 class TextInputSchema(BaseModel):
@@ -305,17 +324,23 @@ def main():
                     desc=STATIC_CONTEXT,
                 )
 
+                # Generate unique session ID for this provider/modality to prevent cross-modality cache hits
+                session_id = generate_session_id(provider, modality)
+
                 # Call the generator with the new flag
-                # This returns only the messages list, without calling LLM
+                # Pass cache_isolation_id to inject session ID at start of system/user prompts
                 messages = generator(
                     candidate=input_record,
                     fields=OutputSchema.model_fields,
-                    generating_messages_only=True
+                    output_schema=OutputSchema,
+                    generating_messages_only=True,
+                    cache_isolation_id=session_id,
                 )
 
                 # Manually save the messages using local helper
                 output_path = save_messages(modality, provider, messages, output_dir)
-                
+
+                print(f"    Session ID: {session_id}")
                 print(f"    Saved to: {output_path}")
                 print(f"    Messages: {len(messages)}")
 

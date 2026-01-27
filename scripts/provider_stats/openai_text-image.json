@@ -1,0 +1,123 @@
+{
+  "provider": "openai",
+  "model": "gpt-4o-2024-08-06",
+  "modality": "text-image",
+  "first_request": {
+    "provider": "openai",
+    "model": "gpt-4o-2024-08-06",
+    "usage": {
+      "completion_tokens": 149,
+      "prompt_tokens": 2273,
+      "total_tokens": 2422,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": 0,
+        "audio_tokens": 0,
+        "reasoning_tokens": 0,
+        "rejected_prediction_tokens": 0
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": 0,
+        "cached_tokens": 0
+      }
+    },
+    "response_content": "To identify the animal, let's analyze the provided information:\n\n1. **Text Description**: The animal is described as a large gray animal with a trunk and big ears, making a trumpeting sound. This desc",
+    "raw_response": {
+      "id": "chatcmpl-D2PKN812vJSPrkVNkXDvH6rGA1Yht",
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "logprobs": null,
+          "message": {
+            "content": "To identify the animal, let's analyze the provided information:\n\n1. **Text Description**: The animal is described as a large gray animal with a trunk and big ears, making a trumpeting sound. This description matches an elephant.\n\n2. **Height**: The height is given as 304.5 cm (approximately 10 feet). This is consistent with the size of an elephant.\n\n3. **Image**: The image shows an elephant with large ears and a trunk. The ears appear large and shaped like Africa, which is characteristic of the African Savanna Elephant.\n\nBased on these observations, the animal is most likely an African Savanna Elephant.\n\nANSWER:\n```json\n{\n  \"animal\": \"African Savanna Elephant\"\n}\n```",
+            "refusal": null,
+            "role": "assistant",
+            "annotations": [],
+            "audio": null,
+            "function_call": null,
+            "tool_calls": null
+          }
+        }
+      ],
+      "created": 1769466387,
+      "model": "gpt-4o-2024-08-06",
+      "object": "chat.completion",
+      "service_tier": "default",
+      "system_fingerprint": "fp_deacdd5f6f",
+      "usage": {
+        "completion_tokens": 149,
+        "prompt_tokens": 2273,
+        "total_tokens": 2422,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": 0,
+          "audio_tokens": 0,
+          "reasoning_tokens": 0,
+          "rejected_prediction_tokens": 0
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cached_tokens": 0
+        }
+      }
+    }
+  },
+  "second_request": {
+    "provider": "openai",
+    "model": "gpt-4o-2024-08-06",
+    "usage": {
+      "completion_tokens": 87,
+      "prompt_tokens": 2273,
+      "total_tokens": 2360,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": 0,
+        "audio_tokens": 0,
+        "reasoning_tokens": 0,
+        "rejected_prediction_tokens": 0
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": 0,
+        "cached_tokens": 1792
+      }
+    },
+    "response_content": "The description mentions a large gray animal with a trunk and big ears that makes a trumpeting sound, which matches the characteristics of an elephant. The height of 304.5 cm (approximately 10 feet) i",
+    "raw_response": {
+      "id": "chatcmpl-D2PKp4pPF20wCT9fSLBn419FsN8Qb",
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "logprobs": null,
+          "message": {
+            "content": "The description mentions a large gray animal with a trunk and big ears that makes a trumpeting sound, which matches the characteristics of an elephant. The height of 304.5 cm (approximately 10 feet) is consistent with an elephant's size. The image shows an elephant with large ears, which are characteristic of the African Savanna Elephant.\n\nANSWER:\n```json\n{\n  \"animal\": \"African Savanna Elephant\"\n}\n```",
+            "refusal": null,
+            "role": "assistant",
+            "annotations": [],
+            "audio": null,
+            "function_call": null,
+            "tool_calls": null
+          }
+        }
+      ],
+      "created": 1769466415,
+      "model": "gpt-4o-2024-08-06",
+      "object": "chat.completion",
+      "service_tier": "default",
+      "system_fingerprint": "fp_deacdd5f6f",
+      "usage": {
+        "completion_tokens": 87,
+        "prompt_tokens": 2273,
+        "total_tokens": 2360,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": 0,
+          "audio_tokens": 0,
+          "reasoning_tokens": 0,
+          "rejected_prediction_tokens": 0
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cached_tokens": 1792
+        }
+      }
+    }
+  }
+}
