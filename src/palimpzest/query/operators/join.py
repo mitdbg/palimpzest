@@ -14,6 +14,7 @@ from openai import OpenAI
 from PIL import Image
 from pydantic.fields import FieldInfo
 from sentence_transformers import SentenceTransformer
+from transformers import AutoTokenizer
 
 from palimpzest.constants import (
     MODEL_CARDS,
@@ -29,6 +30,10 @@ from palimpzest.core.models import GenerationStats, OperatorCostEstimates, Recor
 from palimpzest.query.generators.generators import Generator
 from palimpzest.query.operators.physical import PhysicalOperator
 
+from palimpzest.prompts.block_join_prompts import (
+    BLOCK_JOIN_BASE_USER_PROMPT,
+    BLOCK_JOIN_NO_REASONING_BASE_USER_PROMPT
+)
 
 class Singleton:
      def __new__(cls, *args, **kw):
@@ -491,13 +496,20 @@ class NestedLoopsJoin(LLMJoin):
         return DataRecordSet(output_records, output_record_op_stats), num_inputs_processed
 
 class BlockNestedLoopsJoin(LLMJoin):
-    # Implements block nested loops join with a known selectivity.
+    # Implements block nested loops join with an known selectivity.
     def __init__(
         self,
+        reasoning: bool = True,
+        max_context_size: int = 8192,
         *args,
         **kwargs
     ):
-        kwargs['prompt_strategy'] = PromptStrategy.JOIN_BLOCK
+        self.reasoning = reasoning
+        self.max_context_size = max_context_size
+        if reasoning:
+            kwargs['prompt_strategy'] = PromptStrategy.JOIN_BLOCK
+        else:
+            kwargs['prompt_strategy'] = PromptStrategy.JOIN_BLOCK_NO_REASONING
         super().__init__(*args, **kwargs)
     
     def naive_cost_estimates(
@@ -508,14 +520,40 @@ class BlockNestedLoopsJoin(LLMJoin):
         # TODO: Implement naive cost estimates for block nested loops join.
         pass
 
+    def _number_of_tokens(self, text: str):
+        tokenizer = AutoTokenizer.from_pretrained(self.model)
+        token_ids = tokenizer.encode(text, add_special_tokens=True)
+        return len(token_ids)
+    
     def _find_batch_sizes(
         self,
         left_candidates: list[DataRecord],
-        right_candidates: list[DataRecord]
+        right_candidates: list[DataRecord],
+        selectivity: float
     ) -> tuple[int, int]:
-        # TODO: Implement a method to find optimal batch sizes for left and right tables.
-        # Currently, return batch size of 2 for both sides.
-        return 2, 2
+        """
+        Finds optimal batch sizes for left and right tables, assuming a known selectivity.
+        The procedure is outlined in section 5 of https://arxiv.org/pdf/2510.08489.
+        """
+        left_rows = len(left_candidates)
+        right_rows = len(right_candidates)
+        prompt_token_overhead = self._number_of_tokens(BLOCK_JOIN_BASE_USER_PROMPT if self.reasoning else BLOCK_JOIN_NO_REASONING_BASE_USER_PROMPT)
+        user_token_limit = self.max_context_size - prompt_token_overhead # t
+        index_token_overhead = self._number_of_tokens('\"_index\": \"1\"\n')
+        left_average_tokens = self._number_of_tokens(str(left_candidates)) / left_rows + index_token_overhead # s_1
+        right_average_tokens = self._number_of_tokens(str(right_candidates)) / right_rows + index_token_overhead # s_2
+        reasoning_token_overhead = 200 if self.reasoning else 0
+        output_average_tokens = self._number_of_tokens('1,1;') + reasoning_token_overhead / (left_rows * right_rows * selectivity) # s_3
+
+        left_batch_size = ((-left_average_tokens * right_average_tokens + 
+                            ((left_average_tokens * right_average_tokens) ** 2
+                             + left_average_tokens * right_average_tokens * output_average_tokens * selectivity * user_token_limit) ** 0.5)
+                           / (left_average_tokens * output_average_tokens * selectivity))
+        right_batch_size = (user_token_limit - left_batch_size * left_average_tokens) / (right_average_tokens + left_average_tokens * output_average_tokens * selectivity)
+        left_batch_size = max(1, min(left_rows, round(left_batch_size)))
+        right_batch_size = max(1, min(right_rows, round(right_batch_size)))
+        
+        return left_batch_size, right_batch_size
 
     def _add_indices_to_records(
         self,
@@ -629,8 +667,14 @@ class BlockNestedLoopsJoin(LLMJoin):
         
         return output_records
 
-    def __call__(self, left_candidates: list[DataRecord], right_candidates: list[DataRecord], final: bool = False) -> tuple[DataRecordSet, int]:
-        # TODO: Implement block nested loops join logic.
+    def __call__(
+            self,
+            left_candidates: list[DataRecord],
+            right_candidates: list[DataRecord],
+            final: bool = False,
+            batch_sizes: tuple[int, int] | None = None,
+            known_selectivity: float = 0.001
+        ) -> tuple[DataRecordSet, int]:
         def _find_answer(completion_text: str) -> str:
             # if the model followed the default instructions, the completion text will place
             # its answer between "ANSWER:" and "---"
@@ -667,7 +711,7 @@ class BlockNestedLoopsJoin(LLMJoin):
                 raise Exception(f"Could not parse answer from completion text: {answer_text}")
 
         # get batch sizes
-        left_batch_size, right_batch_size = self._find_batch_sizes(left_candidates, right_candidates)
+        left_batch_size, right_batch_size = batch_sizes if batch_sizes is not None else self._find_batch_sizes(left_candidates, right_candidates, known_selectivity)
 
         # add indices to records
         self._add_indices_to_records(left_candidates, right_candidates, left_batch_size, right_batch_size)
