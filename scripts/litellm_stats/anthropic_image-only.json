@@ -6,28 +6,29 @@
     "provider": "anthropic",
     "model": "anthropic/claude-sonnet-4-5-20250929",
     "usage": {
-      "completion_tokens": 408,
+      "completion_tokens": 443,
       "prompt_tokens": 2452,
-      "total_tokens": 2860,
+      "total_tokens": 2895,
       "completion_tokens_details": null,
       "prompt_tokens_details": {
         "audio_tokens": null,
-        "cached_tokens": 2205,
+        "cached_tokens": 0,
         "text_tokens": null,
         "image_tokens": null,
-        "cache_creation_tokens": 0,
+        "cache_creation_tokens": 2205,
         "cache_creation_token_details": {
-          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 2205,
           "ephemeral_1h_input_tokens": 0
         }
       },
-      "cache_creation_input_tokens": 0,
-      "cache_read_input_tokens": 2205
+      "cache_creation_input_tokens": 2205,
+      "cache_read_input_tokens": 0
     },
+    "usage_raw": null,
     "response_content": "Let's think step-by-step in order to identify the species.\n\n**Step 1: Analyze the image**\nThe image shows a large mammal with the following characteristics:\n- Very large ears that are shaped somewhat ",
     "raw_response": {
-      "id": "chatcmpl-d00a8090-2e0f-4416-bab2-b4db2dbdec73",
-      "created": 1769466390,
+      "id": "chatcmpl-1d12c7af-cb2c-4900-b3b6-c30607f50dcf",
+      "created": 1769495918,
       "model": "claude-sonnet-4-5-20250929",
       "object": "chat.completion",
       "system_fingerprint": null,
@@ -36,7 +37,7 @@
           "finish_reason": "stop",
           "index": 0,
           "message": {
-            "content": "Let's think step-by-step in order to identify the species.\n\n**Step 1: Analyze the image**\nThe image shows a large mammal with the following characteristics:\n- Very large ears that are shaped somewhat like the African continent\n- Long trunk with visible tusks\n- Gray-brown coloration\n- Concave back profile\n- Large body size\n\n**Step 2: Cross-reference with the manual**\nAccording to Section 2.1 (ELEPHANTS), the key distinguishing features are:\n- **African Savanna Elephant**: Larger ears (shaped like Africa), concave back, two fingers on trunk tip. Weight: 5,000-14,000 lbs.\n- **African Forest Elephant**: Smaller stature, oval-shaped ears, straighter tusks pointing downward.\n- **Asian Elephant**: Smaller ears, convex back, one finger on trunk tip, twin domes on head. Weight: 4,000-11,000 lbs.\n\n**Step 3: Match observed features**\nThe animal in the image has:\n- Large ears shaped like Africa \u2713\n- Concave back \u2713\n- Large tusks \u2713\n- Large body size consistent with the weight range\n\n**Step 4: Consider the height measurement**\nThe provided height is 304.5 cm (approximately 10 feet), which is consistent with the shoulder height of an African Savanna Elephant (3.5-4 ft mentioned for lions, but elephants are much larger - typically 10-13 feet at shoulder).\n\n**Conclusion**: Based on the large Africa-shaped ears, concave back, and size, this is an **African Savanna Elephant**.\n\nANSWER:\n{\n  \"animal\": \"African Savanna Elephant\"\n}\n---",
+            "content": "Let's think step-by-step in order to identify the species.\n\n**Step 1: Analyze the image**\nThe image shows a large mammal with the following characteristics:\n- Very large ears that are shaped somewhat like the African continent\n- Long trunk with visible tusks\n- Gray-brown coloration\n- Concave back profile\n- Robust body structure\n\n**Step 2: Compare with manual specifications**\nAccording to Section 2.1 (ELEPHANTS) of the manual:\n- African Savanna Elephant: Larger ears (shaped like Africa), concave back, two fingers on trunk tip. Weight: 5,000-14,000 lbs.\n- African Forest Elephant: Smaller stature, oval-shaped ears, straighter tusks pointing downward.\n- Asian Elephant: Smaller ears, convex back, one finger on trunk tip, twin domes on head. Weight: 4,000-11,000 lbs.\n\n**Step 3: Evaluate the height measurement**\nThe provided height is 304.5 cm (approximately 10 feet or 120 inches). According to the manual, African Savanna Elephants have a shoulder height of 3.5-4 ft, but this appears to be an error in the manual as elephants are much taller. The height of 304.5 cm (about 10 feet) is consistent with an adult African elephant.\n\n**Step 4: Key identifying features**\n- Large ears shaped like Africa \u2192 African species\n- Concave back \u2192 African Savanna Elephant (not Forest Elephant)\n- Large tusks curving outward\n- Overall size and proportions\n\n**Conclusion:**\nBased on the large Africa-shaped ears, concave back, and overall morphology, this is an **African Savanna Elephant** (also known as African Bush Elephant).\n\nANSWER:\n{\n  \"animal\": \"African Savanna Elephant\"\n}\n---",
             "role": "assistant",
             "tool_calls": null,
             "function_call": null,
@@ -48,33 +49,84 @@
         }
       ],
       "usage": {
-        "completion_tokens": 408,
+        "completion_tokens": 443,
         "prompt_tokens": 2452,
-        "total_tokens": 2860,
+        "total_tokens": 2895,
         "completion_tokens_details": null,
         "prompt_tokens_details": {
           "audio_tokens": null,
-          "cached_tokens": 2205,
+          "cached_tokens": 0,
           "text_tokens": null,
           "image_tokens": null,
-          "cache_creation_tokens": 0,
+          "cache_creation_tokens": 2205,
           "cache_creation_token_details": {
-            "ephemeral_5m_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 2205,
             "ephemeral_1h_input_tokens": 0
           }
         },
-        "cache_creation_input_tokens": 0,
-        "cache_read_input_tokens": 2205
+        "cache_creation_input_tokens": 2205,
+        "cache_read_input_tokens": 0
       }
+    },
+    "hidden_params": {
+      "additional_headers": {
+        "x-ratelimit-limit-requests": "50",
+        "x-ratelimit-remaining-requests": "49",
+        "x-ratelimit-limit-tokens": "38000",
+        "x-ratelimit-remaining-tokens": "36000",
+        "llm_provider-date": "Tue, 27 Jan 2026 06:38:38 GMT",
+        "llm_provider-content-type": "application/json",
+        "llm_provider-transfer-encoding": "chunked",
+        "llm_provider-connection": "keep-alive",
+        "llm_provider-anthropic-ratelimit-input-tokens-limit": "30000",
+        "llm_provider-anthropic-ratelimit-input-tokens-remaining": "28000",
+        "llm_provider-anthropic-ratelimit-input-tokens-reset": "2026-01-27T06:38:33Z",
+        "llm_provider-anthropic-ratelimit-output-tokens-limit": "8000",
+        "llm_provider-anthropic-ratelimit-output-tokens-remaining": "8000",
+        "llm_provider-anthropic-ratelimit-output-tokens-reset": "2026-01-27T06:38:41Z",
+        "llm_provider-anthropic-ratelimit-requests-limit": "50",
+        "llm_provider-anthropic-ratelimit-requests-remaining": "49",
+        "llm_provider-anthropic-ratelimit-requests-reset": "2026-01-27T06:38:30Z",
+        "llm_provider-anthropic-ratelimit-tokens-limit": "38000",
+        "llm_provider-anthropic-ratelimit-tokens-remaining": "36000",
+        "llm_provider-anthropic-ratelimit-tokens-reset": "2026-01-27T06:38:33Z",
+        "llm_provider-request-id": "req_011CXXRUPXqyC3NoYbvqH8aT",
+        "llm_provider-strict-transport-security": "max-age=31536000; includeSubDomains; preload",
+        "llm_provider-anthropic-organization-id": "4700f282-148c-425c-9ffe-21cc9e9b0e65",
+        "llm_provider-server": "cloudflare",
+        "llm_provider-x-envoy-upstream-service-time": "9734",
+        "llm_provider-cf-cache-status": "DYNAMIC",
+        "llm_provider-x-robots-tag": "none",
+        "llm_provider-content-encoding": "gzip",
+        "llm_provider-cf-ray": "9c463f563a0ef3a4-AUS",
+        "llm_provider-x-ratelimit-limit-requests": "50",
+        "llm_provider-x-ratelimit-remaining-requests": "49",
+        "llm_provider-x-ratelimit-limit-tokens": "38000",
+        "llm_provider-x-ratelimit-remaining-tokens": "36000"
+      },
+      "optional_params": {
+        "temperature": 0.0
+      },
+      "litellm_call_id": "f5be8243-2c89-470d-99ba-08519ff4993c",
+      "api_base": null,
+      "model_id": null,
+      "response_cost": 0.015654750000000002,
+      "litellm_model_name": "anthropic/claude-sonnet-4-5-20250929",
+      "_response_ms": 10152.305999999999
+    },
+    "callback_data": {
+      "raw_provider_response": null,
+      "raw_provider_usage": null,
+      "detected_provider": null
     }
   },
   "second_request": {
     "provider": "anthropic",
     "model": "anthropic/claude-sonnet-4-5-20250929",
     "usage": {
-      "completion_tokens": 356,
+      "completion_tokens": 333,
       "prompt_tokens": 2669,
-      "total_tokens": 3025,
+      "total_tokens": 3002,
       "completion_tokens_details": null,
       "prompt_tokens_details": {
         "audio_tokens": null,
@@ -90,10 +142,11 @@
       "cache_creation_input_tokens": 0,
       "cache_read_input_tokens": 2205
     },
-    "response_content": "Looking at the provided image and data, I need to identify the species based on the WCRC manual.\n\n**Visual Analysis:**\n- The animal has very large ears that are shaped like the African continent\n- It ",
+    "usage_raw": null,
+    "response_content": "Looking at the provided image and data, I need to identify the species based on the visual characteristics and the height measurement.\n\n**Visual Analysis:**\n- The animal has a large body with thick, w",
     "raw_response": {
-      "id": "chatcmpl-bf82f28d-3e65-48ca-bd30-2f3ce687b83c",
-      "created": 1769466420,
+      "id": "chatcmpl-a754d6f2-e3c8-435c-9f50-a2966a0be705",
+      "created": 1769495947,
       "model": "claude-sonnet-4-5-20250929",
       "object": "chat.completion",
       "system_fingerprint": null,
@@ -102,7 +155,7 @@
           "finish_reason": "stop",
           "index": 0,
           "message": {
-            "content": "Looking at the provided image and data, I need to identify the species based on the WCRC manual.\n\n**Visual Analysis:**\n- The animal has very large ears that are shaped like the African continent\n- It has a long trunk with visible tusks\n- The back appears to have a concave (saddle-like) shape\n- The coloration is brownish-gray\n- The animal is in a savanna-like habitat\n\n**Height Analysis:**\n- The provided height is 304.5 cm (approximately 10 feet at the shoulder)\n- According to Section 2.1, African Savanna Elephants typically measure 3.5-4 ft at shoulder for big cats, but elephants are much larger\n- The height of ~3 meters is consistent with a large elephant\n\n**Species Identification:**\nBased on Section 2.1 ELEPHANTS:\n- **African Savanna Elephant**: Larger ears (shaped like Africa), concave back, two fingers on trunk tip\n- **African Forest Elephant**: Smaller stature, oval-shaped ears, straighter tusks pointing downward\n- **Asian Elephant**: Smaller ears, convex back, one finger on trunk tip\n\nThe key identifying features match the African Savanna Elephant:\n1. Very large ears shaped like the African continent \u2713\n2. Concave (saddle-shaped) back \u2713\n3. Large size consistent with the species \u2713\n4. Savanna habitat \u2713\n\nANSWER:\n{\n  \"animal\": \"African Savanna Elephant\"\n}\n---",
+            "content": "Looking at the provided image and data, I need to identify the species based on the visual characteristics and the height measurement.\n\n**Visual Analysis:**\n- The animal has a large body with thick, wrinkled gray-brown skin\n- Very large ears that are prominently displayed\n- Long trunk extending from the face\n- Visible tusks (ivory)\n- Robust legs supporting a massive body\n- The ear shape appears large and somewhat triangular\n\n**Height Analysis:**\n- Given height: 304.5 cm (approximately 10 feet)\n- This converts to roughly 3 meters at what appears to be shoulder height\n\n**Species Determination:**\nAccording to Section 2.1 of the manual:\n- African Savanna Elephant: Larger ears (shaped like Africa), concave back, two fingers on trunk tip\n- Asian Elephant: Smaller ears, convex back, one finger on trunk tip, twin domes on head. Height: 3.5-4 ft at shoulder\n\nThe height of 304.5 cm (10 feet) is consistent with a large elephant. The most distinctive feature visible is the very large ears, which according to the manual are characteristic of African elephants, particularly the African Savanna Elephant whose ears are described as \"shaped like Africa\" and notably larger than Asian elephants.\n\nThe ear size and overall morphology are consistent with an African Savanna Elephant.\n\nANSWER:\n{\n  \"animal\": \"African Savanna Elephant\"\n}\n---",
             "role": "assistant",
             "tool_calls": null,
             "function_call": null,
@@ -114,9 +167,9 @@
         }
       ],
       "usage": {
-        "completion_tokens": 356,
+        "completion_tokens": 333,
         "prompt_tokens": 2669,
-        "total_tokens": 3025,
+        "total_tokens": 3002,
         "completion_tokens_details": null,
         "prompt_tokens_details": {
           "audio_tokens": null,
@@ -132,6 +185,57 @@
         "cache_creation_input_tokens": 0,
         "cache_read_input_tokens": 2205
       }
+    },
+    "hidden_params": {
+      "additional_headers": {
+        "x-ratelimit-limit-requests": "50",
+        "x-ratelimit-remaining-requests": "49",
+        "x-ratelimit-limit-tokens": "38000",
+        "x-ratelimit-remaining-tokens": "38000",
+        "llm_provider-date": "Tue, 27 Jan 2026 06:39:07 GMT",
+        "llm_provider-content-type": "application/json",
+        "llm_provider-transfer-encoding": "chunked",
+        "llm_provider-connection": "keep-alive",
+        "llm_provider-anthropic-ratelimit-input-tokens-limit": "30000",
+        "llm_provider-anthropic-ratelimit-input-tokens-remaining": "30000",
+        "llm_provider-anthropic-ratelimit-input-tokens-reset": "2026-01-27T06:39:00Z",
+        "llm_provider-anthropic-ratelimit-output-tokens-limit": "8000",
+        "llm_provider-anthropic-ratelimit-output-tokens-remaining": "8000",
+        "llm_provider-anthropic-ratelimit-output-tokens-reset": "2026-01-27T06:39:09Z",
+        "llm_provider-anthropic-ratelimit-requests-limit": "50",
+        "llm_provider-anthropic-ratelimit-requests-remaining": "49",
+        "llm_provider-anthropic-ratelimit-requests-reset": "2026-01-27T06:39:00Z",
+        "llm_provider-anthropic-ratelimit-tokens-limit": "38000",
+        "llm_provider-anthropic-ratelimit-tokens-remaining": "38000",
+        "llm_provider-anthropic-ratelimit-tokens-reset": "2026-01-27T06:39:00Z",
+        "llm_provider-request-id": "req_011CXXRWcKMF3E3EDUPSp8Nz",
+        "llm_provider-strict-transport-security": "max-age=31536000; includeSubDomains; preload",
+        "llm_provider-anthropic-organization-id": "4700f282-148c-425c-9ffe-21cc9e9b0e65",
+        "llm_provider-server": "cloudflare",
+        "llm_provider-x-envoy-upstream-service-time": "8150",
+        "llm_provider-cf-cache-status": "DYNAMIC",
+        "llm_provider-x-robots-tag": "none",
+        "llm_provider-content-encoding": "gzip",
+        "llm_provider-cf-ray": "9c464011fb829109-AUS",
+        "llm_provider-x-ratelimit-limit-requests": "50",
+        "llm_provider-x-ratelimit-remaining-requests": "49",
+        "llm_provider-x-ratelimit-limit-tokens": "38000",
+        "llm_provider-x-ratelimit-remaining-tokens": "38000"
+      },
+      "optional_params": {
+        "temperature": 0.0
+      },
+      "litellm_call_id": "24b25298-3504-41fe-8f45-b7e8c8395218",
+      "api_base": null,
+      "model_id": null,
+      "response_cost": 0.0070485,
+      "litellm_model_name": "anthropic/claude-sonnet-4-5-20250929",
+      "_response_ms": 8608.378999999999
+    },
+    "callback_data": {
+      "raw_provider_response": null,
+      "raw_provider_usage": null,
+      "detected_provider": null
     }
   }
 }

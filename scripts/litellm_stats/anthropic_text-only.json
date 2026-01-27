@@ -12,22 +12,23 @@
       "completion_tokens_details": null,
       "prompt_tokens_details": {
         "audio_tokens": null,
-        "cached_tokens": 2065,
+        "cached_tokens": 0,
         "text_tokens": null,
         "image_tokens": null,
-        "cache_creation_tokens": 0,
+        "cache_creation_tokens": 2065,
         "cache_creation_token_details": {
-          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 2065,
           "ephemeral_1h_input_tokens": 0
         }
       },
-      "cache_creation_input_tokens": 0,
-      "cache_read_input_tokens": 2065
+      "cache_creation_input_tokens": 2065,
+      "cache_read_input_tokens": 0
     },
+    "usage_raw": null,
     "response_content": "Let me analyze the provided context step-by-step to identify the species.\n\n**Step 1: Analyze the text description**\nThe text describes:\n- \"large gray animal\" - indicates a large mammal\n- \"trunk\" - dis",
     "raw_response": {
-      "id": "chatcmpl-312c673f-60d9-4a8f-bbc7-12f7574eb95d",
-      "created": 1769466351,
+      "id": "chatcmpl-bac45dc5-f6ee-4cb3-9e7b-1d883b22dd5c",
+      "created": 1769495395,
       "model": "claude-sonnet-4-5-20250929",
       "object": "chat.completion",
       "system_fingerprint": null,
@@ -54,18 +55,69 @@
         "completion_tokens_details": null,
         "prompt_tokens_details": {
           "audio_tokens": null,
-          "cached_tokens": 2065,
+          "cached_tokens": 0,
           "text_tokens": null,
           "image_tokens": null,
-          "cache_creation_tokens": 0,
+          "cache_creation_tokens": 2065,
           "cache_creation_token_details": {
-            "ephemeral_5m_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 2065,
             "ephemeral_1h_input_tokens": 0
           }
         },
-        "cache_creation_input_tokens": 0,
-        "cache_read_input_tokens": 2065
+        "cache_creation_input_tokens": 2065,
+        "cache_read_input_tokens": 0
       }
+    },
+    "hidden_params": {
+      "additional_headers": {
+        "x-ratelimit-limit-requests": "50",
+        "x-ratelimit-remaining-requests": "49",
+        "x-ratelimit-limit-tokens": "38000",
+        "x-ratelimit-remaining-tokens": "37000",
+        "llm_provider-date": "Tue, 27 Jan 2026 06:29:55 GMT",
+        "llm_provider-content-type": "application/json",
+        "llm_provider-transfer-encoding": "chunked",
+        "llm_provider-connection": "keep-alive",
+        "llm_provider-anthropic-ratelimit-input-tokens-limit": "30000",
+        "llm_provider-anthropic-ratelimit-input-tokens-remaining": "29000",
+        "llm_provider-anthropic-ratelimit-input-tokens-reset": "2026-01-27T06:29:52Z",
+        "llm_provider-anthropic-ratelimit-output-tokens-limit": "8000",
+        "llm_provider-anthropic-ratelimit-output-tokens-remaining": "8000",
+        "llm_provider-anthropic-ratelimit-output-tokens-reset": "2026-01-27T06:29:58Z",
+        "llm_provider-anthropic-ratelimit-requests-limit": "50",
+        "llm_provider-anthropic-ratelimit-requests-remaining": "49",
+        "llm_provider-anthropic-ratelimit-requests-reset": "2026-01-27T06:29:49Z",
+        "llm_provider-anthropic-ratelimit-tokens-limit": "38000",
+        "llm_provider-anthropic-ratelimit-tokens-remaining": "37000",
+        "llm_provider-anthropic-ratelimit-tokens-reset": "2026-01-27T06:29:52Z",
+        "llm_provider-request-id": "req_011CXXQp1eexyHBTenLg758R",
+        "llm_provider-strict-transport-security": "max-age=31536000; includeSubDomains; preload",
+        "llm_provider-anthropic-organization-id": "4700f282-148c-425c-9ffe-21cc9e9b0e65",
+        "llm_provider-server": "cloudflare",
+        "llm_provider-x-envoy-upstream-service-time": "7440",
+        "llm_provider-cf-cache-status": "DYNAMIC",
+        "llm_provider-x-robots-tag": "none",
+        "llm_provider-content-encoding": "gzip",
+        "llm_provider-cf-ray": "9c4632a13a9f1460-AUS",
+        "llm_provider-x-ratelimit-limit-requests": "50",
+        "llm_provider-x-ratelimit-remaining-requests": "49",
+        "llm_provider-x-ratelimit-limit-tokens": "38000",
+        "llm_provider-x-ratelimit-remaining-tokens": "37000"
+      },
+      "optional_params": {
+        "temperature": 0.0
+      },
+      "litellm_call_id": "bd69e48d-5e4c-43a6-bab6-ac75d21bb6a0",
+      "api_base": null,
+      "model_id": null,
+      "response_cost": 0.01249575,
+      "litellm_model_name": "anthropic/claude-sonnet-4-5-20250929",
+      "_response_ms": 7655.226
+    },
+    "callback_data": {
+      "raw_provider_response": null,
+      "raw_provider_usage": null,
+      "detected_provider": null
     }
   },
   "second_request": {
@@ -90,10 +142,11 @@
       "cache_creation_input_tokens": 0,
       "cache_read_input_tokens": 2065
     },
+    "usage_raw": null,
     "response_content": "Let me analyze the provided context step-by-step to identify the species.\n\n**Step 1: Analyze the text description**\nThe text describes:\n- \"large gray animal\" - indicates a large mammal\n- \"trunk\" - dis",
     "raw_response": {
-      "id": "chatcmpl-be129a79-3229-4412-bfa6-f32662082c02",
-      "created": 1769466379,
+      "id": "chatcmpl-d783d16a-c18c-4746-980e-9273c6965182",
+      "created": 1769495424,
       "model": "claude-sonnet-4-5-20250929",
       "object": "chat.completion",
       "system_fingerprint": null,
@@ -132,6 +185,57 @@
         "cache_creation_input_tokens": 0,
         "cache_read_input_tokens": 2065
       }
+    },
+    "hidden_params": {
+      "additional_headers": {
+        "x-ratelimit-limit-requests": "50",
+        "x-ratelimit-remaining-requests": "49",
+        "x-ratelimit-limit-tokens": "38000",
+        "x-ratelimit-remaining-tokens": "38000",
+        "llm_provider-date": "Tue, 27 Jan 2026 06:30:24 GMT",
+        "llm_provider-content-type": "application/json",
+        "llm_provider-transfer-encoding": "chunked",
+        "llm_provider-connection": "keep-alive",
+        "llm_provider-anthropic-ratelimit-input-tokens-limit": "30000",
+        "llm_provider-anthropic-ratelimit-input-tokens-remaining": "30000",
+        "llm_provider-anthropic-ratelimit-input-tokens-reset": "2026-01-27T06:30:18Z",
+        "llm_provider-anthropic-ratelimit-output-tokens-limit": "8000",
+        "llm_provider-anthropic-ratelimit-output-tokens-remaining": "8000",
+        "llm_provider-anthropic-ratelimit-output-tokens-reset": "2026-01-27T06:30:26Z",
+        "llm_provider-anthropic-ratelimit-requests-limit": "50",
+        "llm_provider-anthropic-ratelimit-requests-remaining": "49",
+        "llm_provider-anthropic-ratelimit-requests-reset": "2026-01-27T06:30:17Z",
+        "llm_provider-anthropic-ratelimit-tokens-limit": "38000",
+        "llm_provider-anthropic-ratelimit-tokens-remaining": "38000",
+        "llm_provider-anthropic-ratelimit-tokens-reset": "2026-01-27T06:30:18Z",
+        "llm_provider-request-id": "req_011CXXQr4UNog7qxAuQnLHN7",
+        "llm_provider-strict-transport-security": "max-age=31536000; includeSubDomains; preload",
+        "llm_provider-anthropic-organization-id": "4700f282-148c-425c-9ffe-21cc9e9b0e65",
+        "llm_provider-server": "cloudflare",
+        "llm_provider-x-envoy-upstream-service-time": "8304",
+        "llm_provider-cf-cache-status": "DYNAMIC",
+        "llm_provider-x-robots-tag": "none",
+        "llm_provider-content-encoding": "gzip",
+        "llm_provider-cf-ray": "9c46334eed553e88-AUS",
+        "llm_provider-x-ratelimit-limit-requests": "50",
+        "llm_provider-x-ratelimit-remaining-requests": "49",
+        "llm_provider-x-ratelimit-limit-tokens": "38000",
+        "llm_provider-x-ratelimit-remaining-tokens": "38000"
+      },
+      "optional_params": {
+        "temperature": 0.0
+      },
+      "litellm_call_id": "05cd286d-b338-4ea1-8d75-bb46e6b6607a",
+      "api_base": null,
+      "model_id": null,
+      "response_cost": 0.0053714999999999995,
+      "litellm_model_name": "anthropic/claude-sonnet-4-5-20250929",
+      "_response_ms": 8700.241
+    },
+    "callback_data": {
+      "raw_provider_response": null,
+      "raw_provider_usage": null,
+      "detected_provider": null
     }
   }
 }

@@ -6,17 +6,8 @@
     "provider": "gemini",
     "model": "gemini-2.5-flash",
     "usage": {
-      "cache_tokens_details": [
-        {
-          "modality": "IMAGE",
-          "token_count": 226
-        },
-        {
-          "modality": "TEXT",
-          "token_count": 1798
-        }
-      ],
-      "cached_content_token_count": 2024,
+      "cache_tokens_details": null,
+      "cached_content_token_count": null,
       "candidates_token_count": 104,
       "candidates_tokens_details": null,
       "prompt_token_count": 2303,
@@ -43,12 +34,12 @@
           "content-type": "application/json; charset=UTF-8",
           "vary": "Origin, X-Origin, Referer",
           "content-encoding": "gzip",
-          "date": "Mon, 26 Jan 2026 22:44:10 GMT",
+          "date": "Tue, 27 Jan 2026 05:30:33 GMT",
           "server": "scaffolding on HTTPServer2",
           "x-xss-protection": "0",
           "x-frame-options": "SAMEORIGIN",
           "x-content-type-options": "nosniff",
-          "server-timing": "gfet4t7; dur=3037",
+          "server-timing": "gfet4t7; dur=3741",
           "alt-svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
           "transfer-encoding": "chunked"
         },
@@ -89,19 +80,10 @@
       "create_time": null,
       "model_version": "gemini-2.5-flash",
       "prompt_feedback": null,
-      "response_id": "Ou53adXaFsrnz7IP-qzbiAs",
+      "response_id": "eU14aZuIEberqtsPnd3VcA",
       "usage_metadata": {
-        "cache_tokens_details": [
-          {
-            "modality": "IMAGE",
-            "token_count": 226
-          },
-          {
-            "modality": "TEXT",
-            "token_count": 1798
-          }
-        ],
-        "cached_content_token_count": 2024,
+        "cache_tokens_details": null,
+        "cached_content_token_count": null,
         "candidates_token_count": 104,
         "candidates_tokens_details": null,
         "prompt_token_count": 2303,
@@ -131,12 +113,12 @@
     "usage": {
       "cache_tokens_details": [
         {
-          "modality": "IMAGE",
-          "token_count": 226
-        },
-        {
           "modality": "TEXT",
           "token_count": 1798
+        },
+        {
+          "modality": "IMAGE",
+          "token_count": 226
         }
       ],
       "cached_content_token_count": 2024,
@@ -166,12 +148,12 @@
           "content-type": "application/json; charset=UTF-8",
           "vary": "Origin, X-Origin, Referer",
           "content-encoding": "gzip",
-          "date": "Mon, 26 Jan 2026 22:44:33 GMT",
+          "date": "Tue, 27 Jan 2026 05:30:56 GMT",
           "server": "scaffolding on HTTPServer2",
           "x-xss-protection": "0",
           "x-frame-options": "SAMEORIGIN",
           "x-content-type-options": "nosniff",
-          "server-timing": "gfet4t7; dur=2970",
+          "server-timing": "gfet4t7; dur=3023",
           "alt-svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
           "transfer-encoding": "chunked"
         },
@@ -212,16 +194,16 @@
       "create_time": null,
       "model_version": "gemini-2.5-flash",
       "prompt_feedback": null,
-      "response_id": "Ue53aczYIKWgz7IP9cOawA8",
+      "response_id": "kE14ac6oHoKiqtsPj76p0A4",
       "usage_metadata": {
         "cache_tokens_details": [
           {
-            "modality": "IMAGE",
-            "token_count": 226
-          },
-          {
             "modality": "TEXT",
             "token_count": 1798
+          },
+          {
+            "modality": "IMAGE",
+            "token_count": 226
           }
         ],
         "cached_content_token_count": 2024,

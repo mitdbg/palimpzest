@@ -24,10 +24,11 @@
         "image_tokens": null
       }
     },
+    "usage_raw": null,
     "response_content": "The user has provided an image of an elephant and its estimated height. I need to identify the specific species of elephant using the provided WCRC manual.\n\n1.  **Analyze the image:** The image shows ",
     "raw_response": {
-      "id": "Jut3aYiEFbqk_uMPo-GUyAo",
-      "created": 1769466657,
+      "id": "-U94aej3PN3Vz7IPisXHyAU",
+      "created": 1769492468,
       "model": "gemini-2.5-flash",
       "object": "chat.completion",
       "system_fingerprint": null,
@@ -69,34 +70,58 @@
       "vertex_ai_url_context_metadata": [],
       "vertex_ai_safety_results": [],
       "vertex_ai_citation_metadata": []
+    },
+    "hidden_params": {
+      "custom_llm_provider": "gemini",
+      "region_name": null,
+      "vertex_ai_grounding_metadata": [],
+      "vertex_ai_url_context_metadata": [],
+      "vertex_ai_safety_results": [],
+      "vertex_ai_citation_metadata": [],
+      "optional_params": {
+        "temperature": 0.0
+      },
+      "litellm_call_id": "c5ac1e16-4088-4401-9c0b-2130d29bedee",
+      "api_base": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+      "model_id": null,
+      "response_cost": 0.0030607,
+      "additional_headers": {},
+      "litellm_model_name": "gemini/gemini-2.5-flash",
+      "_response_ms": 5229.139
+    },
+    "callback_data": {
+      "raw_provider_response": null,
+      "raw_provider_usage": null,
+      "detected_provider": null
     }
   },
   "second_request": {
     "provider": "gemini",
     "model": "gemini/gemini-2.5-flash",
     "usage": {
-      "completion_tokens": 979,
+      "completion_tokens": 537,
       "prompt_tokens": 2302,
-      "total_tokens": 3281,
+      "total_tokens": 2839,
       "completion_tokens_details": {
         "accepted_prediction_tokens": null,
         "audio_tokens": null,
-        "reasoning_tokens": 589,
+        "reasoning_tokens": 418,
         "rejected_prediction_tokens": null,
-        "text_tokens": 390,
+        "text_tokens": 119,
         "image_tokens": null
       },
       "prompt_tokens_details": {
         "audio_tokens": null,
-        "cached_tokens": 1011,
-        "text_tokens": 1033,
+        "cached_tokens": 2023,
+        "text_tokens": 21,
         "image_tokens": null
       }
     },
-    "response_content": "The user has provided an image of an elephant and its estimated height. I need to identify the specific species of elephant using the provided WCRC manual.\n\n1.  **Analyze the image:** The image shows ",
+    "usage_raw": null,
+    "response_content": "The image displays an elephant with very large ears, which are described in the WCRC manual (Section 2.1) as \"shaped like Africa\" and characteristic of the African Savanna Elephant. The back of the el",
     "raw_response": {
-      "id": "P-t3adfUFPjUz7IPuYqw0Qs",
-      "created": 1769466682,
+      "id": "EVB4aYUUp4bPsg-LvqfoDA",
+      "created": 1769492494,
       "model": "gemini-2.5-flash",
       "object": "chat.completion",
       "system_fingerprint": null,
@@ -105,7 +130,7 @@
           "finish_reason": "stop",
           "index": 0,
           "message": {
-            "content": "The user has provided an image of an elephant and its estimated height. I need to identify the specific species of elephant using the provided WCRC manual.\n\n1.  **Analyze the image:** The image shows an elephant with very large ears and a noticeable concave curve to its back. Its tusks are long and curved.\n2.  **Analyze the height:** The estimated height is 304.5 cm.\n3.  **Consult the WCRC manual, Section 2.1 ELEPHANTS:**\n    *   **African Savanna Elephant:** Described with \"Larger ears (shaped like Africa), concave back, two fingers on trunk tip.\"\n    *   **African Forest Elephant:** Described with \"Smaller stature, oval-shaped ears, straighter tusks pointing downward.\"\n    *   **Asian Elephant:** Described with \"Smaller ears, convex back, one finger on trunk tip, twin domes on head.\"\n4.  **Compare image and height to descriptions:**\n    *   The elephant in the image clearly has very large ears, consistent with the \"Larger ears\" description for the African Savanna Elephant.\n    *   The back of the elephant in the image is concave, matching the \"concave back\" description for the African Savanna Elephant.\n    *   The ears are not small or oval, and the back is not convex, ruling out African Forest and Asian Elephants.\n    *   While the manual provides weight ranges, not height, African Savanna Elephants are known to be the largest species, and a height of 304.5 cm (approximately 10 feet) is consistent with a large African Savanna Elephant.\n\nBased on the distinctive large ears and concave back, the animal is an African Savanna Elephant.\n\n```json\n{\n  \"animal\": \"African Savanna Elephant\"\n}\n```",
+            "content": "The image displays an elephant with very large ears, which are described in the WCRC manual (Section 2.1) as \"shaped like Africa\" and characteristic of the African Savanna Elephant. The back of the elephant in the image also appears concave, which is another identifying feature of the African Savanna Elephant according to the manual. The provided height of 304.5 cm (approximately 10 feet) is consistent with the large stature of an African Savanna Elephant.\n\n```json\n{\n  \"animal\": \"African Savanna Elephant\"\n}\n```",
             "role": "assistant",
             "tool_calls": null,
             "function_call": null,
@@ -116,21 +141,21 @@
         }
       ],
       "usage": {
-        "completion_tokens": 979,
+        "completion_tokens": 537,
         "prompt_tokens": 2302,
-        "total_tokens": 3281,
+        "total_tokens": 2839,
         "completion_tokens_details": {
           "accepted_prediction_tokens": null,
           "audio_tokens": null,
-          "reasoning_tokens": 589,
+          "reasoning_tokens": 418,
           "rejected_prediction_tokens": null,
-          "text_tokens": 390,
+          "text_tokens": 119,
           "image_tokens": null
         },
         "prompt_tokens_details": {
           "audio_tokens": null,
-          "cached_tokens": 1011,
-          "text_tokens": 1033,
+          "cached_tokens": 2023,
+          "text_tokens": 21,
           "image_tokens": null
         }
       },
@@ -138,6 +163,29 @@
       "vertex_ai_url_context_metadata": [],
       "vertex_ai_safety_results": [],
       "vertex_ai_citation_metadata": []
+    },
+    "hidden_params": {
+      "custom_llm_provider": "gemini",
+      "region_name": null,
+      "vertex_ai_grounding_metadata": [],
+      "vertex_ai_url_context_metadata": [],
+      "vertex_ai_safety_results": [],
+      "vertex_ai_citation_metadata": [],
+      "optional_params": {
+        "temperature": 0.0
+      },
+      "litellm_call_id": "f41b1027-381a-4102-bab6-f4f9135ec6cc",
+      "api_base": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+      "model_id": null,
+      "response_cost": 0.0014094900000000002,
+      "additional_headers": {},
+      "litellm_model_name": "gemini/gemini-2.5-flash",
+      "_response_ms": 3035.502
+    },
+    "callback_data": {
+      "raw_provider_response": null,
+      "raw_provider_usage": null,
+      "detected_provider": null
     }
   }
 }
