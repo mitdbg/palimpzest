@@ -517,8 +517,45 @@ class BlockNestedLoopsJoin(LLMJoin):
         left_source_op_cost_estimates: OperatorCostEstimates,
         right_source_op_cost_estimates: OperatorCostEstimates
     ):
-        # TODO: Implement naive cost estimates for block nested loops join.
-        pass
+        # estimate number of input tokens from source
+        est_num_input_tokens = 2 * NAIVE_EST_NUM_INPUT_TOKENS
+        if self.is_image_op():
+            est_num_input_tokens = 2 * 765 / 10  # 1024x1024 image is 765 tokens
+
+        # NOTE: the output often generates an entire reasoning sentence, thus the true value may be higher
+        # the join operation's LLM call generates index pairs for all positives (e.g. 1,2;), thus we expect
+        # the number of output tokens to be approximately 4 times the selectivity.
+        est_num_output_tokens = 4 * NAIVE_EST_JOIN_SELECTIVITY
+
+        # get est. of conversion time per record from model card;
+        model_conversion_time_per_record = (
+            MODEL_CARDS[self.model.value]["seconds_per_output_token"] * est_num_output_tokens
+        )
+
+        # get est. of conversion cost (in USD) per record from model card
+        usd_per_input_token = (
+            MODEL_CARDS[self.model.value]["usd_per_audio_input_token"]
+            if self.is_audio_op()
+            else MODEL_CARDS[self.model.value]["usd_per_input_token"]
+        )
+        model_conversion_usd_per_record = (
+            usd_per_input_token * est_num_input_tokens
+            + MODEL_CARDS[self.model.value]["usd_per_output_token"] * est_num_output_tokens
+        )
+
+        # estimate output cardinality using a constant assumption of the filter selectivity
+        selectivity = NAIVE_EST_JOIN_SELECTIVITY
+        cardinality = selectivity * (left_source_op_cost_estimates.cardinality * right_source_op_cost_estimates.cardinality)
+
+        # estimate quality of output based on the strength of the model being used
+        quality = (MODEL_CARDS[self.model.value]["overall"] / 100.0)
+
+        return OperatorCostEstimates(
+            cardinality=cardinality,
+            time_per_record=model_conversion_time_per_record,
+            cost_per_record=model_conversion_usd_per_record,
+            quality=quality,
+        )
 
     def _number_of_tokens(self, text: str):
         # Map internal model Enums to valid Hugging Face Tokenizer IDs
