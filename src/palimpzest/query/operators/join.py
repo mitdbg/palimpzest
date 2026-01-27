@@ -687,12 +687,10 @@ class BlockNestedLoopsJoin(LLMJoin):
         left_candidate: list[DataRecord],
         right_candidate: list[DataRecord],
         gen_kwargs: dict,
-    ) -> list[DataRecord]:
-        # TODO: Output record stats.
+    ) -> tuple[list[DataRecord], list[RecordOpStats]]:
         start_time = time.time()
 
-        # generate output; NOTE: FieldInfo is used to indicate the output type; thus, the desc is not needed
-        # fields = {"all_matches": FieldInfo(annotation=list, description="List of index pairs that satisfy the join condition")}
+        # generate output
         field_answers, _, generation_stats, _ = self.generator(left_candidate, None, right_candidate=right_candidate, **gen_kwargs)
 
         # handle different join types
@@ -709,17 +707,46 @@ class BlockNestedLoopsJoin(LLMJoin):
                 self._left_joined_record_ids.add(left_rec._id)
                 self._right_joined_record_ids.add(right_rec._id)
         
-        # compute output records
+        # compute output records and record stats
+        end_time = time.time()
         output_records = []
+        output_record_op_stats = []
         for left_rec in left_candidate:
             for right_rec in right_candidate:
                 passed_operator = (left_rec._id, right_rec._id) in inner_positives
                 join_dr = DataRecord.from_join_parents(self.output_schema, left_rec, right_rec)
                 join_dr._passed_operator = passed_operator
 
+                record_op_stats = RecordOpStats(
+                    record_id=join_dr._id,
+                    record_parent_ids=join_dr._parent_ids,
+                    record_source_indices=join_dr._source_indices,
+                    record_state=join_dr.to_dict(include_bytes=False),
+                    full_op_id=self.get_full_op_id(),
+                    logical_op_id=self.logical_op_id,
+                    op_name=self.op_name(),
+                    time_per_record=(end_time - start_time) / (len(left_candidate) * len(right_candidate)),
+                    cost_per_record=generation_stats.cost_per_record / (len(left_candidate) * len(right_candidate)),
+                    model_name=self.get_model_name(),
+                    join_condition=self.condition,
+                    total_input_tokens=generation_stats.total_input_tokens / (len(left_candidate) * len(right_candidate)),
+                    total_output_tokens=generation_stats.total_output_tokens / (len(left_candidate) * len(right_candidate)),
+                    total_embedding_input_tokens=generation_stats.total_embedding_input_tokens / (len(left_candidate) * len(right_candidate)),
+                    total_input_cost=generation_stats.total_input_cost / (len(left_candidate) * len(right_candidate)),
+                    total_output_cost=generation_stats.total_output_cost / (len(left_candidate) * len(right_candidate)),
+                    total_embedding_cost=generation_stats.total_embedding_cost / (len(left_candidate) * len(right_candidate)),
+                    llm_call_duration_secs=generation_stats.llm_call_duration_secs,
+                    fn_call_duration_secs=generation_stats.fn_call_duration_secs,
+                    total_llm_calls=generation_stats.total_llm_calls,
+                    total_embedding_llm_calls=generation_stats.total_embedding_llm_calls,
+                    # answer=field_answers,
+                    passed_operator=passed_operator,
+                    op_details={k: str(v) for k, v in self.get_id_params().items()},
+                )
                 output_records.append(join_dr)
-        
-        return output_records
+                output_record_op_stats.append(record_op_stats)
+
+        return output_records, output_record_op_stats
 
     def __call__(
             self,
@@ -786,11 +813,9 @@ class BlockNestedLoopsJoin(LLMJoin):
             # collect results as they complete
             for future in as_completed(futures):
                 self.join_idx += 1
-                # join_output_record, join_output_record_op_stats = future.result()
-                join_output_records = future.result()
-                for join_output_record in join_output_records:
-                    output_records.append(join_output_record)
-                    # output_record_op_stats.append(join_output_record_op_stats)
+                join_output_records, join_output_record_op_stats = future.result()
+                output_records.extend(join_output_records)
+                output_record_op_stats.extend(join_output_record_op_stats)
                 print(f"{self.join_idx} JOINED")
 
         # compute the number of inputs processed
