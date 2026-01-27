@@ -521,7 +521,24 @@ class BlockNestedLoopsJoin(LLMJoin):
         pass
 
     def _number_of_tokens(self, text: str):
-        tokenizer = AutoTokenizer.from_pretrained(self.model)
+        # Map internal model Enums to valid Hugging Face Tokenizer IDs
+        hf_model_map = {
+            "Model.GPT_4o_MINI": "Xenova/gpt-4o",
+            "gpt-4o-mini": "Xenova/gpt-4o",
+            "gpt-4o": "Xenova/gpt-4o",
+            # Add fallbacks for other OpenAI models if needed
+            "gpt-3.5-turbo": "gpt2", 
+        }
+
+        # Get the valid HF ID, defaulting to self.model if not found
+        model_id = hf_model_map.get(str(self.model), self.model)
+
+        try:
+            tokenizer = AutoTokenizer.from_pretrained(model_id)
+        except Exception as e:
+            print(f"Warning: Could not load tokenizer for {model_id}. Defaulting to gpt2.")
+            tokenizer = AutoTokenizer.from_pretrained("gpt2")
+
         token_ids = tokenizer.encode(text, add_special_tokens=True)
         return len(token_ids)
     
@@ -552,7 +569,7 @@ class BlockNestedLoopsJoin(LLMJoin):
         right_batch_size = (user_token_limit - left_batch_size * left_average_tokens) / (right_average_tokens + left_average_tokens * output_average_tokens * selectivity)
         left_batch_size = max(1, min(left_rows, round(left_batch_size)))
         right_batch_size = max(1, min(right_rows, round(right_batch_size)))
-        
+
         return left_batch_size, right_batch_size
 
     def _add_indices_to_records(
@@ -676,20 +693,15 @@ class BlockNestedLoopsJoin(LLMJoin):
             known_selectivity: float = 0.001
         ) -> tuple[DataRecordSet, int]:
         def _find_answer(completion_text: str) -> str:
-            # if the model followed the default instructions, the completion text will place
-            # its answer between "ANSWER:" and "---"
-            regex = re.compile("answer:(.*?)---", re.IGNORECASE | re.DOTALL)
-            matches = regex.findall(completion_text)
-            if len(matches) > 0:
-                return matches[0].strip()
+            # list of indicators to try
+            indicators = ["answer:", "answer is:", "index pairs is:"]
+            for indicator in indicators:
+                regex = re.compile(f"{indicator}(.*?)---", re.IGNORECASE | re.DOTALL)
+                matches = regex.findall(completion_text)
+                if len(matches) > 0:
+                    return matches[0].strip()
 
-            # if the first regex didn't find an answer, try testing between "answer is:" and "---"
-            regex = re.compile("answer is:(.*?)---", re.IGNORECASE | re.DOTALL)
-            matches = regex.findall(completion_text)
-            if len(matches) > 0:
-                return matches[0].strip()
-
-            # if the second regex didn't find an answer, try taking all the text after "ANSWER:"
+            # if we didn't find an answer, try taking all the text after "ANSWER:"
             regex = re.compile("answer:(.*)", re.IGNORECASE | re.DOTALL)
             matches = regex.findall(completion_text)
             if len(matches) > 0:
