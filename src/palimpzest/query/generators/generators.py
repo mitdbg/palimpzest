@@ -311,23 +311,9 @@ class Generator(Generic[ContextType, InputType]):
         # generate a list of messages which can be used to construct a payload
         messages = self.prompt_factory.create_messages(candidate, fields, right_candidate, **kwargs)
         is_audio_op = any(msg.get("type") == "input_audio" for msg in messages)
-        is_image_op = any(msg.get("type") == "image_url" for msg in messages) # forward-looking
 
-        # inject cache isolation ID if provided (for testing cache behavior per-modality)
-        # This must happen BEFORE update_messages_for_caching so the ID becomes part of cached content
-        # written for testing purpose, may be removed
         if "cache_isolation_id" in kwargs:
-            session_id = kwargs["cache_isolation_id"]
-            is_anthropic = self.model.is_provider_anthropic()
-            for msg in messages:
-                role = msg.get("role")
-                content = msg.get("content")
-                # Prepend to system message for all providers
-                if role == "system" and isinstance(content, str):
-                    msg["content"] = f"[{session_id}] " + content
-                # For Anthropic, also prepend to user text messages (since user content is cached separately)
-                elif role == "user" and is_anthropic and msg.get("type") == "text" and isinstance(content, str):
-                    msg["content"] = f"[{session_id}] " + content
+            messages = self.prompt_manager.inject_cache_isolation_id(messages, kwargs["cache_isolation_id"])
 
         # generate the text completion
         start_time = time.time()

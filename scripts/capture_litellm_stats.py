@@ -37,7 +37,6 @@ from litellm.integrations.custom_logger import CustomLogger
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from palimpzest.constants import Model
-from palimpzest.prompts.prompt_cache import PromptCacheManager
 
 
 # =============================================================================
@@ -128,7 +127,7 @@ litellm.return_response_headers = True
 # Maps provider name to Model enum and supported modalities
 # The Model enum is used for:
 # 1. Getting the LiteLLM model name via model.value
-# 2. Initializing PromptCacheManager which needs a Model enum
+# 2. Initializing PromptManager which needs a Model enum
 PROVIDER_MODALITY_SUPPORT = {
     "anthropic": {
         "model": Model.CLAUDE_4_5_SONNET,
@@ -303,19 +302,11 @@ def call_litellm_api(
         completion_kwargs["modalities"] = ["text"]
 
     # Apply provider-specific caching configuration
-    # Reference: PromptCacheManager.get_cache_kwargs() and update_messages_for_caching()
+    # Messages from generator_messages already have cache_control markers for Anthropic
     if model.is_provider_openai() and cache_key:
         # OpenAI: Use prompt_cache_key for sticky routing to the same cache shard
         # https://platform.openai.com/docs/guides/prompt-caching
         completion_kwargs["extra_body"] = {"prompt_cache_key": cache_key}
-
-    elif model.is_provider_anthropic():
-        # Anthropic: Requires explicit cache_control markers on messages
-        # Use PromptCacheManager to transform messages with cache_control
-        cache_manager = PromptCacheManager(model)
-        litellm_messages = cache_manager.update_messages_for_caching(litellm_messages)
-
-    # Gemini/Vertex AI and DeepSeek use implicit caching - no special kwargs needed
 
     # Make the LiteLLM call
     response = litellm.completion(
@@ -403,7 +394,7 @@ def capture_stats_for_provider(
     - second_request: stats from second request (should show cache hits)
     """
     # Generate a unique cache key for OpenAI (ensures both requests hit the same cache shard)
-    # Reference: capture_provider_stats.py and PromptCacheManager.__init__
+    # Reference: capture_provider_stats.py and PromptManager.__init__
     openai_cache_key = f"pz-test-{uuid.uuid4().hex[:12]}" if provider in ("openai", "openai-audio") else None
 
     print(f"    First request...")

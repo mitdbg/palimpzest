@@ -199,11 +199,11 @@ def print_cache_stats(execution_stats):
 
     # Token counts are now disjoint:
     # - input_text_tokens: regular (non-cached) input tokens
-    # - text_cache_read_tokens: tokens read from cache (hits)
-    # - text_cache_creation_tokens: tokens written to cache
+    # - cache_read_tokens: tokens read from cache (hits)
+    # - cache_creation_tokens: tokens written to cache
     regular_input = execution_stats.input_text_tokens
-    cache_read = execution_stats.text_cache_read_tokens
-    cache_creation = execution_stats.text_cache_creation_tokens
+    cache_read = execution_stats.cache_read_tokens
+    cache_creation = execution_stats.cache_creation_tokens
     total_output = execution_stats.output_text_tokens
     total_embedding = execution_stats.embedding_input_tokens
 

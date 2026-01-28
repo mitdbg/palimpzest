@@ -21,13 +21,15 @@
         "audio_tokens": 100,
         "cached_tokens": null,
         "text_tokens": 2261,
-        "image_tokens": null
-      }
+        "image_tokens": 258
+      },
+      "cache_read_input_tokens": null
     },
+    "usage_raw": null,
     "response_content": "The text describes an elephant that makes a trumpeting sound. The image shows an elephant with very large ears, which are characteristic of African elephants, specifically the African Savanna Elephant",
     "raw_response": {
-      "id": "vut3ab3CCvrVz7IPvYjIyAs",
-      "created": 1769466807,
+      "id": "tmN4aZuWI7vSz7IPkuOugA0",
+      "created": 1769497522,
       "model": "gemini-2.5-flash",
       "object": "chat.completion",
       "system_fingerprint": null,
@@ -41,8 +43,7 @@
             "tool_calls": null,
             "function_call": null,
             "images": [],
-            "thinking_blocks": [],
-            "provider_specific_fields": null
+            "thinking_blocks": []
           }
         }
       ],
@@ -51,52 +52,74 @@
         "prompt_tokens": 2619,
         "total_tokens": 3171,
         "completion_tokens_details": {
-          "accepted_prediction_tokens": null,
-          "audio_tokens": null,
           "reasoning_tokens": 448,
-          "rejected_prediction_tokens": null,
-          "text_tokens": 104,
-          "image_tokens": null
+          "text_tokens": 104
         },
         "prompt_tokens_details": {
           "audio_tokens": 100,
           "cached_tokens": null,
           "text_tokens": 2261,
-          "image_tokens": null
-        }
+          "image_tokens": 258
+        },
+        "cache_read_input_tokens": null
       },
       "vertex_ai_grounding_metadata": [],
       "vertex_ai_url_context_metadata": [],
       "vertex_ai_safety_results": [],
       "vertex_ai_citation_metadata": []
+    },
+    "hidden_params": {
+      "custom_llm_provider": "gemini",
+      "region_name": null,
+      "vertex_ai_grounding_metadata": [],
+      "vertex_ai_url_context_metadata": [],
+      "vertex_ai_safety_results": [],
+      "vertex_ai_citation_metadata": [],
+      "optional_params": {
+        "temperature": 0.0
+      },
+      "litellm_call_id": "f0b5ea5c-c2ad-48ee-996e-e7ad45d1e2f4",
+      "api_base": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+      "model_id": null,
+      "response_cost": 0.0022357,
+      "additional_headers": {},
+      "litellm_model_name": "gemini/gemini-2.5-flash",
+      "_response_ms": 4414.588
+    },
+    "callback_data": {
+      "raw_provider_response": null,
+      "raw_provider_usage": null,
+      "detected_provider": null
     }
   },
   "second_request": {
     "provider": "gemini",
     "model": "gemini/gemini-2.5-flash",
     "usage": {
-      "completion_tokens": 552,
+      "completion_tokens": 545,
       "prompt_tokens": 2619,
-      "total_tokens": 3171,
+      "total_tokens": 3164,
       "completion_tokens_details": {
         "accepted_prediction_tokens": null,
         "audio_tokens": null,
-        "reasoning_tokens": 448,
+        "reasoning_tokens": 428,
         "rejected_prediction_tokens": null,
-        "text_tokens": 104,
+        "text_tokens": 117,
         "image_tokens": null
       },
       "prompt_tokens_details": {
-        "audio_tokens": 100,
+        "audio_tokens": 23,
         "cached_tokens": 2022,
-        "text_tokens": 2261,
-        "image_tokens": null
-      }
+        "text_tokens": 515,
+        "image_tokens": 59
+      },
+      "cache_read_input_tokens": 2022
     },
-    "response_content": "The text describes an elephant that makes a trumpeting sound. The image shows an elephant with very large ears, which are characteristic of African elephants, specifically the African Savanna Elephant",
+    "usage_raw": null,
+    "response_content": "The text describes an elephant that makes a trumpeting sound. The image shows an elephant with very large ears, shaped like the continent of Africa, and a concave back. The audio recording contains a ",
     "raw_response": {
-      "id": "2ut3aYeEMZuhz7IP1Pu0wQs",
-      "created": 1769466834,
+      "id": "0mN4aZDsFMfBz7IPj9OKmAE",
+      "created": 1769497546,
       "model": "gemini-2.5-flash",
       "object": "chat.completion",
       "system_fingerprint": null,
@@ -105,39 +128,58 @@
           "finish_reason": "stop",
           "index": 0,
           "message": {
-            "content": "The text describes an elephant that makes a trumpeting sound. The image shows an elephant with very large ears, which are characteristic of African elephants, specifically the African Savanna Elephant, whose ears are described as \"shaped like Africa\" in the manual. The audio recording clearly contains a trumpeting sound, which is a known vocalization for elephants according to the manual. Combining these observations, the animal is an African Savanna Elephant.\n\nANSWER:\n{\n  \"animal\": \"African Savanna Elephant\"\n}",
+            "content": "The text describes an elephant that makes a trumpeting sound. The image shows an elephant with very large ears, shaped like the continent of Africa, and a concave back. The audio recording contains a distinct trumpeting sound. According to Section 2.1 of the manual, \"African Savanna Elephant\" is characterized by \"Larger ears (shaped like Africa), concave back\" and \"Vocalizations: Trumpeting\". All these characteristics align perfectly with the African Savanna Elephant.\n\n```json\n{\n  \"animal\": \"African Savanna Elephant\"\n}\n```",
             "role": "assistant",
             "tool_calls": null,
             "function_call": null,
             "images": [],
-            "thinking_blocks": [],
-            "provider_specific_fields": null
+            "thinking_blocks": []
           }
         }
       ],
       "usage": {
-        "completion_tokens": 552,
+        "completion_tokens": 545,
         "prompt_tokens": 2619,
-        "total_tokens": 3171,
+        "total_tokens": 3164,
         "completion_tokens_details": {
-          "accepted_prediction_tokens": null,
-          "audio_tokens": null,
-          "reasoning_tokens": 448,
-          "rejected_prediction_tokens": null,
-          "text_tokens": 104,
-          "image_tokens": null
+          "reasoning_tokens": 428,
+          "text_tokens": 117
         },
         "prompt_tokens_details": {
-          "audio_tokens": 100,
+          "audio_tokens": 23,
           "cached_tokens": 2022,
-          "text_tokens": 2261,
-          "image_tokens": null
-        }
+          "text_tokens": 515,
+          "image_tokens": 59
+        },
+        "cache_read_input_tokens": 2022
       },
       "vertex_ai_grounding_metadata": [],
       "vertex_ai_url_context_metadata": [],
       "vertex_ai_safety_results": [],
       "vertex_ai_citation_metadata": []
+    },
+    "hidden_params": {
+      "custom_llm_provider": "gemini",
+      "region_name": null,
+      "vertex_ai_grounding_metadata": [],
+      "vertex_ai_url_context_metadata": [],
+      "vertex_ai_safety_results": [],
+      "vertex_ai_citation_metadata": [],
+      "optional_params": {
+        "temperature": 0.0
+      },
+      "litellm_call_id": "fe95941e-b601-4e38-b571-c32379d5a3a4",
+      "api_base": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+      "model_id": null,
+      "response_cost": 0.0016183600000000001,
+      "additional_headers": {},
+      "litellm_model_name": "gemini/gemini-2.5-flash",
+      "_response_ms": 7671.111
+    },
+    "callback_data": {
+      "raw_provider_response": null,
+      "raw_provider_usage": null,
+      "detected_provider": null
     }
   }
 }

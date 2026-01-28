@@ -49,6 +49,21 @@ class PromptManager:
         else:
             return {}
     
+    def inject_cache_isolation_id(self, messages: list[dict], session_id: str) -> list[dict]:
+        """
+        Inject a cache isolation ID into messages for testing cache behavior per-modality.
+
+        This must happen BEFORE update_messages_for_caching so the ID becomes part of cached content.
+        """
+        for msg in messages:
+            role = msg.get("role")
+            content = msg.get("content")
+            if role == "system" and isinstance(content, str):
+                msg["content"] = f"[{session_id}] " + content
+            elif role == "user" and self.model.is_provider_anthropic() and msg.get("type") == "text" and isinstance(content, str):
+                msg["content"] = f"[{session_id}] " + content
+        return messages
+
     def update_messages_for_caching(self, messages: list[dict]) -> list[dict]:
         """
         Transform messages to conform to provider-specific caching requirements.

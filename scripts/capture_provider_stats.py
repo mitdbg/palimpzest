@@ -224,7 +224,7 @@ def transform_messages_for_anthropic(messages: list[dict]) -> tuple[str | None, 
     """
     Transform palimpzest/litellm message format to Anthropic API format.
 
-    Input messages may already have cache_control markers from PromptCacheManager.
+    Input messages may already have cache_control markers from PromptManager.
     This function preserves those markers while converting to Anthropic's native format.
 
     Anthropic expects:
@@ -244,7 +244,7 @@ def transform_messages_for_anthropic(messages: list[dict]) -> tuple[str | None, 
             # Anthropic uses system as a separate parameter
             # Content may already be a list of content blocks with cache_control
             if isinstance(content, list):
-                # Already in content block format (from PromptCacheManager)
+                # Already in content block format (from PromptManager)
                 system_prompt = content
             else:
                 # String content - wrap in content block with cache_control

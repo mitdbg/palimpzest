@@ -19,6 +19,7 @@ paper-imgs/
 testdata/enron-tiny.csv
 testdata/*/
 testdata/*.tar.gz
+tests/pytest/data/generator_messages
 
 # python artifacts
 *.egg-info
