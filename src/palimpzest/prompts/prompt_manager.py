@@ -15,7 +15,7 @@ from typing import Any
 from palimpzest.constants import Model
 
 
-class PromptCacheManager:
+class PromptManager:
     """
     Manages prompt caching configurations and message transformations for LLM providers.
 
@@ -79,43 +79,53 @@ class PromptCacheManager:
         return messages
 
 
-    def extract_cache_stats(self, usage: dict) -> dict[str, int]:
+    def extract_usage_stats(self, usage: dict, is_audio_op: bool) -> dict[str, int]:
         """
         Normalize cache statistics from provider-specific response formats.
         """
         stats = {
+            "input_text_tokens": 0,
+            "input_image_tokens": 0, # forward looking
+            "input_audio_tokens": 0,
             "cache_creation_tokens": 0,
-            "cache_read_tokens": 0,
-            "audio_cache_creation_tokens": 0,
-            "audio_cache_read_tokens": 0,
-            "image_cache_creation_tokens": 0,
-            "image_cache_read_tokens": 0
+            "cache_read_tokens": 0
         }
 
-        if not self.model.supports_prompt_caching() or not usage:
-            return stats
+        details = usage.get("prompt_tokens_details") or {}
 
         if self.model.is_provider_openai():
-            details = usage.get("prompt_tokens_details") or {}
-            stats["cache_read_tokens"] = details.get("cached_tokens") or 0
-            stats["audio_cache_read_tokens"] = details.get("audio_cached_tokens") or 0
+            # assume audio models don't support caching for now
+            # only realtime audio models do, but they are not supported by PZ
+            if self.model.supports_prompt_caching() and not is_audio_op:
+                stats["cache_read_tokens"] = details.get("cached_tokens") or 0
+                stats["input_text_tokens"] = usage.get("prompt_tokens") - stats["cache_read_tokens"]
+            elif is_audio_op:
+                stats["input_text_tokens"] = details.get("text_tokens", 0.0)
+                stats["input_audio_tokens"] = details.get("audio_tokens", 0.0)
+            else:
+                stats["input_text_tokens"] = usage.get("prompt_tokens", 0.0)
 
-        elif self.model.is_provider_anthropic():
-            stats["cache_creation_tokens"] = usage.get("cache_creation_input_tokens", 0)
-            stats["cache_read_tokens"] = usage.get("cache_read_input_tokens", 0)
-
+        # TODO: verify for vertex ai
         elif self.model.is_provider_vertex_ai() or self.model.is_provider_google_ai_studio():
             # Try Gemini native field first, then litellm normalized field as fallback
-            stats["cache_read_tokens"] = usage.get("cached_content_token_count") or 0
+            stats["cache_read_tokens"] = usage.get("cache_read_input_tokens", 0.0)
             if stats["cache_read_tokens"] == 0:
                 # litellm may normalize Gemini responses to use prompt_tokens_details
-                details = usage.get("prompt_tokens_details") or {}
                 stats["cache_read_tokens"] = details.get("cached_tokens") or 0
-                stats["audio_cache_read_tokens"] = details.get("audio_cached_tokens") or 0
+            stats["input_text_tokens"] = details.get("text_tokens", 0.0)
+            stats["input_audio_tokens"] = details.get("audio_tokens", 0.0)
+            stats["input_image_tokens"] = details.get("image_tokens", 0.0)
 
+        elif self.model.is_provider_anthropic():
+            stats["cache_creation_tokens"] = usage.get("cache_creation_input_tokens", 0.0)
+            stats["cache_read_tokens"] = usage.get("cache_read_input_tokens", 0.0)
+            stats["input_text_tokens"] = usage.get("prompt_tokens", 0.0) - stats["cache_read_tokens"] - stats["cache_creation_tokens"]
+
+        # TODO: verify this
         elif self.model.is_provider_deepseek():
-            stats["cache_read_tokens"] = usage.get("prompt_cache_hit_tokens", 0)
+            stats["cache_read_tokens"] = usage.get("cache_read_input_tokens", 0)
             stats["cache_creation_tokens"] = 0
+            stats["input_text_tokens"] = usage.get("prompt_tokens", 0) - stats["cache_read_tokens"]
 
         return stats
 

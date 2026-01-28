@@ -9,7 +9,7 @@ from palimpzest.prompts.agent_prompts import (
     FINAL_ANSWER_PRE_MESSAGES_PROMPT,
 )
 from palimpzest.prompts.context_search import CONTEXT_SEARCH_PROMPT
-from palimpzest.prompts.prompt_cache import PromptCacheManager
+from palimpzest.prompts.prompt_manager import PromptManager
 from palimpzest.prompts.prompt_factory import PromptFactory
 from palimpzest.prompts.utils import (
     ONE_TO_MANY_OUTPUT_FORMAT_INSTRUCTION,
@@ -36,7 +36,7 @@ __all__ = [
     # context search
     "CONTEXT_SEARCH_PROMPT",
     # prompt cache
-    "PromptCacheManager",
+    "PromptManager",
     # prompt factory
     "PromptFactory",
     # utils

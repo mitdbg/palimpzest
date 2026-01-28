@@ -21,7 +21,7 @@ from palimpzest.constants import Cardinality, Model, PromptStrategy
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.models import GenerationStats
 from palimpzest.prompts import PromptFactory
-from palimpzest.prompts import PromptCacheManager
+from palimpzest.prompts import PromptManager
 
 # DEFINITIONS
 GenerationOutput = tuple[dict, str | None, GenerationStats, list[dict]]
@@ -119,7 +119,7 @@ class Generator(Generic[ContextType, InputType]):
         self.desc = desc
         self.verbose = verbose
         self.prompt_factory = PromptFactory(prompt_strategy, model, cardinality, desc)
-        self.cache_manager = PromptCacheManager(model)
+        self.prompt_manager = PromptManager(model)
 
     def _parse_reasoning(self, completion_text: str, **kwargs) -> str:
         """Extract the reasoning for the generated output from the completion object."""
@@ -311,9 +311,11 @@ class Generator(Generic[ContextType, InputType]):
         # generate a list of messages which can be used to construct a payload
         messages = self.prompt_factory.create_messages(candidate, fields, right_candidate, **kwargs)
         is_audio_op = any(msg.get("type") == "input_audio" for msg in messages)
+        is_image_op = any(msg.get("type") == "image_url" for msg in messages) # forward-looking
 
         # inject cache isolation ID if provided (for testing cache behavior per-modality)
         # This must happen BEFORE update_messages_for_caching so the ID becomes part of cached content
+        # written for testing purpose, may be removed
         if "cache_isolation_id" in kwargs:
             session_id = kwargs["cache_isolation_id"]
             is_anthropic = self.model.is_provider_anthropic()
@@ -341,8 +343,8 @@ class Generator(Generic[ContextType, InputType]):
             if self.model.is_vllm_model():
                 completion_kwargs = {"api_base": self.api_base, "api_key": os.environ.get("VLLM_API_KEY", "fake-api-key"), **completion_kwargs}
 
-            cache_kwargs = self.cache_manager.get_cache_kwargs()
-            messages = self.cache_manager.update_messages_for_caching(messages)
+            cache_kwargs = self.prompt_manager.get_cache_kwargs()
+            messages = self.prompt_manager.update_messages_for_caching(messages)
             
             # added for testing purpose, may be removed if needed
             if "generating_messages_only" in kwargs and kwargs["generating_messages_only"]:
@@ -383,43 +385,23 @@ class Generator(Generic[ContextType, InputType]):
             usd_per_output_token = self.model.get_usd_per_output_token()
             usd_per_cache_read_token = self.model.get_usd_per_cache_read_token()
             usd_per_cache_creation_token = self.model.get_usd_per_cache_creation_token()
-            usd_per_audio_cache_read_token = self.model.get_usd_per_audio_cache_read_token()
-            usd_per_audio_cache_creation_token = self.model.get_usd_per_audio_cache_creation_token()
-            usd_per_image_cache_read_token = self.model.get_usd_per_image_cache_read_token()
-            usd_per_image_cache_creation_token = self.model.get_usd_per_image_cache_creation_token()
 
             # TODO: for some models (e.g. GPT-5) we cannot separate text from image prompt tokens yet;
             #       for now, we only use tokens from prompt_token_details if it's an audio prompt
             # get output tokens (all text) and input tokens by modality
             output_tokens = usage["completion_tokens"]
+
+            usage_stats = self.prompt_manager.extract_usage_stats(usage, is_audio_op)
+            input_text_tokens = usage_stats["input_text_tokens"]
+            input_audio_tokens = usage_stats["input_audio_tokens"]
+            input_image_tokens = usage_stats["input_image_tokens"]
+            cache_read_tokens = usage_stats["cache_read_tokens"]
+            cache_creation_tokens = usage_stats["cache_creation_tokens"]
             
-            input_audio_tokens = usage["prompt_tokens_details"].get("audio_tokens", 0)
-            input_text_tokens = usage["prompt_tokens_details"].get("text_tokens", 0)
-            input_image_tokens = usage["prompt_tokens_details"].get("image_tokens", 0)
-
-            cache_stats = self.cache_manager.extract_cache_stats(usage)
-            text_cache_read_tokens = cache_stats.get("cache_read_tokens", 0.0)
-            text_cache_creation_tokens = cache_stats.get("cache_creation_tokens", 0.0)
-            audio_cache_read_tokens = cache_stats.get("audio_cache_read_tokens", 0.0)
-            audio_cache_creation_tokens = cache_stats.get("audio_cache_creation_tokens", 0.0)
-            image_cache_read_tokens = cache_stats.get("image_cache_read_tokens", 0.0)
-            image_cache_creation_tokens = cache_stats.get("image_cache_creation_tokens", 0.0)
-
-            if self.model.is_provider_anthropic():
-                # anthropic exludes cache tokens from its input tokens
-                regular_input_text_tokens = input_text_tokens
-                regular_input_audio_tokens = input_audio_tokens
-                regular_input_image_tokens = input_image_tokens
-            else:
-                # the result will never be negative; max(0, *) for extra safety
-                regular_input_text_tokens = max(0, input_text_tokens - text_cache_read_tokens - text_cache_creation_tokens) 
-                regular_input_audio_tokens = max(0, input_audio_tokens - audio_cache_read_tokens - audio_cache_creation_tokens)
-                regular_input_image_tokens = max(0, input_image_tokens - image_cache_read_tokens - image_cache_creation_tokens)
-
             total_cost = (
-                regular_input_text_tokens * usd_per_input_token + regular_input_audio_tokens * usd_per_audio_input_token + regular_input_image_tokens * usd_per_image_input_token
-                + text_cache_creation_tokens * usd_per_cache_creation_token + audio_cache_creation_tokens * usd_per_audio_cache_creation_token + image_cache_creation_tokens * usd_per_image_cache_creation_token
-                + text_cache_read_tokens * usd_per_cache_read_token + audio_cache_read_tokens * usd_per_audio_cache_read_token + image_cache_read_tokens * usd_per_image_cache_read_token
+                input_text_tokens * usd_per_input_token + input_audio_tokens * usd_per_audio_input_token + input_image_tokens * usd_per_image_input_token
+                + cache_creation_tokens * usd_per_cache_creation_token
+                + cache_read_tokens * usd_per_cache_read_token
                 + output_tokens * usd_per_output_token
             )
 
@@ -428,17 +410,13 @@ class Generator(Generic[ContextType, InputType]):
                 llm_call_duration_secs=end_time - start_time,
                 fn_call_duration_secs=0.0,
                 # Raw token counts by modality
-                input_text_tokens=regular_input_text_tokens,
-                input_audio_tokens=regular_input_audio_tokens,
-                input_image_tokens=regular_input_image_tokens,
+                input_text_tokens=input_text_tokens,
+                input_audio_tokens=input_audio_tokens,
+                input_image_tokens=input_image_tokens,
                 output_text_tokens=output_tokens,
-                # Cache token breakdown
-                text_cache_read_tokens=text_cache_read_tokens,
-                text_cache_creation_tokens=text_cache_creation_tokens,
-                audio_cache_read_tokens=audio_cache_read_tokens,
-                audio_cache_creation_tokens=audio_cache_creation_tokens,
-                image_cache_read_tokens=image_cache_read_tokens,
-                image_cache_creation_tokens=image_cache_creation_tokens,
+                # Cache token counts
+                cache_read_tokens=cache_read_tokens,
+                cache_creation_tokens=cache_creation_tokens,
                 # Cost
                 cost_per_record=total_cost,
                 total_llm_calls=1,
