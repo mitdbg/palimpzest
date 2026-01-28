@@ -15,6 +15,7 @@ from PIL import Image
 from pydantic.fields import FieldInfo
 from sentence_transformers import SentenceTransformer
 from transformers import AutoTokenizer
+import tiktoken
 
 from palimpzest.constants import (
     MODEL_CARDS,
@@ -558,26 +559,53 @@ class BlockNestedLoopsJoin(LLMJoin):
         )
 
     def _number_of_tokens(self, text: str):
-        # Map internal model Enums to valid Hugging Face Tokenizer IDs
-        hf_model_map = {
-            "Model.GPT_4o_MINI": "Xenova/gpt-4o",
-            "gpt-4o-mini": "Xenova/gpt-4o",
-            "gpt-4o": "Xenova/gpt-4o",
-            # Add fallbacks for other OpenAI models if needed
-            "gpt-3.5-turbo": "gpt2", 
+        # Map internal model Enums to tokenizer tool and identifier
+        TRANSFORMERS = "transformers"
+        TIKTOKEN = "tiktoken"
+        TOKENIZER_TOOL = {
+            Model.LLAMA3_2_3B: (TRANSFORMERS, "meta-llama/Llama-3.2-3B-Instruct"),
+            Model.LLAMA3_1_8B: (TRANSFORMERS, "meta-llama/Meta-Llama-3.1-8B-Instruct"),
+            Model.LLAMA3_3_70B: (TRANSFORMERS, "meta-llama/Llama-3.3-70B-Instruct"),
+            Model.LLAMA3_2_90B_V: (TRANSFORMERS, "meta-llama/Llama-3.2-90B-Vision-Instruct"),
+            Model.DEEPSEEK_V3: (TRANSFORMERS, "deepseek-ai/DeepSeek-V3"),
+            Model.DEEPSEEK_R1_DISTILL_QWEN_1_5B: (TRANSFORMERS, "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"),
+            Model.GPT_4o: (TIKTOKEN, "o200k_base"),
+            Model.GPT_4o_MINI: (TIKTOKEN, "o200k_base"),
+            Model.GPT_4_1: (TIKTOKEN, "o200k_base"),
+            Model.GPT_4_1_MINI: (TIKTOKEN, "o200k_base"),
+            Model.GPT_4_1_NANO: (TIKTOKEN, "o200k_base"),
+            Model.GPT_5: (TIKTOKEN, "o200k_base"),
+            Model.GPT_5_MINI: (TIKTOKEN, "o200k_base"),
+            Model.GPT_5_NANO: (TIKTOKEN, "o200k_base"),
+            Model.o4_MINI: (TIKTOKEN, "o200k_base"),
+            Model.CLAUDE_3_5_SONNET: (TIKTOKEN, "cl100k_base"),
+            Model.CLAUDE_3_7_SONNET: (TIKTOKEN, "cl100k_base"),
+            Model.CLAUDE_3_5_HAIKU: (TIKTOKEN, "cl100k_base"),
+            Model.GEMINI_2_0_FLASH: (TIKTOKEN, "o200k_base"),
+            Model.GEMINI_2_5_FLASH: (TIKTOKEN, "o200k_base"),
+            Model.GEMINI_2_5_PRO: (TIKTOKEN, "o200k_base"),
+            Model.GOOGLE_GEMINI_2_5_FLASH: (TIKTOKEN, "o200k_base"),
+            Model.GOOGLE_GEMINI_2_5_FLASH_LITE: (TIKTOKEN, "o200k_base"),
+            Model.GOOGLE_GEMINI_2_5_PRO: (TIKTOKEN, "o200k_base"),
+            Model.LLAMA_4_MAVERICK: (TRANSFORMERS, "meta-llama/Llama-4-Maverick-17B-128E-Instruct"),
+            Model.GPT_4o_AUDIO_PREVIEW: (TIKTOKEN, "o200k_base"),
+            Model.GPT_4o_MINI_AUDIO_PREVIEW: (TIKTOKEN, "o200k_base"),
+            Model.VLLM_QWEN_1_5_0_5B_CHAT: (TRANSFORMERS, "Qwen/Qwen1.5-0.5B-Chat"),
+            Model.TEXT_EMBEDDING_3_SMALL: (TIKTOKEN, "cl100k_base"),
+            Model.CLIP_VIT_B_32: (TRANSFORMERS, "openai/clip-vit-base-patch32")
         }
 
-        # Get the valid HF ID, defaulting to self.model if not found
-        model_id = hf_model_map.get(str(self.model), self.model)
-
-        try:
-            tokenizer = AutoTokenizer.from_pretrained(model_id)
-        except Exception as e:
-            print(f"Warning: Could not load tokenizer for {model_id}. Defaulting to gpt2.")
-            tokenizer = AutoTokenizer.from_pretrained("gpt2")
-
-        token_ids = tokenizer.encode(text, add_special_tokens=True)
-        return len(token_ids)
+        tool, identifier = TOKENIZER_TOOL.get(self.model, (TIKTOKEN, "o200k_base"))
+        if tool == TRANSFORMERS:
+            tokenizer = AutoTokenizer.from_pretrained(identifier)
+            token_ids = tokenizer.encode(text, add_special_tokens=True)
+            return len(token_ids)
+        elif tool == TIKTOKEN:
+            encoding = tiktoken.get_encoding(identifier)
+            token_ids = encoding.encode(text)
+            return len(token_ids)
+        else:
+            raise ValueError(f"Unsupported tokenizer tool: {tool}")
     
     def _find_batch_sizes(
         self,
