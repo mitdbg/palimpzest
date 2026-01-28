@@ -707,15 +707,6 @@ Examples:
     providers_to_run = args.provider if args.provider else list(PROVIDER_MODALITY_SUPPORT.keys())
     print(f"Providers to run: {providers_to_run}\n")
 
-    # Load existing combined stats if they exist (to append new results)
-    combined_output_path = os.path.join(output_dir, "all_provider_stats.json")
-    if os.path.exists(combined_output_path):
-        with open(combined_output_path, "r") as f:
-            all_stats = json.load(f)
-        print(f"Loaded {len(all_stats)} existing stats from {combined_output_path}\n")
-    else:
-        all_stats = {}
-
     for provider in providers_to_run:
         config = PROVIDER_MODALITY_SUPPORT[provider]
         model = config["model"]
@@ -745,19 +736,12 @@ Examples:
                 output_path = save_stats(stats, output_dir, provider, modality)
                 print(f"    Saved to: {output_path}")
 
-                all_stats[f"{provider}_{modality}"] = stats
-
             except FileNotFoundError as e:
                 print(f"    SKIPPED: Message file not found - {e}")
             except Exception as e:
                 print(f"    ERROR: {e}")
                 import traceback
                 traceback.print_exc()
-
-    # Save combined stats (appends to existing)
-    with open(combined_output_path, "w") as f:
-        json.dump(all_stats, f, indent=2)
-    print(f"\nSaved combined stats ({len(all_stats)} entries) to: {combined_output_path}")
 
     print("\nDone!")
 

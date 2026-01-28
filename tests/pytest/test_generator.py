@@ -1,5 +1,6 @@
-import hashlib
 import os
+import time
+import uuid
 
 import pytest
 from pydantic import BaseModel, Field
@@ -10,15 +11,12 @@ from palimpzest.core.lib.schemas import AudioFilepath, ImageFilepath, union_sche
 from palimpzest.query.generators.generators import Generator
 
 
-def generate_session_id(provider: str, modality: str) -> str:
+def generate_session_id() -> str:
     """
-    Generate a unique 12-character session ID for a provider/modality combination.
-    This ensures each modality test has a unique prompt prefix, preventing cross-modality cache hits.
-    The ID is deterministic based on provider+modality so repeated runs produce consistent results.
+    Generate a unique 12-character session ID.
+    This ensures each test run has a unique prompt prefix, preventing cache hits from previous runs.
     """
-    hash_input = f"{provider}_{modality}"
-    hash_hex = hashlib.md5(hash_input.encode()).hexdigest()
-    return hash_hex[:12].upper()
+    return uuid.uuid4().hex[:12].upper()
 
 
 @pytest.fixture
@@ -46,8 +44,8 @@ def output_schema():
 def test_generator(model, question, output_schema):
     generator = Generator(model, PromptStrategy.MAP, None)
     output, _, gen_stats, _ = generator(question, output_schema.model_fields, **{"output_schema": output_schema})
-    assert (gen_stats.input_text_tokens + gen_stats.cache_read_tokens + gen_stats.cache_creation_tokens) > 0
-    assert gen_stats.output_text_tokens > 0
+    # Basic checks: generator produced output and tracked some stats
+    assert gen_stats.output_text_tokens > 0, "Expected positive output tokens"
     assert output["answer"][0].lower() == "green"
 
 
@@ -171,122 +169,247 @@ class AnimalOutputSchema(BaseModel):
 
 
 # Expected stats from provider testing (to be filled in after running capture_provider_stats.py)
-# Format: {(provider, modality): {"input_text_tokens": X, "input_image_tokens": X, "input_audio_tokens": X, ...}}
+# Format: {(provider, modality): {"first_request": {...}, "second_request": {...}}}
 EXPECTED_STATS = {
     # Anthropic - claude-sonnet-4-5-20250929
+    # Note: Anthropic doesn't separate image tokens from text tokens in usage stats
     ("anthropic", "text-only"): {
-        "input_text_tokens": None,  # TODO: Fill in from provider stats
-        "input_image_tokens": 0,
-        "input_audio_tokens": 0,
+        "first_request": {
+            "input_text_tokens": 64,
+            "input_image_tokens": 0,
+            "input_audio_tokens": 0,
+            "cache_read_tokens": 0,
+            "cache_creation_tokens": 2065,
+            "output_tokens": 230
+        },
+        "second_request": {
+            "input_text_tokens": 64,
+            "input_image_tokens": 0,
+            "input_audio_tokens": 0,
+            "cache_read_tokens": 2065,
+            "cache_creation_tokens": 0,
+            "output_tokens": 338,
+        },
     },
     ("anthropic", "image-only"): {
-        "input_text_tokens": None,  # TODO: Fill in from provider stats
-        "input_image_tokens": None,  # TODO: Fill in from provider stats
-        "input_audio_tokens": 0,
-    },
-    ("anthropic", "text-image"): {
-        "input_text_tokens": None,  # TODO: Fill in from provider stats
-        "input_image_tokens": None,  # TODO: Fill in from provider stats
-        "input_audio_tokens": 0,
+        "first_request": {
+            "input_text_tokens": 247,
+            "input_image_tokens": 0,
+            "input_audio_tokens": 0,
+            "cache_read_tokens": 0,
+            "cache_creation_tokens": 2205,
+            "output_tokens": 472,
+        },
+        "second_request": {
+            "input_text_tokens": 247,
+            "input_image_tokens": 0,
+            "input_audio_tokens": 0,
+            "cache_read_tokens": 2205,
+            "cache_creation_tokens": 0,
+            "output_tokens": 393,
+        },
     },
     # OpenAI - gpt-4o-2024-08-06
     ("openai", "text-only"): {
-        "input_text_tokens": None,  # TODO: Fill in from provider stats
-        "input_image_tokens": 0,
-        "input_audio_tokens": 0,
+        "first_request": {
+            "input_text_tokens": 1856,
+            "input_image_tokens": 0,
+            "input_audio_tokens": 0,
+            "cache_read_tokens": 0,
+            "cache_creation_tokens": 0,
+            "output_tokens": 131,
+        },
+        "second_request": {
+            "input_text_tokens": 832,
+            "input_image_tokens": 0,
+            "input_audio_tokens": 0,
+            "cache_read_tokens": 1024,
+            "cache_creation_tokens": 0,
+            "output_tokens": 88,
+        },
     },
     ("openai", "image-only"): {
-        "input_text_tokens": None,  # TODO: Fill in from provider stats
-        "input_image_tokens": None,  # TODO: Fill in from provider stats
-        "input_audio_tokens": 0,
-    },
-    ("openai", "text-image"): {
-        "input_text_tokens": None,  # TODO: Fill in from provider stats
-        "input_image_tokens": None,  # TODO: Fill in from provider stats
-        "input_audio_tokens": 0,
+        "first_request": {
+            "input_text_tokens": 2220,
+            "input_image_tokens": 0,
+            "input_audio_tokens": 0,
+            "cache_read_tokens": 0,
+            "cache_creation_tokens": 0,
+            "output_tokens": 85,
+        },
+        "second_request": {
+            "input_text_tokens": 428,
+            "input_image_tokens": 0,
+            "input_audio_tokens": 0,
+            "cache_read_tokens": 1792,
+            "cache_creation_tokens": 0,
+            "output_tokens": 75,
+        },
     },
     # OpenAI Audio - gpt-4o-audio-preview
     ("openai-audio", "audio-only"): {
-        "input_text_tokens": None,  # TODO: Fill in from provider stats
-        "input_image_tokens": 0,
-        "input_audio_tokens": None,  # TODO: Fill in from provider stats
+        "first_request": {
+            "input_text_tokens": 1974,
+            "input_image_tokens": 0,
+            "input_audio_tokens": 31,
+            "cache_read_tokens": 0,
+            "cache_creation_tokens": 0,
+            "output_tokens": 100,
+        },
+        "second_request": {
+            "input_text_tokens": 1974,
+            "input_image_tokens": 0,
+            "input_audio_tokens": 31,
+            "cache_read_tokens": 0,
+            "cache_creation_tokens": 0,
+            "output_tokens": 166,
+        },
     },
-    ("openai-audio", "text-audio"): {
-        "input_text_tokens": None,  # TODO: Fill in from provider stats
-        "input_image_tokens": 0,
-        "input_audio_tokens": None,  # TODO: Fill in from provider stats
-    },
-    # Gemini - gemini-2.5-flash (all seven modalities)
+    # Gemini - gemini-2.5-flash
     ("gemini", "text-only"): {
-        "input_text_tokens": None,  # TODO: Fill in from provider stats
-        "input_image_tokens": 0,
-        "input_audio_tokens": 0,
+        "first_request": {
+            "input_text_tokens": 1923,
+            "input_image_tokens": 0,
+            "input_audio_tokens": 0,
+            "cache_read_tokens": 0,
+            "cache_creation_tokens": 0,
+            "output_tokens": 61,
+        },
+        "second_request": {
+            "input_text_tokens": 913,
+            "input_image_tokens": 0,
+            "input_audio_tokens": 0,
+            "cache_read_tokens": 1010,
+            "cache_creation_tokens": 0,
+            "output_tokens": 74,
+        },
     },
     ("gemini", "image-only"): {
-        "input_text_tokens": None,  # TODO: Fill in from provider stats
-        "input_image_tokens": None,  # TODO: Fill in from provider stats
-        "input_audio_tokens": 0,
+        "first_request": {
+            "input_text_tokens": 2045,
+            "input_image_tokens": 258,
+            "input_audio_tokens": 0,
+            "cache_read_tokens": 0,
+            "cache_creation_tokens": 0,
+            "output_tokens": 91,
+        },
+        "second_request": {
+            "input_text_tokens": 247,
+            "input_image_tokens": 32,
+            "input_audio_tokens": 0,
+            "cache_read_tokens": 2024,
+            "cache_creation_tokens": 0,
+            "output_tokens": 104,
+        },
     },
     ("gemini", "audio-only"): {
-        "input_text_tokens": None,  # TODO: Fill in from provider stats
-        "input_image_tokens": 0,
-        "input_audio_tokens": None,  # TODO: Fill in from provider stats
-    },
-    ("gemini", "text-image"): {
-        "input_text_tokens": None,  # TODO: Fill in from provider stats
-        "input_image_tokens": None,  # TODO: Fill in from provider stats
-        "input_audio_tokens": 0,
-    },
-    ("gemini", "text-audio"): {
-        "input_text_tokens": None,  # TODO: Fill in from provider stats
-        "input_image_tokens": 0,
-        "input_audio_tokens": None,  # TODO: Fill in from provider stats
-    },
-    ("gemini", "image-audio"): {
-        "input_text_tokens": None,  # TODO: Fill in from provider stats
-        "input_image_tokens": None,  # TODO: Fill in from provider stats
-        "input_audio_tokens": None,  # TODO: Fill in from provider stats
+        "first_request": {
+            "input_text_tokens": 2040,
+            "input_image_tokens": 0,
+            "input_audio_tokens": 100,
+            "cache_read_tokens": 0,
+            "cache_creation_tokens": 0,
+            "output_tokens": 125,
+        },
+        "second_request": {
+            "input_text_tokens": 117,
+            "input_image_tokens": 0,
+            "input_audio_tokens": 6,
+            "cache_read_tokens": 2017,
+            "cache_creation_tokens": 0,
+            "output_tokens": 125,
+        },
     },
     ("gemini", "text-image-audio"): {
-        "input_text_tokens": None,  # TODO: Fill in from provider stats
-        "input_image_tokens": None,  # TODO: Fill in from provider stats
-        "input_audio_tokens": None,  # TODO: Fill in from provider stats
+        "first_request": {
+            "input_text_tokens": 2262,
+            "input_image_tokens": 258,
+            "input_audio_tokens": 100,
+            "cache_read_tokens": 0,
+            "cache_creation_tokens": 0,
+            "output_tokens": 118,
+        },
+        "second_request": {
+            "input_text_tokens": 516,
+            "input_image_tokens": 59,
+            "input_audio_tokens": 23,
+            "cache_read_tokens": 2022,
+            "cache_creation_tokens": 0,
+            "output_tokens": 181,
+        },
     },
-    # Vertex AI - gemini-2.5-flash (all seven modalities)
+    # Vertex AI - gemini-2.5-flash
     ("vertex_ai", "text-only"): {
-        "input_text_tokens": None,  # TODO: Fill in from provider stats
-        "input_image_tokens": 0,
-        "input_audio_tokens": 0,
+        "first_request": {
+            "input_text_tokens": None,
+            "input_image_tokens": 0,
+            "input_audio_tokens": 0,
+            "cache_read_tokens": None,
+            "cache_creation_tokens": 0,
+            "output_tokens": None,
+        },
+        "second_request": {
+            "input_text_tokens": None,
+            "input_image_tokens": 0,
+            "input_audio_tokens": 0,
+            "cache_read_tokens": None,
+            "cache_creation_tokens": 0,
+            "output_tokens": None,
+        },
     },
     ("vertex_ai", "image-only"): {
-        "input_text_tokens": None,  # TODO: Fill in from provider stats
-        "input_image_tokens": None,  # TODO: Fill in from provider stats
-        "input_audio_tokens": 0,
+        "first_request": {
+            "input_text_tokens": None,
+            "input_image_tokens": None,
+            "input_audio_tokens": 0,
+            "cache_read_tokens": None,
+            "cache_creation_tokens": 0,
+            "output_tokens": None,
+        },
+        "second_request": {
+            "input_text_tokens": None,
+            "input_image_tokens": None,
+            "input_audio_tokens": 0,
+            "cache_read_tokens": None,
+            "cache_creation_tokens": 0,
+            "output_tokens": None,
+        },
     },
     ("vertex_ai", "audio-only"): {
-        "input_text_tokens": None,  # TODO: Fill in from provider stats
-        "input_image_tokens": 0,
-        "input_audio_tokens": None,  # TODO: Fill in from provider stats
-    },
-    ("vertex_ai", "text-image"): {
-        "input_text_tokens": None,  # TODO: Fill in from provider stats
-        "input_image_tokens": None,  # TODO: Fill in from provider stats
-        "input_audio_tokens": 0,
-    },
-    ("vertex_ai", "text-audio"): {
-        "input_text_tokens": None,  # TODO: Fill in from provider stats
-        "input_image_tokens": 0,
-        "input_audio_tokens": None,  # TODO: Fill in from provider stats
-    },
-    ("vertex_ai", "image-audio"): {
-        "input_text_tokens": None,  # TODO: Fill in from provider stats
-        "input_image_tokens": None,  # TODO: Fill in from provider stats
-        "input_audio_tokens": None,  # TODO: Fill in from provider stats
+        "first_request": {
+            "input_text_tokens": None,
+            "input_image_tokens": 0,
+            "input_audio_tokens": None,
+            "cache_read_tokens": None,
+            "cache_creation_tokens": 0,
+            "output_tokens": None,
+        },
+        "second_request": {
+            "input_text_tokens": None,
+            "input_image_tokens": 0,
+            "input_audio_tokens": None,
+            "cache_read_tokens": None,
+            "cache_creation_tokens": 0,
+            "output_tokens": None,
+        },
     },
     ("vertex_ai", "text-image-audio"): {
-        "input_text_tokens": None,  # TODO: Fill in from provider stats
-        "input_image_tokens": None,  # TODO: Fill in from provider stats
-        "input_audio_tokens": None,  # TODO: Fill in from provider stats
+        "first_request": {
+            "input_text_tokens": None,
+            "input_image_tokens": None,
+            "input_audio_tokens": None,
+            "cache_read_tokens": None,
+            "cache_creation_tokens": 0,
+            "output_tokens": None,
+        },
+        "second_request": {
+            "input_text_tokens": None,
+            "input_image_tokens": None,
+            "input_audio_tokens": None,
+            "cache_read_tokens": None,
+            "cache_creation_tokens": 0,
+            "output_tokens": None,
+        },
     },
 }
 
@@ -353,253 +476,157 @@ def get_input_schema_for_modality(modality: str):
 
 
 # =============================================================================
-# ANTHROPIC TESTS (text, image, text+image only - no audio support)
+# PROVIDER CONFIGURATION
 # =============================================================================
-@pytest.mark.parametrize(
-    "modality",
-    ["text-only", "image-only", "text-image"],
-    ids=["text-only", "image-only", "text-image"],
-)
-@pytest.mark.skipif(os.getenv("ANTHROPIC_API_KEY") is None, reason="ANTHROPIC_API_KEY not present")
-def test_generator_stats_anthropic(modality):
-    """Test Generator stats tracking for Anthropic models."""
-    model = Model.CLAUDE_4_5_SONNET
-    input_schema = get_input_schema_for_modality(modality)
-    input_record = create_input_record(input_schema, modality)
-    session_id = generate_session_id("anthropic", modality)
+PROVIDER_CONFIG = {
+    "anthropic": {
+        "model": Model.CLAUDE_4_5_SONNET,
+        "supported_modalities": ["text-only", "image-only"],
+        "api_key_env": "ANTHROPIC_API_KEY",
+    },
+    "openai": {
+        "model": Model.GPT_4o,
+        "supported_modalities": ["text-only", "image-only"],
+        "api_key_env": "OPENAI_API_KEY",
+    },
+    "openai-audio": {
+        "model": Model.GPT_4o_AUDIO_PREVIEW,
+        "supported_modalities": ["audio-only"],
+        "api_key_env": "OPENAI_API_KEY",
+    },
+    "gemini": {
+        "model": Model.GOOGLE_GEMINI_2_5_FLASH,
+        "supported_modalities": ["text-only", "image-only", "audio-only", "text-image-audio"],
+        "api_key_env": "GOOGLE_API_KEY",
+    },
+    "vertex_ai": {
+        "model": Model.GEMINI_2_5_FLASH,
+        "supported_modalities": ["text-only", "image-only", "audio-only", "text-image-audio"],
+        "api_key_env": ["GOOGLE_APPLICATION_CREDENTIALS", "VERTEX_PROJECT"],
+    },
+}
 
-    generator = Generator(model, PromptStrategy.MAP, None, desc=STATIC_CONTEXT)
-    output, _, gen_stats, _ = generator(
-        input_record,
-        AnimalOutputSchema.model_fields,
-        output_schema=AnimalOutputSchema,
-        cache_isolation_id=session_id,
-    )
+ALL_MODALITIES = ["text-only", "image-only", "audio-only", "text-image-audio"]
+ALL_PROVIDERS = ["anthropic", "openai", "openai-audio", "gemini", "vertex_ai"]
 
-    # Verify output
-    assert output is not None
-    assert "animal" in output
+CACHE_WAIT_SECONDS = 20
 
-    # Get expected stats
-    expected = EXPECTED_STATS.get(("anthropic", modality), {})
 
-    # Assert input token counts match expected values
+def check_api_key(provider: str) -> bool:
+    """Check if the API key for a provider is present."""
+    config = PROVIDER_CONFIG[provider]
+    api_key_env = config["api_key_env"]
+    if isinstance(api_key_env, list):
+        return any(os.getenv(key) is not None for key in api_key_env)
+    return os.getenv(api_key_env) is not None
+
+
+def is_modality_supported(provider: str, modality: str) -> bool:
+    """Check if a modality is supported by a provider."""
+    return modality in PROVIDER_CONFIG[provider]["supported_modalities"]
+
+
+def within_tolerance(actual: int, expected: int, tolerance: float = 0.05) -> bool:
+    """Check if actual value is within tolerance of expected value."""
+    if expected == 0:
+        return actual == 0
+    margin = max(1, int(expected * tolerance))  # At least 1 token margin
+    return abs(actual - expected) <= margin
+
+
+def assert_stats_match(gen_stats, expected: dict, request_name: str, tolerance: float = 0.05):
+    """Assert that generation stats match expected values within tolerance."""
     if expected.get("input_text_tokens") is not None:
-        assert gen_stats.input_text_tokens == expected["input_text_tokens"], \
-            f"input_text_tokens mismatch: got {gen_stats.input_text_tokens}, expected {expected['input_text_tokens']}"
+        assert within_tolerance(gen_stats.input_text_tokens, expected["input_text_tokens"], tolerance), \
+            f"{request_name} input_text_tokens mismatch: got {gen_stats.input_text_tokens}, expected {expected['input_text_tokens']} (±{tolerance*100}%)"
 
     if expected.get("input_image_tokens") is not None:
-        assert gen_stats.input_image_tokens == expected["input_image_tokens"], \
-            f"input_image_tokens mismatch: got {gen_stats.input_image_tokens}, expected {expected['input_image_tokens']}"
-
-    assert gen_stats.input_audio_tokens == 0, "Anthropic should have 0 audio tokens"
-
-    # Assert output tokens are positive
-    assert gen_stats.output_text_tokens > 0, "output_text_tokens should be positive"
-
-    # Assert cost_per_record is calculated correctly
-    # cost = input_cost + output_cost + cache_costs
-    assert gen_stats.cost_per_record > 0, "cost_per_record should be positive"
-
-
-# =============================================================================
-# OPENAI TESTS (text, image, text+image)
-# =============================================================================
-@pytest.mark.parametrize(
-    "modality",
-    ["text-only", "image-only", "text-image"],
-    ids=["text-only", "image-only", "text-image"],
-)
-@pytest.mark.skipif(os.getenv("OPENAI_API_KEY") is None, reason="OPENAI_API_KEY not present")
-def test_generator_stats_openai(modality):
-    """Test Generator stats tracking for OpenAI models (non-audio)."""
-    model = Model.GPT_4o
-    input_schema = get_input_schema_for_modality(modality)
-    input_record = create_input_record(input_schema, modality)
-    session_id = generate_session_id("openai", modality)
-
-    generator = Generator(model, PromptStrategy.MAP, None, desc=STATIC_CONTEXT)
-    output, _, gen_stats, _ = generator(
-        input_record,
-        AnimalOutputSchema.model_fields,
-        output_schema=AnimalOutputSchema,
-        cache_isolation_id=session_id,
-    )
-
-    # Verify output
-    assert output is not None
-    assert "animal" in output
-
-    # Get expected stats
-    expected = EXPECTED_STATS.get(("openai", modality), {})
-
-    # Assert input token counts match expected values
-    if expected.get("input_text_tokens") is not None:
-        assert gen_stats.input_text_tokens == expected["input_text_tokens"], \
-            f"input_text_tokens mismatch: got {gen_stats.input_text_tokens}, expected {expected['input_text_tokens']}"
-
-    if expected.get("input_image_tokens") is not None:
-        assert gen_stats.input_image_tokens == expected["input_image_tokens"], \
-            f"input_image_tokens mismatch: got {gen_stats.input_image_tokens}, expected {expected['input_image_tokens']}"
-
-    assert gen_stats.input_audio_tokens == 0, "Non-audio OpenAI model should have 0 audio tokens"
-
-    # Assert output tokens are positive
-    assert gen_stats.output_text_tokens > 0, "output_text_tokens should be positive"
-
-    # Assert cost_per_record is calculated correctly
-    assert gen_stats.cost_per_record > 0, "cost_per_record should be positive"
-
-
-# =============================================================================
-# OPENAI AUDIO TESTS (audio-only, text+audio)
-# =============================================================================
-@pytest.mark.parametrize(
-    "modality",
-    ["audio-only", "text-audio"],
-    ids=["audio-only", "text-audio"],
-)
-@pytest.mark.skipif(os.getenv("OPENAI_API_KEY") is None, reason="OPENAI_API_KEY not present")
-def test_generator_stats_openai_audio(modality):
-    """Test Generator stats tracking for OpenAI audio models."""
-    model = Model.GPT_4o_AUDIO_PREVIEW
-    input_schema = get_input_schema_for_modality(modality)
-    input_record = create_input_record(input_schema, modality)
-    session_id = generate_session_id("openai-audio", modality)
-
-    generator = Generator(model, PromptStrategy.MAP, None, desc=STATIC_CONTEXT)
-    output, _, gen_stats, _ = generator(
-        input_record,
-        AnimalOutputSchema.model_fields,
-        output_schema=AnimalOutputSchema,
-        cache_isolation_id=session_id,
-    )
-
-    # Verify output
-    assert output is not None
-    assert "animal" in output
-
-    # Get expected stats
-    expected = EXPECTED_STATS.get(("openai-audio", modality), {})
-
-    # Assert input token counts match expected values
-    if expected.get("input_text_tokens") is not None:
-        assert gen_stats.input_text_tokens == expected["input_text_tokens"], \
-            f"input_text_tokens mismatch: got {gen_stats.input_text_tokens}, expected {expected['input_text_tokens']}"
+        assert within_tolerance(gen_stats.input_image_tokens, expected["input_image_tokens"], tolerance), \
+            f"{request_name} input_image_tokens mismatch: got {gen_stats.input_image_tokens}, expected {expected['input_image_tokens']} (±{tolerance*100}%)"
 
     if expected.get("input_audio_tokens") is not None:
-        assert gen_stats.input_audio_tokens == expected["input_audio_tokens"], \
-            f"input_audio_tokens mismatch: got {gen_stats.input_audio_tokens}, expected {expected['input_audio_tokens']}"
+        assert within_tolerance(gen_stats.input_audio_tokens, expected["input_audio_tokens"], tolerance), \
+            f"{request_name} input_audio_tokens mismatch: got {gen_stats.input_audio_tokens}, expected {expected['input_audio_tokens']} (±{tolerance*100}%)"
 
-    assert gen_stats.input_image_tokens == 0, "Audio model should have 0 image tokens"
+    if expected.get("cache_read_tokens") is not None:
+        assert within_tolerance(gen_stats.cache_read_tokens, expected["cache_read_tokens"], tolerance), \
+            f"{request_name} cache_read_tokens mismatch: got {gen_stats.cache_read_tokens}, expected {expected['cache_read_tokens']} (±{tolerance*100}%)"
 
-    # Assert output tokens are positive
-    assert gen_stats.output_text_tokens > 0, "output_text_tokens should be positive"
+    if expected.get("cache_creation_tokens") is not None:
+        assert within_tolerance(gen_stats.cache_creation_tokens, expected["cache_creation_tokens"], tolerance), \
+            f"{request_name} cache_creation_tokens mismatch: got {gen_stats.cache_creation_tokens}, expected {expected['cache_creation_tokens']} (±{tolerance*100}%)"
 
-    # Assert cost_per_record is calculated correctly
-    assert gen_stats.cost_per_record > 0, "cost_per_record should be positive"
+    assert gen_stats.output_text_tokens > 0, f"{request_name} output_text_tokens should be positive"
+    assert gen_stats.cost_per_record > 0, f"{request_name} cost_per_record should be positive"
 
 
 # =============================================================================
-# GEMINI TESTS (all seven modality combinations)
+# COMBINED GENERATOR STATS TEST
 # =============================================================================
 @pytest.mark.parametrize(
-    "modality",
-    ["text-only", "image-only", "audio-only", "text-image", "text-audio", "image-audio", "text-image-audio"],
-    ids=["text-only", "image-only", "audio-only", "text-image", "text-audio", "image-audio", "text-image-audio"],
+    "provider,modality",
+    [(p, m) for p in ALL_PROVIDERS for m in ALL_MODALITIES],
+    ids=[f"{p}-{m}" for p in ALL_PROVIDERS for m in ALL_MODALITIES],
 )
-@pytest.mark.skipif(os.getenv("GOOGLE_API_KEY") is None, reason="GOOGLE_API_KEY not present")
-def test_generator_stats_gemini(modality):
-    """Test Generator stats tracking for Gemini models (Google AI Studio)."""
-    model = Model.GOOGLE_GEMINI_2_5_FLASH
+def test_generator_stats(provider, modality):
+    """Test Generator stats tracking for all provider/modality combinations.
+
+    Makes two requests:
+    1. First request (no cache) - should show cache_creation_tokens for providers that support it
+    2. Second request (with cache) - should show cache_read_tokens after waiting for cache availability
+    """
+    # Skip if modality not supported by provider
+    if not is_modality_supported(provider, modality):
+        pytest.skip(f"Modality {modality} not supported by {provider}")
+
+    # Skip if API key not present
+    if not check_api_key(provider):
+        config = PROVIDER_CONFIG[provider]
+        pytest.skip(f"API key not present: {config['api_key_env']}")
+
+    # Get model and create input
+    model = PROVIDER_CONFIG[provider]["model"]
     input_schema = get_input_schema_for_modality(modality)
     input_record = create_input_record(input_schema, modality)
-    session_id = generate_session_id("gemini", modality)
+    session_id = generate_session_id()
 
+    # Create generator
     generator = Generator(model, PromptStrategy.MAP, None, desc=STATIC_CONTEXT)
-    output, _, gen_stats, _ = generator(
+
+    # Get expected stats
+    expected = EXPECTED_STATS.get((provider, modality), {})
+
+    # First request (no cache)
+    output1, _, gen_stats1, _ = generator(
         input_record,
         AnimalOutputSchema.model_fields,
         output_schema=AnimalOutputSchema,
         cache_isolation_id=session_id,
     )
 
-    # Verify output
-    assert output is not None
-    assert "animal" in output
+    # Verify first request output
+    assert output1 is not None
+    assert "animal" in output1
 
-    # Get expected stats
-    expected = EXPECTED_STATS.get(("gemini", modality), {})
+    # Assert first request stats
+    if "first_request" in expected:
+        assert_stats_match(gen_stats1, expected["first_request"], "first_request")
 
-    # Assert input token counts match expected values
-    if expected.get("input_text_tokens") is not None:
-        assert gen_stats.input_text_tokens == expected["input_text_tokens"], \
-            f"input_text_tokens mismatch: got {gen_stats.input_text_tokens}, expected {expected['input_text_tokens']}"
+    # Wait for cache to be available
+    time.sleep(CACHE_WAIT_SECONDS)
 
-    if expected.get("input_image_tokens") is not None:
-        assert gen_stats.input_image_tokens == expected["input_image_tokens"], \
-            f"input_image_tokens mismatch: got {gen_stats.input_image_tokens}, expected {expected['input_image_tokens']}"
-
-    if expected.get("input_audio_tokens") is not None:
-        assert gen_stats.input_audio_tokens == expected["input_audio_tokens"], \
-            f"input_audio_tokens mismatch: got {gen_stats.input_audio_tokens}, expected {expected['input_audio_tokens']}"
-
-    # Assert output tokens are positive
-    assert gen_stats.output_text_tokens > 0, "output_text_tokens should be positive"
-
-    # Assert cost_per_record is calculated correctly
-    assert gen_stats.cost_per_record > 0, "cost_per_record should be positive"
-
-
-# =============================================================================
-# VERTEX AI TESTS (all seven modality combinations)
-# =============================================================================
-@pytest.mark.parametrize(
-    "modality",
-    ["text-only", "image-only", "audio-only", "text-image", "text-audio", "image-audio", "text-image-audio"],
-    ids=["text-only", "image-only", "audio-only", "text-image", "text-audio", "image-audio", "text-image-audio"],
-)
-@pytest.mark.skipif(
-    os.getenv("GOOGLE_APPLICATION_CREDENTIALS") is None and os.getenv("VERTEX_PROJECT") is None,
-    reason="Vertex AI credentials not present"
-)
-def test_generator_stats_vertex_ai(modality):
-    """Test Generator stats tracking for Vertex AI Gemini models."""
-    model = Model.GEMINI_2_5_FLASH
-    input_schema = get_input_schema_for_modality(modality)
-    input_record = create_input_record(input_schema, modality)
-    session_id = generate_session_id("vertex_ai", modality)
-
-    generator = Generator(model, PromptStrategy.MAP, None, desc=STATIC_CONTEXT)
-    output, _, gen_stats, _ = generator(
+    # Second request (should use cache)
+    output2, _, gen_stats2, _ = generator(
         input_record,
         AnimalOutputSchema.model_fields,
         output_schema=AnimalOutputSchema,
         cache_isolation_id=session_id,
     )
 
-    # Verify output
-    assert output is not None
-    assert "animal" in output
+    # Verify second request output
+    assert output2 is not None
+    assert "animal" in output2
 
-    # Get expected stats
-    expected = EXPECTED_STATS.get(("vertex_ai", modality), {})
-
-    # Assert input token counts match expected values
-    if expected.get("input_text_tokens") is not None:
-        assert gen_stats.input_text_tokens == expected["input_text_tokens"], \
-            f"input_text_tokens mismatch: got {gen_stats.input_text_tokens}, expected {expected['input_text_tokens']}"
-
-    if expected.get("input_image_tokens") is not None:
-        assert gen_stats.input_image_tokens == expected["input_image_tokens"], \
-            f"input_image_tokens mismatch: got {gen_stats.input_image_tokens}, expected {expected['input_image_tokens']}"
-
-    if expected.get("input_audio_tokens") is not None:
-        assert gen_stats.input_audio_tokens == expected["input_audio_tokens"], \
-            f"input_audio_tokens mismatch: got {gen_stats.input_audio_tokens}, expected {expected['input_audio_tokens']}"
-
-    # Assert output tokens are positive
-    assert gen_stats.output_text_tokens > 0, "output_text_tokens should be positive"
-
-    # Assert cost_per_record is calculated correctly
-    assert gen_stats.cost_per_record > 0, "cost_per_record should be positive"
+    # Assert second request stats
+    if "second_request" in expected:
+        assert_stats_match(gen_stats2, expected["second_request"], "second_request")

@@ -5,7 +5,6 @@ This module provides provider-specific prompt caching configurations:
 - OpenAI: Automatic prefix caching with prompt_cache_key for sticky routing
 - Gemini (Google AI Studio / Vertex AI): Implicit caching (automatic prefix matching)
 - Anthropic: Explicit cache_control with ephemeral type on system and user message content
-- DeepSeek: Automatic context caching (enabled by default, 64 token minimum)
 """
 
 import copy
@@ -82,13 +81,11 @@ class PromptManager:
         # https://platform.claude.com/docs/en/build-with-claude/prompt-caching
         if self.model.is_provider_anthropic():
             return self._transform_messages_for_anthropic(messages)
-        # implicit caching for Deepseek/Gemini/Openai Models that current support caching
+        # implicit caching for Gemini/OpenAI models that currently support caching
         # OpenAI: https://platform.openai.com/docs/guides/prompt-caching
         # Gemini: https://ai.google.dev/gemini-api/docs/caching
-        # DeepSeek: https://api-docs.deepseek.com/guides/kv_cache
         elif (self.model.is_provider_openai() or
-              self.model.is_provider_google_ai_studio() or self.model.is_provider_vertex_ai() or
-              self.model.is_provider_deepseek()):
+              self.model.is_provider_google_ai_studio() or self.model.is_provider_vertex_ai()):
             return self._remove_cache_boundary_markers(messages)
 
         return messages
@@ -113,34 +110,37 @@ class PromptManager:
             # only realtime audio models do, but they are not supported by PZ
             if self.model.supports_prompt_caching() and not is_audio_op:
                 stats["cache_read_tokens"] = details.get("cached_tokens") or 0
-                stats["input_text_tokens"] = usage.get("prompt_tokens") - stats["cache_read_tokens"]
+                stats["input_text_tokens"] = (usage.get("prompt_tokens") or 0) - stats["cache_read_tokens"]
             elif is_audio_op:
-                stats["input_text_tokens"] = details.get("text_tokens", 0.0)
-                stats["input_audio_tokens"] = details.get("audio_tokens", 0.0)
+                stats["input_text_tokens"] = details.get("text_tokens") or 0
+                stats["input_audio_tokens"] = details.get("audio_tokens") or 0
             else:
-                stats["input_text_tokens"] = usage.get("prompt_tokens", 0.0)
+                stats["input_text_tokens"] = usage.get("prompt_tokens") or 0
 
         # TODO: verify for vertex ai
         elif self.model.is_provider_vertex_ai() or self.model.is_provider_google_ai_studio():
             # Try Gemini native field first, then litellm normalized field as fallback
-            stats["cache_read_tokens"] = usage.get("cache_read_input_tokens", 0.0)
+            stats["cache_read_tokens"] = usage.get("cache_read_input_tokens") or 0
             if stats["cache_read_tokens"] == 0:
                 # litellm may normalize Gemini responses to use prompt_tokens_details
                 stats["cache_read_tokens"] = details.get("cached_tokens") or 0
-            stats["input_text_tokens"] = details.get("text_tokens", 0.0)
-            stats["input_audio_tokens"] = details.get("audio_tokens", 0.0)
-            stats["input_image_tokens"] = details.get("image_tokens", 0.0)
+            stats["input_text_tokens"] = details.get("text_tokens") or 0
+            stats["input_audio_tokens"] = details.get("audio_tokens") or 0
+            stats["input_image_tokens"] = details.get("image_tokens") or 0
 
         elif self.model.is_provider_anthropic():
-            stats["cache_creation_tokens"] = usage.get("cache_creation_input_tokens", 0.0)
-            stats["cache_read_tokens"] = usage.get("cache_read_input_tokens", 0.0)
-            stats["input_text_tokens"] = usage.get("prompt_tokens", 0.0) - stats["cache_read_tokens"] - stats["cache_creation_tokens"]
+            stats["cache_creation_tokens"] = usage.get("cache_creation_input_tokens") or 0
+            stats["cache_read_tokens"] = usage.get("cache_read_input_tokens") or 0
+            stats["input_text_tokens"] = max(0, (usage.get("prompt_tokens") or 0) - stats["cache_read_tokens"] - stats["cache_creation_tokens"])
 
-        # TODO: verify this
-        elif self.model.is_provider_deepseek():
-            stats["cache_read_tokens"] = usage.get("cache_read_input_tokens", 0)
-            stats["cache_creation_tokens"] = 0
-            stats["input_text_tokens"] = usage.get("prompt_tokens", 0) - stats["cache_read_tokens"]
+        # all other models (assume caching not supported)
+        else:
+            if is_audio_op:
+                stats["input_text_tokens"] = details.get("text_tokens") or 0
+                stats["input_audio_tokens"] = details.get("audio_tokens") or 0
+            else:
+                stats["input_text_tokens"] = usage.get("prompt_tokens") or 0
+
 
         return stats
 
@@ -149,7 +149,7 @@ class PromptManager:
         """
         Remove <<cache-boundary>> markers from user messages.
 
-        For providers with automatic (implicit) caching (OpenAI, Gemini, DeepSeek), we don't need
+        For providers with automatic (implicit) caching (OpenAI, Gemini), we don't need
         explicit cache markers. This function cleans up the markers from prompts.
 
         Args:
