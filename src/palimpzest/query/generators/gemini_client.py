@@ -1,8 +1,8 @@
 """
-Direct client for Google AI Studio (Gemini) that bypasses litellm.
+Direct client for Gemini (Google AI Studio and Vertex AI) that bypasses litellm.
 
 This module provides a GeminiClient class that:
-1. Calls Gemini API directly via google-generativeai SDK
+1. Calls Gemini API directly via google-genai SDK
 2. Converts litellm/palimpzest message format to Gemini format
 3. Relies on implicit context caching (automatic prefix matching)
 """
@@ -13,9 +13,9 @@ import base64
 import logging
 from dataclasses import dataclass
 from typing import Any
+
 from google import genai
 from google.genai import types
-
 
 logger = logging.getLogger(__name__)
 
@@ -30,34 +30,32 @@ class GeminiResponse:
 
 class GeminiClient:
     """
-    Direct client for Google AI Studio (Gemini) that bypasses litellm.
-
+    Direct client for Gemini (Google AI Studio and Vertex AI) that bypasses litellm.
     Uses implicit caching (automatic prefix matching) for prompt caching.
 
-    Uses a singleton pattern per model name so that cache state is shared across
-    all Generator instances using the same model (e.g., across different operators
-    in the same plan).
+    Uses a singleton pattern per (model, use_vertex) so that client state is shared
+    across all Generator instances using the same model and provider.
 
     Args:
-        model: Model name
-
-    Example usage:
-        client = GeminiClient.get_instance(model="gemini-2.5-flash")
-        response = client.generate(messages)
+        model: Model name (e.g., "gemini-2.5-flash")
+        use_vertex: If True, use Vertex AI; otherwise use Google AI Studio
     """
 
-    _instances: dict[str, GeminiClient] = {}
+    _instances: dict[tuple[str, bool], GeminiClient] = {}
 
     @classmethod
-    def get_instance(cls, model: str) -> GeminiClient:
-        """Get or create a singleton GeminiClient for the given model."""
-        if model not in cls._instances:
-            cls._instances[model] = cls(model)
-        return cls._instances[model]
+    def get_instance(cls, model: str, use_vertex: bool = False) -> GeminiClient:
+        """Get or create a singleton GeminiClient for the given model and provider."""
+        key = (model, use_vertex)
+        if key not in cls._instances:
+            cls._instances[key] = cls(model, use_vertex)
+        return cls._instances[key]
 
-    def __init__(self, model):
+    def __init__(self, model: str, use_vertex: bool = False):
         self.model = model
-        self.client = genai.Client()
+        self.use_vertex = use_vertex
+        # Vertex AI: uses GOOGLE_APPLICATION_CREDENTIALS for auth
+        self.client = genai.Client(vertexai=True) if use_vertex else genai.Client()
 
     def _detect_image_media_type(self, base64_data: str) -> str:
         """Detect image format from base64 data by examining magic bytes."""
@@ -120,7 +118,12 @@ class GeminiClient:
                         if img.get("type") == "image_url":
                             url = img["image_url"]["url"]
                             if url.startswith("data:"):
-                                _, data = url.split(";base64,")
+                                # Robust parsing: handle "data:[<mediatype>];base64,<data>"
+                                base64_marker = ";base64,"
+                                marker_idx = url.find(base64_marker)
+                                if marker_idx == -1:
+                                    continue
+                                data = url[marker_idx + len(base64_marker):]
                                 media_type = self._detect_image_media_type(data)
                                 parts.append({
                                     "inline_data": {
@@ -158,7 +161,11 @@ class GeminiClient:
                             parts.append({"text": block.get("text", "")})
 
                 if parts:
-                    gemini_contents.append({"role": "model", "parts": parts})
+                    # Merge consecutive model messages (Gemini requires strict role alternation)
+                    if gemini_contents and gemini_contents[-1]["role"] == "model":
+                        gemini_contents[-1]["parts"].extend(parts)
+                    else:
+                        gemini_contents.append({"role": "model", "parts": parts})
 
         return system_instruction, gemini_contents
 
@@ -188,7 +195,12 @@ class GeminiClient:
         if usage_metadata is None:
             return generation_stats
 
-        raw = usage_metadata.model_dump()
+        try:
+            raw = usage_metadata.model_dump()
+        except (AttributeError, Exception):
+            # Fallback for SDK versions without model_dump()
+            raw = vars(usage_metadata) if hasattr(usage_metadata, "__dict__") else {}
+            logger.warning("Could not call model_dump() on usage_metadata, using fallback")
 
         # Parse cache read tokens by modality
         for detail in (raw.get("cache_tokens_details") or []):
@@ -221,6 +233,8 @@ class GeminiClient:
     # Maps reasoning_effort to Gemini thinking_budget token counts
     # Reference: https://github.com/BerriAI/litellm/blob/620664921902d7a9bfb29897a7b27c1a7ef4ddfb/litellm/constants.py#L88
     REASONING_EFFORT_TO_THINKING_BUDGET = {
+        "disable": 0,
+        "minimal": 128,
         "low": 1024,
         "medium": 2048,
         "high": 4096,

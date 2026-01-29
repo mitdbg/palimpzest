@@ -20,8 +20,7 @@ from pydantic.fields import FieldInfo
 from palimpzest.constants import Cardinality, Model, PromptStrategy
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.models import GenerationStats
-from palimpzest.prompts import PromptFactory
-from palimpzest.prompts import PromptManager
+from palimpzest.prompts import PromptFactory, PromptManager
 
 # DEFINITIONS
 GenerationOutput = tuple[dict, str | None, GenerationStats, list[dict]]
@@ -121,13 +120,16 @@ class Generator(Generic[ContextType, InputType]):
         self.prompt_factory = PromptFactory(prompt_strategy, model, cardinality, desc)
         self.prompt_manager = PromptManager(model)
 
-        # Initialize GeminiClient for direct Gemini API calls (Google AI Studio only)
+        # Initialize GeminiClient for direct Gemini API calls (Google AI Studio and Vertex AI)
         self.gemini_client = None
-        if model.is_provider_google_ai_studio():
+        if model.is_provider_google_ai_studio() or model.is_provider_vertex_ai():
             from palimpzest.query.generators.gemini_client import GeminiClient
             # Extract model name without provider prefix (e.g., "gemini/gemini-2.5-flash" -> "gemini-2.5-flash")
             gemini_model = model.value.split("/")[-1] if "/" in model.value else model.value
-            self.gemini_client = GeminiClient.get_instance(model=gemini_model)
+            self.gemini_client = GeminiClient.get_instance(
+                model=gemini_model,
+                use_vertex=model.is_provider_vertex_ai(),
+            )
 
     def _parse_reasoning(self, completion_text: str, **kwargs) -> str:
         """Extract the reasoning for the generated output from the completion object."""
@@ -387,19 +389,19 @@ class Generator(Generic[ContextType, InputType]):
         generation_stats = None
         if completion_text is not None:
             # get cost per input/output token for the model
-            usd_per_input_token = self.model.get_usd_per_input_token()
-            usd_per_audio_input_token = self.model.get_usd_per_audio_input_token()
-            usd_per_image_input_token = self.model.get_usd_per_image_input_token()
-            usd_per_output_token = self.model.get_usd_per_output_token()
-            usd_per_cache_read_token = self.model.get_usd_per_cache_read_token()
-            usd_per_audio_cache_read_token = self.model.get_usd_per_audio_cache_read_token()
-            usd_per_image_cache_read_token = self.model.get_usd_per_image_cache_read_token()
-            usd_per_cache_creation_token = self.model.get_usd_per_cache_creation_token()
+            usd_per_input_token = self.model.get_usd_per_input_token() or 0.0
+            usd_per_audio_input_token = self.model.get_usd_per_audio_input_token() or 0.0
+            usd_per_image_input_token = self.model.get_usd_per_image_input_token() or 0.0
+            usd_per_output_token = self.model.get_usd_per_output_token() or 0.0
+            usd_per_cache_read_token = self.model.get_usd_per_cache_read_token() or 0.0
+            usd_per_audio_cache_read_token = self.model.get_usd_per_audio_cache_read_token() or 0.0
+            usd_per_image_cache_read_token = self.model.get_usd_per_image_cache_read_token() or 0.0
+            usd_per_cache_creation_token = self.model.get_usd_per_cache_creation_token() or 0.0
 
             # Extract usage stats based on provider
             if self.gemini_client is not None:
                 # Usage already processed by GeminiClient
-                output_text_tokens = usage_stats["output_text_tokens"]
+                output_text_tokens = usage_stats.get("output_text_tokens", 0)
             else:
                 # litellm response format
                 output_text_tokens = usage.get("completion_tokens") or 0

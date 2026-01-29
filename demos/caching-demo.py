@@ -16,7 +16,6 @@ Supported caching providers:
 - OpenAI (GPT-4o, GPT-4o-mini): Automatic prefix caching
 - Anthropic (Claude 3.5 Sonnet/Haiku): Explicit cache_control markers
 - Gemini: Implicit caching
-- DeepSeek: Context caching
 """
 import argparse
 import os
@@ -176,11 +175,11 @@ class TravelRequestDataset(pz.IterDataset):
 MODEL_MAPPING = {
     "gpt-4o": Model.GPT_4o,
     "gpt-4o-mini": Model.GPT_4o_MINI,
-    "claude-4-0-sonnet": Model.CLAUDE_4_0_SONNET,
+    "claude-4-0-sonnet": Model.CLAUDE_4_SONNET,
     # "claude-3-7-sonnet": Model.CLAUDE_3_7_SONNET, # deprecated model testing
     "claude-3-5-haiku": Model.CLAUDE_3_5_HAIKU,
     "gemini-2.5-flash": Model.GOOGLE_GEMINI_2_5_FLASH,
-    # "deepseek-v3": Model.DEEPSEEK_V3, # TODO: test with changes from 265
+    # "deepseek-v3": Model.DEEPSEEK_V3,
 }
 
 def get_model_from_string(model_str: str) -> Model:
@@ -231,7 +230,7 @@ def print_cache_stats(execution_stats):
         print(f"\nCache Hit Rate: {hit_rate:.1f}%")
 
 def main():
-    parser = argparse.ArgumentParser(description="Realistic Demo showcasing prompt caching in Palimpzest")
+    parser = argparse.ArgumentParser(description="Demo showcasing prompt caching in Palimpzest")
     parser.add_argument("--model", type=str, default="gpt-4o-mini", help="Model to use")
     parser.add_argument("--num-records", type=int, default=5, help="Number of requests to process")
     parser.add_argument("--verbose", action="store_true", help="Enable verbose output")

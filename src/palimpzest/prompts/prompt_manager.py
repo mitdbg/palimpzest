@@ -57,9 +57,8 @@ class PromptManager:
         for msg in messages:
             role = msg.get("role")
             content = msg.get("content")
-            if role == "system" and isinstance(content, str):
-                msg["content"] = f"[{session_id}] " + content
-            elif role == "user" and self.model.is_provider_anthropic() and msg.get("type") == "text" and isinstance(content, str):
+            if role == "system" and isinstance(content, str) or \
+               role == "user" and self.model.is_provider_anthropic() and msg.get("type") == "text" and isinstance(content, str):
                 msg["content"] = f"[{session_id}] " + content
         return messages
 
@@ -117,21 +116,20 @@ class PromptManager:
             else:
                 stats["input_text_tokens"] = usage.get("prompt_tokens") or 0
 
-        # TODO: verify for vertex ai (moved to gemini client)
-        # elif self.model.is_provider_vertex_ai() or self.model.is_provider_google_ai_studio():
-        #     # Try Gemini native field first, then litellm normalized field as fallback
+        # Google AI Studio: usage stats extracted directly in GeminiClient
+        # TODO: verify for Vertex AI (currently goes through litellm)
+        # elif self.model.is_provider_vertex_ai():
         #     stats["cache_read_tokens"] = usage.get("cache_read_input_tokens") or 0
         #     if stats["cache_read_tokens"] == 0:
-        #         # litellm may normalize Gemini responses to use prompt_tokens_details
         #         stats["cache_read_tokens"] = details.get("cached_tokens") or 0
         #     stats["input_text_tokens"] = details.get("text_tokens") or 0
         #     stats["input_audio_tokens"] = details.get("audio_tokens") or 0
         #     stats["input_image_tokens"] = details.get("image_tokens") or 0
 
-        # elif self.model.is_provider_anthropic():
-        #     stats["cache_creation_tokens"] = usage.get("cache_creation_input_tokens") or 0
-        #     stats["cache_read_tokens"] = usage.get("cache_read_input_tokens") or 0
-        #     stats["input_text_tokens"] = max(0, (usage.get("prompt_tokens") or 0) - stats["cache_read_tokens"] - stats["cache_creation_tokens"])
+        elif self.model.is_provider_anthropic():
+            stats["cache_creation_tokens"] = usage.get("cache_creation_input_tokens") or 0
+            stats["cache_read_tokens"] = usage.get("cache_read_input_tokens") or 0
+            stats["input_text_tokens"] = max(0, (usage.get("prompt_tokens") or 0) - stats["cache_read_tokens"] - stats["cache_creation_tokens"])
 
         # all other models (assume caching not supported)
         else:

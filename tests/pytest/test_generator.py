@@ -506,7 +506,7 @@ PROVIDER_CONFIG = {
 ALL_MODALITIES = ["text-only", "image-only", "audio-only", "text-image-audio"]
 ALL_PROVIDERS = ["anthropic", "openai", "openai-audio", "gemini", "vertex_ai"]
 
-CACHE_WAIT_SECONDS = 20
+CACHE_WAIT_SECONDS = 10
 
 
 def check_api_key(provider: str) -> bool:
