@@ -419,24 +419,21 @@ def create_input_record(input_schema, modality: str):
     data_item = {}
 
     # Add text fields if applicable
-    if "text" in modality or input_schema == TextInputSchema:
-        if hasattr(input_schema, "model_fields"):
+    if "text" in modality or input_schema == TextInputSchema and hasattr(input_schema, "model_fields"):
             if "text" in input_schema.model_fields:
                 data_item["text"] = "An elephant is a large gray animal with a trunk and big ears. It makes a trumpeting sound."
             if "age" in input_schema.model_fields:
                 data_item["age"] = 15
 
     # Add image fields if applicable
-    if "image" in modality or input_schema == ImageInputSchema:
-        if hasattr(input_schema, "model_fields"):
+    if "image" in modality or input_schema == ImageInputSchema and hasattr(input_schema, "model_fields"):
             if "image_file" in input_schema.model_fields:
                 data_item["image_file"] = "tests/pytest/data/elephant.png"
             if "height" in input_schema.model_fields:
                 data_item["height"] = 304.5
 
     # Add audio fields if applicable
-    if "audio" in modality or input_schema == AudioInputSchema:
-        if hasattr(input_schema, "model_fields"):
+    if "audio" in modality or input_schema == AudioInputSchema and hasattr(input_schema, "model_fields"):
             if "audio_file" in input_schema.model_fields:
                 data_item["audio_file"] = "tests/pytest/data/elephant.wav"
             if "year" in input_schema.model_fields:
