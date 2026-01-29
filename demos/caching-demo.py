@@ -2,9 +2,9 @@
 """
 Realistic Demo showcasing prompt caching capabilities in Palimpzest.
 
-This demo processes multiple employee travel requests against a comprehensive 
-Corporate Travel Policy. The policy text (~2000 tokens) is included in the 
-system prompt, creating a realistic scenario for prompt caching where a large 
+This demo processes multiple employee travel requests against a comprehensive
+Corporate Travel Policy. The policy text (~2000 tokens) is included in the
+system prompt, creating a realistic scenario for prompt caching where a large
 static context is reused across multiple dynamic inputs.
 
 Workload:
@@ -17,6 +17,7 @@ Supported caching providers:
 - Anthropic (Claude 3.5 Sonnet/Haiku): Explicit cache_control markers
 - Gemini: Implicit caching
 """
+
 import argparse
 import os
 import time
@@ -108,25 +109,21 @@ EMPLOYEE_REQUESTS = [
     I booked a flight to London (8.5 hours) in Business Class for the client summit. 
     Hotel is $320/night. Meal expenses were about $90/day. 
     Receipts attached.""",
-
     # Request 2: Violation (Booking window & First Class)
     """Subject: Urgent NY Trip
     I need to fly to New York tomorrow. Booked First Class because it was the only seat left.
     Hotel is the Ritz at $500/night. 
     Also expensed $40 for in-flight Wi-Fi to finish the Q3 report.""",
-
     # Request 3: Violation (Car Rental & Alcohol)
     """Subject: Austin Conference
     Rented a luxury SUV for the team in Austin. 
     Dinner with the team (no clients) came to $800 ($200/person) including 3 bottles of wine.
     Hotel was $240/night.""",
-
     # Request 4: Compliant (Tier 2 City)
     """Subject: Berlin Site Visit
     Flew Economy to Berlin. Hotel was $220/night.
     Took a taxi from TXL ($45 + $5 tip).
     Daily meals averaged $70.""",
-    
     # Request 5: Violation (Misc items)
     """Subject: Tokyo Tech Symposium
     Trip duration: 4 days. 
@@ -136,15 +133,27 @@ EMPLOYEE_REQUESTS = [
     - Laundry service ($60)
     - Forgotten toothbrush replacement ($15)
     - Parking ticket ($50)
-    """
+    """,
 ]
 
 # Output Schema
 OUTPUT_SCHEMA = [
     {"name": "status", "type": str, "desc": "One of: 'COMPLIANT', 'PARTIAL_VIOLATION', 'MAJOR_VIOLATION'"},
-    {"name": "violations", "type": str, "desc": "A list of specific policy violations found, referencing the specific section numbers (e.g., 'Violation of Section 2.2'). If compliant, return 'None'."},
-    {"name": "reimbursable_summary", "type": str, "desc": "A concise summary of what should be reimbursed vs rejected based on the policy text."},
-    {"name": "flag_for_review", "type": bool, "desc": "True if the request requires manual review by a manager (e.g. for high amounts or ambiguous justifications)."},
+    {
+        "name": "violations",
+        "type": str,
+        "desc": "A list of specific policy violations found, referencing the specific section numbers (e.g., 'Violation of Section 2.2'). If compliant, return 'None'.",
+    },
+    {
+        "name": "reimbursable_summary",
+        "type": str,
+        "desc": "A concise summary of what should be reimbursed vs rejected based on the policy text.",
+    },
+    {
+        "name": "flag_for_review",
+        "type": bool,
+        "desc": "True if the request requires manual review by a manager (e.g. for high amounts or ambiguous justifications).",
+    },
 ]
 
 TASK_DESC = f"""
@@ -156,8 +165,10 @@ The full policy text is provided below.
 Analyze the input email and determine if the expenses adhere to the policy.
 """
 
+
 class TravelRequestDataset(pz.IterDataset):
     """Custom dataset that provides travel requests as text records."""
+
     def __init__(self, requests: List[str]):
         super().__init__(id="travel_requests", schema=TextFile)
         self.requests = requests
@@ -171,16 +182,18 @@ class TravelRequestDataset(pz.IterDataset):
             "contents": self.requests[idx],
         }
 
+
 # Model mapping (Same as original)
 MODEL_MAPPING = {
     "gpt-4o": Model.GPT_4o,
     "gpt-4o-mini": Model.GPT_4o_MINI,
     "claude-4-0-sonnet": Model.CLAUDE_4_SONNET,
     # "claude-3-7-sonnet": Model.CLAUDE_3_7_SONNET, # deprecated model testing
-    "claude-3-5-haiku": Model.CLAUDE_3_5_HAIKU,
+    "claude-4-5-haiku": Model.CLAUDE_4_5_HAIKU,
     "gemini-2.5-flash": Model.GOOGLE_GEMINI_2_5_FLASH,
     # "deepseek-v3": Model.DEEPSEEK_V3,
 }
+
 
 def get_model_from_string(model_str: str) -> Model:
     if model_str.lower() in MODEL_MAPPING:
@@ -189,6 +202,7 @@ def get_model_from_string(model_str: str) -> Model:
         if model.value.lower() == model_str.lower():
             return model
     raise ValueError(f"Unknown model: {model_str}")
+
 
 def print_cache_stats(execution_stats):
     """Print cache-related statistics from execution."""
@@ -229,13 +243,14 @@ def print_cache_stats(execution_stats):
         hit_rate = (cache_read / total_cacheable) * 100
         print(f"\nCache Hit Rate: {hit_rate:.1f}%")
 
+
 def main():
     parser = argparse.ArgumentParser(description="Demo showcasing prompt caching in Palimpzest")
     parser.add_argument("--model", type=str, default="gpt-4o-mini", help="Model to use")
     parser.add_argument("--num-records", type=int, default=5, help="Number of requests to process")
     parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
     parser.add_argument("--profile", action="store_true", help="Save profiling data")
-    
+
     args = parser.parse_args()
     model = get_model_from_string(args.model)
 
@@ -254,20 +269,22 @@ def main():
     print(" PZ CACHING DEMO: CORPORATE AUDIT")
     print("=" * 60)
     print(f"Model: {model.value}")
-    print(f"Policy Context Size: ~{len(CORPORATE_TRAVEL_POLICY.split())} words (~{int(len(CORPORATE_TRAVEL_POLICY.split()) * 1.3)} tokens)")
-    
+    print(
+        f"Policy Context Size: ~{len(CORPORATE_TRAVEL_POLICY.split())} words (~{int(len(CORPORATE_TRAVEL_POLICY.split()) * 1.3)} tokens)"
+    )
+
     # Repeat the request list if user wants more records than we have mocks
     base_requests = EMPLOYEE_REQUESTS
     requests = []
     while len(requests) < args.num_records:
         requests.extend(base_requests)
-    requests = requests[:args.num_records]
-    
+    requests = requests[: args.num_records]
+
     print(f"Processing {len(requests)} travel requests...")
 
     # Build Plan
     dataset = TravelRequestDataset(requests)
-    
+
     # The 'desc' field incorporates the huge CORPORATE_TRAVEL_POLICY string.
     # This ensures the System Prompt is large (>1024 tokens) and identical for all records.
     plan = dataset.sem_map(OUTPUT_SCHEMA, desc=TASK_DESC)
@@ -275,7 +292,7 @@ def main():
     config = pz.QueryProcessorConfig(
         policy=pz.MaxQuality(),
         verbose=args.verbose,
-        execution_strategy="sequential", # Sequential often easier to debug caching behavior initially
+        execution_strategy="sequential",  # Sequential often easier to debug caching behavior initially
         available_models=[model],
     )
 
@@ -288,13 +305,14 @@ def main():
     print(" AUDIT RESULTS")
     print("=" * 60)
     for i, record in enumerate(result.data_records):
-        print(f"\n[Request {i+1}]")
+        print(f"\n[Request {i + 1}]")
         print(f"Status: {record.status}")
         print(f"Violations: {record.violations}")
         print(f"Summary: {record.reimbursable_summary}")
 
     print_cache_stats(result.execution_stats)
     print(f"\nWall Clock Time: {end_time - start_time:.2f}s")
+
 
 if __name__ == "__main__":
     main()

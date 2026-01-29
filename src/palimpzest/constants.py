@@ -281,6 +281,12 @@ class Model:
     def is_provider_deepseek(self) -> bool:
         return self.provider == "deepseek"
 
+    def is_model_gemini(self) -> bool:
+        return "gemini" in self.value.lower()
+
+    def get_model_name(self) -> str:
+        return self.value.split("/")[-1] if "/" in self.value else self.value
+
     def is_o_model(self) -> bool:
         return self.model_specs.get("is_o_model", False)
 

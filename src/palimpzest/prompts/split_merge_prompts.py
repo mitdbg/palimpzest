@@ -73,13 +73,13 @@ You will be provided with a description of each input field and each output fiel
 
 {output_format_instruction} Finish your response with a newline character followed by ---
 ---
-<<cache-boundary>>{chunk_outputs}
-
 INPUT FIELDS:
 {input_fields_desc}
 
 OUTPUT FIELDS:
 {output_fields_desc}
+
+<<cache-boundary>>{chunk_outputs}
 
 Let's think step-by-step in order to answer the question.
 
@@ -93,12 +93,12 @@ You will be provided with a description of each input field and the filter condi
 
 Remember, your answer must be TRUE or FALSE. Finish your response with a newline character followed by ---
 ---
-<<cache-boundary>>{chunk_outputs}
-
 INPUT FIELDS:
 {input_fields_desc}
 
 FILTER CONDITION: {filter_condition}
+
+<<cache-boundary>>{chunk_outputs}
 
 Let's think step-by-step in order to answer the question.
 

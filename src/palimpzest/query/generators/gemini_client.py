@@ -42,6 +42,16 @@ class GeminiClient:
     """
 
     _instances: dict[tuple[str, bool], GeminiClient] = {}
+    
+    # Maps reasoning_effort to Gemini thinking_budget token counts
+    # Reference: https://github.com/BerriAI/litellm/blob/620664921902d7a9bfb29897a7b27c1a7ef4ddfb/litellm/constants.py#L88
+    REASONING_EFFORT_TO_THINKING_BUDGET = {
+        "disable": 0,
+        "minimal": 128,
+        "low": 1024,
+        "medium": 2048,
+        "high": 4096,
+    }
 
     @classmethod
     def get_instance(cls, model: str, use_vertex: bool = False) -> GeminiClient:
@@ -229,16 +239,6 @@ class GeminiClient:
         generation_stats["output_text_tokens"] = (raw.get("candidates_token_count") or 0) + (raw.get("thoughts_token_count") or 0)
 
         return generation_stats
-
-    # Maps reasoning_effort to Gemini thinking_budget token counts
-    # Reference: https://github.com/BerriAI/litellm/blob/620664921902d7a9bfb29897a7b27c1a7ef4ddfb/litellm/constants.py#L88
-    REASONING_EFFORT_TO_THINKING_BUDGET = {
-        "disable": 0,
-        "minimal": 128,
-        "low": 1024,
-        "medium": 2048,
-        "high": 4096,
-    }
 
     def generate(
         self,

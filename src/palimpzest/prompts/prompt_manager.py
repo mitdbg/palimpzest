@@ -105,19 +105,18 @@ class PromptManager:
         details = usage.get("prompt_tokens_details") or {}
 
         if self.model.is_provider_openai():
-            # assume audio models don't support caching for now
             # only realtime audio models do, but they are not supported by PZ
             if self.model.supports_prompt_caching() and not is_audio_op:
                 stats["cache_read_tokens"] = details.get("cached_tokens") or 0
                 stats["input_text_tokens"] = (usage.get("prompt_tokens") or 0) - stats["cache_read_tokens"]
+            # audio models don't support caching for now
             elif is_audio_op:
                 stats["input_text_tokens"] = details.get("text_tokens") or 0
                 stats["input_audio_tokens"] = details.get("audio_tokens") or 0
             else:
                 stats["input_text_tokens"] = usage.get("prompt_tokens") or 0
 
-        # Google AI Studio: usage stats extracted directly in GeminiClient
-        # TODO: verify for Vertex AI (currently goes through litellm)
+        # Moved to Gemini client class, now usage stats are extracted directly in GeminiClient
         # elif self.model.is_provider_vertex_ai():
         #     stats["cache_read_tokens"] = usage.get("cache_read_input_tokens") or 0
         #     if stats["cache_read_tokens"] == 0:

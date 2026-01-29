@@ -38,7 +38,7 @@ def output_schema():
         pytest.param(Model.GPT_4o_MINI, marks=pytest.mark.skipif(os.getenv("OPENAI_API_KEY") is None, reason="OPENAI_API_KEY not present")),
         pytest.param(Model.DEEPSEEK_V3, marks=pytest.mark.skipif(os.getenv("TOGETHER_API_KEY") is None, reason="TOGETHER_API_KEY not present")),
         pytest.param(Model.LLAMA3_2_3B, marks=pytest.mark.skipif(os.getenv("TOGETHER_API_KEY") is None, reason="TOGETHER_API_KEY not present")),
-        pytest.param(Model.CLAUDE_3_5_HAIKU, marks=pytest.mark.skipif(os.getenv("ANTHROPIC_API_KEY") is None, reason="ANTHROPIC_API_KEY not present")),
+        pytest.param(Model.CLAUDE_4_5_HAIKU, marks=pytest.mark.skipif(os.getenv("ANTHROPIC_API_KEY") is None, reason="ANTHROPIC_API_KEY not present")),
     ]
 )
 def test_generator(model, question, output_schema):
@@ -534,24 +534,18 @@ def within_tolerance(actual: int, expected: int, tolerance: float = 0.05) -> boo
 def assert_stats_match(gen_stats, expected: dict, request_name: str, provider: str = "", tolerance: float = 0.05):
     """Assert that generation stats match expected values within tolerance.
 
-    For OpenAI, cache hits are non-deterministic (prefix caching depends on server-side
-    shard routing). So for cache_read_tokens we accept anywhere in [0, expected+5%],
+    For providers with implicit caching (OpenAI, Gemini), cache hits are non-deterministic.
+    So for cache_read_tokens we accept anywhere in [0, expected+5%],
     and input_text_tokens is validated as: total logical input ≈ input_text + cache_read.
     """
-    is_openai = provider.startswith("openai")
+    has_implicit_caching = provider.startswith("openai") or provider.startswith("gemini")
 
-    if is_openai and expected.get("cache_read_tokens") is not None and expected["cache_read_tokens"] > 0:
-        # OpenAI: cache hit is non-deterministic, accept 0..expected+tolerance
+    if has_implicit_caching and expected.get("cache_read_tokens") is not None and expected["cache_read_tokens"] > 0:
+        # Implicit caching (OpenAI/Gemini): cache hit is non-deterministic, accept 0..expected+tolerance
         expected_cache = expected["cache_read_tokens"]
         cache_upper = expected_cache + max(1, int(expected_cache * tolerance))
         assert 0 <= gen_stats.cache_read_tokens <= cache_upper, \
             f"{request_name} cache_read_tokens out of range: got {gen_stats.cache_read_tokens}, expected 0..{cache_upper}"
-
-        # input_text_tokens + cache_read_tokens should equal the logical total
-        expected_logical_total = expected["input_text_tokens"] + expected["cache_read_tokens"]
-        actual_logical_total = gen_stats.input_text_tokens + gen_stats.cache_read_tokens
-        assert within_tolerance(actual_logical_total, expected_logical_total, tolerance), \
-            f"{request_name} logical total input mismatch: got {actual_logical_total} (input={gen_stats.input_text_tokens} + cache={gen_stats.cache_read_tokens}), expected ~{expected_logical_total}"
     else:
         if expected.get("input_text_tokens") is not None:
             assert within_tolerance(gen_stats.input_text_tokens, expected["input_text_tokens"], tolerance), \
@@ -573,13 +567,24 @@ def assert_stats_match(gen_stats, expected: dict, request_name: str, provider: s
         assert within_tolerance(gen_stats.cache_creation_tokens, expected["cache_creation_tokens"], tolerance), \
             f"{request_name} cache_creation_tokens mismatch: got {gen_stats.cache_creation_tokens}, expected {expected['cache_creation_tokens']} (±{tolerance*100}%)"
 
+    # Verify total input token invariant across all providers:
+    # input_text + input_image + input_audio + cache_read + cache_creation ≈ expected total
+    expected_total = sum(expected.get(k, 0) or 0 for k in [
+        "input_text_tokens", "input_image_tokens", "input_audio_tokens",
+        "cache_read_tokens", "cache_creation_tokens",
+    ])
+    actual_total = (
+        gen_stats.input_text_tokens + gen_stats.input_image_tokens + gen_stats.input_audio_tokens
+        + gen_stats.cache_read_tokens + gen_stats.cache_creation_tokens
+    )
+    if expected_total > 0:
+        assert within_tolerance(actual_total, expected_total, tolerance), \
+            f"{request_name} total input tokens mismatch: got {actual_total}, expected {expected_total} (±{tolerance*100}%)"
+
     assert gen_stats.output_text_tokens > 0, f"{request_name} output_text_tokens should be positive"
     assert gen_stats.cost_per_record > 0, f"{request_name} cost_per_record should be positive"
 
 
-# =============================================================================
-# COMBINED GENERATOR STATS TEST
-# =============================================================================
 @pytest.mark.parametrize(
     "provider,modality",
     [(p, m) for p in ALL_PROVIDERS for m in ALL_MODALITIES],

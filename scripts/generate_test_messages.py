@@ -349,10 +349,7 @@ def main():
                     role = msg.get("role", "unknown")
                     msg_type = msg.get("type", "unknown")
                     content = msg.get("content", "")
-                    if isinstance(content, str):
-                        content_len = len(content)
-                    else:
-                        content_len = len(str(content))
+                    content_len = len(content) if isinstance(content, str) else len(str(content))
                     print(f"      [{i}] role={role}, type={msg_type}, len={content_len}")
 
                 generated_count += 1

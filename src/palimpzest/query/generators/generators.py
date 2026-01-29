@@ -122,12 +122,10 @@ class Generator(Generic[ContextType, InputType]):
 
         # Initialize GeminiClient for direct Gemini API calls (Google AI Studio and Vertex AI)
         self.gemini_client = None
-        if model.is_provider_google_ai_studio() or model.is_provider_vertex_ai():
+        if model.is_model_gemini():
             from palimpzest.query.generators.gemini_client import GeminiClient
-            # Extract model name without provider prefix (e.g., "gemini/gemini-2.5-flash" -> "gemini-2.5-flash")
-            gemini_model = model.value.split("/")[-1] if "/" in model.value else model.value
             self.gemini_client = GeminiClient.get_instance(
-                model=gemini_model,
+                model=model.get_model_name(),
                 use_vertex=model.is_provider_vertex_ai(),
             )
 

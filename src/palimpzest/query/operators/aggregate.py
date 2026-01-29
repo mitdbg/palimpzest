@@ -660,6 +660,7 @@ class SemanticAggregate(AggregateOp):
             fn_call_duration_secs=generation_stats.fn_call_duration_secs,
             total_llm_calls=generation_stats.total_llm_calls,
             total_embedding_llm_calls=generation_stats.total_embedding_llm_calls,
+            image_operation=self.is_image_op(),
             op_details={k: str(v) for k, v in self.get_id_params().items()},
         )
 
