@@ -109,8 +109,6 @@ class Generator(Generic[ContextType, InputType]):
         cardinality: Cardinality = Cardinality.ONE_TO_ONE,
         desc: str | None = None,
         verbose: bool = False,
-        gemini_explicit_cache: bool = False,
-        gemini_cache_ttl: int = 300,
     ):
         self.model = model
         self.model_name = model.value
@@ -129,11 +127,7 @@ class Generator(Generic[ContextType, InputType]):
             from palimpzest.query.generators.gemini_client import GeminiClient
             # Extract model name without provider prefix (e.g., "gemini/gemini-2.5-flash" -> "gemini-2.5-flash")
             gemini_model = model.value.split("/")[-1] if "/" in model.value else model.value
-            self.gemini_client = GeminiClient(
-                model=gemini_model,
-                use_explicit_cache=gemini_explicit_cache,
-                cache_ttl_seconds=gemini_cache_ttl,
-            )
+            self.gemini_client = GeminiClient.get_instance(model=gemini_model)
 
     def _parse_reasoning(self, completion_text: str, **kwargs) -> str:
         """Extract the reasoning for the generated output from the completion object."""
@@ -338,15 +332,18 @@ class Generator(Generic[ContextType, InputType]):
             if "generating_messages_only" in kwargs and kwargs["generating_messages_only"]:
                 return messages
 
+            messages = self.prompt_manager.update_messages_for_caching(messages)
+
             # Use GeminiClient directly for Google AI Studio models
             if self.gemini_client is not None:
                 gemini_response = self.gemini_client.generate(
                     messages=messages,
                     temperature=kwargs.get("temperature", 0.0),
+                    reasoning_effort=self.reasoning_effort if self.model.is_reasoning_model() else None,
                 )
                 end_time = time.time()
                 completion_text = gemini_response.content
-                usage = gemini_response.usage
+                usage_stats = gemini_response.usage
                 logger.debug(f"Generated completion via GeminiClient in {end_time - start_time:.2f} seconds")
             else:
                 # Use litellm for all other providers
@@ -361,8 +358,6 @@ class Generator(Generic[ContextType, InputType]):
                     completion_kwargs = {"api_base": self.api_base, "api_key": os.environ.get("VLLM_API_KEY", "fake-api-key"), **completion_kwargs}
 
                 cache_kwargs = self.prompt_manager.get_cache_kwargs()
-                messages = self.prompt_manager.update_messages_for_caching(messages)
-
                 completion_kwargs = {**completion_kwargs, **cache_kwargs}
                 completion = litellm.completion(model=self.model_name, messages=messages, **completion_kwargs)
                 end_time = time.time()
@@ -397,41 +392,43 @@ class Generator(Generic[ContextType, InputType]):
             usd_per_image_input_token = self.model.get_usd_per_image_input_token()
             usd_per_output_token = self.model.get_usd_per_output_token()
             usd_per_cache_read_token = self.model.get_usd_per_cache_read_token()
+            usd_per_audio_cache_read_token = self.model.get_usd_per_audio_cache_read_token()
+            usd_per_image_cache_read_token = self.model.get_usd_per_image_cache_read_token()
             usd_per_cache_creation_token = self.model.get_usd_per_cache_creation_token()
 
             # Extract usage stats based on provider
             if self.gemini_client is not None:
-                # Direct Gemini response format
-                output_text_tokens = usage.get("candidates_token_count") or 0
-                input_text_tokens, input_image_tokens, input_audio_tokens = 0, 0, 0
-                prompt_details = usage.get("prompt_tokens_details") or []
-                for detail in prompt_details:
-                    modality = detail.get("modality", "").upper()
-                    token_count = detail.get("token_count") or 0
-                    if modality == "TEXT":
-                        input_text_tokens = token_count
-                    elif modality == "IMAGE":
-                        input_image_tokens = token_count
-                    elif modality == "AUDIO":
-                        input_audio_tokens = token_count
-                cache_read_tokens = usage.get("cached_content_token_count") or 0
-                cache_creation_tokens = 0  # Gemini doesn't report cache creation separately
+                # Usage already processed by GeminiClient
+                output_text_tokens = usage_stats["output_text_tokens"]
             else:
                 # litellm response format
                 output_text_tokens = usage.get("completion_tokens") or 0
                 usage_stats = self.prompt_manager.extract_usage_stats(usage, is_audio_op)
-                input_text_tokens = usage_stats["input_text_tokens"]
-                input_audio_tokens = usage_stats["input_audio_tokens"]
-                input_image_tokens = usage_stats["input_image_tokens"]
-                cache_read_tokens = usage_stats["cache_read_tokens"]
-                cache_creation_tokens = usage_stats["cache_creation_tokens"]
+
+            input_text_tokens = usage_stats["input_text_tokens"]
+            input_audio_tokens = usage_stats["input_audio_tokens"]
+            input_image_tokens = usage_stats["input_image_tokens"]
+            cache_read_tokens = usage_stats["cache_read_tokens"]
+            cache_creation_tokens = usage_stats["cache_creation_tokens"]
+
+            # Compute cache cost: use per-modality breakdown if available (Gemini), otherwise aggregate
+            if self.gemini_client is not None:
+                cache_cost = (
+                    usage_stats["text_cache_read_tokens"] * usd_per_cache_read_token
+                    + usage_stats["audio_cache_read_tokens"] * usd_per_audio_cache_read_token
+                    + usage_stats["image_cache_read_tokens"] * usd_per_image_cache_read_token
+                )
+            else:
+                cache_cost = (
+                    cache_read_tokens * usd_per_cache_read_token
+                    + cache_creation_tokens * usd_per_cache_creation_token
+                )
 
             total_cost = (
                 input_text_tokens * usd_per_input_token
                 + input_audio_tokens * usd_per_audio_input_token
                 + input_image_tokens * usd_per_image_input_token
-                + cache_creation_tokens * usd_per_cache_creation_token
-                + cache_read_tokens * usd_per_cache_read_token
+                + cache_cost
                 + output_text_tokens * usd_per_output_token
             )
 

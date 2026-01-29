@@ -310,9 +310,6 @@ class Model:
 
     def get_usd_per_input_token(self) -> float:
         return self.model_specs.get("usd_per_input_token", 0.0)
-    
-    def get_usd_per_output_token(self) -> float:
-        return self.model_specs.get("usd_per_output_token", 0.0)
 
     def get_usd_per_audio_input_token(self) -> float:
         return self.model_specs.get("usd_per_audio_input_token", self.get_usd_per_input_token())
@@ -321,20 +318,24 @@ class Model:
     def get_usd_per_image_input_token(self) -> float:
         return self.model_specs.get("usd_per_image_input_token", self.get_usd_per_input_token())
 
-    # forward-looking
     def get_usd_per_cache_read_token(self) -> float:
         return self.model_specs.get("usd_per_cache_read_token", self.get_usd_per_input_token())
     
-    # forward-looking
     def get_usd_per_audio_cache_read_token(self) -> float:
-        return self.model_specs.get("usd_per_audio_cache_read_token", self.get_usd_per_audio_input_token())
+        return self.model_specs.get("usd_per_audio_cache_read_token", self.get_usd_per_cache_read_token())
     
-    # forward-looking
     def get_usd_per_image_cache_read_token(self) -> float:
-        return self.model_specs.get("usd_per_audio_cache_read_token", self.get_usd_per_image_input_token())
+        return self.model_specs.get("usd_per_image_cache_read_token", self.get_usd_per_cache_read_token())
+    
+    # forward looking; Gemini explicit
+    def get_usd_per_cached_token_per_hour(self) -> float:
+        return self.model_specs.get("usd_per_cached_token_per_hour", 0.0)
      
     def get_usd_per_cache_creation_token(self) -> float:
         return self.model_specs.get("usd_per_cache_creation_token", 0.0)
+    
+    def get_usd_per_output_token(self) -> float:
+        return self.model_specs.get("usd_per_output_token", 0.0)
     
     # forward-looking
     def get_usd_per_audio_cache_creation_token(self) -> float:

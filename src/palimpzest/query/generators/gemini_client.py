@@ -4,7 +4,7 @@ Direct client for Google AI Studio (Gemini) that bypasses litellm.
 This module provides a GeminiClient class that:
 1. Calls Gemini API directly via google-generativeai SDK
 2. Converts litellm/palimpzest message format to Gemini format
-3. Supports both implicit and explicit caching options
+3. Relies on implicit context caching (automatic prefix matching)
 """
 
 from __future__ import annotations
@@ -13,7 +13,9 @@ import base64
 import logging
 from dataclasses import dataclass
 from typing import Any
+from google import genai
 from google.genai import types
+
 
 logger = logging.getLogger(__name__)
 
@@ -30,48 +32,32 @@ class GeminiClient:
     """
     Direct client for Google AI Studio (Gemini) that bypasses litellm.
 
-    Supports both implicit caching (automatic prefix matching) and explicit caching
-    (using CachedContent for longer-lived caches).
+    Uses implicit caching (automatic prefix matching) for prompt caching.
+
+    Uses a singleton pattern per model name so that cache state is shared across
+    all Generator instances using the same model (e.g., across different operators
+    in the same plan).
 
     Args:
-        model: Model name (e.g., "gemini-2.5-flash")
-        use_explicit_cache: If True, use explicit CachedContent for caching.
-                           If False (default), rely on implicit context caching.
-        cache_ttl_seconds: TTL for explicit cache (default: 300 = 5 minutes)
+        model: Model name
 
     Example usage:
-        # Implicit caching (automatic prefix matching)
-        client = GeminiClient(model="gemini-2.5-flash")
-        response = client.generate(messages)
-
-        # Explicit caching (longer-lived cache with CachedContent)
-        client = GeminiClient(
-            model="gemini-2.5-flash",
-            use_explicit_cache=True,
-            cache_ttl_seconds=600
-        )
+        client = GeminiClient.get_instance(model="gemini-2.5-flash")
         response = client.generate(messages)
     """
 
-    def __init__(
-        self,
-        model: str = "gemini-2.5-flash",
-        use_explicit_cache: bool = False,
-        cache_ttl_seconds: int = 300,
-    ):
-        self.model = model
-        self.use_explicit_cache = use_explicit_cache
-        self.cache_ttl_seconds = cache_ttl_seconds
-        self._client = None
-        self._cached_content = None  # For explicit caching
-        self._cached_system_instruction = None  # Track what's cached
+    _instances: dict[str, GeminiClient] = {}
 
-    def _get_client(self):
-        """Lazy initialization of Gemini client."""
-        if self._client is None:
-            from google import genai
-            self._client = genai.Client()
-        return self._client
+    @classmethod
+    def get_instance(cls, model: str) -> GeminiClient:
+        """Get or create a singleton GeminiClient for the given model."""
+        if model not in cls._instances:
+            cls._instances[model] = cls(model)
+        return cls._instances[model]
+
+    def __init__(self, model):
+        self.model = model
+        self.client = genai.Client()
 
     def _detect_image_media_type(self, base64_data: str) -> str:
         """Detect image format from base64 data by examining magic bytes."""
@@ -108,7 +94,6 @@ class GeminiClient:
             content = msg.get("content")
 
             if role == "system":
-                # Extract system instruction
                 if isinstance(content, list):
                     text_parts = [
                         block.get("text", "")
@@ -177,80 +162,75 @@ class GeminiClient:
 
         return system_instruction, gemini_contents
 
-    def _create_or_get_cache(self, system_instruction: str | None) -> Any:
-        """
-        Create or retrieve explicit cache for the system instruction.
-
-        Args:
-            system_instruction: The system instruction to cache
-
-        Returns:
-            The cached_content object if explicit caching is enabled,
-            otherwise returns None.
-        """
-        if not self.use_explicit_cache or not system_instruction:
-            return None
-
-        from datetime import timedelta
-        from google.genai import types
-
-        # Check if we already have a valid cache for this instruction
-        if (self._cached_content is not None and
-            self._cached_system_instruction == system_instruction):
-            return self._cached_content
-
-        client = self._get_client()
-
-        # Create new cached content
-        try:
-            self._cached_content = client.caches.create(
-                model=self.model,
-                config=types.CreateCachedContentConfig(
-                    system_instruction=system_instruction,
-                    ttl=timedelta(seconds=self.cache_ttl_seconds),
-                )
-            )
-            self._cached_system_instruction = system_instruction
-            logger.debug(f"Created explicit cache: {self._cached_content.name}")
-            return self._cached_content
-        except Exception as e:
-            logger.warning(f"Failed to create explicit cache: {e}")
-            return None
-
     def _extract_usage_stats(self, usage_metadata: Any) -> dict:
         """
-        Extract usage statistics from Gemini response.
+        Extract and process usage statistics from Gemini response into the
+        standard format expected by Generator.
 
         Args:
             usage_metadata: The usage_metadata from Gemini response
 
         Returns:
-            Dictionary with usage statistics
+            Dictionary with information needed by GenerationStats.
         """
-        if usage_metadata is None:
-            return {}
+        generation_stats = {
+            "input_text_tokens": 0,
+            "input_image_tokens": 0,
+            "input_audio_tokens": 0,
+            "cache_read_tokens": 0,
+            "text_cache_read_tokens": 0,
+            "image_cache_read_tokens": 0,
+            "audio_cache_read_tokens": 0,
+            "cache_creation_tokens": 0,
+            "output_text_tokens": 0
+        }
 
-        try:
-            return usage_metadata.model_dump()
-        except AttributeError:
-            try:
-                return usage_metadata.to_dict()
-            except AttributeError:
-                # Manual extraction
-                return {
-                    "prompt_token_count": getattr(usage_metadata, "prompt_token_count", None),
-                    "candidates_token_count": getattr(usage_metadata, "candidates_token_count", None),
-                    "total_token_count": getattr(usage_metadata, "total_token_count", None),
-                    "cached_content_token_count": getattr(usage_metadata, "cached_content_token_count", None),
-                    "prompt_tokens_details": getattr(usage_metadata, "prompt_tokens_details", None),
-                    "cache_tokens_details": getattr(usage_metadata, "cache_tokens_details", None),
-                }
+        if usage_metadata is None:
+            return generation_stats
+
+        raw = usage_metadata.model_dump()
+
+        # Parse cache read tokens by modality
+        for detail in (raw.get("cache_tokens_details") or []):
+            modality = (detail.get("modality") or "").upper()
+            token_count = detail.get("token_count") or 0
+            if modality == "TEXT":
+                generation_stats["text_cache_read_tokens"] = token_count
+            elif modality == "IMAGE":
+                generation_stats["image_cache_read_tokens"] = token_count
+            elif modality == "AUDIO":
+                generation_stats["audio_cache_read_tokens"] = token_count
+
+        generation_stats["cache_read_tokens"] = raw.get("cached_content_token_count") or 0
+
+        # Parse input tokens by modality (excludes cached tokens)
+        for detail in (raw.get("prompt_tokens_details") or []):
+            modality = (detail.get("modality") or "").upper()
+            token_count = detail.get("token_count") or 0
+            if modality == "TEXT":
+                generation_stats["input_text_tokens"] = max(0, token_count - generation_stats["text_cache_read_tokens"])
+            elif modality == "IMAGE":
+                generation_stats["input_image_tokens"] = max(0, token_count - generation_stats["image_cache_read_tokens"])
+            elif modality == "AUDIO":
+                generation_stats["input_audio_tokens"] = max(0, token_count - generation_stats["audio_cache_read_tokens"])
+
+        generation_stats["output_text_tokens"] = (raw.get("candidates_token_count") or 0) + (raw.get("thoughts_token_count") or 0)
+
+        return generation_stats
+
+    # Maps reasoning_effort to Gemini thinking_budget token counts
+    # Reference: https://github.com/BerriAI/litellm/blob/620664921902d7a9bfb29897a7b27c1a7ef4ddfb/litellm/constants.py#L88
+    REASONING_EFFORT_TO_THINKING_BUDGET = {
+        "low": 1024,
+        "medium": 2048,
+        "high": 4096,
+    }
 
     def generate(
         self,
         messages: list[dict],
         temperature: float = 0.0,
-        **kwargs
+        reasoning_effort: str | None = None,
     ) -> GeminiResponse:
         """
         Generate content using Gemini API directly.
@@ -258,46 +238,30 @@ class GeminiClient:
         Args:
             messages: List of messages in litellm/palimpzest format
             temperature: Sampling temperature (default: 0.0)
-            **kwargs: Additional arguments (ignored for compatibility)
+            reasoning_effort: Optional thinking budget level ("low", "medium", "high")
 
         Returns:
             GeminiResponse with content, usage stats, and raw response
         """
-        client = self._get_client()
         system_instruction, gemini_contents = self._transform_messages(messages)
 
         # Build config
         config_kwargs = {"temperature": temperature}
+        if system_instruction:
+            config_kwargs["system_instruction"] = system_instruction
 
-        if self.use_explicit_cache:
-            # Use explicit caching
-            cached_content = self._create_or_get_cache(system_instruction)
-            if cached_content:
-                # When using cached content, don't include system_instruction in config
-                response = client.models.generate_content(
-                    model=cached_content.name,  # Use cache name as model
-                    contents=gemini_contents,
-                    config=types.GenerateContentConfig(**config_kwargs),
-                )
-            else:
-                # Fallback to regular call if cache creation failed
-                if system_instruction:
-                    config_kwargs["system_instruction"] = system_instruction
-                response = client.models.generate_content(
-                    model=self.model,
-                    contents=gemini_contents,
-                    config=types.GenerateContentConfig(**config_kwargs),
-                )
-        else:
-            # Use implicit caching (automatic prefix matching)
-            if system_instruction:
-                config_kwargs["system_instruction"] = system_instruction
+        # Map reasoning_effort to thinking_config
+        if reasoning_effort is not None:
+            budget = self.REASONING_EFFORT_TO_THINKING_BUDGET.get(reasoning_effort)
+            if budget is None:
+                raise ValueError(f"Invalid reasoning effort: {reasoning_effort}")
+            config_kwargs["thinking_config"] = types.ThinkingConfig(thinking_budget=budget)
 
-            response = client.models.generate_content(
-                model=self.model,
-                contents=gemini_contents,
-                config=types.GenerateContentConfig(**config_kwargs),
-            )
+        response = self.client.models.generate_content(
+            model=self.model,
+            contents=gemini_contents,
+            config=types.GenerateContentConfig(**config_kwargs),
+        )
 
         # Extract response content
         content = ""
@@ -309,7 +273,7 @@ class GeminiClient:
                     if hasattr(part, "text") and part.text
                 )
 
-        # Extract usage stats
+        # Extract and process usage stats
         usage = self._extract_usage_stats(response.usage_metadata)
 
         return GeminiResponse(
@@ -317,16 +281,3 @@ class GeminiClient:
             usage=usage,
             raw_response=response,
         )
-
-    def clear_cache(self):
-        """Clear the explicit cache if it exists."""
-        if self._cached_content is not None:
-            try:
-                client = self._get_client()
-                client.caches.delete(name=self._cached_content.name)
-                logger.debug(f"Deleted explicit cache: {self._cached_content.name}")
-            except Exception as e:
-                logger.warning(f"Failed to delete cache: {e}")
-            finally:
-                self._cached_content = None
-                self._cached_system_instruction = None

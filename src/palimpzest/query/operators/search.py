@@ -112,7 +112,6 @@ class SmolAgentsSearch(PhysicalOperator):
             input_image_tokens=generation_stats.input_image_tokens,
             cache_read_tokens=generation_stats.cache_read_tokens,
             cache_creation_tokens=generation_stats.cache_creation_tokens,
-            output_audio_tokens=generation_stats.output_audio_tokens,
             output_text_tokens=generation_stats.output_text_tokens,
             embedding_input_tokens=generation_stats.embedding_input_tokens,
             llm_call_duration_secs=generation_stats.llm_call_duration_secs,

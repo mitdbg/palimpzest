@@ -123,7 +123,6 @@ class ConvertOp(PhysicalOperator, ABC):
                 input_image_tokens=per_record_stats.input_image_tokens,
                 cache_read_tokens=per_record_stats.cache_read_tokens,
                 cache_creation_tokens=per_record_stats.cache_creation_tokens,
-                output_audio_tokens=per_record_stats.output_audio_tokens,
                 output_text_tokens=per_record_stats.output_text_tokens,
                 embedding_input_tokens=per_record_stats.embedding_input_tokens,
                 llm_call_duration_secs=per_record_stats.llm_call_duration_secs,
