@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from copy import deepcopy
 
+#### for BO only ###
 import torch
 from botorch.models import SingleTaskGP
 from gpytorch.kernels import RBFKernel, ScaleKernel
@@ -13,7 +14,8 @@ from gpytorch.mlls import ExactMarginalLogLikelihood
 from botorch.fit import fit_gpytorch_mll
 from botorch.optim.optimize import optimize_acqf
 from botorch.acquisition.analytic import LogExpectedImprovement
-
+from palimpzest.query.operators.convert import LLMConvertBonded
+###########
 
 from pydantic.fields import FieldInfo
 
@@ -61,11 +63,13 @@ logger = logging.getLogger(__name__)
 class BayesianOptimizer:
     def __init__(
             self,
-            initial_dataset, # ex. [(model_name_1, (0.2, 0.01, 0.05)), (model_name_2, (0.6, 0.005, 0.1))]
+            initial_dataset, # ex. [(model_name_1, (20, 0.01, 1/1e6)), (model_name_2, (80, 0.005, 2/1e7))]
             policy: Policy,
-            validator: Validator,
             cost_budget: float,
             cost_model,
+            input_schema,
+            output_schema,
+            validator: Validator = Validator(model = Model.GPT_5_NANO),
             acq_func: str = "EI"
             ):
         '''
@@ -73,17 +77,17 @@ class BayesianOptimizer:
         :policy: policy we are trying to optimize for (e.g. MaxQuality, MinCost, MaxQuality@Cost<$1, etc.)
         '''
         self.policy = policy #assumed to be a single-objective policy for now
-        primary_metric = self.policy.get_primary_metric()
+        self.primary_metric = self.policy.get_primary_metric()
 
-        # class which will be used to assess the quality of outputs produced by a given physical plan
         self.validator = validator
+        self.input_schema = input_schema
+        self.output_schema = output_schema
 
-        # dataset of (input, observation) pairs; initialized to be empty, but in theory we could initialize this
-        # with past observations from the same (or a different) workload; corresponds to D in Algorithm 1.1 of BOpt textbook
-        self.X, self.Y_quality, self.Y_latency, self.Y_cost = self.format_dataset(initial_dataset)
-        if primary_metric == "quality": self.Y = self.Y_quality
-        elif primary_metric == "latency": self.Y = self.Y_latency
-        elif primary_metric == "cost": self.Y = self.Y_cost
+        self.X, self.X_models, self.Y_quality, self.Y_latency, self.Y_cost = self.format_dataset(initial_dataset)
+        if self.primary_metric == "quality": self.Y = self.Y_quality
+        elif self.primary_metric == "time": self.Y = self.Y_latency
+        elif self.primary_metric == "cost": self.Y = self.Y_cost
+        self.suggested_points = self.X
 
         # budget in dollars which will determine when we stop optimization
         self.cost_budget = cost_budget
@@ -92,9 +96,10 @@ class BayesianOptimizer:
 
         self.acq_func = acq_func
 
-    def model_embedding(self, model_name: str) -> list[float]:
+    def model_embedding(self, model_name: str) -> torch.Tensor:
         '''
         embed a model name into the input space of the GP
+        output: tensor of shape (1,3)
         '''
         model_card = MODEL_CARDS[model_name]
         input_cost = model_card["usd_per_input_token"]
@@ -105,73 +110,88 @@ class BayesianOptimizer:
             model_card["seconds_per_output_token"],
             avg_cost
         ]
-        return torch.tensor([x])
+        return torch.tensor(x, dtype = torch.double).unsqueeze(0)
 
     def format_dataset(self, initial_dataset):
         '''
         format starting dataset into tensors for GP training
+        outputs:
+        X: tensor of shape (n, 3)
+        Y_quality: tensor of shape (n, 1)
+        Y_latency: tensor of shape (n, 1)
+        Y_cost: tensor of shape (n, 1)
         '''
         X = []
+        X_models = []
         Y_quality = []
         Y_latency = []
         Y_cost = []
         for model_name, (quality, latency, cost) in initial_dataset:
             X.append(self.model_embedding(model_name))
+            X_models.append(model_name)
             Y_quality.append(quality)
-            Y_latency.append(latency)
-            Y_cost.append(cost)
-        return torch.cat(X), torch.tensor(Y_quality).unsqueeze(-1), torch.tensor(Y_latency).unsqueeze(-1), torch.tensor(Y_cost).unsqueeze(-1)
+            Y_latency.append(-abs(latency))
+            Y_cost.append(-abs(cost))
+        return torch.cat(X, dim=0), X_models, torch.tensor(Y_quality, dtype=torch.double).unsqueeze(-1), torch.tensor(Y_latency, dtype=torch.double).unsqueeze(-1), torch.tensor(Y_cost, dtype=torch.double).unsqueeze(-1)
 
-    # def prior_mean(self):
-    #     # TODO: make prior input query and input data dependent
-    #     if self.dataset == []:
-    #         # use MMLU Pro average values as prior
-    #         return {
-    #             "quality": 65,
-    #             "latency": NAIVE_EST_SOURCE_RECORD_SIZE_IN_BYTES * TOKENS_PER_CHARACTER * 0.01,
-    #             "cost": NAIVE_EST_SOURCE_RECORD_SIZE_IN_BYTES * TOKENS_PER_CHARACTER * 1.0/1e6
-    #         }
-    #     return {
-    #         "quality": torch.mean(self.Y_quality).item(),
-    #         "latency": torch.mean(self.Y_latency).item(),
-    #         "cost": torch.mean(self.Y_cost).item()
-    #     }
-
+    def point_to_model(self, point) -> Model:
+        '''
+        point:  tensor of shape (1, 3) corresponding to (quality, latency, cost) in domain space
+        '''
+        # Convert point to a physical plan (highest covariance)
+        max_covar = -float('inf')
+        closest_model = None
+        for model in Model:
+            if not model.is_openai_model() or model.is_audio_model() or model.is_text_embedding_model():
+                continue
+            covar = self.gp.covar_module(self.gp.input_transform(point), self.gp.input_transform(self.model_embedding(model)))
+            covar = covar.evaluate().item()
+            if covar > max_covar:
+                max_covar = covar
+                closest_model = model
+        print(f"Selected: {closest_model}, {self.model_embedding(closest_model)} for point: {point}, covar = {max_covar}")
+        return closest_model, self.model_embedding(closest_model)
+    
     def terminate(self) -> bool:
         """
         Returns True when we've exceeded our cost budget and returns False otherwise.
         """
         return self.cost_so_far >= self.cost_budget
-
-    def next_points(self) -> list[PhysicalPlan]:
+    
+    def next_points(self, batch_size = 1):
         """
-        Returns a list of physical plans to run. These lists could be singletons.
+        Returns a list of point(s) to run.
+        Tensor of shape (batch_size, 3) corresponding to (quality, latency, cost) in domain space
         """
-        prior_mean = ConstantMean(prior=NormalPrior(0.0, 1.0)) #to be consistent with standardized output
-        prior_covariance = ScaleKernel(RBFKernel(ard_num_dims=self.X.shape[-1], lengthscale_prior=LogNormalPrior(0.0, 1.0)),
-                            outputscale_prior=LogNormalPrior(0.0, 1.0))
+        # prior_mean = ConstantMean(prior=NormalPrior(0.0, 1.0)) #to be consistent with standardized output
+        # prior_covariance = ScaleKernel(RBFKernel(ard_num_dims=self.X.shape[-1]), lengthscale_prior=LogNormalPrior(0.0, 1.0), outputscale_prior=LogNormalPrior(0.0, 1.0))
+        bounds = torch.tensor([
+            [60.0, 0.004, 2.0/1e7],
+            [90.0, 0.02, 7.0/1e6]
+        ], dtype=torch.double)
         self.gp = SingleTaskGP(
             self.X,
             self.Y,
-            covar_module=prior_covariance,
-            mean_module=prior_mean,
-            input_transform=Normalize(self.X.shape[-1]),
+            #covar_module=prior_covariance,
+            # prior_mean = prior_mean,
+            input_transform=Normalize(self.X.shape[-1], bounds = bounds),
             outcome_transform=Standardize(m=self.Y.shape[-1]),
         )
-
-        mll = ExactMarginalLogLikelihood(self.gp.likelihood, self.gp) #calculated over model hyperparameters (lengthscale, outputscale, noise)
+        self.gp.train()
+        self.gp.likelihood.train()
+        mll = ExactMarginalLogLikelihood(self.gp.likelihood, self.gp)
         fit_gpytorch_mll(mll) #MAP hyperparameter fitting
 
         if self.acq_func == "EI":
             #note: gp.train_targets is the standardized version of Y
             acq_function = LogExpectedImprovement(self.gp, best_f=self.gp.train_targets.max())
-        next_point, _  = optimize_acqf(
+        next_points, _  = optimize_acqf(
             acq_function=acq_function,
-            q=1, num_restarts=10, raw_samples=20,
-            bounds =torch.tensor([[0.0, 0.0, 0.0], [1.0, 1.0, 1.0]]),
+            q=batch_size, num_restarts=10, raw_samples=20,
+            bounds = bounds,
             return_best_only = True
         )
-        return  [next_point,]
+        return next_points
 
     def get_optimal_plan(self) -> PhysicalPlan:
         """
@@ -184,53 +204,67 @@ class BayesianOptimizer:
         max_obj = -float('inf')
         best_plan = None
         best_posterior = None
-        for model in MODEL_CARDS.keys():
-            try:
-                if "audio" in model: continue
-                with torch.no_grad():
-                    posterior = self.gp.posterior(self.model_embedding(model))
-            except Exception as e:
-                print(f"Error getting posterior for model {model}: {e}")
+        for model in Model:
+            if not model.is_openai_model() or model.is_audio_model() or model.is_text_embedding_model():
                 continue
+            with torch.no_grad():
+                    posterior = self.gp.posterior(self.model_embedding(model))
             mean = posterior.mean.item()
             if mean > max_obj:
                 max_obj = mean
                 best_plan = model
                 best_posterior = posterior
+        torch.save({
+            'gp_state_dict': self.gp.state_dict(),
+            'X': self.X,
+            'X_models': self.X_models,
+            'suggested_points': self.suggested_points,
+            'Y': self.Y,
+            'likelihood_state_dict': self.gp.likelihood.state_dict(),
+            'input_transform': self.gp.input_transform,
+            'outcome_transform': self.gp.outcome_transform,
+        }, 'gp_full_openai_minTime_all.pth')
         return best_plan, best_posterior
 
-    def point_to_plan(self, point) -> PhysicalPlan:
-        '''
-        point: tensor of shape (1, 3) corresponding to (quality, latency, cost) in domain space
-        '''
-        # Convert point to a physical plan (highest covariance)
-        max_covar = -float('inf')
-        closest_model = None
-        for model in MODEL_CARDS.keys():
-            covar = self.gp.covar_module(point, self.model_embedding(model))
-            if covar > max_covar:
-                max_covar = covar
-                closest_model = model
-        print(f"Selected: {closest_model}, {self.model_embedding(closest_model)} for point: {point}")
-        return closest_model
-
-    def optimize(self) -> PhysicalPlan:
+    def optimize(self, data_samples: list) -> PhysicalPlan:
         """Run the sequential optimization algorithm (Algorithm 1.1) from the BOpt textbook."""
-        point = self.next_points()
         while not self.terminate():
-            point = self.next_points()
-            physical_plans = self.point_to_plan(point)
-            for physical_plan in physical_plans:
-                # NOTE: this exact syntax is not supported yet, but we can implement it
-                # TODO: we want to work with -output for latency/cost
-                output, cost = physical_plan(self.input) #TODO: define self.input
-                quality = self.validator.validate(output)
-                self.cost_so_far += cost
-
-                self.X = torch.cat([self.X, point])
-                self.Y = torch.cat([self.Y, quality])
-
+            points = self.next_points()
+            for point in points:
+                point = point.unsqueeze(0).to(torch.double) #shape (1, 3)
+                if self.terminate(): break
+                model, model_embedding = self.point_to_model(point)
+                physical_op = LLMConvertBonded(model = model, input_schema = self.input_schema,
+                                            logical_op_id = "email_extracter", output_schema = self.output_schema)
+                results = []
+                for sample in data_samples:
+                    data_record_set = physical_op(sample)
+                    output = {"sender": data_record_set.data_records[0].sender, "subject": data_record_set.data_records[0].subject}
+                    if output["sender"] is None or output["subject"] is None:
+                        print(f"got None output for {model} on email {sample._source_indices[0]}")
+                    quality, gen_stats, full_hash = self.validator._score_map(physical_op, fields = ["sender", "subject"],
+                                                                            input_record = sample, output = output, full_hash="abc123")
+                    if self.primary_metric == "quality":
+                        results.append(quality)
+                    elif self.primary_metric == "time":
+                        results.append(-abs(data_record_set.record_op_stats[0].llm_call_duration_secs))
+                        #results.append(-getattr(gen_stats, "llm_call_duration_secs")) #wrong
+                    elif self.primary_metric == "cost":
+                        input_cost = data_record_set.record_op_stats[0].total_input_cost
+                        output_cost = data_record_set.record_op_stats[0].total_output_cost
+                        results.append(- abs(input_cost + output_cost))
+                    if results[-1] is None:
+                        print(f"got None value for {model} on email {sample._source_indices[0]}")
+                    cost = 1 #temporary hard code
+                    self.cost_so_far += cost
+                self.X = torch.cat([self.X, model_embedding])
+                self.suggested_points = torch.cat([self.suggested_points, point])
+                self.X_models.append(model)
+                avg_result = sum(results)/len(results)
+                self.Y = torch.cat([self.Y, torch.tensor([[avg_result]])])
+                print(f"Result: {model}, avg {self.primary_metric} {avg_result}")
         return self.get_optimal_plan()
+
 
 
 class Optimizer:
