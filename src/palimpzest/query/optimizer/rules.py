@@ -670,25 +670,32 @@ class RAGRule(ImplementationRule):
         models = [model for model in runtime_kwargs["available_models"] if cls._model_matches_input(model, logical_expression)]
         variable_op_kwargs = []
         for model in models:
-             use_reasoning_prompt, reasoning_effort = resolve_reasoning_settings(model, runtime_kwargs["reasoning_effort"])
-             prompt_strategy = (
-                 PromptStrategy.MAP if use_reasoning_prompt else PromptStrategy.MAP_NO_REASONING
-                 if phys_op_cls is RAGConvert
-                 else PromptStrategy.FILTER if use_reasoning_prompt else PromptStrategy.FILTER_NO_REASONING
-             )
-             variable_op_kwargs.extend(
-                 [
-                    {
-                        "model": model,
-                        "prompt_strategy": prompt_strategy,
-                        "num_chunks_per_field": num_chunks_per_field,
-                        "chunk_size": chunk_size,
-                        "reasoning_effort": reasoning_effort,
-                    }
-                    for num_chunks_per_field in cls.num_chunks_per_fields
-                    for chunk_size in cls.chunk_sizes
-                 ]
-             )
+            use_reasoning_prompt, reasoning_effort = resolve_reasoning_settings(model, runtime_kwargs["reasoning_effort"])              
+            
+            if phys_op_cls is RAGConvert:
+                reasoning = PromptStrategy.MAP
+                no_reasoning = PromptStrategy.MAP_NO_REASONING
+            elif phys_op_cls is RAGFilter:
+                reasoning = PromptStrategy.FILTER
+                no_reasoning = PromptStrategy.FILTER_NO_REASONING
+            else:
+                raise ValueError(f"Unsupported physical operator class: {phys_op_cls}")
+            
+            prompt_strategy = reasoning if use_reasoning_prompt else no_reasoning
+
+            variable_op_kwargs.extend(
+                [
+                {
+                    "model": model,
+                    "prompt_strategy": prompt_strategy,
+                    "num_chunks_per_field": num_chunks_per_field,
+                    "chunk_size": chunk_size,
+                    "reasoning_effort": reasoning_effort,
+                }
+                for num_chunks_per_field in cls.num_chunks_per_fields
+                for chunk_size in cls.chunk_sizes
+                ]
+            )
 
         return cls._perform_substitution(logical_expression, phys_op_cls, runtime_kwargs, variable_op_kwargs)
 
@@ -759,11 +766,18 @@ class CritiqueAndRefineRule(ImplementationRule):
         variable_op_kwargs = []
         for model in models:
             use_reasoning_prompt, reasoning_effort = resolve_reasoning_settings(model, runtime_kwargs["reasoning_effort"])
-            prompt_strategy = (
-                PromptStrategy.MAP if use_reasoning_prompt else PromptStrategy.MAP_NO_REASONING
-                if phys_op_cls is CritiqueAndRefineConvert
-                else PromptStrategy.FILTER if use_reasoning_prompt else PromptStrategy.FILTER_NO_REASONING
-            )
+
+            if phys_op_cls is CritiqueAndRefineConvert:
+                reasoning = PromptStrategy.MAP
+                no_reasoning = PromptStrategy.MAP_NO_REASONING
+            elif phys_op_cls is CritiqueAndRefineFilter:
+                reasoning = PromptStrategy.FILTER
+                no_reasoning = PromptStrategy.FILTER_NO_REASONING
+            else:
+                raise ValueError(f"Unsupported physical operator class: {phys_op_cls}")
+            
+            prompt_strategy = reasoning if use_reasoning_prompt else no_reasoning
+
             variable_op_kwargs.extend(
                 [
                     {
