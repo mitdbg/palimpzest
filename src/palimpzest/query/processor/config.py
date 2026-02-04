@@ -28,7 +28,7 @@ class QueryProcessorConfig(BaseModel):
     max_workers: int | None = Field(default=64)
     join_parallelism: int = Field(default=64)
     batch_size: int | None = Field(default=None)
-    reasoning_effort: str | None = Field(default="default")  # Gemini: "disable", "low", "medium", "high"
+    reasoning_effort: str = Field(default="default")  # Gemini: "disable", "low", "medium", "high"
     use_vertex: bool = Field(default=False)  # Whether to use Vertex models for Gemini or Google models
     gemini_credentials_path: str | None = Field(default=None)  # Path to Gemini credentials file
     api_base: str | None = Field(default=None)  # API base URL for vLLM

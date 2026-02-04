@@ -267,7 +267,7 @@ class LLMConvert(ConvertOp):
         self,
         model: Model,
         prompt_strategy: PromptStrategy = PromptStrategy.MAP,
-        reasoning_effort: str | None = None,
+        reasoning_effort: str = "default",
         *args,
         **kwargs,
     ):

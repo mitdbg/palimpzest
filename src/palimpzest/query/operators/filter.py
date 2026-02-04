@@ -166,7 +166,7 @@ class LLMFilter(FilterOp):
         self,
         model: Model,
         prompt_strategy: PromptStrategy = PromptStrategy.FILTER,
-        reasoning_effort: str | None = None,
+        reasoning_effort: str = "default",
         *args,
         **kwargs,
     ):

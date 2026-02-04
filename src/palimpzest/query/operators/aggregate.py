@@ -530,7 +530,7 @@ class MaxAggregateOp(AggregateOp):
 
 class SemanticAggregate(AggregateOp):
 
-    def __init__(self, agg_str: str, model: Model, prompt_strategy: PromptStrategy = PromptStrategy.AGG, reasoning_effort: str | None = None, *args, **kwargs):
+    def __init__(self, agg_str: str, model: Model, prompt_strategy: PromptStrategy = PromptStrategy.AGG, reasoning_effort: str = "default", *args, **kwargs):
         # call parent constructor
         super().__init__(*args, **kwargs)
         self.agg_str = agg_str
