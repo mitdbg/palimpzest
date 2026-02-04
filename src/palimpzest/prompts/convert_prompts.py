@@ -62,7 +62,7 @@ INPUT FIELDS:
 OUTPUT FIELDS:
 {output_fields_desc}
 
-CONTEXT:
+<<cache-boundary>>CONTEXT:
 {context}<<image-audio-placeholder>>
 
 Let's think step-by-step in order to answer the question.
@@ -81,7 +81,7 @@ INPUT FIELDS:
 OUTPUT FIELDS:
 {output_fields_desc}
 
-CONTEXT:
+<<cache-boundary>>CONTEXT:
 {context}<<image-audio-placeholder>>
 
 ANSWER: """

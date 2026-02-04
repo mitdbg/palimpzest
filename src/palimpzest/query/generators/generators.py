@@ -20,7 +20,7 @@ from pydantic.fields import FieldInfo
 from palimpzest.constants import Cardinality, Model, PromptStrategy
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.models import GenerationStats
-from palimpzest.prompts import PromptFactory
+from palimpzest.prompts import PromptFactory, PromptManager
 
 # DEFINITIONS
 GenerationOutput = tuple[dict, str | None, GenerationStats, list[dict]]
@@ -118,6 +118,16 @@ class Generator(Generic[ContextType, InputType]):
         self.desc = desc
         self.verbose = verbose
         self.prompt_factory = PromptFactory(prompt_strategy, model, cardinality, desc)
+        self.prompt_manager = PromptManager(model)
+
+        # Initialize GeminiClient for direct Gemini API calls (Google AI Studio and Vertex AI)
+        self.gemini_client = None
+        if model.is_model_gemini():
+            from palimpzest.query.generators.gemini_client import GeminiClient
+            self.gemini_client = GeminiClient.get_instance(
+                model=model.get_model_name(),
+                use_vertex=model.is_provider_vertex_ai(),
+            )
 
     def _parse_reasoning(self, completion_text: str, **kwargs) -> str:
         """Extract the reasoning for the generated output from the completion object."""
@@ -310,22 +320,51 @@ class Generator(Generic[ContextType, InputType]):
         messages = self.prompt_factory.create_messages(candidate, fields, right_candidate, **kwargs)
         is_audio_op = any(msg.get("type") == "input_audio" for msg in messages)
 
+        if "cache_isolation_id" in kwargs:
+            messages = self.prompt_manager.inject_cache_isolation_id(messages, kwargs["cache_isolation_id"])
+
         # generate the text completion
         start_time = time.time()
         completion = None
+        completion_text = None
         try:
-            completion_kwargs = {}
-            if not self.model.is_o_model() and not self.model.is_gpt_5_model():
-                completion_kwargs = {"temperature": kwargs.get("temperature", 0.0), **completion_kwargs}
-            if is_audio_op:
-                completion_kwargs = {"modalities": ["text"], **completion_kwargs}
-            if self.model.is_reasoning_model():
-                completion_kwargs = {"reasoning_effort": self.reasoning_effort, **completion_kwargs}
-            if self.model.is_vllm_model():
-                completion_kwargs = {"api_base": self.api_base, "api_key": os.environ.get("VLLM_API_KEY", "fake-api-key"), **completion_kwargs}
-            completion = litellm.completion(model=self.model_name, messages=messages, **completion_kwargs)
-            end_time = time.time()
-            logger.debug(f"Generated completion in {end_time - start_time:.2f} seconds")
+            # added for testing purpose, may be removed if needed
+            if "generating_messages_only" in kwargs and kwargs["generating_messages_only"]:
+                return messages
+
+            messages = self.prompt_manager.update_messages_for_caching(messages)
+
+            # Use GeminiClient directly for Google AI Studio models
+            if self.gemini_client is not None:
+                gemini_response = self.gemini_client.generate(
+                    messages=messages,
+                    temperature=kwargs.get("temperature", 0.0),
+                    reasoning_effort=self.reasoning_effort if self.model.is_reasoning_model() else None,
+                )
+                end_time = time.time()
+                completion_text = gemini_response.content
+                usage_stats = gemini_response.usage
+                logger.debug(f"Generated completion via GeminiClient in {end_time - start_time:.2f} seconds")
+            else:
+                # Use litellm for all other providers
+                completion_kwargs = {}
+                if not self.model.is_o_model() and not self.model.is_gpt_5_model():
+                    completion_kwargs = {"temperature": kwargs.get("temperature", 0.0), **completion_kwargs}
+                if is_audio_op:
+                    completion_kwargs = {"modalities": ["text"], **completion_kwargs}
+                if self.model.is_reasoning_model():
+                    completion_kwargs = {"reasoning_effort": self.reasoning_effort, **completion_kwargs}
+                if self.model.is_vllm_model():
+                    completion_kwargs = {"api_base": self.api_base, "api_key": os.environ.get("VLLM_API_KEY", "fake-api-key"), **completion_kwargs}
+
+                cache_kwargs = self.prompt_manager.get_cache_kwargs()
+                completion_kwargs = {**completion_kwargs, **cache_kwargs}
+                completion = litellm.completion(model=self.model_name, messages=messages, **completion_kwargs)
+                end_time = time.time()
+                completion_text = completion.choices[0].message.content
+                usage = completion.usage.model_dump()
+                logger.debug(f"Generated completion via litellm in {end_time - start_time:.2f} seconds")
+
         # if there's an error generating the completion, we have to return an empty answer
         # and can only account for the time spent performing the failed generation
         except Exception as e:
@@ -346,60 +385,97 @@ class Generator(Generic[ContextType, InputType]):
 
         # parse usage statistics and create the GenerationStats
         generation_stats = None
-        if completion is not None:
-            usage = completion.usage.model_dump()
-
+        if completion_text is not None:
             # get cost per input/output token for the model
-            usd_per_input_token = self.model.get_usd_per_input_token()
-            usd_per_audio_input_token = self.model.get_usd_per_audio_input_token()
-            usd_per_output_token = self.model.get_usd_per_output_token()
+            usd_per_input_token = self.model.get_usd_per_input_token() or 0.0
+            usd_per_audio_input_token = self.model.get_usd_per_audio_input_token() or 0.0
+            usd_per_image_input_token = self.model.get_usd_per_image_input_token() or 0.0
+            usd_per_output_token = self.model.get_usd_per_output_token() or 0.0
+            usd_per_cache_read_token = self.model.get_usd_per_cache_read_token() or 0.0
+            usd_per_audio_cache_read_token = self.model.get_usd_per_audio_cache_read_token() or 0.0
+            usd_per_image_cache_read_token = self.model.get_usd_per_image_cache_read_token() or 0.0
+            usd_per_cache_creation_token = self.model.get_usd_per_cache_creation_token() or 0.0
 
-            # TODO: for some models (e.g. GPT-5) we cannot separate text from image prompt tokens yet;
-            #       for now, we only use tokens from prompt_token_details if it's an audio prompt
-            # get output tokens (all text) and input tokens by modality
-            output_tokens = usage["completion_tokens"]
-            if is_audio_op:
-                input_audio_tokens = usage["prompt_tokens_details"].get("audio_tokens", 0)
-                input_text_tokens = usage["prompt_tokens_details"].get("text_tokens", 0)
-                input_image_tokens = 0
+            # Extract usage stats based on provider
+            if self.gemini_client is not None:
+                # Usage already processed by GeminiClient
+                output_text_tokens = usage_stats.get("output_text_tokens", 0)
             else:
-                input_audio_tokens = 0
-                input_text_tokens = usage["prompt_tokens"]
-                input_image_tokens = 0
-            input_tokens = input_audio_tokens + input_text_tokens + input_image_tokens
+                # litellm response format
+                output_text_tokens = usage.get("completion_tokens") or 0
+                usage_stats = self.prompt_manager.extract_usage_stats(usage, is_audio_op)
 
-            # compute the input and output token costs
-            total_input_cost = (input_text_tokens + input_image_tokens) * usd_per_input_token + input_audio_tokens * usd_per_audio_input_token
-            total_output_cost = output_tokens * usd_per_output_token
+            input_text_tokens = usage_stats["input_text_tokens"]
+            input_audio_tokens = usage_stats["input_audio_tokens"]
+            input_image_tokens = usage_stats["input_image_tokens"]
+            cache_read_tokens = usage_stats["cache_read_tokens"]
+            cache_creation_tokens = usage_stats["cache_creation_tokens"]
+
+            # Compute cache cost: use per-modality breakdown if available (Gemini), otherwise aggregate
+            if self.gemini_client is not None:
+                cache_cost = (
+                    usage_stats["text_cache_read_tokens"] * usd_per_cache_read_token
+                    + usage_stats["audio_cache_read_tokens"] * usd_per_audio_cache_read_token
+                    + usage_stats["image_cache_read_tokens"] * usd_per_image_cache_read_token
+                )
+            else:
+                cache_cost = (
+                    cache_read_tokens * usd_per_cache_read_token
+                    + cache_creation_tokens * usd_per_cache_creation_token
+                )
+
+            total_cost = (
+                input_text_tokens * usd_per_input_token
+                + input_audio_tokens * usd_per_audio_input_token
+                + input_image_tokens * usd_per_image_input_token
+                + cache_cost
+                + output_text_tokens * usd_per_output_token
+            )
 
             generation_stats = GenerationStats(
                 model_name=self.model_name,
                 llm_call_duration_secs=end_time - start_time,
                 fn_call_duration_secs=0.0,
-                input_audio_tokens=input_audio_tokens,
+                # Raw token counts by modality
                 input_text_tokens=input_text_tokens,
+                input_audio_tokens=input_audio_tokens,
                 input_image_tokens=input_image_tokens,
-                total_input_tokens=input_tokens,
-                total_output_tokens=output_tokens,
-                total_input_cost=total_input_cost,
-                total_output_cost=total_output_cost,
-                cost_per_record=total_input_cost + total_output_cost,
+                output_text_tokens=output_text_tokens,
+                # Cache token counts
+                cache_read_tokens=cache_read_tokens,
+                cache_creation_tokens=cache_creation_tokens,
+                # Cost
+                cost_per_record=total_cost,
                 total_llm_calls=1,
             )
 
         # pretty print prompt + full completion output for debugging
-        completion_text = completion.choices[0].message.content
         prompt, system_prompt = "", ""
         for message in messages:
             if message["role"] == "system":
-                system_prompt += message["content"] + "\n"
+                content = message["content"]
+                if isinstance(content, str):
+                    system_prompt += content + "\n"
+                elif isinstance(content, list):
+                    # Handle Anthropic-style content blocks
+                    for block in content:
+                        if isinstance(block, dict) and block.get("type") == "text":
+                            system_prompt += block.get("text", "") + "\n"
             if message["role"] == "user":
-                if message["type"] == "text":
-                    prompt += message["content"] + "\n"
-                elif message["type"] == "image":
-                    prompt += "<image>\n" * len(message["content"])
-                elif message["type"] == "input_audio":
-                    prompt += "<audio>\n" * len(message["content"])
+                content = message.get("content", "")
+                msg_type = message.get("type", "text")
+                if msg_type == "text":
+                    if isinstance(content, str):
+                        prompt += content + "\n"
+                    elif isinstance(content, list):
+                        # Handle Anthropic-style content blocks
+                        for block in content:
+                            if isinstance(block, dict) and block.get("type") == "text":
+                                prompt += block.get("text", "") + "\n"
+                elif msg_type == "image":
+                    prompt += "<image>\n" * len(content)
+                elif msg_type == "input_audio":
+                    prompt += "<audio>\n" * len(content)
         logger.debug(f"PROMPT:\n{prompt}")
         logger.debug(Fore.GREEN + f"{completion_text}\n" + Style.RESET_ALL)
 

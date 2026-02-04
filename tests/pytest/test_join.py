@@ -173,5 +173,5 @@ def test_embedding_join(mocker):
         assert sorted(output_record.schema.model_fields) == sorted(input_schema.model_fields)
 
     # check that all output record stats have embedding stats
-    assert all(stats.total_embedding_cost > 0.0 for stats in record_op_stats_lst)
+    assert all(stats.cost_per_record > 0.0 for stats in record_op_stats_lst)
     assert sum(record._passed_operator for record in records) == 3

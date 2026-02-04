@@ -11,16 +11,16 @@ An example is shown below:
 LEFT INPUT FIELDS:
 {example_input_fields}
 
-LEFT CONTEXT:
-{{{example_context}}}{image_disclaimer}{audio_disclaimer}
-
 RIGHT INPUT FIELDS:
 {right_example_input_fields}
 
+JOIN CONDITION: {example_join_condition}
+
+LEFT CONTEXT:
+{{{example_context}}}{image_disclaimer}{audio_disclaimer}
+
 RIGHT CONTEXT:
 {{{right_example_context}}}{right_image_disclaimer}{right_audio_disclaimer}
-
-JOIN CONDITION: {example_join_condition}
 
 Let's think step-by-step in order to evaluate the join condition.
 
@@ -40,16 +40,16 @@ An example is shown below:
 LEFT INPUT FIELDS:
 {example_input_fields}
 
-LEFT CONTEXT:
-{{{example_context}}}{image_disclaimer}{audio_disclaimer}
-
 RIGHT INPUT FIELDS:
 {right_example_input_fields}
 
+JOIN CONDITION: {example_join_condition}
+
+LEFT CONTEXT:
+{{{example_context}}}{image_disclaimer}{audio_disclaimer}
+
 RIGHT CONTEXT:
 {{{right_example_context}}}{right_image_disclaimer}{right_audio_disclaimer}
-
-JOIN CONDITION: {example_join_condition}
 
 ANSWER: TRUE
 ---
@@ -63,16 +63,16 @@ Remember, your answer must be TRUE or FALSE. Finish your response with a newline
 LEFT INPUT FIELDS:
 {input_fields_desc}
 
-LEFT CONTEXT:
-{context}<<image-audio-placeholder>>
-
 RIGHT INPUT FIELDS:
 {right_input_fields_desc}
 
+JOIN CONDITION: {join_condition}
+
+<<cache-boundary>>LEFT CONTEXT:
+{context}<<image-audio-placeholder>>
+
 RIGHT CONTEXT:
 {right_context}<<right-image-audio-placeholder>>
-
-JOIN CONDITION: {join_condition}
 
 Let's think step-by-step in order to evaluate the join condition.
 
@@ -86,15 +86,15 @@ Remember, your answer must be TRUE or FALSE. Finish your response with a newline
 LEFT INPUT FIELDS:
 {input_fields_desc}
 
-LEFT CONTEXT:
-{context}<<image-audio-placeholder>>
-
 RIGHT INPUT FIELDS:
 {right_input_fields_desc}
 
+JOIN CONDITION: {join_condition}
+
+<<cache-boundary>>LEFT CONTEXT:
+{context}<<image-audio-placeholder>>
+
 RIGHT CONTEXT:
 {right_context}<<right-image-audio-placeholder>>
-
-JOIN CONDITION: {join_condition}
 
 ANSWER: """

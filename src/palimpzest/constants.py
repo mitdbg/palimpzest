@@ -281,6 +281,12 @@ class Model:
     def is_provider_deepseek(self) -> bool:
         return self.provider == "deepseek"
 
+    def is_model_gemini(self) -> bool:
+        return "gemini" in self.value.lower()
+
+    def get_model_name(self) -> str:
+        return self.value.split("/")[-1] if "/" in self.value else self.value
+
     def is_o_model(self) -> bool:
         return self.model_specs.get("is_o_model", False)
 
@@ -310,24 +316,40 @@ class Model:
 
     def get_usd_per_input_token(self) -> float:
         return self.model_specs.get("usd_per_input_token", 0.0)
-    
-    def get_usd_per_output_token(self) -> float:
-        return self.model_specs.get("usd_per_output_token", 0.0)
 
     def get_usd_per_audio_input_token(self) -> float:
-        return self.model_specs.get("usd_per_audio_input_token", 0.0)
+        return self.model_specs.get("usd_per_audio_input_token", self.get_usd_per_input_token())
+    
+    # forward-looking, TODO: default value discussion
+    def get_usd_per_image_input_token(self) -> float:
+        return self.model_specs.get("usd_per_image_input_token", self.get_usd_per_input_token())
 
     def get_usd_per_cache_read_token(self) -> float:
-        return self.model_specs.get("usd_per_cache_read_token", self.get_usd_per_cache_read_token())
+        return self.model_specs.get("usd_per_cache_read_token", self.get_usd_per_input_token())
     
     def get_usd_per_audio_cache_read_token(self) -> float:
-        return self.model_specs.get("usd_per_audio_cache_read_token", self.get_usd_per_audio_cache_read_token())
+        return self.model_specs.get("usd_per_audio_cache_read_token", self.get_usd_per_cache_read_token())
     
+    def get_usd_per_image_cache_read_token(self) -> float:
+        return self.model_specs.get("usd_per_image_cache_read_token", self.get_usd_per_cache_read_token())
+    
+    # forward looking; Gemini explicit
+    def get_usd_per_cached_token_per_hour(self) -> float:
+        return self.model_specs.get("usd_per_cached_token_per_hour", 0.0)
+     
     def get_usd_per_cache_creation_token(self) -> float:
         return self.model_specs.get("usd_per_cache_creation_token", 0.0)
     
+    def get_usd_per_output_token(self) -> float:
+        return self.model_specs.get("usd_per_output_token", 0.0)
+    
+    # forward-looking
     def get_usd_per_audio_cache_creation_token(self) -> float:
         return self.model_specs.get("usd_per_audio_cache_creation_token", 0.0)
+    
+    # forward-looking
+    def get_usd_per_image_cache_creation_token(self) -> float:
+        return self.model_specs.get("usd_per_image_cache_creation_token", 0.0)
     
     def get_seconds_per_output_token(self) -> float:
         return self.model_specs.get("seconds_per_output_token", 0.0)
