@@ -60,15 +60,15 @@ def get_models(include_embedding: bool = False, use_vertex: bool = False, gemini
     return models
 
 
-def use_reasoning_prompt(reasoning_effort: str | None) -> bool:
+def use_reasoning_prompt(reasoning_effort: str) -> bool:
     """
     Determine whether to use the reasoning prompt based on the provided reasoning effort.
     By default, we use the reasoning prompt everywhere unless the reasoning_effort is in [None, "disable", "minimal", "low"].
     """
-    return reasoning_effort not in [None, "disable", "minimal", "low"]
+    return reasoning_effort not in ["disable", "minimal", "low"]
 
 
-def resolve_reasoning_effort(model: Model, reasoning_effort: str | None) -> str | None:
+def resolve_reasoning_effort(model: Model, reasoning_effort: str) -> str | None:
     """
     Resolve the reasoning effort setting based on the model and provided reasoning effort.
     """
