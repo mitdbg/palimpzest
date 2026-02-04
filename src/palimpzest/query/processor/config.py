@@ -31,7 +31,6 @@ class QueryProcessorConfig(BaseModel):
     reasoning_effort: str | None = Field(default="default")  # Gemini: "disable", "low", "medium", "high"
     use_vertex: bool = Field(default=False)  # Whether to use Vertex models for Gemini or Google models
     gemini_credentials_path: str | None = Field(default=None)  # Path to Gemini credentials file
-    api_base: str | None = Field(default=None)  # API base URL for vLLM
 
     # operator flags
     allow_bonded_query: bool = Field(default=True)

@@ -538,7 +538,7 @@ class SemanticAggregate(AggregateOp):
         self.prompt_strategy = prompt_strategy
         self.reasoning_effort = reasoning_effort
         if model is not None:
-            self.generator = Generator(model, prompt_strategy, reasoning_effort, self.api_base)
+            self.generator = Generator(model, prompt_strategy, reasoning_effort)
 
     def __str__(self):
         op = super().__str__()

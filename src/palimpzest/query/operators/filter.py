@@ -175,7 +175,7 @@ class LLMFilter(FilterOp):
         self.prompt_strategy = prompt_strategy
         self.reasoning_effort = reasoning_effort
         if model is not None:
-            self.generator = Generator(model, prompt_strategy, reasoning_effort, self.api_base, Cardinality.ONE_TO_ONE, self.desc, self.verbose)
+            self.generator = Generator(model, prompt_strategy, reasoning_effort, Cardinality.ONE_TO_ONE, self.desc, self.verbose)
 
     def get_id_params(self):
         id_params = super().get_id_params()

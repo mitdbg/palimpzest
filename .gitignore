@@ -59,3 +59,8 @@ pz-env/
 abacus-research/cuad-data/*
 abacus-research/opt-profiling-data/*
 abacus-research/parse-answer-errors/*
+
+# stats
+scripts/litellm_stats/
+scripts/provider_stats/
+tests/pytest/data/generator_messages/

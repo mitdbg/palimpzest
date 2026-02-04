@@ -104,7 +104,6 @@ class Generator(Generic[ContextType, InputType]):
         model: Model,
         prompt_strategy: PromptStrategy,
         reasoning_effort: str | None,
-        api_base: str | None = None,
         cardinality: Cardinality = Cardinality.ONE_TO_ONE,
         desc: str | None = None,
         verbose: bool = False,
@@ -114,7 +113,6 @@ class Generator(Generic[ContextType, InputType]):
         self.cardinality = cardinality
         self.prompt_strategy = prompt_strategy
         self.reasoning_effort = reasoning_effort
-        self.api_base = api_base
         self.desc = desc
         self.verbose = verbose
         self.prompt_factory = PromptFactory(prompt_strategy, model, cardinality, desc)
@@ -322,7 +320,7 @@ class Generator(Generic[ContextType, InputType]):
             if self.model.is_reasoning_model():
                 completion_kwargs = {"reasoning_effort": self.reasoning_effort, **completion_kwargs}
             if self.model.is_vllm_model():
-                completion_kwargs = {"api_base": self.api_base, "api_key": os.environ.get("VLLM_API_KEY", "fake-api-key"), **completion_kwargs}
+                completion_kwargs = {"api_base": self.model.api_base, "api_key": os.environ.get("VLLM_API_KEY", "fake-api-key"), **self.model.vllm_kwargs, **completion_kwargs}
             completion = litellm.completion(model=self.model_name, messages=messages, **completion_kwargs)
             end_time = time.time()
             logger.debug(f"Generated completion in {end_time - start_time:.2f} seconds")
@@ -348,6 +346,7 @@ class Generator(Generic[ContextType, InputType]):
         generation_stats = None
         if completion is not None:
             usage = completion.usage.model_dump()
+            print(f"DEBUG usage: {usage}")
 
             # get cost per input/output token for the model
             usd_per_input_token = self.model.get_usd_per_input_token()

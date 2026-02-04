@@ -276,7 +276,7 @@ class LLMConvert(ConvertOp):
         self.prompt_strategy = prompt_strategy
         self.reasoning_effort = reasoning_effort
         if model is not None:
-            self.generator = Generator(model, prompt_strategy, reasoning_effort, self.api_base, self.cardinality, self.desc, self.verbose)
+            self.generator = Generator(model, prompt_strategy, reasoning_effort, self.cardinality, self.desc, self.verbose)
 
     def __str__(self):
         op = super().__str__()
