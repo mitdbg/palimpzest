@@ -26,6 +26,7 @@ from palimpzest.constants import (
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.models import GenerationStats
 from palimpzest.prompts import PromptFactory
+from palimpzest.utils.model_helpers import resolve_reasoning_effort
 
 # DEFINITIONS
 GenerationOutput = tuple[dict, str | None, GenerationStats, list[dict]]
@@ -108,7 +109,7 @@ class Generator(Generic[ContextType, InputType]):
         self,
         model: Model,
         prompt_strategy: PromptStrategy,
-        reasoning_effort: str | None,
+        reasoning_effort: str,
         api_base: str | None = None,
         cardinality: Cardinality = Cardinality.ONE_TO_ONE,
         desc: str | None = None,
@@ -325,7 +326,8 @@ class Generator(Generic[ContextType, InputType]):
             if is_audio_op:
                 completion_kwargs = {"modalities": ["text"], **completion_kwargs}
             if self.model.is_reasoning_model():
-                completion_kwargs = {"reasoning_effort": self.reasoning_effort, **completion_kwargs}
+                reasoning_effort = resolve_reasoning_effort(self.model, self.reasoning_effort)
+                completion_kwargs = {"reasoning_effort": reasoning_effort, **completion_kwargs}
             if self.model.is_vllm_model():
                 completion_kwargs = {"api_base": self.api_base, "api_key": os.environ.get("VLLM_API_KEY", "fake-api-key"), **completion_kwargs}
             completion = litellm.completion(model=self.model_name, messages=messages, **completion_kwargs)

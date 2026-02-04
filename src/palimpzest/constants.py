@@ -25,7 +25,7 @@ class Model(str, Enum):
     GPT_5_MINI = "openai/gpt-5-mini-2025-08-07"
     GPT_5_NANO = "openai/gpt-5-nano-2025-08-07"
     o4_MINI = "openai/o4-mini-2025-04-16"  # noqa: N815
-    CLAUDE_3_5_SONNET = "anthropic/claude-3-5-sonnet-20241022"
+    # CLAUDE_3_5_SONNET = "anthropic/claude-3-5-sonnet-20241022"
     CLAUDE_3_7_SONNET = "anthropic/claude-3-7-sonnet-20250219"
     CLAUDE_3_5_HAIKU = "anthropic/claude-3-5-haiku-20241022"
     GEMINI_2_0_FLASH = "vertex_ai/gemini-2.0-flash"
@@ -621,7 +621,7 @@ MODEL_CARDS = {
     # Model.o1.value: o1_MODEL_CARD,
     Model.TEXT_EMBEDDING_3_SMALL.value: TEXT_EMBEDDING_3_SMALL_MODEL_CARD,
     Model.CLIP_VIT_B_32.value: CLIP_VIT_B_32_MODEL_CARD,
-    Model.CLAUDE_3_5_SONNET.value: CLAUDE_3_5_SONNET_MODEL_CARD,
+    # Model.CLAUDE_3_5_SONNET.value: CLAUDE_3_5_SONNET_MODEL_CARD,
     Model.CLAUDE_3_7_SONNET.value: CLAUDE_3_7_SONNET_MODEL_CARD,
     Model.CLAUDE_3_5_HAIKU.value: CLAUDE_3_5_HAIKU_MODEL_CARD,
     Model.GEMINI_2_0_FLASH.value: GEMINI_2_0_FLASH_MODEL_CARD,
