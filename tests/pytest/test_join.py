@@ -12,6 +12,10 @@ from palimpzest.core.models import GenerationStats
 from palimpzest.query.generators.generators import Generator
 from palimpzest.query.operators.join import EmbeddingJoin, NestedLoopsJoin
 
+import pandas as pd
+import palimpzest as pz
+from palimpzest.query.operators.join import BlockNestedLoopsJoin
+
 if not os.environ.get("OPENAI_API_KEY"):
     from palimpzest.utils.env_helpers import load_env
 
@@ -124,6 +128,124 @@ def test_join(mocker, left_input_schema, right_input_schema, physical_op_class):
 
     assert sorted(output_record.schema.model_fields) == sorted(input_schema.model_fields)
     assert output_record._passed_operator
+
+def test_block_join(mocker):
+    """Test BlockNestedLoopsJoin operator on simple text input"""
+
+    def mock_block_join_generator_call(candidate, fields, right_candidate=None, json_output=True, **kwargs):
+        # BlockNestedLoopsJoin expects matching index pairs in 'all_matches'.
+        # Indices are 1-based relative to the batch lists provided.
+        
+        # Calculate lengths of the batches
+        n_left = len(candidate) if isinstance(candidate, list) else 1
+        n_right = len(right_candidate) if isinstance(right_candidate, list) else 1
+        
+        # Create matches for all pairs (simulating a full cross-product match for testing)
+        matches = []
+        for i in range(1, n_left + 1):
+            for j in range(1, n_right + 1):
+                matches.append((i, j))
+                
+        field_answers = {"all_matches": matches}
+        reasoning = "The inputs match."
+        generation_stats = GenerationStats(
+            cost_per_record=1.0, 
+            time_per_record=1.0, 
+            num_input_tokens=10, 
+            num_output_tokens=10
+        )
+        messages = []
+        return field_answers, reasoning, generation_stats, messages
+
+    # datasets of movie reviews and actor descriptions
+    movie_reviews = [
+        {"review": "Inception is a mind-bending thriller that blurs the lines between dreams and reality. A must-watch!"},
+        {"review": "The Devil Wears Prada is a sharp and witty look into the fashion industry, with standout performances."},
+        {"review": "Titanic is a heartbreaking love story set against the backdrop of a historic tragedy. Truly moving."},
+        {"review": "The Dark Knight redefined the superhero genre with its intense action and complex characters."},
+        {"review": "Training Day is a gritty crime drama that keeps you on the edge of your seat from start to finish."},
+    ]
+    actor_descriptions = [
+        {"actor": "Tom Cruise is an American actor and producer known for his roles in action films such as 'Top Gun' and the 'Mission: Impossible' series."},
+        {"actor": "Meryl Streep is an acclaimed American actress recognized for her versatility and roles in films like 'The Devil Wears Prada' and 'Sophie's Choice'."},
+        {"actor": "Leonardo DiCaprio is an American actor and film producer known for his performances in 'Titanic', 'Inception', and 'The Revenant'."},
+        {"actor": "Scarlett Johansson is an American actress and singer, famous for her roles in 'Lost in Translation' and as Black Widow in the Marvel Cinematic Universe."},
+        {"actor": "Denzel Washington is an American actor and director known for his powerful performances in films like 'Training Day' and 'Malcolm X'."},
+    ]
+
+    # create DataRecords for movie reviews
+    movie_ds = pz.MemoryDataset(id="movies", vals=movie_reviews)
+    output = movie_ds.run()
+    left_candidates = [dr for dr in output]
+
+    # create DataRecords for actor descriptions
+    actor_ds = pz.MemoryDataset(id="actors", vals=actor_descriptions)
+    output = actor_ds.run()
+    right_candidates = [dr for dr in output]
+
+    # execute semantic join with your operator
+    class JoinSchema(BaseModel):
+        review: str = Field(description="A movie review")
+        actor: str = Field(description="A sentence about an actor")
+
+    input_schema = union_schemas([JoinSchema, JoinSchema])
+
+    # Test two versions: reasoning and no reasoning
+    join_ops = [
+        BlockNestedLoopsJoin(
+            input_schema=JoinSchema,
+            output_schema=JoinSchema,
+            model=pz.Model.GPT_4o_MINI,
+            condition="The actor appears in the movie being reviewed",
+            reasoning=True,
+            logical_op_id="abc123"
+        ),
+        BlockNestedLoopsJoin(
+            input_schema=JoinSchema,
+            output_schema=JoinSchema,
+            model=pz.Model.GPT_4o_MINI,
+            condition="The actor appears in the movie being reviewed",
+            reasoning=False,
+            logical_op_id="abc124"
+        )
+    ]
+    for join_op in join_ops:
+        # Test different batch sizes
+        batch_to_calls = [
+            ((1, 1), 25),
+            ((2, 2), 9),
+            ((3, 2), 6),
+            ((5, 5), 1),
+            (None, None)
+        ]
+        for batch_sizes, expected_calls in batch_to_calls:
+            join_op._left_input_records = []
+            join_op._right_input_records = []
+            join_op._left_joined_record_ids = set()
+            join_op._right_joined_record_ids = set()
+            # only execute LLM calls if specified
+            if not os.getenv("RUN_LLM_TESTS"):
+                mock_call = mocker.patch.object(Generator, "__call__", side_effect=mock_block_join_generator_call)
+            
+            # apply join operator to the inputs
+            if batch_sizes is None:
+                data_record_set, num_inputs_processed = join_op(left_candidates, right_candidates)
+
+            else:
+                data_record_set, num_inputs_processed = join_op(left_candidates, right_candidates, batch_sizes = batch_sizes)
+
+                # check that the mock was called expected number of times
+                if not os.getenv("RUN_LLM_TESTS"):
+                    assert mock_call.call_count == expected_calls
+            
+            # sanity checks on output records and stats
+            records = data_record_set.data_records
+            record_op_stats_lst = data_record_set.record_op_stats
+            assert len(record_op_stats_lst) == 25
+            assert num_inputs_processed == 25
+
+            for output_record in records:
+                assert sorted(output_record.schema.model_fields) == sorted(input_schema.model_fields)
 
 def test_embedding_join(mocker):
     """Test EmbeddingJoin operator on simple text input"""

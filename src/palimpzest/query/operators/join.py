@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import regex as re
 import threading
 import time
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+from dotenv import load_dotenv
 
 import numpy as np
 from numpy.linalg import norm
@@ -11,6 +14,8 @@ from openai import OpenAI
 from PIL import Image
 from pydantic.fields import FieldInfo
 from sentence_transformers import SentenceTransformer
+from transformers import AutoTokenizer
+import tiktoken
 
 from palimpzest.constants import (
     NAIVE_EST_JOIN_SELECTIVITY,
@@ -25,6 +30,10 @@ from palimpzest.core.models import GenerationStats, OperatorCostEstimates, Recor
 from palimpzest.query.generators.generators import Generator
 from palimpzest.query.operators.physical import PhysicalOperator
 
+from palimpzest.prompts.block_join_prompts import (
+    BLOCK_JOIN_BASE_USER_PROMPT,
+    BLOCK_JOIN_NO_REASONING_BASE_USER_PROMPT
+)
 
 class Singleton:
      def __new__(cls, *args, **kw):
@@ -487,7 +496,377 @@ class NestedLoopsJoin(LLMJoin):
 
         return DataRecordSet(output_records, output_record_op_stats), num_inputs_processed
 
+class BlockNestedLoopsJoin(LLMJoin):
+    # Implements block nested loops join with an known selectivity.
+    def __init__(
+        self,
+        reasoning: bool = True,
+        max_context_size: int = 8192,
+        *args,
+        **kwargs
+    ):
+        self.reasoning = reasoning
+        self.max_context_size = max_context_size
+        if reasoning:
+            kwargs['prompt_strategy'] = PromptStrategy.JOIN_BLOCK
+        else:
+            kwargs['prompt_strategy'] = PromptStrategy.JOIN_BLOCK_NO_REASONING
+        super().__init__(*args, **kwargs)
+    
+    def naive_cost_estimates(
+        self,
+        left_source_op_cost_estimates: OperatorCostEstimates,
+        right_source_op_cost_estimates: OperatorCostEstimates
+    ):
+        # estimate number of input tokens from source
+        est_num_input_tokens = 2 * NAIVE_EST_NUM_INPUT_TOKENS
+        if self.is_image_op():
+            est_num_input_tokens = 2 * 765 / 10  # 1024x1024 image is 765 tokens
 
+        # NOTE: the output often generates an entire reasoning sentence, thus the true value may be higher
+        # the join operation's LLM call generates index pairs for all positives (e.g. 1,2;), thus we expect
+        # the number of output tokens to be approximately 4 times the selectivity.
+        est_num_output_tokens = 4 * NAIVE_EST_JOIN_SELECTIVITY
+
+        # get est. of conversion time per record from model card;
+        model_conversion_time_per_record = (
+            MODEL_CARDS[self.model.value]["seconds_per_output_token"] * est_num_output_tokens
+        )
+
+        # get est. of conversion cost (in USD) per record from model card
+        usd_per_input_token = (
+            MODEL_CARDS[self.model.value]["usd_per_audio_input_token"]
+            if self.is_audio_op()
+            else MODEL_CARDS[self.model.value]["usd_per_input_token"]
+        )
+        model_conversion_usd_per_record = (
+            usd_per_input_token * est_num_input_tokens
+            + MODEL_CARDS[self.model.value]["usd_per_output_token"] * est_num_output_tokens
+        )
+
+        # estimate output cardinality using a constant assumption of the filter selectivity
+        selectivity = NAIVE_EST_JOIN_SELECTIVITY
+        cardinality = selectivity * (left_source_op_cost_estimates.cardinality * right_source_op_cost_estimates.cardinality)
+
+        # estimate quality of output based on the strength of the model being used
+        quality = (MODEL_CARDS[self.model.value]["overall"] / 100.0)
+
+        return OperatorCostEstimates(
+            cardinality=cardinality,
+            time_per_record=model_conversion_time_per_record,
+            cost_per_record=model_conversion_usd_per_record,
+            quality=quality,
+        )
+
+    def _number_of_tokens(self, text: str):
+        # Map internal model Enums to tokenizer tool and identifier
+        TRANSFORMERS = "transformers"
+        TIKTOKEN = "tiktoken"
+        TOKENIZER_TOOL = {
+            Model.LLAMA3_2_3B: (TRANSFORMERS, "meta-llama/Llama-3.2-3B-Instruct"),
+            Model.LLAMA3_1_8B: (TRANSFORMERS, "meta-llama/Meta-Llama-3.1-8B-Instruct"),
+            Model.LLAMA3_3_70B: (TRANSFORMERS, "meta-llama/Llama-3.3-70B-Instruct"),
+            Model.LLAMA3_2_90B_V: (TRANSFORMERS, "meta-llama/Llama-3.2-90B-Vision-Instruct"),
+            Model.DEEPSEEK_V3: (TRANSFORMERS, "deepseek-ai/DeepSeek-V3"),
+            Model.DEEPSEEK_R1_DISTILL_QWEN_1_5B: (TRANSFORMERS, "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"),
+            Model.GPT_4o: (TIKTOKEN, "o200k_base"),
+            Model.GPT_4o_MINI: (TIKTOKEN, "o200k_base"),
+            Model.GPT_4_1: (TIKTOKEN, "o200k_base"),
+            Model.GPT_4_1_MINI: (TIKTOKEN, "o200k_base"),
+            Model.GPT_4_1_NANO: (TIKTOKEN, "o200k_base"),
+            Model.GPT_5: (TIKTOKEN, "o200k_base"),
+            Model.GPT_5_MINI: (TIKTOKEN, "o200k_base"),
+            Model.GPT_5_NANO: (TIKTOKEN, "o200k_base"),
+            Model.o4_MINI: (TIKTOKEN, "o200k_base"),
+            Model.CLAUDE_3_5_SONNET: (TIKTOKEN, "cl100k_base"),
+            Model.CLAUDE_3_7_SONNET: (TIKTOKEN, "cl100k_base"),
+            Model.CLAUDE_3_5_HAIKU: (TIKTOKEN, "cl100k_base"),
+            Model.GEMINI_2_0_FLASH: (TIKTOKEN, "o200k_base"),
+            Model.GEMINI_2_5_FLASH: (TIKTOKEN, "o200k_base"),
+            Model.GEMINI_2_5_PRO: (TIKTOKEN, "o200k_base"),
+            Model.GOOGLE_GEMINI_2_5_FLASH: (TIKTOKEN, "o200k_base"),
+            Model.GOOGLE_GEMINI_2_5_FLASH_LITE: (TIKTOKEN, "o200k_base"),
+            Model.GOOGLE_GEMINI_2_5_PRO: (TIKTOKEN, "o200k_base"),
+            Model.LLAMA_4_MAVERICK: (TRANSFORMERS, "meta-llama/Llama-4-Maverick-17B-128E-Instruct"),
+            Model.GPT_4o_AUDIO_PREVIEW: (TIKTOKEN, "o200k_base"),
+            Model.GPT_4o_MINI_AUDIO_PREVIEW: (TIKTOKEN, "o200k_base"),
+            Model.VLLM_QWEN_1_5_0_5B_CHAT: (TRANSFORMERS, "Qwen/Qwen1.5-0.5B-Chat"),
+            Model.TEXT_EMBEDDING_3_SMALL: (TIKTOKEN, "cl100k_base"),
+            Model.CLIP_VIT_B_32: (TRANSFORMERS, "openai/clip-vit-base-patch32")
+        }
+
+        tool, identifier = TOKENIZER_TOOL.get(self.model, (TIKTOKEN, "o200k_base"))
+        if tool == TRANSFORMERS:
+            tokenizer = AutoTokenizer.from_pretrained(identifier)
+            token_ids = tokenizer.encode(text, add_special_tokens=True)
+            return len(token_ids)
+        elif tool == TIKTOKEN:
+            encoding = tiktoken.get_encoding(identifier)
+            token_ids = encoding.encode(text)
+            return len(token_ids)
+        else:
+            raise ValueError(f"Unsupported tokenizer tool: {tool}")
+    
+    def _find_batch_sizes(
+        self,
+        left_candidates: list[DataRecord],
+        right_candidates: list[DataRecord],
+        selectivity: float
+    ) -> tuple[int, int]:
+        """
+        Finds optimal batch sizes for left and right tables, assuming a known selectivity.
+        The procedure is outlined in section 5 of https://arxiv.org/pdf/2510.08489.
+        """
+        left_rows = len(left_candidates)
+        right_rows = len(right_candidates)
+        prompt_token_overhead = self._number_of_tokens(BLOCK_JOIN_BASE_USER_PROMPT if self.reasoning else BLOCK_JOIN_NO_REASONING_BASE_USER_PROMPT)
+        user_token_limit = self.max_context_size - prompt_token_overhead # t
+        index_token_overhead = self._number_of_tokens('\"_index\": \"1\"\n')
+        left_average_tokens = self._number_of_tokens(str(left_candidates)) / left_rows + index_token_overhead # s_1
+        right_average_tokens = self._number_of_tokens(str(right_candidates)) / right_rows + index_token_overhead # s_2
+        reasoning_token_overhead = 200 if self.reasoning else 0
+        output_average_tokens = self._number_of_tokens('1,1;') + reasoning_token_overhead / (left_rows * right_rows * selectivity) # s_3
+
+        left_batch_size = ((-left_average_tokens * right_average_tokens + 
+                            ((left_average_tokens * right_average_tokens) ** 2
+                             + left_average_tokens * right_average_tokens * output_average_tokens * selectivity * user_token_limit) ** 0.5)
+                           / (left_average_tokens * output_average_tokens * selectivity))
+        right_batch_size = (user_token_limit - left_batch_size * left_average_tokens) / (right_average_tokens + left_average_tokens * output_average_tokens * selectivity)
+        left_batch_size = max(1, min(left_rows, round(left_batch_size)))
+        right_batch_size = max(1, min(right_rows, round(right_batch_size)))
+
+        return left_batch_size, right_batch_size
+
+    def _add_indices_to_records(
+        self,
+        left_candidates: list[DataRecord],
+        right_candidates: list[DataRecord],
+        left_batch_size: int,
+        right_batch_size: int,
+    ):
+        left_candidates_size = len(left_candidates)
+        right_candidates_size = len(right_candidates)
+        left_input_records_size = len(self._left_input_records)
+        right_input_records_size = len(self._right_input_records)
+
+        # add indices to records
+        def _helper(records: list[DataRecord]):
+            for i, record in enumerate(records):
+                record._index = str(i + 1)
+        
+        for left_index in range(0, left_candidates_size, left_batch_size):
+            left_batch = left_candidates[left_index:left_index + left_batch_size]
+            _helper(left_batch)
+        for left_index in range(0, left_input_records_size, left_batch_size):
+            left_batch = self._left_input_records[left_index:left_index + left_batch_size]
+            _helper(left_batch)
+        for right_index in range(0, right_candidates_size, right_batch_size):
+            right_batch = right_candidates[right_index:right_index + right_batch_size]
+            _helper(right_batch)
+        for right_index in range(0, right_input_records_size, right_batch_size):
+            right_batch = self._right_input_records[right_index:right_index + right_batch_size]
+            _helper(right_batch)
+
+    def _del_indices_from_records(
+        self,
+        left_candidates: list[DataRecord],
+        right_candidates: list[DataRecord]
+    ):
+        for record in left_candidates:
+            del record._index
+        for record in self._left_input_records:
+            del record._index
+        for record in right_candidates:
+            del record._index
+        for record in self._right_input_records:
+            del record._index
+
+    def _create_join_candidates(
+        self,
+        left_candidates: list[DataRecord],
+        right_candidates: list[DataRecord],
+        left_batch_size: int,
+        right_batch_size: int
+    ) -> list:
+        left_candidates_size = len(left_candidates)
+        right_candidates_size = len(right_candidates)
+        left_input_records_size = len(self._left_input_records)
+        right_input_records_size = len(self._right_input_records)
+
+        join_candidates = []
+        for left_index in range(0, left_candidates_size, left_batch_size):
+            left_batch = left_candidates[left_index:left_index + left_batch_size]
+            for right_index in range(0, right_candidates_size, right_batch_size):
+                right_batch = right_candidates[right_index:right_index + right_batch_size]
+                join_candidates.append((left_batch, right_batch))
+            for right_index in range(0, right_input_records_size, right_batch_size):
+                right_batch = self._right_input_records[right_index:right_index + right_batch_size]
+                join_candidates.append((left_batch, right_batch))
+        for left_index in range(0, left_input_records_size, left_batch_size):
+            left_batch = self._left_input_records[left_index:left_index + left_batch_size]
+            for right_index in range(0, right_candidates_size, right_batch_size):
+                right_batch = right_candidates[right_index:right_index + right_batch_size]
+                join_candidates.append((left_batch, right_batch))
+        
+        return join_candidates
+
+    def _process_join_candidate_pair(
+        self,
+        left_candidate: list[DataRecord],
+        right_candidate: list[DataRecord],
+        gen_kwargs: dict,
+    ) -> tuple[list[DataRecord], list[RecordOpStats]]:
+        start_time = time.time()
+
+        # generate output
+        field_answers, _, generation_stats, _ = self.generator(left_candidate, None, right_candidate=right_candidate, **gen_kwargs)
+
+        # handle different join types
+        inner_positives = set()
+        for left_idx, right_idx in field_answers["all_matches"]:
+            left_rec = left_candidate[left_idx - 1]
+            right_rec = right_candidate[right_idx - 1]
+            inner_positives.add((left_rec._id, right_rec._id))
+            if self.how == "left":
+                self._left_joined_record_ids.add(left_rec._id)
+            elif self.how == "right":
+                self._right_joined_record_ids.add(right_rec._id)
+            elif self.how == "outer":
+                self._left_joined_record_ids.add(left_rec._id)
+                self._right_joined_record_ids.add(right_rec._id)
+        
+        # compute output records and record stats
+        end_time = time.time()
+        output_records = []
+        output_record_op_stats = []
+        for left_rec in left_candidate:
+            for right_rec in right_candidate:
+                passed_operator = (left_rec._id, right_rec._id) in inner_positives
+                join_dr = DataRecord.from_join_parents(self.output_schema, left_rec, right_rec)
+                join_dr._passed_operator = passed_operator
+
+                record_op_stats = RecordOpStats(
+                    record_id=join_dr._id,
+                    record_parent_ids=join_dr._parent_ids,
+                    record_source_indices=join_dr._source_indices,
+                    record_state=join_dr.to_dict(include_bytes=False),
+                    full_op_id=self.get_full_op_id(),
+                    logical_op_id=self.logical_op_id,
+                    op_name=self.op_name(),
+                    time_per_record=(end_time - start_time) / (len(left_candidate) * len(right_candidate)),
+                    cost_per_record=generation_stats.cost_per_record / (len(left_candidate) * len(right_candidate)),
+                    model_name=self.get_model_name(),
+                    join_condition=self.condition,
+                    total_input_tokens=generation_stats.total_input_tokens / (len(left_candidate) * len(right_candidate)),
+                    total_output_tokens=generation_stats.total_output_tokens / (len(left_candidate) * len(right_candidate)),
+                    total_embedding_input_tokens=generation_stats.total_embedding_input_tokens / (len(left_candidate) * len(right_candidate)),
+                    total_input_cost=generation_stats.total_input_cost / (len(left_candidate) * len(right_candidate)),
+                    total_output_cost=generation_stats.total_output_cost / (len(left_candidate) * len(right_candidate)),
+                    total_embedding_cost=generation_stats.total_embedding_cost / (len(left_candidate) * len(right_candidate)),
+                    llm_call_duration_secs=generation_stats.llm_call_duration_secs,
+                    fn_call_duration_secs=generation_stats.fn_call_duration_secs,
+                    total_llm_calls=generation_stats.total_llm_calls,
+                    total_embedding_llm_calls=generation_stats.total_embedding_llm_calls,
+                    # answer=field_answers,
+                    passed_operator=passed_operator,
+                    op_details={k: str(v) for k, v in self.get_id_params().items()},
+                )
+                output_records.append(join_dr)
+                output_record_op_stats.append(record_op_stats)
+
+        return output_records, output_record_op_stats
+
+    def __call__(
+            self,
+            left_candidates: list[DataRecord],
+            right_candidates: list[DataRecord],
+            final: bool = False,
+            batch_sizes: tuple[int, int] | None = None,
+            known_selectivity: float = 0.001
+        ) -> tuple[DataRecordSet, int]:
+        def _find_answer(completion_text: str) -> str:
+            # list of indicators to try
+            indicators = ["answer:", "answer is:", "index pairs is:", "index pairs are:", "join condition are:", "output:"]
+            for indicator in indicators:
+                regex = re.compile(f"{indicator}(.*?)---", re.IGNORECASE | re.DOTALL)
+                matches = regex.findall(completion_text)
+                if len(matches) > 0:
+                    return matches[0].strip()
+
+            # if we didn't find an answer, try taking all the text after "ANSWER:"
+            regex = re.compile("answer:(.*)", re.IGNORECASE | re.DOTALL)
+            matches = regex.findall(completion_text)
+            if len(matches) > 0:
+                return matches[0].strip()
+            
+            # if all else fails, return the entire completion text
+            return completion_text.strip()
+        
+        def _parse_answer(completion_text: str) -> dict[str, list]:
+            try:
+                answer_text = _find_answer(completion_text)
+                index_pairs = []
+                for pair_str in answer_text.split(";"):
+                    if "," in pair_str:
+                        left_pair_str, right_pair_str = pair_str.split(",")
+                        index_pairs.append((int(left_pair_str.strip()), int(right_pair_str.strip())))
+                return {"all_matches": index_pairs}
+            except Exception:
+                raise Exception(f"Could not parse answer from completion text: {answer_text}")
+
+        # get batch sizes
+        left_batch_size, right_batch_size = batch_sizes if batch_sizes is not None else self._find_batch_sizes(left_candidates, right_candidates, known_selectivity)
+
+        # add indices to records
+        self._add_indices_to_records(left_candidates, right_candidates, left_batch_size, right_batch_size)
+        
+        # create the set of candidates to join
+        join_candidates = self._create_join_candidates(left_candidates, right_candidates, left_batch_size, right_batch_size)
+
+        # get the set of input fields from both records in the join
+        input_fields = self.get_input_fields()
+        input_fields.append("_index")
+
+        # construct kwargs for generation
+        gen_kwargs = {"project_cols": input_fields, "join_condition": self.condition, "parse_answer": _parse_answer}
+
+        # apply the generator to each pair of candidates
+        output_records, output_record_op_stats = [], []
+        with ThreadPoolExecutor(max_workers=self.join_parallelism) as executor:
+            futures = [
+                executor.submit(self._process_join_candidate_pair, candidate, right_candidate, gen_kwargs)
+                for candidate, right_candidate in join_candidates
+            ]
+  
+            # collect results as they complete
+            for future in as_completed(futures):
+                self.join_idx += 1
+                join_output_records, join_output_record_op_stats = future.result()
+                output_records.extend(join_output_records)
+                output_record_op_stats.extend(join_output_record_op_stats)
+                print(f"{self.join_idx} JOINED")
+
+        # compute the number of inputs processed
+        num_inputs_processed = len(left_candidates) * len(right_candidates)
+
+        # store input records to join with new records added later
+        if self.retain_inputs:
+            self._left_input_records.extend(left_candidates)
+            self._right_input_records.extend(right_candidates)
+
+        # delete indices from records
+        self._del_indices_from_records(left_candidates, right_candidates)
+
+        # if this is the final call, then add in any left/right/outer join records that did not match
+        if final:
+            return self._compute_unmatched_records(), 0
+
+        # return empty DataRecordSet if no output records were produced
+        if len(output_records) == 0:
+            return DataRecordSet([], []), num_inputs_processed
+
+        return DataRecordSet(output_records, output_record_op_stats), num_inputs_processed
+    
 class EmbeddingJoin(LLMJoin):
     # NOTE: we currently do not support audio joins as embedding models for audio seem to have
     # specialized use cases (e.g., speech-to-text) with strict requirements on things like e.g. sample rate
@@ -589,6 +968,7 @@ class EmbeddingJoin(LLMJoin):
         total_embedding_input_tokens = 0
         embeddings = None
         if self.text_only:
+            load_dotenv()
             client = OpenAI()
             inputs = [dr.to_json_str(bytes_to_str=True, project_cols=input_fields, sorted=True) for dr in candidates]
             response = client.embeddings.create(input=inputs, model=self.embedding_model.value)
