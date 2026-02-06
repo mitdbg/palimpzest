@@ -11,6 +11,7 @@ Prerequisites:
        --model-id openai/Qwen/Qwen2.5-1.5B-Instruct
 """
 import argparse
+import os
 
 from pydantic import BaseModel, Field
 
@@ -32,8 +33,9 @@ def main():
     # Create the vLLM model with api_base and kwargs on the Model instance
     vllm_model = pz.Model(args.model_id, api_base=args.api_base, max_tokens=args.max_tokens)
 
-    # Create a small in-memory dataset
-    dataset = pz.Dataset("test-sentiment", schema=pz.TextFile)
+    # Load the enron-tiny dataset
+    data_path = os.path.join(os.path.dirname(__file__), "..", "testdata", "enron-tiny")
+    dataset = pz.TextFileDataset(id="test-sentiment", path=data_path)
     dataset = dataset.sem_map(SentimentResult, desc="Classify the sentiment of the text")
 
     # Configure with vLLM model

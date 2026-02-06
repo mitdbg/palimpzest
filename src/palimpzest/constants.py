@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import os
+from contextlib import suppress
 from enum import Enum
 
 import litellm
-from palimpzest.utils.model_info_helpers import ModelMetricsManager
+
+from palimpzest.utils.model_info_helpers import ModelMetricsManager, derive_model_flags, predict_local_model_metrics
 
 
 class PromptStrategy(str, Enum):
@@ -211,42 +213,39 @@ class Model:
 
         Model._registry[model_id] = self
 
-    # Default values for vLLM models when litellm doesn't have info.
-    # Based on typical small local models (e.g., Llama 3.2 3B).
-    VLLM_DEFAULT_SECONDS_PER_OUTPUT_TOKEN = 0.01
-    VLLM_DEFAULT_QUALITY_SCORE = 40.0
-
     def _get_litellm_model_specs(self, model_id: str) -> dict:
         """Get model specs from litellm's local model_cost data for vLLM models."""
+        # Use predict function to get quality and latency metrics via fuzzy matching
+        predicted_metrics = predict_local_model_metrics(model_id)
+
         specs = {
             "is_text_model": True,
             "is_vision_model": False,
             "is_audio_model": False,
             "supports_function_calling": False,
             "supports_prompt_caching": False,
-            "usd_per_input_token": 0.0,
+            "usd_per_input_token": 0.0, # cost always 0 for local model
             "usd_per_output_token": 0.0,
-            "seconds_per_output_token": Model.VLLM_DEFAULT_SECONDS_PER_OUTPUT_TOKEN,
-            "MMLU_Pro_score": Model.VLLM_DEFAULT_QUALITY_SCORE,
+            "seconds_per_output_token": predicted_metrics["seconds_per_output_token"],
+            "MMLU_Pro_score": predicted_metrics["MMLU_Pro_score"],
         }
 
-        # Use litellm's local capability checking functions (no network calls)
-        try:
+        # Set model-specific flags (e.g. is_llama_model, is_o_model)
+        specs.update(derive_model_flags(model_id))
+
+        specs["is_vision_model"] = False
+        specs["supports_function_calling"] = False
+        with suppress(Exception):
             specs["is_vision_model"] = litellm.supports_vision(model=model_id)
-        except Exception:
-            pass
 
-        try:
-            specs["supports_function_calling"] = litellm.supports_function_calling(model=model_id)
-        except Exception:
-            pass
+        with suppress(Exception):
+            specs["supports_function_calling"] = (litellm.supports_function_calling(model=model_id))
 
-        # Get cost and capability info from litellm's model_cost dict (local data)
+        # Get capability info from litellm's model_cost dict (local data)
+        # Note: Cost is always 0 for local models, so we don't use litellm's cost data
         try:
             if model_id in litellm.model_cost:
                 model_info = litellm.model_cost[model_id]
-                specs["usd_per_input_token"] = model_info.get("input_cost_per_token", 0.0)
-                specs["usd_per_output_token"] = model_info.get("output_cost_per_token", 0.0)
                 specs["supports_prompt_caching"] = model_info.get("supports_prompt_caching", False)
                 specs["is_audio_model"] = model_info.get("supports_audio_input", False)
         except Exception:
@@ -422,8 +421,6 @@ Model.GOOGLE_GEMINI_2_5_PRO = Model("gemini/gemini-2.5-pro")
 Model.LLAMA_4_MAVERICK = Model("vertex_ai/meta/llama-4-maverick-17b-128e-instruct-maas")
 Model.GPT_4o_AUDIO_PREVIEW = Model("openai/gpt-4o-audio-preview")
 Model.GPT_4o_MINI_AUDIO_PREVIEW = Model("openai/gpt-4o-mini-audio-preview")
-# vLLM models require api_base to be set. Create your own vLLM model like this:
-# my_vllm_model = Model("hosted_vllm/qwen/Qwen1.5-0.5B-Chat", api_base="http://localhost:8000/v1")
 Model.TEXT_EMBEDDING_3_SMALL = Model("text-embedding-3-small")
 Model.CLIP_VIT_B_32 = Model("clip-ViT-B-32")
 
