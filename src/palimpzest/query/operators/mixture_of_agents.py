@@ -33,10 +33,10 @@ class MixtureOfAgentsConvert(LLMConvert):
 
         # create generators
         self.proposer_generators = [
-            Generator(model, PromptStrategy.MAP_MOA_PROPOSER, self.reasoning_effort, self.api_base, self.cardinality, self.desc, self.verbose)
+            Generator(model, PromptStrategy.MAP_MOA_PROPOSER, self.reasoning_effort, self.cardinality, self.desc, self.verbose)
             for model in proposer_models
         ]
-        self.aggregator_generator = Generator(aggregator_model, PromptStrategy.MAP_MOA_AGG, self.reasoning_effort, self.api_base, self.cardinality, self.desc, self.verbose)
+        self.aggregator_generator = Generator(aggregator_model, PromptStrategy.MAP_MOA_AGG, self.reasoning_effort, self.cardinality, self.desc, self.verbose)
 
     def __str__(self):
         op = super().__str__()
@@ -150,10 +150,10 @@ class MixtureOfAgentsFilter(LLMFilter):
 
         # create generators
         self.proposer_generators = [
-            Generator(model, PromptStrategy.FILTER_MOA_PROPOSER, self.reasoning_effort, self.api_base, Cardinality.ONE_TO_ONE, self.desc, self.verbose)
+            Generator(model, PromptStrategy.FILTER_MOA_PROPOSER, self.reasoning_effort, Cardinality.ONE_TO_ONE, self.desc, self.verbose)
             for model in proposer_models
         ]
-        self.aggregator_generator = Generator(aggregator_model, PromptStrategy.FILTER_MOA_AGG, self.reasoning_effort, self.api_base, Cardinality.ONE_TO_ONE, self.desc, self.verbose)
+        self.aggregator_generator = Generator(aggregator_model, PromptStrategy.FILTER_MOA_AGG, self.reasoning_effort, Cardinality.ONE_TO_ONE, self.desc, self.verbose)
 
     def __str__(self):
         op = super().__str__()

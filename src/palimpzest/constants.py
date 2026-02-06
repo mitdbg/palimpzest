@@ -4,7 +4,9 @@ from __future__ import annotations
 import os
 from enum import Enum
 
-from palimpzest.utils.model_info_helpers import ModelMetricsManager
+import litellm
+
+from palimpzest.utils.model_info_helpers import ModelMetricsManager, predict_local_model_metrics
 
 
 class PromptStrategy(str, Enum):
@@ -194,13 +196,62 @@ class Model:
     # Registry of known models (maps value string to Model instance)
     _registry: dict[str, Model] = {}
 
-    def __init__(self, model_id: str, local_model_url: str | None = None):
+    def __init__(self, model_id: str, api_base: str | None = None, **vllm_kwargs):
         self.metrics_manager = ModelMetricsManager()
         self.model_id = model_id
-        self.model_specs = self.metrics_manager.get_model_metrics(model_id)
-        if not self.model_specs:
-            raise ValueError("Palimpzest currently does not contain information about this model.")
+        self.api_base = api_base
+        self.vllm_kwargs = vllm_kwargs if vllm_kwargs else {}
+
+        # For vLLM models (api_base is set), try to get model info from litellm's local data
+        if api_base is not None:
+            self.model_specs = self._get_litellm_model_specs(model_id)
+        else:
+            self.model_specs = self.metrics_manager.get_model_metrics(model_id)
+            if not self.model_specs:
+                raise ValueError("Palimpzest currently does not contain information about this model.")
+
         Model._registry[model_id] = self
+
+    def _get_litellm_model_specs(self, model_id: str) -> dict:
+        """Get model specs from litellm's local model_cost data for vLLM models."""
+        # Use predict function to get quality, latency metrics, and capability flags
+        predicted_metrics = predict_local_model_metrics(model_id)
+
+        # Start with defaults, then overlay predicted values
+        specs = {
+            "is_text_model": True,
+            "is_vision_model": False,
+            "is_llama_model": False,
+            "is_clip_model": False,
+            "is_audio_model": False,
+            "is_reasoning_model": False,
+            "is_embedding_model": False,
+            "is_vllm_model": True,  # Mark as vLLM model
+            "usd_per_input_token": 0.0,  # Cost always 0 for local model
+            "usd_per_output_token": 0.0,
+            "seconds_per_output_token": predicted_metrics["seconds_per_output_token"],
+            "MMLU_Pro_score": predicted_metrics["MMLU_Pro_score"],
+        }
+
+        # Overlay all flags detected from model name (including False values like is_text_model for embeddings)
+        for key, value in predicted_metrics.items():
+            if key.startswith("is_"):
+                specs[key] = value
+
+        # Try litellm for additional capability detection (may not work for local models)
+        try:
+            if litellm.supports_vision(model=model_id):
+                specs["is_vision_model"] = True
+        except Exception:
+            pass
+
+        try:
+            if litellm.supports_audio_input(model=model_id):
+                specs["is_audio_model"] = True
+        except Exception:
+            pass
+
+        return specs
 
     def __lt__(self, other):
         if isinstance(other, Model):
@@ -258,7 +309,7 @@ class Model:
         return self.model_specs.get("is_llama_model", False)
     
     def is_vllm_model(self) -> bool:
-        return self.model_specs.get("is_vllm_model", False)
+        return self.model_specs.get("is_vllm_model", False) and self.api_base is not None
     
     def is_embedding_model(self) -> bool:
         return self.model_specs.get("is_embedding_model", False)
@@ -306,11 +357,12 @@ class Model:
         return self.is_audio_model() and self.is_text_model()
 
     def supports_prompt_caching(self) -> bool:
-        return self.model_specs.get("supports_prompt_caching", False)
+        return (self.is_provider_anthropic() or self.is_provider_google_ai_studio() or self.is_provider_vertex_ai or self.is_provider_openai()) \
+            and self.model_specs.get("supports_prompt_caching", False)
 
     def get_usd_per_input_token(self) -> float:
         return self.model_specs.get("usd_per_input_token", 0.0)
-    
+
     def get_usd_per_output_token(self) -> float:
         return self.model_specs.get("usd_per_output_token", 0.0)
 
@@ -318,17 +370,17 @@ class Model:
         return self.model_specs.get("usd_per_audio_input_token", 0.0)
 
     def get_usd_per_cache_read_token(self) -> float:
-        return self.model_specs.get("usd_per_cache_read_token", self.get_usd_per_cache_read_token())
+        return self.model_specs.get("usd_per_cache_read_token", self.get_usd_per_input_token())
     
     def get_usd_per_audio_cache_read_token(self) -> float:
-        return self.model_specs.get("usd_per_audio_cache_read_token", self.get_usd_per_audio_cache_read_token())
+        return self.model_specs.get("usd_per_audio_cache_read_token", self.get_usd_per_cache_read_token())
     
     def get_usd_per_cache_creation_token(self) -> float:
         return self.model_specs.get("usd_per_cache_creation_token", 0.0)
-    
+
     def get_usd_per_audio_cache_creation_token(self) -> float:
         return self.model_specs.get("usd_per_audio_cache_creation_token", 0.0)
-    
+
     def get_seconds_per_output_token(self) -> float:
         return self.model_specs.get("seconds_per_output_token", 0.0)
 
@@ -370,7 +422,6 @@ Model.GOOGLE_GEMINI_2_5_PRO = Model("gemini/gemini-2.5-pro")
 Model.LLAMA_4_MAVERICK = Model("vertex_ai/meta/llama-4-maverick-17b-128e-instruct-maas")
 Model.GPT_4o_AUDIO_PREVIEW = Model("openai/gpt-4o-audio-preview")
 Model.GPT_4o_MINI_AUDIO_PREVIEW = Model("openai/gpt-4o-mini-audio-preview")
-Model.VLLM_QWEN_1_5_0_5B_CHAT = Model("hosted_vllm/qwen/Qwen1.5-0.5B-Chat")
 Model.TEXT_EMBEDDING_3_SMALL = Model("text-embedding-3-small")
 Model.CLIP_VIT_B_32 = Model("clip-ViT-B-32")
 

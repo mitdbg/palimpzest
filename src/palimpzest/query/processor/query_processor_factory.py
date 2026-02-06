@@ -79,7 +79,6 @@ class QueryProcessorFactory:
                 policy = config.policy,
                 use_vertex = config.use_vertex,
                 gemini_credentials_path = config.gemini_credentials_path,
-                api_base = config.api_base
             )
 
         # get the list of models to remove (if provided by the user's config)
@@ -138,6 +137,10 @@ class QueryProcessorFactory:
         gemini_key = os.getenv("GEMINI_API_KEY")
         google_key = os.getenv("GOOGLE_API_KEY")
 
+        vllm_models = [model for model in config.available_models if model.is_vllm_model()]
+        if len(vllm_models) > 1:
+            raise ValueError("Only one vLLM model can be used per run. Multiple vLLM models found in available_models.")
+
         for model in config.available_models:
             if model.is_provider_openai() and not openai_key:
                 raise ValueError("OPENAI_API_KEY must be set to use OpenAI models.")
@@ -147,8 +150,8 @@ class QueryProcessorFactory:
                 raise ValueError("TOGETHER_API_KEY must be set to use Together models.")
             if model.is_provider_google_ai_studio() and not (gemini_key or google_key or config.gemini_credentials_path):
                 raise ValueError("GEMINI_API_KEY, GOOGLE_API_KEY, or gemini_credentials path must be set to use Google Gemini models.")
-            if model.is_vllm_model() and config.api_base is None:
-                raise ValueError("api_base must be set to use vLLM models.")
+            if model.is_vllm_model() and model.api_base is None:
+                raise ValueError("api_base must be set on the Model instance to use vLLM models.")
         return config, validator
 
     @classmethod

@@ -23,8 +23,8 @@ class SplitConvert(LLMConvert):
         super().__init__(*args, **kwargs)
         self.num_chunks = num_chunks
         self.min_size_to_chunk = min_size_to_chunk
-        self.split_generator = Generator(self.model, PromptStrategy.MAP_SPLIT_PROPOSER, self.reasoning_effort, self.api_base, self.cardinality, self.desc, self.verbose)
-        self.split_merge_generator = Generator(self.model, PromptStrategy.MAP_SPLIT_MERGER, self.reasoning_effort, self.api_base, self.cardinality, self.desc, self.verbose)
+        self.split_generator = Generator(self.model, PromptStrategy.MAP_SPLIT_PROPOSER, self.reasoning_effort, self.cardinality, self.desc, self.verbose)
+        self.split_merge_generator = Generator(self.model, PromptStrategy.MAP_SPLIT_MERGER, self.reasoning_effort, self.cardinality, self.desc, self.verbose)
 
         # crude adjustment factor for naive estimation in unoptimized setting
         self.naive_quality_adjustment = 0.6
@@ -173,8 +173,8 @@ class SplitFilter(LLMFilter):
         super().__init__(*args, **kwargs)
         self.num_chunks = num_chunks
         self.min_size_to_chunk = min_size_to_chunk
-        self.split_generator = Generator(self.model, PromptStrategy.FILTER_SPLIT_PROPOSER, self.reasoning_effort, self.api_base, Cardinality.ONE_TO_ONE, self.desc, self.verbose)
-        self.split_merge_generator = Generator(self.model, PromptStrategy.FILTER_SPLIT_MERGER, self.reasoning_effort, self.api_base, Cardinality.ONE_TO_ONE, self.desc, self.verbose)
+        self.split_generator = Generator(self.model, PromptStrategy.FILTER_SPLIT_PROPOSER, self.reasoning_effort, Cardinality.ONE_TO_ONE, self.desc, self.verbose)
+        self.split_merge_generator = Generator(self.model, PromptStrategy.FILTER_SPLIT_MERGER, self.reasoning_effort, Cardinality.ONE_TO_ONE, self.desc, self.verbose)
 
         # crude adjustment factor for naive estimation in no-sentinel setting
         self.naive_quality_adjustment = 0.6

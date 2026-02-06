@@ -5,7 +5,7 @@ from palimpzest.core.models import PlanCost
 from palimpzest.policy import Policy
 
 
-def get_models(include_embedding: bool = False, use_vertex: bool = False, gemini_credentials_path: str | None = None, api_base: str | None = None) -> list[Model]:
+def get_models(include_embedding: bool = False, use_vertex: bool = False, gemini_credentials_path: str | None = None) -> list[Model]:
     """
     Return the set of models which the system has access to based on the set environment variables.
     """
@@ -56,17 +56,9 @@ def get_models(include_embedding: bool = False, use_vertex: bool = False, gemini
         else:
             models.extend(google_ai_studio_models)
 
-    if api_base is not None:
-        vllm_models = [model for model in all_models if model.is_vllm_model()]
-        if not include_embedding:
-            vllm_models = [
-                model for model in vllm_models if not model.is_embedding_model()
-            ]
-        models.extend(vllm_models)
-
     return models
 
-def get_optimal_models(policy: Policy, include_embedding: bool = False, use_vertex: bool = False, gemini_credentials_path: str | None = None, api_base: str | None = None) -> list[Model]:
+def get_optimal_models(policy: Policy, include_embedding: bool = False, use_vertex: bool = False, gemini_credentials_path: str | None = None) -> list[Model]:
     """
     Selects the top models from the available list based on the user's policy.
 
@@ -79,7 +71,6 @@ def get_optimal_models(policy: Policy, include_embedding: bool = False, use_vert
         include_embedding=include_embedding,
         use_vertex=use_vertex,
         gemini_credentials_path=gemini_credentials_path,
-        api_base=api_base
     )
 
     if not available_models:
