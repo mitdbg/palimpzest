@@ -32,13 +32,12 @@ from palimpzest.utils.model_helpers import (
     get_optimal_models,
 )
 from palimpzest.utils.model_info_helpers import (
+    DEFAULT_QUALITY_SCORE,
+    DEFAULT_SECONDS_PER_OUTPUT_TOKEN,
+    MMLU_PRO_SCORES,
     derive_model_flags,
     fuzzy_match_score,
     predict_local_model_metrics,
-    MMLU_PRO_SCORES,
-    LATENCY_TPS_DATA,
-    DEFAULT_QUALITY_SCORE,
-    DEFAULT_SECONDS_PER_OUTPUT_TOKEN,
 )
 
 # =============================================================================
