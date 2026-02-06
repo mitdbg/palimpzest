@@ -215,39 +215,40 @@ class Model:
 
     def _get_litellm_model_specs(self, model_id: str) -> dict:
         """Get model specs from litellm's local model_cost data for vLLM models."""
-        # Use predict function to get quality and latency metrics via fuzzy matching
+        # Use predict function to get quality, latency metrics, and capability flags
         predicted_metrics = predict_local_model_metrics(model_id)
 
+        # Start with defaults, then overlay predicted values
         specs = {
             "is_text_model": True,
             "is_vision_model": False,
+            "is_llama_model": False,
+            "is_clip_model": False,
             "is_audio_model": False,
-            "supports_function_calling": False,
-            "supports_prompt_caching": False,
-            "usd_per_input_token": 0.0, # cost always 0 for local model
+            "is_reasoning_model": False,
+            "is_embedding_model": False,
+            "is_vllm_model": True,  # Mark as vLLM model
+            "usd_per_input_token": 0.0,  # Cost always 0 for local model
             "usd_per_output_token": 0.0,
             "seconds_per_output_token": predicted_metrics["seconds_per_output_token"],
             "MMLU_Pro_score": predicted_metrics["MMLU_Pro_score"],
         }
 
-        # Set model-specific flags (e.g. is_llama_model, is_o_model)
-        specs.update(derive_model_flags(model_id))
+        # Overlay all flags detected from model name (including False values like is_text_model for embeddings)
+        for key, value in predicted_metrics.items():
+            if key.startswith("is_"):
+                specs[key] = value
 
-        specs["is_vision_model"] = False
-        specs["supports_function_calling"] = False
-        with suppress(Exception):
-            specs["is_vision_model"] = litellm.supports_vision(model=model_id)
-
-        with suppress(Exception):
-            specs["supports_function_calling"] = (litellm.supports_function_calling(model=model_id))
-
-        # Get capability info from litellm's model_cost dict (local data)
-        # Note: Cost is always 0 for local models, so we don't use litellm's cost data
+        # Try litellm for additional capability detection (may not work for local models)
         try:
-            if model_id in litellm.model_cost:
-                model_info = litellm.model_cost[model_id]
-                specs["supports_prompt_caching"] = model_info.get("supports_prompt_caching", False)
-                specs["is_audio_model"] = model_info.get("supports_audio_input", False)
+            if litellm.supports_vision(model=model_id):
+                specs["is_vision_model"] = True
+        except Exception:
+            pass
+
+        try:
+            if litellm.supports_audio_input(model=model_id):
+                specs["is_audio_model"] = True
         except Exception:
             pass
 
@@ -309,7 +310,7 @@ class Model:
         return self.model_specs.get("is_llama_model", False)
     
     def is_vllm_model(self) -> bool:
-        return self.model_specs.get("is_vllm_model", False) or self.api_base is not None
+        return self.model_specs.get("is_vllm_model", False) and self.api_base is not None
     
     def is_embedding_model(self) -> bool:
         return self.model_specs.get("is_embedding_model", False)
@@ -357,7 +358,8 @@ class Model:
         return self.is_audio_model() and self.is_text_model()
 
     def supports_prompt_caching(self) -> bool:
-        return self.model_specs.get("supports_prompt_caching", False)
+        return (self.is_provider_anthropic() or self.is_provider_google_ai_studio() or self.is_provider_vertex_ai or self.is_provider_openai()) \
+            and self.model_specs.get("supports_prompt_caching", False)
 
     def get_usd_per_input_token(self) -> float:
         return self.model_specs.get("usd_per_input_token", 0.0)
