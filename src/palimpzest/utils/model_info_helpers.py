@@ -287,9 +287,8 @@ def fuzzy_match_score(model_id: str, scores_dict: dict[str, float]) -> float | N
     if model_base:
         for key, score in scores_dict.items():
             key_base, key_ver, key_size = _extract_version_info(key)
-            if key_base and model_base in key_base or key_base in model_base:
-                # Same family, check size match
-                if key_size and model_size and key_size == model_size:
+            if (key_base and model_base in key_base or key_base in model_base) \
+                and (key_size and model_size and key_size == model_size):
                     return score
 
     return best_match

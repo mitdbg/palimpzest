@@ -2,12 +2,11 @@
 from __future__ import annotations
 
 import os
-from contextlib import suppress
 from enum import Enum
 
 import litellm
 
-from palimpzest.utils.model_info_helpers import ModelMetricsManager, derive_model_flags, predict_local_model_metrics
+from palimpzest.utils.model_info_helpers import ModelMetricsManager, predict_local_model_metrics
 
 
 class PromptStrategy(str, Enum):
