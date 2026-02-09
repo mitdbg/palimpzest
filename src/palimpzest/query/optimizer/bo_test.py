@@ -1,4 +1,3 @@
-from black import Mode
 from palimpzest.query.optimizer.optimizer import BayesianOptimizer
 from pydantic import BaseModel, Field
 from palimpzest.core.elements.records import DataRecord
@@ -13,22 +12,16 @@ import pandas as pd
 
 if __name__ == "__main__":
     #litellm._turn_on_debug()
-    # initial_dataset = [
-    #     ("together_ai/meta-llama/Llama-3.2-3B-Instruct-Turbo", (0.7, 1.1, 0.5)),
-    #     ("together_ai/meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo", (0.85, 1.0, 0.8)),
-    #     ("together_ai/meta-llama/Llama-3.3-70B-Instruct-Turbo", (0.95, 1.8, 1.3)),
-    #     ("together_ai/meta-llama/Llama-3.2-90B-Vision-Instruct-Turbo", (0.87, 2.0, 2.0))
-    # ]
     initial_dataset = [
-        (Model.GPT_4_1, (1.0, 1.589207, 0.002878)),
-        (Model.GPT_4_1_MINI, (1.0, 0.727763, 0.000474)),
-        (Model.GPT_4_1_NANO, (1.0, 2.075557, 0.000163)),
-        (Model.GPT_4o, (1.0, 2.642218, 0.004408)),
-        (Model.GPT_4o_MINI, (1.0, 3.611015, 0.000242)),
-        (Model.GPT_5, (1.0, 5.299906, 0.00412)),
-        (Model.GPT_5_MINI, (1.0, 4.856572, 0.000696)),
-        (Model.GPT_5_NANO, (1.0, 4.932934, 0.000210)),
-        (Model.o4_MINI, (1.0, 2.306797, 0.002144))
+        # (Model.GPT_4_1_NANO, (1.0, 1.449226, 0.000157)),
+        # (Model.GPT_4_1, (1.0, 1.457867, 0.002914)),
+        # (Model.GPT_4_1_MINI, (1.0, 1.149936, 0.000474)),
+        # (Model.GPT_4o_MINI, (1.0, 3.205636, 0.000246)),
+        # (Model.GPT_5, (1.0, 3.395675, 0.00332)),
+        # (Model.GPT_5_MINI, (1.0, 4.553895, 0.000726)),
+        # (Model.GPT_5_NANO, (1.0, 3.341086, 0.000191)),
+        # (Model.o4_MINI, (1.0, 2.929694, 0.002221)),
+        (Model.GPT_4o, (1.0, 2.560178, 0.004451)),
     ]
    
     class EmailFile(BaseModel):
@@ -45,14 +38,15 @@ if __name__ == "__main__":
         email = DataRecord(data_item = TextFile(filename = f"allen-p-inbox-{idx}.txt", contents = contents), source_indices = f"{idx}")
         email_dataset.append(email)
 
-    bo_optimizer = BayesianOptimizer(initial_dataset, pz.MinTime(), cost_budget=40, cost_model=None,
+    bo_optimizer = BayesianOptimizer(initial_dataset, pz.MinCost(), cost_budget=12  , cost_model=None,
                                     input_schema=TextFile, output_schema=EmailFile, acq_func="EI",)
-    best_model, best_posterior = bo_optimizer.optimize(email_dataset)
+    best_model, best_posterior = bo_optimizer.optimize(email_dataset, save_name_prefix="gp_full_openai_minCost_worst", intermediate_save=[4, 8])
     print("Best model selected:", best_model)
-    print("Best model posterior mean:", best_posterior.mean.item())
-    print("Best model posterior variance:", best_posterior.variance.item())
+    print("Best posterior mean:", best_posterior.mean.item())
+    print("Best posterior variance:", best_posterior.variance.item())
     print("Final datapoints:")
     print("X:", bo_optimizer.X)
+    # print("X_suggested:", bo_optimizer.suggested_points)
     print("X_models:", bo_optimizer.X_models)
     print("Y:", bo_optimizer.Y)
 
@@ -72,13 +66,14 @@ if __name__ == "__main__":
 
     #         single_result['total_input_cost'] = data_record_set.record_op_stats[0].total_input_cost
     #         single_result['total_output_cost'] = data_record_set.record_op_stats[0].total_output_cost
+    #         single_result['total_cost'] = single_result['total_input_cost'] + single_result['total_output_cost']
     #         single_result['llm_call_duration_secs'] = data_record_set.record_op_stats[0].llm_call_duration_secs
     #         single_result['quality'] = quality
-    #         single_result['model'] = model.value
+    #         single_result['model'] = model
     #         single_result['parent_ids'] = sample._source_indices[0]
     #         all_results.append(single_result)
     #     print(f"Completed model {model}")
     # df = pd.DataFrame(all_results)
     # print(df)
-    # df.to_csv("gpt_email_results_good.csv", index=False)
+    # df.to_csv("gpt_email_results.csv", index=False)
 

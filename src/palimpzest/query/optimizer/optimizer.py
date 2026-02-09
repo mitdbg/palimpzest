@@ -171,7 +171,7 @@ class BayesianOptimizer:
         """
         return self.cost_so_far >= self.cost_budget
     
-    def next_points(self, batch_size = 1):
+    def next_points(self, num_candidates = 1):
         """
         Returns a list of point(s) to run.
         Tensor of shape (batch_size, 3) corresponding to (quality, latency, cost) in domain space
@@ -198,10 +198,11 @@ class BayesianOptimizer:
 
         if self.acq_func == "EI":
             #note: gp.train_targets is the standardized version of Y
-            acq_function = LogExpectedImprovement(self.gp, best_f=self.gp.train_targets.max())
+            acq_function = LogExpectedImprovement(self.gp, best_f=self.Y.max())
+            #future: consider quasi-EI methods
         next_points, _  = optimize_acqf(
             acq_function=acq_function,
-            q=batch_size, num_restarts=10, raw_samples=20,
+            q=num_candidates, num_restarts=10, raw_samples=20,
             bounds = bounds,
             return_best_only = True,
             options = {'seed': 42}
@@ -248,10 +249,10 @@ class BayesianOptimizer:
             'likelihood_state_dict': self.gp.likelihood.state_dict(),
             'input_transform': self.gp.input_transform,
             'outcome_transform': self.gp.outcome_transform,
-        }, save_name)
+        }, f"{save_name}_{int(self.cost_so_far)}_2.pth")
         return best_plan, best_posterior
 
-    def optimize(self, data_samples: list, save_name: str) -> PhysicalPlan:
+    def optimize(self, data_samples: list, save_name_prefix: str, intermediate_save: list) -> PhysicalPlan:
         """Run the sequential optimization algorithm (Algorithm 1.1) from the BOpt textbook."""
         while not self.terminate():
             points = self.next_points()
@@ -281,13 +282,15 @@ class BayesianOptimizer:
                         print(f"got None value for {model} on email {sample._source_indices[0]}")
                     cost = 1 #temporary hard code
                     self.cost_so_far += cost
+                    if self.cost_so_far in intermediate_save:
+                        self.get_optimal_plan("observed", save_name_prefix)
                 self.X = torch.cat([self.X, point]) # changed model_embedding --> point
                 #self.suggested_points = torch.cat([self.suggested_points, point])
                 self.X_models.append(model)
                 avg_result = sum(results)/len(results)
                 self.Y = torch.cat([self.Y, torch.tensor([[avg_result]])])
-                print(f"Result: {model}, avg {self.primary_metric} {avg_result}")
-        return self.get_optimal_plan("observed", save_name)
+                print(f"{self.cost_so_far}/{self.cost_budget} result: {model}, avg {self.primary_metric} {avg_result}")
+        return self.get_optimal_plan("observed", save_name_prefix)
 
 
 
