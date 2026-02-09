@@ -75,7 +75,6 @@ class PromptManager:
         if not self.model.supports_prompt_caching():
             return messages
 
-        # TODO: Update with changes from #265
         # Anthropic: Explicit cache_control with ephemeral type
         # https://platform.claude.com/docs/en/build-with-claude/prompt-caching
         if self.model.is_provider_anthropic():
