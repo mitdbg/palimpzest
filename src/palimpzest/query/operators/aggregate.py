@@ -169,6 +169,8 @@ class ApplyGroupByOp(AggregateOp):
         # return list of data records (one per group)
         drs: list[DataRecord] = []
         group_by_fields = self.gby_fields
+        # Construct aggregation field names: "func(field)"
+        agg_field_names = [f"{field}" for field in self.agg_fields]
         for g in agg_state:
             # build up data item
             data_item = {}
@@ -178,7 +180,7 @@ class ApplyGroupByOp(AggregateOp):
             vals = agg_state[g]
             for i in range(0, len(vals)):
                 v = ApplyGroupByOp.agg_final(self.agg_funcs[i], vals[i])
-                data_item[self.agg_fields[i]] = v
+                data_item[agg_field_names[i]] = v
 
             # create new DataRecord
             schema = self.output_schema
@@ -609,9 +611,17 @@ class SemanticAggregate(AggregateOp):
         model_conversion_time_per_record = MODEL_CARDS[model_name]["seconds_per_output_token"] * est_num_output_tokens
 
         # get est. of conversion cost (in USD) per record from model card
-        usd_per_input_token = MODEL_CARDS[model_name].get("usd_per_input_token")
-        if getattr(self, "prompt_strategy", None) is not None and self.prompt_strategy.is_audio_prompt():
+        # Check for audio models first
+        if "usd_per_audio_input_token" in MODEL_CARDS[model_name]:
             usd_per_input_token = MODEL_CARDS[model_name]["usd_per_audio_input_token"]
+        else:
+            usd_per_input_token = MODEL_CARDS[model_name].get("usd_per_input_token")
+        
+        if usd_per_input_token is None:
+            raise ValueError(
+                f"Model '{model_name}' has usd_per_input_token=None in MODEL_CARDS. "
+                f"This model may not support cost estimation. Model card: {MODEL_CARDS[model_name]}"
+            )
 
         model_conversion_usd_per_record = (
             usd_per_input_token * est_num_input_tokens
@@ -750,7 +760,18 @@ class SemanticGroupByOp(AggregateOp):
         model_conversion_time_per_record = MODEL_CARDS[model_name]["seconds_per_output_token"] * est_num_output_tokens
 
         # get est. of conversion cost (in USD) per record from model card
-        usd_per_input_token = MODEL_CARDS[model_name].get("usd_per_input_token")
+        # Check for audio models first
+        if "usd_per_audio_input_token" in MODEL_CARDS[model_name]:
+            usd_per_input_token = MODEL_CARDS[model_name]["usd_per_audio_input_token"]
+        else:
+            usd_per_input_token = MODEL_CARDS[model_name].get("usd_per_input_token")
+        
+        if usd_per_input_token is None:
+            raise ValueError(
+                f"Model '{model_name}' has usd_per_input_token=None in MODEL_CARDS. "
+                f"This model may not support cost estimation. Model card: {MODEL_CARDS[model_name]}"
+            )
+        
         model_conversion_usd_per_record = (
             usd_per_input_token * est_num_input_tokens
             + MODEL_CARDS[model_name]["usd_per_output_token"] * est_num_output_tokens
@@ -817,7 +838,7 @@ class SemanticGroupByOp(AggregateOp):
         record_op_stats_lst = []
         
         # Get the output field names from the output schema
-        output_field_names = [f for f in self.output_schema.model_fields if f not in self.gby_fields]
+        output_field_names = [f for f in self.output_schema.model_fields.keys() if f not in self.gby_fields]
         
         for group_key in agg_state:
             # Build aggregated data item for this group
@@ -867,7 +888,7 @@ class SemanticGroupByOp(AggregateOp):
         
         return DataRecordSet(drs, record_op_stats_lst)
     
-    def _assign_groups_llm(self, candidates: list[DataRecord]) -> tuple[list[str], GenerationStats]:
+    def _assign_groups_llm(self, candidates: list[DataRecord]) -> tuple[list[str], any]:
         """
         Phase 1: Use LLM to assign each candidate to a semantic group.
         
@@ -887,16 +908,24 @@ class SemanticGroupByOp(AggregateOp):
         group_labels = []
         total_stats = GenerationStats()
         
-        # Get input fields once
-        input_fields = self.get_input_fields()
+        # Get input fields - but only use the groupby field to avoid image detection issues
+        # Since ImageFilepath is just an alias for str, passing all string fields causes
+        # the prompt factory to try to open them as image files
+        input_fields = [self.gby_fields[0]]  # Only pass the groupby field
+
         fields = {self.gby_fields[0]: str}
         
-        for candidate in candidates:
-            # Ask LLM to classify this record - pass single candidate, not list
+        print(f"\nSemanticGroupByOp: Processing {len(candidates)} records for group assignment...")
+        for idx, candidate in enumerate(candidates):
+            # Show progress every 10 records
+            if idx % 10 == 0:
+                print(f"  Processing record {idx+1}/{len(candidates)}...")
+            
+            # Ask LLM to extract/normalize the groupby field value - pass single candidate, not list
             gen_kwargs = {
                 "project_cols": input_fields,
                 "output_schema": groupby_schema,
-                "agg_instruction": f"Determine the '{self.gby_fields[0]}' category for this record."
+                "agg_instruction": f"Extract the value of '{self.gby_fields[0]}' from this record."
             }
             
             field_answers, _, gen_stats, _ = self.generator(candidate, fields, **gen_kwargs)
@@ -911,4 +940,5 @@ class SemanticGroupByOp(AggregateOp):
             # Accumulate stats
             total_stats += gen_stats
         
+        print(f"  Completed! Found {len(set(group_labels))} unique groups from {len(candidates)} records")
         return group_labels, total_stats
