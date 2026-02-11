@@ -41,6 +41,7 @@ class Model(str, Enum):
     # o1 = "o1-2024-12-17"
     TEXT_EMBEDDING_3_SMALL = "text-embedding-3-small"
     CLIP_VIT_B_32 = "clip-ViT-B-32"
+    NOMIC_EMBED_TEXT = "ollama/nomic-embed-text"
 
     def __repr__(self):
         return f"{self.name}"
@@ -78,6 +79,9 @@ class Model(str, Enum):
     def is_vllm_model(self):
         return "hosted_vllm" in self.value.lower()
 
+    def is_ollama_model(self):
+        return self.value.startswith("ollama/")
+
     def is_reasoning_model(self):
         reasoning_models = [
             Model.GPT_5, Model.GPT_5_MINI, Model.GPT_5_NANO, Model.o4_MINI,
@@ -90,7 +94,7 @@ class Model(str, Enum):
     def is_text_model(self):
         non_text_models = [
             Model.LLAMA3_2_90B_V,
-            Model.CLIP_VIT_B_32, Model.TEXT_EMBEDDING_3_SMALL,
+            Model.CLIP_VIT_B_32, Model.TEXT_EMBEDDING_3_SMALL, Model.NOMIC_EMBED_TEXT,
             Model.GPT_4o_AUDIO_PREVIEW, Model.GPT_4o_MINI_AUDIO_PREVIEW,
         ]
         return self not in non_text_models
@@ -127,7 +131,10 @@ class Model(str, Enum):
         ]
 
     def is_embedding_model(self):
-        return self in [Model.CLIP_VIT_B_32, Model.TEXT_EMBEDDING_3_SMALL]
+        return self in [Model.CLIP_VIT_B_32, Model.TEXT_EMBEDDING_3_SMALL, Model.NOMIC_EMBED_TEXT]
+    
+    def is_text_image_multimodal_embedding_model(self):
+        return self in [Model.CLIP_VIT_B_32]
 
 
 class PromptStrategy(str, Enum):
@@ -600,6 +607,16 @@ VLLM_QWEN_1_5_0_5B_CHAT_MODEL_CARD = {
     "overall": 30.0, # TODO: fill-in with a better estimate
 }
 
+NOMIC_EMBED_TEXT_MODEL_CARD = {
+    ##### Cost in USD #####
+    "usd_per_input_token": 0.00 / 1e6,
+    "usd_per_output_token": 0.0 / 1e6,
+    ##### Time #####
+    "seconds_per_output_token": 0.0098,  # NOTE: just copying GPT_4o_MINI_MODEL_CARD for now
+    ##### Agg. Benchmark #####
+    "overall": 50,  # NOTE: just copying GPT_4o_MINI_MODEL_CARD for now
+}
+
 MODEL_CARDS = {
     Model.LLAMA3_2_3B.value: LLAMA3_2_3B_INSTRUCT_MODEL_CARD,
     Model.LLAMA3_1_8B.value: LLAMA3_1_8B_INSTRUCT_MODEL_CARD,
@@ -632,4 +649,5 @@ MODEL_CARDS = {
     Model.GOOGLE_GEMINI_2_5_PRO.value: GEMINI_2_5_PRO_MODEL_CARD,
     Model.LLAMA_4_MAVERICK.value: LLAMA_4_MAVERICK_MODEL_CARD,
     Model.VLLM_QWEN_1_5_0_5B_CHAT.value: VLLM_QWEN_1_5_0_5B_CHAT_MODEL_CARD,
+    Model.NOMIC_EMBED_TEXT.value: NOMIC_EMBED_TEXT_MODEL_CARD,
 }

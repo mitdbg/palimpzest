@@ -3,6 +3,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
+from litellm import embedding as litellm_embedding
 from numpy import dot
 from numpy.linalg import norm
 from openai import OpenAI
@@ -20,11 +21,9 @@ from palimpzest.query.operators.filter import LLMFilter
 
 
 class RAGConvert(LLMConvert):
-    def __init__(self, num_chunks_per_field: int, chunk_size: int = 1000, *args, **kwargs):
+    def __init__(self, num_chunks_per_field: int, embedding_model: Model, chunk_size: int = 1000, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # NOTE: in the future, we should abstract the embedding model to allow for different models
-        self.client = None
-        self.embedding_model = Model.TEXT_EMBEDDING_3_SMALL
+        self.embedding_model = embedding_model
         self.num_chunks_per_field = num_chunks_per_field
         self.chunk_size = chunk_size
 
@@ -101,15 +100,15 @@ class RAGConvert(LLMConvert):
 
         # compute the embedding
         start_time = time.time()
-        response = self.client.embeddings.create(input=text, model=model_name)
+        response = litellm_embedding(model=model_name, input=text)
         total_time = time.time() - start_time
 
         # extract the embedding
-        embedding = response.data[0].embedding
+        embedding = response.data[0]['embedding']
 
         # compute the generation stats object
         model_card = MODEL_CARDS[model_name]
-        total_embedding_input_tokens = response.usage.total_tokens
+        total_embedding_input_tokens = response.usage.total_tokens if response.usage is not None else 0
         total_embedding_cost = model_card["usd_per_input_token"] * total_embedding_input_tokens
         embed_stats = GenerationStats(
             model_name=model_name,  # NOTE: this should be overwritten by generation model in convert()
@@ -194,8 +193,6 @@ class RAGConvert(LLMConvert):
         return candidate, embed_stats
 
     def convert(self, candidate: DataRecord, fields: dict[str, FieldInfo]) -> tuple[dict[str, list], GenerationStats]:
-        # set client
-        self.client = OpenAI() if self.client is None else self.client
 
         # get the set of input fields to use for the convert operation
         input_fields = self.get_input_fields()
@@ -231,11 +228,9 @@ class RAGConvert(LLMConvert):
 
 
 class RAGFilter(LLMFilter):
-    def __init__(self, num_chunks_per_field: int, chunk_size: int = 1000, *args, **kwargs):
+    def __init__(self, num_chunks_per_field: int, embedding_model: Model,chunk_size: int = 1000, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # NOTE: in the future, we should abstract the embedding model to allow for different models
-        self.client = None
-        self.embedding_model = Model.TEXT_EMBEDDING_3_SMALL
+        self.embedding_model = embedding_model
         self.num_chunks_per_field = num_chunks_per_field
         self.chunk_size = chunk_size
 
@@ -312,15 +307,15 @@ class RAGFilter(LLMFilter):
 
         # compute the embedding
         start_time = time.time()
-        response = self.client.embeddings.create(input=text, model=model_name)
+        response = litellm_embedding(model=model_name, input=text)
         total_time = time.time() - start_time
 
         # extract the embedding
-        embedding = response.data[0].embedding
+        embedding = response.data
 
         # compute the generation stats object
         model_card = MODEL_CARDS[model_name]
-        total_embedding_input_tokens = response.usage.total_tokens
+        total_embedding_input_tokens = response.usage.total_tokens if response.usage is not None else 0
         total_embedding_cost = model_card["usd_per_input_token"] * total_embedding_input_tokens
         embed_stats = GenerationStats(
             model_name=model_name,  # NOTE: this should be overwritten by generation model in filter()
@@ -401,9 +396,6 @@ class RAGFilter(LLMFilter):
         return candidate, embed_stats
 
     def filter(self, candidate: DataRecord) -> tuple[dict[str, bool], GenerationStats]:
-        # set client
-        self.client = OpenAI() if self.client is None else self.client
-
         # get the set of input fields to use for the filter operation
         input_fields = self.get_input_fields()
 

@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import numpy as np
+from litellm import embedding as litellm_embedding
 from numpy.linalg import norm
 from openai import OpenAI
 from PIL import Image
@@ -13,12 +14,12 @@ from pydantic.fields import FieldInfo
 from sentence_transformers import SentenceTransformer
 
 from palimpzest.constants import (
-    MODEL_CARDS,
-    NAIVE_EST_JOIN_SELECTIVITY,
-    NAIVE_EST_NUM_INPUT_TOKENS,
-    Cardinality,
-    Model,
-    PromptStrategy,
+     MODEL_CARDS,
+     NAIVE_EST_JOIN_SELECTIVITY,
+     NAIVE_EST_NUM_INPUT_TOKENS,
+     Cardinality,
+     Model,
+     PromptStrategy,
 )
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.core.lib.schemas import AUDIO_FIELD_TYPES, IMAGE_FIELD_TYPES, ImageFilepath
@@ -493,6 +494,7 @@ class EmbeddingJoin(LLMJoin):
     # specialized use cases (e.g., speech-to-text) with strict requirements on things like e.g. sample rate
     def __init__(
         self,
+        embedding_model: Model,
         num_samples: int = 10,
         *args,
         **kwargs,
@@ -500,6 +502,7 @@ class EmbeddingJoin(LLMJoin):
         super().__init__(*args, **kwargs)
         self.num_samples = num_samples
         self.samples_drawn = 0
+        self.embedding_model = embedding_model
 
         # compute whether all fields are text fields
         self.text_only = all([
@@ -507,7 +510,7 @@ class EmbeddingJoin(LLMJoin):
             for field_name, field in self.input_schema.model_fields.items()
             if field_name.split(".")[-1] in self.get_input_fields()
         ])
-        self.embedding_model = Model.TEXT_EMBEDDING_3_SMALL if self.text_only else Model.CLIP_VIT_B_32
+        
         self.locks = Locks()
 
         # keep track of embedding costs that could not be amortized if no output records were produced
@@ -589,11 +592,10 @@ class EmbeddingJoin(LLMJoin):
         total_embedding_input_tokens = 0
         embeddings = None
         if self.text_only:
-            client = OpenAI()
             inputs = [dr.to_json_str(bytes_to_str=True, project_cols=input_fields, sorted=True) for dr in candidates]
-            response = client.embeddings.create(input=inputs, model=self.embedding_model.value)
-            total_embedding_input_tokens = response.usage.total_tokens
-            embeddings = np.array([item.embedding for item in response.data])
+            response = litellm_embedding(input=inputs, model=self.embedding_model.value)
+            total_embedding_input_tokens = response.usage.total_tokens if response.usage is not None else 0
+            embeddings = np.array([item['embedding'] for item in response.data])
         else:
             model = self.locks.get_model(self.embedding_model.value)
             embeddings = np.zeros((len(candidates), 512))  # CLIP embeddings are 512-dimensional
