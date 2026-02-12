@@ -197,7 +197,6 @@ class BayesianOptimizer:
         fit_gpytorch_mll(mll) #MAP hyperparameter fitting
 
         if self.acq_func == "EI":
-            #note: gp.train_targets is the standardized version of Y
             acq_function = LogExpectedImprovement(self.gp, best_f=self.Y.max())
             #future: consider quasi-EI methods
         next_points, _  = optimize_acqf(
@@ -205,7 +204,7 @@ class BayesianOptimizer:
             q=num_candidates, num_restarts=10, raw_samples=20,
             bounds = bounds,
             return_best_only = True,
-            options = {'seed': 42}
+            options = {'seed': 42}  #maxiter, batch_limit
         )
         return next_points
 
@@ -280,15 +279,15 @@ class BayesianOptimizer:
                         results.append(- abs(input_cost + output_cost))
                     if results[-1] is None:
                         print(f"got None value for {model} on email {sample._source_indices[0]}")
-                    cost = 1 #temporary hard code
-                    self.cost_so_far += cost
-                    if self.cost_so_far in intermediate_save:
-                        self.get_optimal_plan("observed", save_name_prefix)
                 self.X = torch.cat([self.X, point]) # changed model_embedding --> point
                 #self.suggested_points = torch.cat([self.suggested_points, point])
                 self.X_models.append(model)
                 avg_result = sum(results)/len(results)
                 self.Y = torch.cat([self.Y, torch.tensor([[avg_result]])])
+                cost = 1 #temporary hard code
+                self.cost_so_far += cost
+                if self.cost_so_far in intermediate_save:
+                    self.get_optimal_plan("observed", save_name_prefix)
                 print(f"{self.cost_so_far}/{self.cost_budget} result: {model}, avg {self.primary_metric} {avg_result}")
         return self.get_optimal_plan("observed", save_name_prefix)
 
