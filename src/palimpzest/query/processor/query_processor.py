@@ -40,7 +40,7 @@ class QueryProcessor:
     ):
         """
         Initialize QueryProcessor with optional custom components.
-        
+
         Args:
             dataset: Dataset to process
             TODO
@@ -118,7 +118,26 @@ class QueryProcessor:
         if self.validator is not None:
             # create sentinel plan
             sentinel_plan = self._create_sentinel_plan(self.train_dataset)
+        if self.estimate_filter_selectivity:
+            # Get training dataset for selectivity estimation
+            if self.train_dataset is not None:
+                selectivity_train_dataset = self.train_dataset
+            else:
+                selectivity_train_dataset = self.dataset._get_root_datasets()
 
+            # Estimate filter selectivity
+            self._filter_selectivity_result = estimate_filter_selectivity_for_sentinel_plan(
+                sentinel_plan=sentinel_plan,
+                train_dataset=selectivity_train_dataset,
+                num_samples=self.filter_selectivity_samples,
+                verbose=self.verbose,
+            )
+
+            # Optimize filter ordering (logs recommendations)
+            sentinel_plan = optimize_filter_ordering()
+            sentinel_plan=sentinel_plan,
+            selectivity_result=self._filter_selectivity_result,
+            verbose=self.verbose,
             # generate sample execution data
             if self.train_dataset is not None:
                 sentinel_plan_stats = self.sentinel_execution_strategy.execute_sentinel_plan(sentinel_plan, self.train_dataset, self.validator)
@@ -150,3 +169,4 @@ class QueryProcessor:
         logger.info(f"Done executing {self.__class__.__name__}")
 
         return result
+#test change
