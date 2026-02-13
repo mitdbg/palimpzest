@@ -203,6 +203,7 @@ class DataRecord:
         # get the set of fields and field descriptions to copy from the parent record
         copy_field_names = parent_record.get_field_names() if project_cols is None else project_cols
         copy_field_names = [field.split(".")[-1] for field in copy_field_names]
+        copy_field_names = [field for field in copy_field_names if field not in ["_index"]]
 
         # copy fields from the parent
         data_item.update({field_name: parent_record[field_name] for field_name in copy_field_names})
@@ -306,6 +307,7 @@ class DataRecord:
         fields = records[0].get_field_names()
         if project_cols is not None and len(project_cols) > 0:
             fields = [field for field in fields if field in project_cols]
+        fields = [field for field in fields if field not in ["_index"]]
 
         # convert Context --> str
         for record in records:
