@@ -9,6 +9,7 @@ from palimpzest.core.data import context
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.core.models import OperatorCostEstimates, RecordOpStats
 from palimpzest.query.operators.physical import PhysicalOperator
+from palimpzest.tools.pdfparser import get_text_from_pdf
 
 
 class ScanPhysicalOp(PhysicalOperator, ABC):
@@ -90,6 +91,129 @@ class ScanPhysicalOp(PhysicalOperator, ABC):
  
         # construct and return DataRecordSet object
         return DataRecordSet([dr], [record_op_stats])
+
+
+class BasePDFScanOp(ScanPhysicalOp):
+    def __call__(self, idx: int) -> DataRecordSet:
+        start_time = time.time()
+        item = self.datasource[idx]
+
+        # extract text from PDF from contents
+        pdf_filename = item["filename"]
+        pdf_bytes = item["contents"]
+        text_content = self.extract_text(pdf_filename, pdf_bytes)
+        item["text_contents"] = text_content
+
+        end_time = time.time()
+
+        # check that item covers fields in output schema
+        output_field_names = list(self.output_schema.model_fields)
+        assert all([field in item for field in output_field_names]), f"Some fields in Dataset schema not present in item!\n - Dataset fields: {output_field_names}\n - Item fields: {list(item.keys())}"
+
+        # construct a DataRecord from the item
+        data_item = self.output_schema(**{field: item[field] for field in output_field_names})
+        dr = DataRecord(data_item, source_indices=[f"{self.datasource.id}-{idx}"])
+
+        # create RecordOpStats objects
+        record_op_stats = RecordOpStats(
+            record_id=dr._id,
+            record_parent_ids=dr._parent_ids,
+            record_source_indices=dr._source_indices,
+            record_state=dr.to_dict(include_bytes=False),
+            full_op_id=self.get_full_op_id(),
+            logical_op_id=self.logical_op_id,
+            op_name=self.op_name(),
+            time_per_record=(end_time - start_time),
+            cost_per_record=0.0,
+            op_details={k: str(v) for k, v in self.get_id_params().items()},
+        )
+ 
+        # construct and return DataRecordSet object
+        return DataRecordSet([dr], [record_op_stats])
+
+    @abstractmethod
+    def extract_text(self, filename: str, pdf_bytes: bytes) -> str:
+        pass
+
+
+class PypdfScan(BasePDFScanOp):
+    def extract_text(self, filename: str, pdf_bytes: bytes) -> str:
+        return get_text_from_pdf(filename, pdf_bytes, pdfprocessor="pypdf")
+
+    def naive_cost_estimates(
+        self,
+        source_op_cost_estimates: OperatorCostEstimates,
+        input_record_size_in_bytes: int | float,
+    ) -> OperatorCostEstimates:
+        # estimate time spent reading each record
+        per_record_size_kb = input_record_size_in_bytes / 1024.0
+        time_per_record = LOCAL_SCAN_TIME_PER_KB * per_record_size_kb
+
+        # estimate output cardinality
+        cardinality = source_op_cost_estimates.cardinality
+
+        # for now, assume no cost per record for reading data
+        return OperatorCostEstimates(
+            cardinality=cardinality,
+            time_per_record=time_per_record,
+            cost_per_record=0,
+            quality=1.0,
+        )
+
+
+class MarkerScan(BasePDFScanOp):
+    def extract_text(self, filename: str, pdf_bytes: bytes) -> str:
+        # try to import marker
+        try:
+           from marker.converters.pdf import PdfConverter
+           from marker.models import create_model_dict
+           from marker.output import text_from_rendered
+        except ImportError:
+            raise ImportError("Marker is not installed. Please install it with `pip install marker-pdf`")
+
+        # temporary save pdf bytes to file, as marker requires file path
+        # TODO: Refactor marker usage to accept bytes if possible or handle tmp file better
+        import tempfile
+        import os
+        
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp_pdf:
+            tmp_pdf.write(pdf_bytes)
+            tmp_pdf_path = tmp_pdf.name
+        
+        try:
+            converter = PdfConverter(
+                artifact_dict=create_model_dict(),
+            )
+            rendered = converter(tmp_pdf_path)
+            text, _ = text_from_rendered(rendered)
+        finally:
+            if os.path.exists(tmp_pdf_path):
+                os.remove(tmp_pdf_path)
+            
+        return text
+
+    def naive_cost_estimates(
+        self,
+        source_op_cost_estimates: OperatorCostEstimates,
+        input_record_size_in_bytes: int | float,
+    ) -> OperatorCostEstimates:
+        # estimate time spent reading each record
+        per_record_size_kb = input_record_size_in_bytes / 1024.0
+        
+        # marker is slower than pypdf, say 5x? 10x?
+        # TODO: calibrate this
+        time_per_record = LOCAL_SCAN_TIME_PER_KB * per_record_size_kb * 10
+
+        # estimate output cardinality
+        cardinality = source_op_cost_estimates.cardinality
+
+        # for now, assume no cost per record for reading data
+        return OperatorCostEstimates(
+            cardinality=cardinality,
+            time_per_record=time_per_record,
+            cost_per_record=0,
+            quality=1.0,
+        )
 
 
 class MarshalAndScanDataOp(ScanPhysicalOp):

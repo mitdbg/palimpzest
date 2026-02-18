@@ -24,7 +24,6 @@ from palimpzest.core.lib.schemas import (
     create_schema_from_fields,
 )
 from palimpzest.query.operators.logical import BaseScan
-from palimpzest.tools.pdfparser import get_text_from_pdf
 
 
 ####################
@@ -326,16 +325,12 @@ class ImageFileDataset(BaseFileDataset):
 class PDFFileDataset(BaseFileDataset):
     """
     PDFFileDataset returns a dictionary for each PDF file in a directory. Each dictionary contains the
-    filename, raw PDF content, and parsed text content of a single PDF file in the directory.
-
-    This class also uses one of a predefined set of PDF processors to extract text content from the PDF files.
+    filename and raw PDF content of a single PDF file in the directory.
     """
     def __init__(
         self,
         id: str,
         path: str,
-        pdfprocessor: str = "pypdf",
-        file_cache_dir: str = "/tmp",
     ) -> None:
         """
         Constructor for the `PDFFileDataset` class. The `schema` is set to the `PDFFile` schema.
@@ -343,31 +338,26 @@ class PDFFileDataset(BaseFileDataset):
         Args:
             id (str): a string identifier for the `Dataset`
             path (str): The path to the directory
-            pdfprocessor (str): The PDF processor to use for extracting text content from the PDF files
-            file_cache_dir (str): The directory to store the temporary files generated during PDF processing
         """
         super().__init__(path=path, id=id, schema=PDFFile)
         self.filepaths = [fp for fp in self.filepaths if fp.endswith(tuple(constants.PDF_EXTENSIONS))]
-        self.pdfprocessor = pdfprocessor
-        self.file_cache_dir = file_cache_dir
 
     def __getitem__(self, idx: int) -> dict:
         """
-        Returns a dictionary with the filename, raw PDF content, and parsed text content of the PDF file at the
+        Returns a dictionary with the filename and raw PDF content of the PDF file at the
         specified `idx`.
 
         Args:
             idx (int): The index of the item to return
 
         Returns:
-            dict: A dictionary with the filename, raw PDF content, and parsed text content of the PDF file.
+            dict: A dictionary with the filename and raw PDF content of the PDF file.
 
             .. code-block:: python
 
                 {
                     "filename": "file.pdf",
                     "contents": b"raw PDF content here",
-                    "text_contents": "parsed text content here",
                 }
         """
         filepath = self.filepaths[idx]
@@ -375,11 +365,8 @@ class PDFFileDataset(BaseFileDataset):
         with open(filepath, "rb") as f:
             pdf_bytes = f.read()
 
-        # generate text_content from PDF
-        text_content = get_text_from_pdf(pdf_filename, pdf_bytes, pdfprocessor=self.pdfprocessor, file_cache_dir=self.file_cache_dir)
-
         # construct and return item
-        return {"filename": pdf_filename, "contents": pdf_bytes, "text_contents": text_content}
+        return {"filename": pdf_filename, "contents": pdf_bytes}
 
 
 class TextFileDataset(BaseFileDataset):
@@ -521,11 +508,7 @@ def get_local_source(id: str, path: str | Path, **kwargs) -> dataset.Dataset:
             return ImageFileDataset(id, path)
 
         elif all([f.endswith(tuple(constants.PDF_EXTENSIONS)) for f in os.listdir(path)]):
-            pdfprocessor = kwargs.get("pdfprocessor", constants.DEFAULT_PDF_PROCESSOR)
-            file_cache_dir = kwargs.get("file_cache_dir", "/tmp")
-            return PDFFileDataset(
-                id=id, path=path, pdfprocessor=pdfprocessor, file_cache_dir=file_cache_dir
-            )
+            return PDFFileDataset(id=id, path=path)
 
         elif all([f.endswith(tuple(constants.XLS_EXTENSIONS)) for f in os.listdir(path)]):
             return XLSFileDataset(id, path)
