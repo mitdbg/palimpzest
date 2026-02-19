@@ -501,17 +501,23 @@ class BlockNestedLoopsJoin(LLMJoin):
     # Implements block nested loops join with an known selectivity.
     def __init__(
         self,
-        reasoning: bool = True,
+        batch_sizes: tuple[int, int] | None = None,
+        known_selectivity: float = 0.001,
         max_context_size: int = 8192,
+        reasoning: bool = True,
+        is_demo: bool = False,
         *args,
         **kwargs
     ):
-        self.reasoning = reasoning
+        self.batch_sizes = batch_sizes
+        self.known_selectivity = known_selectivity
         self.max_context_size = max_context_size
-        if reasoning:
-            kwargs['prompt_strategy'] = PromptStrategy.JOIN_BLOCK
-        else:
-            kwargs['prompt_strategy'] = PromptStrategy.JOIN_BLOCK_NO_REASONING
+        self.reasoning = reasoning
+        if is_demo:
+            if reasoning:
+                kwargs['prompt_strategy'] = PromptStrategy.JOIN_BLOCK
+            else:
+                kwargs['prompt_strategy'] = PromptStrategy.JOIN_BLOCK_NO_REASONING
         super().__init__(*args, **kwargs)
     
     def naive_cost_estimates(
@@ -781,9 +787,7 @@ class BlockNestedLoopsJoin(LLMJoin):
             self,
             left_candidates: list[DataRecord],
             right_candidates: list[DataRecord],
-            final: bool = False,
-            batch_sizes: tuple[int, int] | None = None,
-            known_selectivity: float = 0.001
+            final: bool = False
         ) -> tuple[DataRecordSet, int]:
         def _find_answer(completion_text: str) -> str:
             # list of indicators to try
@@ -816,7 +820,7 @@ class BlockNestedLoopsJoin(LLMJoin):
                 raise Exception(f"Could not parse answer from completion text: {answer_text}")
 
         # get batch sizes
-        left_batch_size, right_batch_size = batch_sizes if batch_sizes is not None else self._find_batch_sizes(left_candidates, right_candidates, known_selectivity)
+        left_batch_size, right_batch_size = self.batch_sizes if self.batch_sizes is not None else self._find_batch_sizes(left_candidates, right_candidates, self.known_selectivity)
 
         # add indices to records
         self._add_indices_to_records(left_candidates, right_candidates, left_batch_size, right_batch_size)

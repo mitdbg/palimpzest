@@ -195,63 +195,47 @@ def test_block_join(mocker):
         actor: str = Field(description="A sentence about an actor")
 
     input_schema = union_schemas([JoinSchema, JoinSchema])
-
-    # Test two versions: reasoning and no reasoning
-    join_ops = [
-        BlockNestedLoopsJoin(
-            input_schema=JoinSchema,
-            output_schema=JoinSchema,
-            model=pz.Model.GPT_4o_MINI,
-            condition="The actor appears in the movie being reviewed",
-            reasoning=True,
-            logical_op_id="abc123"
-        ),
-        BlockNestedLoopsJoin(
-            input_schema=JoinSchema,
-            output_schema=JoinSchema,
-            model=pz.Model.GPT_4o_MINI,
-            condition="The actor appears in the movie being reviewed",
-            reasoning=False,
-            logical_op_id="abc124"
-        )
+    
+    # Map reasoning / no reasoning and batch sizes to join operator
+    batch_to_calls = [
+        ((1, 1), 25),
+        ((2, 2), 9),
+        ((3, 2), 6),
+        ((5, 5), 1),
+        (None, None)
     ]
-    for join_op in join_ops:
-        # Test different batch sizes
-        batch_to_calls = [
-            ((1, 1), 25),
-            ((2, 2), 9),
-            ((3, 2), 6),
-            ((5, 5), 1),
-            (None, None)
-        ]
+    join_ops = {}
+    for reasoning in [True, False]:
         for batch_sizes, expected_calls in batch_to_calls:
-            join_op._left_input_records = []
-            join_op._right_input_records = []
-            join_op._left_joined_record_ids = set()
-            join_op._right_joined_record_ids = set()
-            # only execute LLM calls if specified
-            if not os.getenv("RUN_LLM_TESTS"):
-                mock_call = mocker.patch.object(Generator, "__call__", side_effect=mock_block_join_generator_call)
-            
-            # apply join operator to the inputs
-            if batch_sizes is None:
-                data_record_set, num_inputs_processed = join_op(left_candidates, right_candidates)
+            join_ops[(reasoning, batch_sizes, expected_calls)] = BlockNestedLoopsJoin(
+                input_schema=JoinSchema,
+                output_schema=JoinSchema,
+                model=pz.Model.GPT_4o_MINI,
+                condition="The actor appears in the movie being reviewed",
+                reasoning=reasoning,
+                batch_sizes=batch_sizes,
+                logical_op_id=f"test_{reasoning}_{batch_sizes}"
+            )
+    for params, join_op in join_ops.items():
+        reasoning, batch_sizes, expected_calls = params
+        # only execute LLM calls if specified
+        if not os.getenv("RUN_LLM_TESTS"):
+            mock_call = mocker.patch.object(Generator, "__call__", side_effect=mock_block_join_generator_call)
+        
+        data_record_set, num_inputs_processed = join_op(left_candidates, right_candidates)
 
-            else:
-                data_record_set, num_inputs_processed = join_op(left_candidates, right_candidates, batch_sizes = batch_sizes)
+        # check that the mock was called expected number of times
+        if not os.getenv("RUN_LLM_TESTS") and expected_calls is not None:
+            assert mock_call.call_count == expected_calls
+        
+        # sanity checks on output records and stats
+        records = data_record_set.data_records
+        record_op_stats_lst = data_record_set.record_op_stats
+        assert len(record_op_stats_lst) == 25
+        assert num_inputs_processed == 25
 
-                # check that the mock was called expected number of times
-                if not os.getenv("RUN_LLM_TESTS"):
-                    assert mock_call.call_count == expected_calls
-            
-            # sanity checks on output records and stats
-            records = data_record_set.data_records
-            record_op_stats_lst = data_record_set.record_op_stats
-            assert len(record_op_stats_lst) == 25
-            assert num_inputs_processed == 25
-
-            for output_record in records:
-                assert sorted(output_record.schema.model_fields) == sorted(input_schema.model_fields)
+        for output_record in records:
+            assert sorted(output_record.schema.model_fields) == sorted(input_schema.model_fields)
 
 def test_embedding_join(mocker, embedding_text_only_model):
     """Test EmbeddingJoin operator on simple text input"""
