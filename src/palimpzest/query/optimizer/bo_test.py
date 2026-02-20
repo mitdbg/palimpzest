@@ -38,17 +38,25 @@ if __name__ == "__main__":
         email = DataRecord(data_item = TextFile(filename = f"allen-p-inbox-{idx}.txt", contents = contents), source_indices = f"{idx}")
         email_dataset.append(email)
 
-    bo_optimizer = BayesianOptimizer(initial_dataset, pz.MinCost(), cost_budget=12  , cost_model=None,
+    # # 1. single objective example
+    # bo_optimizer = BayesianOptimizer(initial_dataset, [pz.MinCost()], cost_budget=4  , cost_model=None,
+    #                                 input_schema=TextFile, output_schema=EmailFile, acq_func="EI",)
+    # best_model, best_posterior = bo_optimizer.optimize_singleObj(email_dataset, save_name_prefix="gp_full_openai_minCost_worst", intermediate_save=[])
+    # print("Best model selected:", best_model)
+    # print("Best posterior mean:", best_posterior.mean.item())
+    # print("Best posterior variance:", best_posterior.variance.item())
+    # print("Final datapoints:")
+    # print("X:", bo_optimizer.X)
+    # print("X_models:", bo_optimizer.X_models)
+
+    # 2. two-objective example
+    bo_optimizer = BayesianOptimizer(initial_dataset, [pz.MaxQuality(), pz.MinCost()], cost_budget=8, cost_model=None,
                                     input_schema=TextFile, output_schema=EmailFile, acq_func="EI",)
-    best_model, best_posterior = bo_optimizer.optimize(email_dataset, save_name_prefix="gp_full_openai_minCost_worst", intermediate_save=[4, 8])
-    print("Best model selected:", best_model)
-    print("Best posterior mean:", best_posterior.mean.item())
-    print("Best posterior variance:", best_posterior.variance.item())
+    bo_optimizer.optimize_twoObj(email_dataset, save_name_prefix="gp_full_openai_MaxQuality_MinCost_worst", intermediate_save=[])
     print("Final datapoints:")
     print("X:", bo_optimizer.X)
-    # print("X_suggested:", bo_optimizer.suggested_points)
     print("X_models:", bo_optimizer.X_models)
-    print("Y:", bo_optimizer.Y)
+    print("Y_all:", bo_optimizer.Y_all)
 
     # # Evaluate all models and save results to CSV
     # all_results = []
