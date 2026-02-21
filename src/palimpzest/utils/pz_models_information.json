@@ -741,7 +741,7 @@
     "ollama/nomic-embed-text": {
         "usd_per_input_token": 0.0,
         "usd_per_output_token": null,
-        "seconds_per_output_token": 0.001,
+        "seconds_per_output_token": 0.01,
         "MMLU_Pro_score": 50.0,
         "is_reasoning_model": false,
         "is_text_model": false,
