@@ -448,7 +448,6 @@ class Generator(Generic[ContextType, InputType]):
                 cost_per_record=total_cost,
                 total_llm_calls=1,
             )
-            print(f"DEBUG generation_stats: {generation_stats}")
 
         # pretty print prompt + full completion output for debugging
         prompt, system_prompt = "", ""
