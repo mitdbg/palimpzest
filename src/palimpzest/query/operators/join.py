@@ -529,12 +529,14 @@ class EmbeddingJoin(LLMJoin):
 
     def __str__(self):
         op = super().__str__()
+        op += f"    Embedding Model: {self.embedding_model.value}\n"
         op += f"    Num Samples: {self.num_samples}\n"
         return op
 
     def get_id_params(self):
         id_params = super().get_id_params()
         id_params = {
+            "embedding_model": self.embedding_model.value,
             "num_samples": self.num_samples,
             **id_params,
         }
@@ -544,6 +546,7 @@ class EmbeddingJoin(LLMJoin):
     def get_op_params(self):
         op_params = super().get_op_params()
         op_params = {
+            "embedding_model": self.embedding_model,
             "num_samples": self.num_samples,
             **op_params,
         }

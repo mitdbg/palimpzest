@@ -28,19 +28,30 @@ class RAGConvert(LLMConvert):
 
     def __str__(self):
         op = super().__str__()
+        op += f"    Embedding Model: {self.embedding_model.value}\n"
         op += f"    Number of Chunks: {str(self.num_chunks_per_field)}\n"
         op += f"    Chunk Size: {str(self.chunk_size)}\n"
         return op
 
     def get_id_params(self):
         id_params = super().get_id_params()
-        id_params = {"num_chunks_per_field": self.num_chunks_per_field, "chunk_size": self.chunk_size, **id_params}
-
+        id_params = {
+            "embedding_model": self.embedding_model.value,
+            "num_chunks_per_field": self.num_chunks_per_field,
+            "chunk_size": self.chunk_size,
+            **id_params,
+        }
         return id_params
 
     def get_op_params(self):
         op_params = super().get_op_params()
-        return {"num_chunks_per_field": self.num_chunks_per_field, "chunk_size": self.chunk_size, **op_params}
+        op_params = {
+            "embedding_model": self.embedding_model,
+            "num_chunks_per_field": self.num_chunks_per_field,
+            "chunk_size": self.chunk_size,
+            **op_params,
+        }
+        return op_params
 
     def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         """
@@ -228,19 +239,30 @@ class RAGFilter(LLMFilter):
 
     def __str__(self):
         op = super().__str__()
+        op += f"    Embedding Model: {self.embedding_model.value}\n"
         op += f"    Number of Chunks: {str(self.num_chunks_per_field)}\n"
         op += f"    Chunk Size: {str(self.chunk_size)}\n"
         return op
 
     def get_id_params(self):
         id_params = super().get_id_params()
-        id_params = {"num_chunks_per_field": self.num_chunks_per_field, "chunk_size": self.chunk_size, **id_params}
-
+        id_params = {
+            "embedding_model": self.embedding_model.value,
+            "num_chunks_per_field": self.num_chunks_per_field,
+            "chunk_size": self.chunk_size,
+            **id_params,
+        }
         return id_params
 
     def get_op_params(self):
         op_params = super().get_op_params()
-        return {"num_chunks_per_field": self.num_chunks_per_field, "chunk_size": self.chunk_size, **op_params}
+        op_params = {
+            "embedding_model": self.embedding_model,
+            "num_chunks_per_field": self.num_chunks_per_field,
+            "chunk_size": self.chunk_size,
+            **op_params,
+        }
+        return op_params
 
     def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         """

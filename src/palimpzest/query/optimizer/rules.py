@@ -2,7 +2,6 @@ import logging
 import os
 from copy import deepcopy
 from itertools import combinations, product
-from typing import List, cast
 
 from palimpzest.constants import AggFunc, Model, PromptStrategy
 from palimpzest.core.data.context_manager import ContextManager
@@ -525,12 +524,12 @@ class ImplementationRule(Rule):
     @classmethod
     def _embedding_model_matches_input(cls, model: Model, logical_expression: LogicalExpression) -> bool:
         """Returns True if the embedding model is capable of processing the input and False otherwise."""
-
         if cls._is_text_image_multimodal_operation(logical_expression) and model.is_text_image_multimodal_embedding_model():
             return True
-        
-        return cls._is_text_only_operation(logical_expression) and model.is_embedding_model()
-    
+
+        is_text_embedding_model = model.is_embedding_model() and not model.is_text_image_multimodal_embedding_model()
+        return cls._is_text_only_operation(logical_expression) and is_text_embedding_model
+
     @classmethod
     def _get_fixed_op_kwargs(cls, logical_expression: LogicalExpression, runtime_kwargs: dict) -> dict:
         """Get the fixed set of physical op kwargs provided by the logical expression and the runtime keyword arguments."""
@@ -676,11 +675,9 @@ class RAGRule(ImplementationRule):
         phys_op_cls = RAGConvert if isinstance(logical_expression.operator, ConvertScan) else RAGFilter
 
         # create variable physical operator kwargs for each (model, embedding_model) which can implement this logical_expression
-        provided_models : List[Model] = cast(List[Model], runtime_kwargs["available_models"])
+        provided_models: list[Model] = runtime_kwargs["available_models"]
         models = [model for model in provided_models if cls._model_matches_input(model, logical_expression)]
-        # NOTE: We don't need to restrict the set of embedding models based on the logical expression's as those operator
-        # only embed text
-        embedding_models = [model for model in provided_models if model.is_embedding_model()]
+        embedding_models = [model for model in provided_models if cls._embedding_model_matches_input(model, logical_expression)]
 
         variable_op_kwargs = []
         for (model, embedding_model) in product(models, embedding_models):
@@ -979,8 +976,8 @@ class EmbeddingJoinRule(ImplementationRule):
         logger.debug(f"Substituting EmbeddingJoinRule for {logical_expression}")
 
         # create variable physical operator kwargs for each  (model, embedding_model) which can implement this logical_expression
-        provided_models : List[Model] = cast(List[Model], runtime_kwargs["available_models"])
-        models = [model for model in runtime_kwargs["available_models"] if cls._model_matches_input(model, logical_expression)]
+        provided_models: list[Model] = runtime_kwargs["available_models"]
+        models = [model for model in provided_models if cls._model_matches_input(model, logical_expression)]
         embedding_models = [model for model in provided_models if cls._embedding_model_matches_input(model, logical_expression)]
         variable_op_kwargs = []
 
