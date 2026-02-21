@@ -10,6 +10,7 @@
         "is_audio_model": false,
         "is_llama_model": true,
         "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
         "supports_prompt_caching": false,
         "provider": "together_ai",
         "sources": [
@@ -28,6 +29,7 @@
         "is_audio_model": false,
         "is_llama_model": true,
         "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
         "supports_prompt_caching": false,
         "provider": "together_ai",
         "sources": null
@@ -43,6 +45,7 @@
         "is_audio_model": false,
         "is_llama_model": true,
         "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
         "supports_prompt_caching": false,
         "provider": "together_ai",
         "sources": null
@@ -58,6 +61,7 @@
         "is_audio_model": false,
         "is_llama_model": true,
         "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
         "supports_prompt_caching": false,
         "provider": "together_ai",
         "sources": null
@@ -72,6 +76,7 @@
         "is_vision_model": false,
         "is_audio_model": false,
         "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
         "supports_prompt_caching": false,
         "provider": "together_ai",
         "sources": null
@@ -86,6 +91,7 @@
         "is_vision_model": false,
         "is_audio_model": false,
         "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
         "supports_prompt_caching": false,
         "provider": "together_ai",
         "sources": [
@@ -103,6 +109,7 @@
         "is_vision_model": false,
         "is_audio_model": false,
         "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
         "supports_prompt_caching": false,
         "provider": "together_ai",
         "sources": [
@@ -139,6 +146,7 @@
         "is_vision_model": true,
         "is_audio_model": false,
         "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
         "supports_prompt_caching": true,
         "provider": "openai",
         "sources": null,
@@ -155,6 +163,7 @@
         "is_vision_model": true,
         "is_audio_model": false,
         "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
         "supports_prompt_caching": true,
         "provider": "openai",
         "sources": null
@@ -170,6 +179,7 @@
         "is_vision_model": true,
         "is_audio_model": false,
         "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
         "supports_prompt_caching": true,
         "provider": "openai",
         "sources": null
@@ -185,6 +195,7 @@
         "is_vision_model": true,
         "is_audio_model": false,
         "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
         "supports_prompt_caching": true,
         "provider": "openai",
         "sources": null
@@ -200,6 +211,7 @@
         "is_vision_model": true,
         "is_audio_model": false,
         "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
         "supports_prompt_caching": true,
         "provider": "openai",
         "sources": null
@@ -216,6 +228,7 @@
         "is_audio_model": false,
         "is_gpt_5_model": true,
         "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
         "supports_prompt_caching": true,
         "provider": "openai",
         "sources": null
@@ -233,6 +246,7 @@
         "is_audio_model": false,
         "is_gpt_5_model": true,
         "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
         "supports_prompt_caching": true,
         "provider": "openai",
         "sources": ["https://platform.openai.com/docs/pricing"]
@@ -249,6 +263,7 @@
         "is_audio_model": false,
         "is_gpt_5_model": true,
         "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
         "supports_prompt_caching": true,
         "provider": "openai",
         "sources": ["https://platform.openai.com/docs/pricing"]
@@ -266,6 +281,7 @@
         "is_audio_model": false,
         "is_gpt_5_model": true,
         "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
         "supports_prompt_caching": true,
         "provider": "openai",
         "sources": ["https://platform.openai.com/docs/pricing"]
@@ -282,6 +298,7 @@
         "is_audio_model": false,
         "is_o_model": true,
         "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
         "supports_prompt_caching": true,
         "provider": "openai",
         "sources": null
@@ -298,6 +315,7 @@
         "is_vision_model": false,
         "is_audio_model": false,
         "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
         "supports_prompt_caching": false,
         "provider": "anthropic",
         "sources": ["https://platform.claude.com/docs/en/about-claude/pricing"]
@@ -314,6 +332,7 @@
         "is_vision_model": true,
         "is_audio_model": false,
         "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
         "supports_prompt_caching": true,
         "provider": "anthropic",
         "sources": ["https://platform.claude.com/docs/en/about-claude/pricing"]
@@ -330,6 +349,7 @@
         "is_vision_model": true,
         "is_audio_model": false,
         "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
         "supports_prompt_caching": true,
         "provider": "anthropic",
         "sources": ["https://platform.claude.com/docs/en/about-claude/pricing"]
@@ -346,6 +366,7 @@
         "is_vision_model": false,
         "is_audio_model": false,
         "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
         "supports_prompt_caching": true,
         "provider": "anthropic",
         "sources": ["https://platform.claude.com/docs/en/about-claude/pricing"]
@@ -362,6 +383,7 @@
         "is_vision_model": true,
         "is_audio_model": false,
         "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
         "supports_prompt_caching": true,
         "provider": "anthropic",
         "sources": ["https://platform.claude.com/docs/en/about-claude/pricing"]
@@ -378,6 +400,7 @@
         "is_vision_model": true,
         "is_audio_model": false,
         "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
         "supports_prompt_caching": true,
         "provider": "anthropic",
         "sources": null
@@ -396,6 +419,7 @@
         "is_vision_model": true,
         "is_audio_model": true,
         "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
         "supports_prompt_caching": true,
         "provider": "vertex_ai",
         "sources": ["https://cloud.google.com/vertex-ai/generative-ai/pricing"]
@@ -414,6 +438,7 @@
         "is_vision_model": true,
         "is_audio_model": true,
         "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
         "supports_prompt_caching": true,
         "provider": "vertex_ai",
         "sources": ["https://cloud.google.com/vertex-ai/generative-ai/pricing"]
@@ -430,6 +455,7 @@
         "is_vision_model": true,
         "is_audio_model": true,
         "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
         "supports_prompt_caching": false,
         "provider": "vertex_ai",
         "sources": ["https://cloud.google.com/vertex-ai/generative-ai/pricing"],
@@ -449,6 +475,7 @@
         "is_vision_model": true,
         "is_audio_model": true,
         "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
         "supports_prompt_caching": true,
         "provider": "vertex_ai",
         "sources": null,
@@ -468,6 +495,7 @@
         "is_vision_model": true,
         "is_audio_model": true,
         "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
         "supports_prompt_caching": true,
         "provider": "vertex_ai",
         "sources": ["https://cloud.google.com/vertex-ai/generative-ai/pricing"]
@@ -485,6 +513,7 @@
         "is_vision_model": true,
         "is_audio_model": true,
         "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
         "supports_prompt_caching": true,
         "provider": "vertex_ai",
         "sources": ["https://cloud.google.com/vertex-ai/generative-ai/pricing"]
@@ -502,6 +531,7 @@
         "is_vision_model": true,
         "is_audio_model": false,
         "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
         "supports_prompt_caching": false,
         "provider": "gemini",
         "sources": ["https://ai.google.dev/gemini-api/docs/pricing"]
@@ -519,6 +549,7 @@
         "is_vision_model": false,
         "is_audio_model": true,
         "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
         "supports_prompt_caching": true,
         "provider": "gemini",
         "sources": ["https://ai.google.dev/gemini-api/docs/pricing"]
@@ -536,6 +567,7 @@
         "is_vision_model": true,
         "is_audio_model": true,
         "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
         "supports_prompt_caching": true,
         "provider": "gemini",
         "sources": ["https://ai.google.dev/gemini-api/docs/pricing"]
@@ -553,6 +585,7 @@
         "is_vision_model": true,
         "is_audio_model": true,
         "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
         "supports_prompt_caching": true,
         "provider": "gemini",
         "sources": ["https://ai.google.dev/gemini-api/docs/pricing"]
@@ -571,6 +604,7 @@
         "is_vision_model": true,
         "is_audio_model": true,
         "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
         "supports_prompt_caching": true,
         "provider": "gemini",
         "sources": ["https://ai.google.dev/gemini-api/docs/pricing"],
@@ -589,6 +623,7 @@
         "is_vision_model": true,
         "is_audio_model": true,
         "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
         "supports_prompt_caching": true,
         "provider": "gemini",
         "sources": ["https://ai.google.dev/gemini-api/docs/pricing"]
@@ -603,6 +638,7 @@
         "is_vision_model": true,
         "is_audio_model": false,
         "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
         "supports_prompt_caching": false,
         "provider": "vertex_ai",
         "sources": null
@@ -619,6 +655,7 @@
         "is_vision_model": false,
         "is_audio_model": true,
         "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
         "supports_prompt_caching": false,
         "provider": "openai",
         "sources": ["https://platform.openai.com/docs/models/gpt-4o-audio-preview"]
@@ -635,6 +672,7 @@
         "is_vision_model": false,
         "is_audio_model": true,
         "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
         "provider": "openai",
         "sources": ["https://platform.openai.com/docs/models/gpt-4o-mini-audio-preview"]
     },
@@ -649,11 +687,12 @@
         "is_audio_model": false,
         "is_vllm_model": true,
         "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
         "provider": "hosted_vllm",
         "sources": null,
         "note": "fill in seconds per output token and MMLU-pro score fill in with better estimates."
     },
-    "text-embedding-3-small": {
+    "openai/text-embedding-3-small": {
         "usd_per_input_token": 2e-08,
         "usd_per_output_token": null,
         "seconds_per_output_token": 0.0098,
@@ -663,11 +702,12 @@
         "is_vision_model": false,
         "is_audio_model": false,
         "is_embedding_model": true,
+        "is_text_image_multimodal_embedding_model": false,
         "provider": "openai",
         "sources": ["https://platform.openai.com/docs/models/text-embedding-3-small"],
         "note": "just copying GPT_4o_MINI_MODEL_CARD for now for overall and seconds per output token"
     },
-    "text-embedding-3-large": {
+    "openai/text-embedding-3-large": {
         "usd_per_input_token": 0.13e-08,
         "usd_per_output_token": null,
         "seconds_per_output_token": null,
@@ -677,6 +717,7 @@
         "is_vision_model": false,
         "is_audio_model": false,
         "is_embedding_model": true,
+        "is_text_image_multimodal_embedding_model": false,
         "provider": "openai",
         "sources": ["https://platform.openai.com/docs/models/text-embedding-3-large"],
         "note": "just copying GPT_4o_MINI_MODEL_CARD for now for overall and seconds per output token"
@@ -692,8 +733,24 @@
         "is_audio_model": false,
         "is_clip_model": true,
         "is_embedding_model": true,
+        "is_text_image_multimodal_embedding_model": true,
         "provider": "together_ai",
         "sources": null,
         "note": "just copying TEXT_EMBEDDING_3_SMALL_MODEL_CARD for now for seconds per output token; imageNet top-1 accuracy"
+    },
+    "ollama/nomic-embed-text": {
+        "usd_per_input_token": 0.0,
+        "usd_per_output_token": null,
+        "seconds_per_output_token": 0.01,
+        "MMLU_Pro_score": 50.0,
+        "is_reasoning_model": false,
+        "is_text_model": false,
+        "is_vision_model": false,
+        "is_audio_model": false,
+        "is_embedding_model": true,
+        "is_text_image_multimodal_embedding_model": false,
+        "provider": "ollama",
+        "sources": [],
+        "note": "copied text-embedding-3-small model card and made numbers slightly worse to protect default behavior for max quality and min latency"
     }
 }

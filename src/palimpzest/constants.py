@@ -226,6 +226,7 @@ class Model:
             "is_audio_model": False,
             "is_reasoning_model": False,
             "is_embedding_model": False,
+            "is_text_image_multimodal_embedding_model": False,
             "is_vllm_model": True,  # Mark as vLLM model
             "usd_per_input_token": 0.0,  # Cost always 0 for local model
             "usd_per_output_token": 0.0,
@@ -313,7 +314,10 @@ class Model:
     
     def is_embedding_model(self) -> bool:
         return self.model_specs.get("is_embedding_model", False)
-    
+
+    def is_text_image_multimodal_embedding_model(self) -> bool:
+        return self.model_specs.get("is_text_image_multimodal_embedding_model", False)
+
     def is_provider_vertex_ai(self) -> bool:
         return self.provider == "vertex_ai"
     
@@ -331,6 +335,9 @@ class Model:
     
     def is_provider_deepseek(self) -> bool:
         return self.provider == "deepseek"
+
+    def is_provider_ollama(self) -> bool:
+        return self.provider == "ollama"
 
     def is_model_gemini(self) -> bool:
         return "gemini" in self.value.lower()
@@ -444,8 +451,9 @@ Model.GOOGLE_GEMINI_2_5_PRO = Model("gemini/gemini-2.5-pro")
 Model.LLAMA_4_MAVERICK = Model("vertex_ai/meta/llama-4-maverick-17b-128e-instruct-maas")
 Model.GPT_4o_AUDIO_PREVIEW = Model("openai/gpt-4o-audio-preview")
 Model.GPT_4o_MINI_AUDIO_PREVIEW = Model("openai/gpt-4o-mini-audio-preview")
-Model.TEXT_EMBEDDING_3_SMALL = Model("text-embedding-3-small")
+Model.TEXT_EMBEDDING_3_SMALL = Model("openai/text-embedding-3-small")
 Model.CLIP_VIT_B_32 = Model("clip-ViT-B-32")
+Model.NOMIC_EMBED_TEXT = Model("ollama/nomic-embed-text")
 
 #### MODEL PERFORMANCE & COST METRICS ####
 # Overall model quality is computed using MMLU-Pro; multi-modal models currently use the same score for vision

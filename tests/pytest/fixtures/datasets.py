@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 import pytest
 
@@ -61,15 +62,19 @@ class CostModelTestDataset(IterDataset):
         return {"value": number}
 
 
+@pytest.fixture(scope="session")
+def project_root() -> Path:
+    return Path(__file__).resolve().parent.parent.parent.parent
+
 ### DATA PATH FIXTURES ###
 @pytest.fixture
-def enron_eval_tiny_data_path():
-    return "testdata/enron-eval-tiny"
+def enron_eval_tiny_data_path(project_root) -> str:
+    return str(project_root / "testdata/enron-eval-tiny")
 
 
 @pytest.fixture
-def real_estate_eval_tiny_data_path():
-    return "testdata/real-estate-eval-tiny"
+def real_estate_eval_tiny_data_path(project_root) -> str:
+    return str(project_root / "testdata/real-estate-eval-tiny")
 
 
 ### ROOT DATASET FIXTURES ###

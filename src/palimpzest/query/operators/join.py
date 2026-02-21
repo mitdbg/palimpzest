@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import numpy as np
+from litellm import embedding as litellm_embedding
 from numpy.linalg import norm
 from openai import OpenAI
 from PIL import Image
@@ -494,6 +495,7 @@ class EmbeddingJoin(LLMJoin):
     # specialized use cases (e.g., speech-to-text) with strict requirements on things like e.g. sample rate
     def __init__(
         self,
+        embedding_model: Model,
         num_samples: int = 10,
         *args,
         **kwargs,
@@ -501,6 +503,7 @@ class EmbeddingJoin(LLMJoin):
         super().__init__(*args, **kwargs)
         self.num_samples = num_samples
         self.samples_drawn = 0
+        self.embedding_model = embedding_model
 
         # compute whether all fields are text fields
         self.text_only = all([
@@ -508,7 +511,6 @@ class EmbeddingJoin(LLMJoin):
             for field_name, field in self.input_schema.model_fields.items()
             if field_name.split(".")[-1] in self.get_input_fields()
         ])
-        self.embedding_model = Model.TEXT_EMBEDDING_3_SMALL if self.text_only else Model.CLIP_VIT_B_32
         self.locks = Locks()
 
         # keep track of embedding costs that could not be amortized if no output records were produced
@@ -527,12 +529,14 @@ class EmbeddingJoin(LLMJoin):
 
     def __str__(self):
         op = super().__str__()
+        op += f"    Embedding Model: {self.embedding_model.value}\n"
         op += f"    Num Samples: {self.num_samples}\n"
         return op
 
     def get_id_params(self):
         id_params = super().get_id_params()
         id_params = {
+            "embedding_model": self.embedding_model.value,
             "num_samples": self.num_samples,
             **id_params,
         }
@@ -542,6 +546,7 @@ class EmbeddingJoin(LLMJoin):
     def get_op_params(self):
         op_params = super().get_op_params()
         op_params = {
+            "embedding_model": self.embedding_model,
             "num_samples": self.num_samples,
             **op_params,
         }
@@ -590,11 +595,10 @@ class EmbeddingJoin(LLMJoin):
         total_embedding_input_tokens = 0
         embeddings = None
         if self.text_only:
-            client = OpenAI()
             inputs = [dr.to_json_str(bytes_to_str=True, project_cols=input_fields, sorted=True) for dr in candidates]
-            response = client.embeddings.create(input=inputs, model=self.embedding_model.value)
-            total_embedding_input_tokens = response.usage.total_tokens
-            embeddings = np.array([item.embedding for item in response.data])
+            response = litellm_embedding(input=inputs, model=self.embedding_model.value)
+            total_embedding_input_tokens = response.usage.total_tokens if response.usage is not None else 0
+            embeddings = np.array([item['embedding'] for item in response.data])
         else:
             model = self.locks.get_model(self.embedding_model.value)
             embeddings = np.zeros((len(candidates), 512))  # CLIP embeddings are 512-dimensional
