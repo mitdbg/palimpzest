@@ -67,7 +67,7 @@ class Optimizer:
         cost_model: BaseCostModel,
         available_models: list[Model],
         join_parallelism: int = 64,
-        reasoning_effort: str | None = "default",
+        reasoning_effort: str = "default",
         verbose: bool = False,
         allow_bonded_query: bool = True,
         allow_rag_reduction: bool = False,
