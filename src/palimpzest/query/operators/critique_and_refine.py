@@ -29,8 +29,8 @@ class CritiqueAndRefineConvert(LLMConvert):
         self.refine_model = refine_model
 
         # create generators
-        self.critic_generator = Generator(self.critic_model, PromptStrategy.MAP_CRITIC, self.reasoning_effort, self.api_base, self.cardinality, self.desc, self.verbose)
-        self.refine_generator = Generator(self.refine_model, PromptStrategy.MAP_REFINE, self.reasoning_effort, self.api_base, self.cardinality, self.desc, self.verbose)
+        self.critic_generator = Generator(self.critic_model, PromptStrategy.MAP_CRITIC, self.reasoning_effort, self.cardinality, self.desc, self.verbose)
+        self.refine_generator = Generator(self.refine_model, PromptStrategy.MAP_REFINE, self.reasoning_effort, self.cardinality, self.desc, self.verbose)
 
     def __str__(self):
         op = super().__str__()
@@ -117,8 +117,8 @@ class CritiqueAndRefineFilter(LLMFilter):
         self.refine_model = refine_model
 
         # create generators
-        self.critic_generator = Generator(self.critic_model, PromptStrategy.FILTER_CRITIC, self.reasoning_effort, self.api_base, Cardinality.ONE_TO_ONE, self.desc, self.verbose)
-        self.refine_generator = Generator(self.refine_model, PromptStrategy.FILTER_REFINE, self.reasoning_effort, self.api_base, Cardinality.ONE_TO_ONE, self.desc, self.verbose)
+        self.critic_generator = Generator(self.critic_model, PromptStrategy.FILTER_CRITIC, self.reasoning_effort, Cardinality.ONE_TO_ONE, self.desc, self.verbose)
+        self.refine_generator = Generator(self.refine_model, PromptStrategy.FILTER_REFINE, self.reasoning_effort, Cardinality.ONE_TO_ONE, self.desc, self.verbose)
 
     def __str__(self):
         op = super().__str__()

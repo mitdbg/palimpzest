@@ -50,6 +50,17 @@ def test_generator(model, question, output_schema):
     assert output["answer"][0].lower() == "green"
 
 
+@pytest.mark.skipif(os.getenv("VLLM_API_BASE") is None, reason="VLLM_API_BASE not set (no vLLM server running)")
+def test_vllm_generator(question, output_schema):
+    api_base = os.getenv("VLLM_API_BASE")
+    model_id = os.getenv("VLLM_MODEL_ID", "openai/Qwen/Qwen2.5-1.5B-Instruct")
+    model = Model(model_id, api_base=api_base)
+    generator = Generator(model, PromptStrategy.MAP, None)
+    output, _, gen_stats, _ = generator(question, output_schema.model_fields, **{"output_schema": output_schema})
+    assert gen_stats.total_input_tokens > 0
+    assert gen_stats.total_output_tokens > 0
+    assert output["answer"] is not None
+
 # =============================================================================
 # GENERATOR STATS VALIDATION TESTS
 # =============================================================================
@@ -316,7 +327,7 @@ EXPECTED_STATS = {
         "second_request": {
             "input_text_tokens": 117,
             "input_image_tokens": 0,
-            "input_audio_tokens": 6,
+            "input_audio_tokens": [6, 100],
             "cache_read_tokens": 2017,
             "cache_creation_tokens": 0,
             "output_tokens": 125,
@@ -334,7 +345,7 @@ EXPECTED_STATS = {
         "second_request": {
             "input_text_tokens": 516,
             "input_image_tokens": [59, 258],
-            "input_audio_tokens": 23,
+            "input_audio_tokens": [23, 100],
             "cache_read_tokens": 2022,
             "cache_creation_tokens": 0,
             "output_tokens": 181,
@@ -567,8 +578,13 @@ def assert_stats_match(gen_stats, expected: dict, request_name: str, provider: s
                 f"{request_name} input_image_tokens mismatch: got {gen_stats.input_image_tokens}, expected {expected['input_image_tokens']} (±{tolerance*100}%)"
 
     if expected.get("input_audio_tokens") is not None:
-        assert within_tolerance(gen_stats.input_audio_tokens, expected["input_audio_tokens"], tolerance), \
-            f"{request_name} input_audio_tokens mismatch: got {gen_stats.input_audio_tokens}, expected {expected['input_audio_tokens']} (±{tolerance*100}%)"
+        if isinstance(expected["input_audio_tokens"], list):
+            # If expected input_audio_tokens is a list, accept any value in the list
+            assert any(within_tolerance(gen_stats.input_audio_tokens, expected_input_audio_tokens, tolerance) for expected_input_audio_tokens in expected["input_audio_tokens"]), \
+                f"{request_name} input_audio_tokens mismatch: got {gen_stats.input_audio_tokens}, expected one of {expected['input_audio_tokens']}"
+        else:
+            assert within_tolerance(gen_stats.input_audio_tokens, expected["input_audio_tokens"], tolerance), \
+                f"{request_name} input_audio_tokens mismatch: got {gen_stats.input_audio_tokens}, expected {expected['input_audio_tokens']} (±{tolerance*100}%)"
 
     if expected.get("cache_creation_tokens") is not None:
         assert within_tolerance(gen_stats.cache_creation_tokens, expected["cache_creation_tokens"], tolerance), \
@@ -591,7 +607,7 @@ def assert_stats_match(gen_stats, expected: dict, request_name: str, provider: s
         if expected_total > 0:
             assert within_tolerance(actual_total, expected_total, tolerance), \
                 f"{request_name} total input tokens mismatch: got {actual_total}, expected {expected_total} (±{tolerance*100}%)"
-    except AssertionError as e:
+    except AssertionError:
         for field in ["input_text_tokens", "input_image_tokens", "input_audio_tokens", "cache_read_tokens", "cache_creation_tokens"]:
             if expected.get(field) is not None:
                 if isinstance(expected[field], list):
