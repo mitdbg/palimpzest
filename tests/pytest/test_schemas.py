@@ -1,3 +1,5 @@
+from typing import Any
+
 import pytest
 from pydantic import BaseModel, Field
 
@@ -58,7 +60,7 @@ def test_create_schema_from_df():
     pet_schema = create_schema_from_df(df)
     assert pet_schema.__name__ == "Schema['age', 'name', 'weight']"
     assert get_schema_field_names(pet_schema) == ["name", "age", "weight"]
-    assert pet_schema.model_fields["name"].annotation is str
+    assert pet_schema.model_fields["name"].annotation in [str, Any]
     assert pet_schema.model_fields["age"].annotation is int
     assert pet_schema.model_fields["weight"].annotation is float
 

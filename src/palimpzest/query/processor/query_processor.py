@@ -20,21 +20,21 @@ from palimpzest.core.models import ExecutionStats, PlanStats
 from palimpzest.policy import Policy
 from palimpzest.query.execution.execution_strategy import ExecutionStrategy, SentinelExecutionStrategy
 from palimpzest.query.optimizer.cost_model import SampleBasedCostModel
-from palimpzest.query.optimizer.optimizer import Optimizer
-from palimpzest.query.optimizer.optimizer_strategy_type import OptimizationStrategyType
-from palimpzest.query.optimizer.plan import SentinelPlan
-from palimpzest.utils.hash_helpers import hash_for_id
-from palimpzest.validator.validator import Validator
 
 # ============================================================================
 # NEW IMPORTS - Filter Selectivity Module
 # ============================================================================
 from palimpzest.query.optimizer.filter_selectivity import (
-    estimate_filter_selectivity_for_sentinel_plan,
-    optimize_filter_ordering,
-    generate_and_prune_filter_orderings,
     SelectivityEstimationResult,
+    estimate_filter_selectivity_for_sentinel_plan,
+    generate_and_prune_filter_orderings,
+    optimize_filter_ordering,
 )
+from palimpzest.query.optimizer.optimizer import Optimizer
+from palimpzest.query.optimizer.optimizer_strategy_type import OptimizationStrategyType
+from palimpzest.query.optimizer.plan import SentinelPlan
+from palimpzest.utils.hash_helpers import hash_for_id
+from palimpzest.validator.validator import Validator
 
 logger = logging.getLogger(__name__)
 
@@ -226,6 +226,12 @@ class QueryProcessor:
             # LINE 120: Create sentinel plan (ORIGINAL)
             # ==============================================================
             sentinel_plan = self._create_sentinel_plan(self.train_dataset)
+        if self.estimate_filter_selectivity:
+            # Get training dataset for selectivity estimation
+            if self.train_dataset is not None:
+                selectivity_train_dataset = self.train_dataset
+            else:
+                selectivity_train_dataset = self.dataset._get_root_datasets()
 
             # ==============================================================
             # NEW CODE - INSERT BETWEEN LINES 120-122

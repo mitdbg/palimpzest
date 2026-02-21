@@ -7,7 +7,7 @@ import time
 import numpy as np
 from openai import OpenAI
 
-from palimpzest.constants import MODEL_CARDS, Cardinality, Model
+from palimpzest.constants import Cardinality, Model
 from palimpzest.query.generators.generators import get_json_from_answer
 
 
@@ -109,8 +109,9 @@ ANSWER:
         completion = client.chat.completions.create(**payload)
 
         # compute total cost
-        usd_per_input_token = MODEL_CARDS[model_name]["usd_per_input_token"]
-        usd_per_output_token = MODEL_CARDS[model_name]["usd_per_output_token"]
+        model = Model(model_name)
+        usd_per_input_token = model.get_usd_per_input_token()
+        usd_per_output_token = model.get_usd_per_output_token()
         input_tokens = completion.usage.prompt_tokens
         output_tokens = completion.usage.completion_tokens
         total_cost += input_tokens * usd_per_input_token + output_tokens * usd_per_output_token
