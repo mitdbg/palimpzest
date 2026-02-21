@@ -17,7 +17,7 @@ from palimpzest.query.operators.filter import LLMFilter
 
 
 class RAGConvert(LLMConvert):
-    def __init__(self, num_chunks_per_field: int, embedding_model: Model, chunk_size: int = 1000, *args, **kwargs):
+    def __init__(self, embedding_model: Model, num_chunks_per_field: int, chunk_size: int = 1000, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.embedding_model = embedding_model
         self.num_chunks_per_field = num_chunks_per_field
@@ -183,7 +183,6 @@ class RAGConvert(LLMConvert):
         return candidate, embed_stats
 
     def convert(self, candidate: DataRecord, fields: dict[str, FieldInfo]) -> tuple[dict[str, list], GenerationStats]:
-
         # get the set of input fields to use for the convert operation
         input_fields = self.get_input_fields()
         output_fields = list(fields.keys())
@@ -218,7 +217,7 @@ class RAGConvert(LLMConvert):
 
 
 class RAGFilter(LLMFilter):
-    def __init__(self, num_chunks_per_field: int, embedding_model: Model,chunk_size: int = 1000, *args, **kwargs):
+    def __init__(self, embedding_model: Model, num_chunks_per_field: int, chunk_size: int = 1000, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.embedding_model = embedding_model
         self.num_chunks_per_field = num_chunks_per_field
@@ -301,7 +300,7 @@ class RAGFilter(LLMFilter):
         total_time = time.time() - start_time
 
         # extract the embedding
-        embedding = response.data
+        embedding = response.data[0]['embedding']
 
         # compute the generation stats object
         total_embedding_input_tokens = response.usage.total_tokens if response.usage is not None else 0
