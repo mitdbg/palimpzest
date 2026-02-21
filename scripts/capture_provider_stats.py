@@ -114,7 +114,7 @@ PROVIDER_MODALITY_SUPPORT = {
 def load_messages(modality: str, provider: str, messages_dir: str) -> list[dict]:
     """Load messages from JSON file for a given modality/provider combination."""
     filepath = os.path.join(messages_dir, f"{modality}_{provider}.json")
-    with open(filepath, "r") as f:
+    with open(filepath) as f:
         return json.load(f)
 
 
@@ -605,7 +605,7 @@ def capture_stats_for_provider(
     # Generate a unique cache key for OpenAI (ensures both requests hit the same cache shard)
     openai_cache_key = f"pz-test-{uuid.uuid4().hex[:12]}" if provider in ("openai", "openai-audio") else None
 
-    print(f"    First request...")
+    print("    First request...")
     if provider == "openai" or provider == "openai-audio":
         first_stats = call_openai_api(messages, model, cache_key=openai_cache_key)
     elif provider == "anthropic":
@@ -619,10 +619,10 @@ def capture_stats_for_provider(
 
     print(f"      Usage: {first_stats['usage']}")
 
-    print(f"    Waiting 20 seconds for cache to be available...")
+    print("    Waiting 20 seconds for cache to be available...")
     time.sleep(20)
 
-    print(f"    Second request (should show cache hits)...")
+    print("    Second request (should show cache hits)...")
     if provider == "openai" or provider == "openai-audio":
         second_stats = call_openai_api(messages, model, cache_key=openai_cache_key)
     elif provider == "anthropic":

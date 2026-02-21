@@ -36,6 +36,8 @@ from litellm.integrations.custom_logger import CustomLogger
 # Add project root to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+import contextlib
+
 from palimpzest.constants import Model
 
 
@@ -172,7 +174,7 @@ PROVIDER_MODALITY_SUPPORT = {
 def load_messages(modality: str, provider: str, messages_dir: str) -> list[dict]:
     """Load messages from JSON file for a given modality/provider combination."""
     filepath = os.path.join(messages_dir, f"{modality}_{provider}.json")
-    with open(filepath, "r") as f:
+    with open(filepath) as f:
         return json.load(f)
 
 
@@ -339,10 +341,8 @@ def call_litellm_api(
                 if isinstance(original, dict) and "usage_metadata" in original:
                     usage_raw = original["usage_metadata"]
                 elif hasattr(original, "usage_metadata"):
-                    try:
+                    with contextlib.suppress(Exception):
                         usage_raw = original.usage_metadata.model_dump() if hasattr(original.usage_metadata, "model_dump") else dict(original.usage_metadata)
-                    except Exception:
-                        pass
     except Exception:
         pass
 
@@ -397,14 +397,14 @@ def capture_stats_for_provider(
     # Reference: capture_provider_stats.py and PromptManager.__init__
     openai_cache_key = f"pz-test-{uuid.uuid4().hex[:12]}" if provider in ("openai", "openai-audio") else None
 
-    print(f"    First request...")
+    print("    First request...")
     first_stats = call_litellm_api(messages, model, provider, cache_key=openai_cache_key)
     print(f"      Usage: {first_stats['usage']}")
 
-    print(f"    Waiting 20 seconds for cache to be available...")
+    print("    Waiting 20 seconds for cache to be available...")
     time.sleep(20)
 
-    print(f"    Second request (should show cache hits)...")
+    print("    Second request (should show cache hits)...")
     second_stats = call_litellm_api(messages, model, provider, cache_key=openai_cache_key)
     print(f"      Usage: {second_stats['usage']}")
 

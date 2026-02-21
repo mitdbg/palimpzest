@@ -31,6 +31,7 @@ from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.lib.schemas import AudioFilepath, ImageFilepath, union_schemas
 from palimpzest.query.generators.generators import Generator
 
+
 def generate_session_id(provider: str, modality: str) -> str:
     """
     Generate a unique 12-character session ID for a provider/modality combination.
