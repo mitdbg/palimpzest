@@ -129,6 +129,11 @@ class PromptManager:
             stats["cache_read_tokens"] = usage.get("cache_read_input_tokens") or 0
             stats["input_text_tokens"] = max(0, (usage.get("prompt_tokens") or 0) - stats["cache_read_tokens"] - stats["cache_creation_tokens"])
 
+        elif self.model.is_vllm_model():
+            # vLLM does not seem to provide cache statistics through litellm, so we currently have no way
+            # to extract cache read/creation tokens for vLLM models.
+            pass
+
         # all other models (assume caching not supported)
         else:
             if is_audio_op:
