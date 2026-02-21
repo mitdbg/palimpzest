@@ -5,7 +5,6 @@ import math
 from pydantic.fields import FieldInfo
 
 from palimpzest.constants import (
-    MODEL_CARDS,
     NAIVE_EST_NUM_INPUT_TOKENS,
     NAIVE_EST_NUM_OUTPUT_TOKENS,
     Cardinality,
@@ -24,8 +23,8 @@ class SplitConvert(LLMConvert):
         super().__init__(*args, **kwargs)
         self.num_chunks = num_chunks
         self.min_size_to_chunk = min_size_to_chunk
-        self.split_generator = Generator(self.model, PromptStrategy.MAP_SPLIT_PROPOSER, self.reasoning_effort, self.api_base, self.cardinality, self.desc, self.verbose)
-        self.split_merge_generator = Generator(self.model, PromptStrategy.MAP_SPLIT_MERGER, self.reasoning_effort, self.api_base, self.cardinality, self.desc, self.verbose)
+        self.split_generator = Generator(self.model, PromptStrategy.MAP_SPLIT_PROPOSER, self.reasoning_effort, self.cardinality, self.desc, self.verbose)
+        self.split_merge_generator = Generator(self.model, PromptStrategy.MAP_SPLIT_MERGER, self.reasoning_effort, self.cardinality, self.desc, self.verbose)
 
         # crude adjustment factor for naive estimation in unoptimized setting
         self.naive_quality_adjustment = 0.6
@@ -61,8 +60,8 @@ class SplitConvert(LLMConvert):
         est_num_input_tokens = NAIVE_EST_NUM_INPUT_TOKENS
         est_num_output_tokens = NAIVE_EST_NUM_OUTPUT_TOKENS
         model_conversion_usd_per_record = (
-            MODEL_CARDS[self.model.value]["usd_per_input_token"] * est_num_input_tokens
-            + MODEL_CARDS[self.model.value]["usd_per_output_token"] * est_num_output_tokens
+            self.model.get_usd_per_input_token() * est_num_input_tokens
+            + self.model.get_usd_per_output_token() * est_num_output_tokens
         )
 
         # set refined estimate of cost per record
@@ -174,8 +173,8 @@ class SplitFilter(LLMFilter):
         super().__init__(*args, **kwargs)
         self.num_chunks = num_chunks
         self.min_size_to_chunk = min_size_to_chunk
-        self.split_generator = Generator(self.model, PromptStrategy.FILTER_SPLIT_PROPOSER, self.reasoning_effort, self.api_base, Cardinality.ONE_TO_ONE, self.desc, self.verbose)
-        self.split_merge_generator = Generator(self.model, PromptStrategy.FILTER_SPLIT_MERGER, self.reasoning_effort, self.api_base, Cardinality.ONE_TO_ONE, self.desc, self.verbose)
+        self.split_generator = Generator(self.model, PromptStrategy.FILTER_SPLIT_PROPOSER, self.reasoning_effort, Cardinality.ONE_TO_ONE, self.desc, self.verbose)
+        self.split_merge_generator = Generator(self.model, PromptStrategy.FILTER_SPLIT_MERGER, self.reasoning_effort, Cardinality.ONE_TO_ONE, self.desc, self.verbose)
 
         # crude adjustment factor for naive estimation in no-sentinel setting
         self.naive_quality_adjustment = 0.6
@@ -211,8 +210,8 @@ class SplitFilter(LLMFilter):
         est_num_input_tokens = NAIVE_EST_NUM_INPUT_TOKENS
         est_num_output_tokens = NAIVE_EST_NUM_OUTPUT_TOKENS
         model_conversion_usd_per_record = (
-            MODEL_CARDS[self.model.value]["usd_per_input_token"] * est_num_input_tokens
-            + MODEL_CARDS[self.model.value]["usd_per_output_token"] * est_num_output_tokens
+            self.model.get_usd_per_input_token() * est_num_input_tokens
+            + self.model.get_usd_per_output_token() * est_num_output_tokens
         )
 
         # set refined estimate of cost per record

@@ -183,6 +183,6 @@ def test_embedding_join(mocker, embedding_text_only_model):
         assert sorted(output_record.schema.model_fields) == sorted(input_schema.model_fields)
 
     # check that all output record stats have embedding stats
-    # Embedding cost could be 0.0 if the embedding model is mocked
-    assert all(stats.total_embedding_cost >= 0.0 for stats in record_op_stats_lst)
+    # embedding cost could be 0.0 if the embedding model is mocked
+    assert all(stats.cost_per_record >= 0.0 for stats in record_op_stats_lst)
     assert sum(record._passed_operator for record in records) == 3

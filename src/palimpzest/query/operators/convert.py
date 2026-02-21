@@ -7,7 +7,6 @@ from typing import Callable
 from pydantic.fields import FieldInfo
 
 from palimpzest.constants import (
-    MODEL_CARDS,
     NAIVE_EST_NUM_INPUT_TOKENS,
     NAIVE_EST_NUM_OUTPUT_TOKENS,
     NAIVE_EST_ONE_TO_MANY_SELECTIVITY,
@@ -119,12 +118,13 @@ class ConvertOp(PhysicalOperator, ABC):
                 answer={field_name: getattr(dr, field_name, None) for field_name in field_names},
                 input_fields=list(self.input_schema.model_fields),
                 generated_fields=field_names,
-                total_input_tokens=per_record_stats.total_input_tokens,
-                total_output_tokens=per_record_stats.total_output_tokens,
-                total_embedding_input_tokens=per_record_stats.total_embedding_input_tokens,
-                total_input_cost=per_record_stats.total_input_cost,
-                total_output_cost=per_record_stats.total_output_cost,
-                total_embedding_cost=per_record_stats.total_embedding_cost,
+                input_text_tokens=per_record_stats.input_text_tokens,
+                input_audio_tokens=per_record_stats.input_audio_tokens,
+                input_image_tokens=per_record_stats.input_image_tokens,
+                cache_read_tokens=per_record_stats.cache_read_tokens,
+                cache_creation_tokens=per_record_stats.cache_creation_tokens,
+                output_text_tokens=per_record_stats.output_text_tokens,
+                embedding_input_tokens=per_record_stats.embedding_input_tokens,
                 llm_call_duration_secs=per_record_stats.llm_call_duration_secs,
                 fn_call_duration_secs=per_record_stats.fn_call_duration_secs,
                 total_llm_calls=per_record_stats.total_llm_calls,
@@ -277,7 +277,7 @@ class LLMConvert(ConvertOp):
         self.prompt_strategy = prompt_strategy
         self.reasoning_effort = reasoning_effort
         if model is not None:
-            self.generator = Generator(model, prompt_strategy, reasoning_effort, self.api_base, self.cardinality, self.desc, self.verbose)
+            self.generator = Generator(model, prompt_strategy, reasoning_effort, self.cardinality, self.desc, self.verbose)
 
     def __str__(self):
         op = super().__str__()
@@ -322,17 +322,16 @@ class LLMConvert(ConvertOp):
         est_num_output_tokens = NAIVE_EST_NUM_OUTPUT_TOKENS
 
         # get est. of conversion time per record from model card;
-        model_name = self.model.value
-        model_conversion_time_per_record = MODEL_CARDS[model_name]["seconds_per_output_token"] * est_num_output_tokens
+        model_conversion_time_per_record = self.model.get_seconds_per_output_token() * est_num_output_tokens
 
         # get est. of conversion cost (in USD) per record from model card
-        usd_per_input_token = MODEL_CARDS[model_name].get("usd_per_input_token")
+        usd_per_input_token = self.model.get_usd_per_input_token()
         if getattr(self, "prompt_strategy", None) is not None and self.is_audio_op():
-            usd_per_input_token = MODEL_CARDS[model_name]["usd_per_audio_input_token"]
+            usd_per_input_token = self.model.get_usd_per_audio_input_token()
 
         model_conversion_usd_per_record = (
             usd_per_input_token * est_num_input_tokens
-            + MODEL_CARDS[model_name]["usd_per_output_token"] * est_num_output_tokens
+            + self.model.get_usd_per_output_token() * est_num_output_tokens
         )
 
         # estimate cardinality and selectivity given the "cardinality" set by the user
@@ -340,7 +339,7 @@ class LLMConvert(ConvertOp):
         cardinality = selectivity * source_op_cost_estimates.cardinality
 
         # estimate quality of output based on the strength of the model being used
-        quality = (MODEL_CARDS[model_name]["overall"] / 100.0)
+        quality = (self.model.get_overall_score() / 100.0)
 
         return OperatorCostEstimates(
             cardinality=cardinality,
