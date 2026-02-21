@@ -8,7 +8,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import numpy as np
 from litellm import embedding as litellm_embedding
 from numpy.linalg import norm
-from openai import OpenAI
 from PIL import Image
 from pydantic.fields import FieldInfo
 from sentence_transformers import SentenceTransformer
@@ -420,7 +419,7 @@ class NestedLoopsJoin(LLMJoin):
 
         model_conversion_usd_per_record = (
             usd_per_input_token * est_num_input_tokens
-            + self.model.get_usd_per_output_token * est_num_output_tokens
+            + self.model.get_usd_per_output_token() * est_num_output_tokens
         )
 
         # estimate output cardinality using a constant assumption of the filter selectivity

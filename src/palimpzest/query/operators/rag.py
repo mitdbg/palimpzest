@@ -6,7 +6,6 @@ from typing import Any
 from litellm import embedding as litellm_embedding
 from numpy import dot
 from numpy.linalg import norm
-from openai import OpenAI
 from pydantic.fields import FieldInfo
 
 from palimpzest.constants import NAIVE_EST_NUM_OUTPUT_TOKENS, Model

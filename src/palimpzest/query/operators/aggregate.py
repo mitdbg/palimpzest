@@ -590,7 +590,7 @@ class SemanticAggregate(AggregateOp):
 
         # get est. of conversion cost (in USD) per record from model card
         usd_per_input_token = self.model.get_usd_per_input_token()
-        if getattr(self, "prompt_strategy", None) is not None and self.prompt_strategy.is_audio_prompt():
+        if getattr(self, "prompt_strategy", None) is not None and self.is_audio_op():
             usd_per_input_token = self.model.get_usd_per_audio_input_token()
 
         model_conversion_usd_per_record = (

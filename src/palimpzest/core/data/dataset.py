@@ -592,11 +592,10 @@ class Dataset:
         # construct new output schema
         new_output_schema = None
         if isinstance(col, dict):
-            col_schema = create_schema_from_fields([col])
-            new_output_schema = union_schemas([self.schema, col_schema])
+            new_output_schema = create_schema_from_fields([col])
         elif issubclass(col, BaseModel):
             assert len(col.model_fields) == 1, "For semantic aggregation, when passing a BaseModel to `col` it must have exactly one field."
-            new_output_schema = union_schemas([self.schema, col])
+            new_output_schema = col
         else:
             raise ValueError("`col` must be a dictionary or a single-field BaseModel.")
 
