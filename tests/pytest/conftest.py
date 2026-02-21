@@ -9,6 +9,7 @@ pytest_plugins = [
     "fixtures.expected_physical_plans",
     "fixtures.expected_qualities",
     "fixtures.expected_records",
+    "fixtures.models",
     "fixtures.physical_plans",
     "fixtures.operator_to_stats",
     "fixtures.schemas",

@@ -350,6 +350,8 @@ class OpFrontier:
                 right_source_indices = source_indices[1]
                 left_inputs = left_source_indices_to_inputs.get(left_source_indices, [])
                 right_inputs = right_source_indices_to_inputs.get(right_source_indices, [])
+                left_inputs = [input for input in left_inputs if input is not None]
+                right_inputs = [input for input in right_inputs if input is not None]
                 if len(left_inputs) > 0 and len(right_inputs) > 0:
                     op_inputs.append((op, (left_source_indices, right_source_indices), (left_inputs, right_inputs)))
             return op_inputs

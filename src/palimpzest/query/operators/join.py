@@ -6,14 +6,13 @@ from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import numpy as np
+from litellm import embedding as litellm_embedding
 from numpy.linalg import norm
-from openai import OpenAI
 from PIL import Image
 from pydantic.fields import FieldInfo
 from sentence_transformers import SentenceTransformer
 
 from palimpzest.constants import (
-    MODEL_CARDS,
     NAIVE_EST_JOIN_SELECTIVITY,
     NAIVE_EST_NUM_INPUT_TOKENS,
     Cardinality,
@@ -301,7 +300,7 @@ class LLMJoin(JoinOp):
         self.model = model
         self.prompt_strategy = prompt_strategy
         self.reasoning_effort = reasoning_effort
-        self.generator = Generator(model, prompt_strategy, reasoning_effort, self.api_base, Cardinality.ONE_TO_ONE, self.desc, self.verbose)
+        self.generator = Generator(model, prompt_strategy, reasoning_effort, Cardinality.ONE_TO_ONE, self.desc, self.verbose)
 
     def __str__(self):
         op = super().__str__()
@@ -374,12 +373,13 @@ class LLMJoin(JoinOp):
             cost_per_record=generation_stats.cost_per_record,
             model_name=self.get_model_name(),
             join_condition=self.condition,
-            total_input_tokens=generation_stats.total_input_tokens,
-            total_output_tokens=generation_stats.total_output_tokens,
-            total_embedding_input_tokens=generation_stats.total_embedding_input_tokens,
-            total_input_cost=generation_stats.total_input_cost,
-            total_output_cost=generation_stats.total_output_cost,
-            total_embedding_cost=generation_stats.total_embedding_cost,
+            input_text_tokens=generation_stats.input_text_tokens,
+            input_audio_tokens=generation_stats.input_audio_tokens,
+            input_image_tokens=generation_stats.input_image_tokens,
+            cache_read_tokens=generation_stats.cache_read_tokens,
+            cache_creation_tokens=generation_stats.cache_creation_tokens,
+            output_text_tokens=generation_stats.output_text_tokens,
+            embedding_input_tokens=generation_stats.embedding_input_tokens,
             llm_call_duration_secs=generation_stats.llm_call_duration_secs,
             fn_call_duration_secs=generation_stats.fn_call_duration_secs,
             total_llm_calls=generation_stats.total_llm_calls,
@@ -407,18 +407,19 @@ class NestedLoopsJoin(LLMJoin):
 
         # get est. of conversion time per record from model card;
         model_conversion_time_per_record = (
-            MODEL_CARDS[self.model.value]["seconds_per_output_token"] * est_num_output_tokens
+            self.model.get_seconds_per_output_token() * est_num_output_tokens
         )
 
         # get est. of conversion cost (in USD) per record from model card
         usd_per_input_token = (
-            MODEL_CARDS[self.model.value]["usd_per_audio_input_token"]
+            self.model.get_usd_per_audio_input_token()
             if self.is_audio_op()
-            else MODEL_CARDS[self.model.value]["usd_per_input_token"]
+            else self.model.get_usd_per_input_token()
         )
+
         model_conversion_usd_per_record = (
             usd_per_input_token * est_num_input_tokens
-            + MODEL_CARDS[self.model.value]["usd_per_output_token"] * est_num_output_tokens
+            + self.model.get_usd_per_output_token() * est_num_output_tokens
         )
 
         # estimate output cardinality using a constant assumption of the filter selectivity
@@ -426,7 +427,7 @@ class NestedLoopsJoin(LLMJoin):
         cardinality = selectivity * (left_source_op_cost_estimates.cardinality * right_source_op_cost_estimates.cardinality)
 
         # estimate quality of output based on the strength of the model being used
-        quality = (MODEL_CARDS[self.model.value]["overall"] / 100.0)
+        quality = (self.model.get_overall_score() / 100.0)
 
         return OperatorCostEstimates(
             cardinality=cardinality,
@@ -493,6 +494,7 @@ class EmbeddingJoin(LLMJoin):
     # specialized use cases (e.g., speech-to-text) with strict requirements on things like e.g. sample rate
     def __init__(
         self,
+        embedding_model: Model,
         num_samples: int = 10,
         *args,
         **kwargs,
@@ -500,6 +502,7 @@ class EmbeddingJoin(LLMJoin):
         super().__init__(*args, **kwargs)
         self.num_samples = num_samples
         self.samples_drawn = 0
+        self.embedding_model = embedding_model
 
         # compute whether all fields are text fields
         self.text_only = all([
@@ -507,7 +510,6 @@ class EmbeddingJoin(LLMJoin):
             for field_name, field in self.input_schema.model_fields.items()
             if field_name.split(".")[-1] in self.get_input_fields()
         ])
-        self.embedding_model = Model.TEXT_EMBEDDING_3_SMALL if self.text_only else Model.CLIP_VIT_B_32
         self.locks = Locks()
 
         # keep track of embedding costs that could not be amortized if no output records were produced
@@ -526,12 +528,14 @@ class EmbeddingJoin(LLMJoin):
 
     def __str__(self):
         op = super().__str__()
+        op += f"    Embedding Model: {self.embedding_model.value}\n"
         op += f"    Num Samples: {self.num_samples}\n"
         return op
 
     def get_id_params(self):
         id_params = super().get_id_params()
         id_params = {
+            "embedding_model": self.embedding_model.value,
             "num_samples": self.num_samples,
             **id_params,
         }
@@ -541,6 +545,7 @@ class EmbeddingJoin(LLMJoin):
     def get_op_params(self):
         op_params = super().get_op_params()
         op_params = {
+            "embedding_model": self.embedding_model,
             "num_samples": self.num_samples,
             **op_params,
         }
@@ -560,18 +565,18 @@ class EmbeddingJoin(LLMJoin):
 
         # get est. of conversion time per record from model card;
         model_conversion_time_per_record = (
-            MODEL_CARDS[self.embedding_model.value]["seconds_per_output_token"] * est_num_output_tokens
+            self.embedding_model.get_seconds_per_output_token() * est_num_output_tokens
         )
 
         # get est. of conversion cost (in USD) per record from model card
-        model_conversion_usd_per_record = MODEL_CARDS[self.embedding_model.value]["usd_per_input_token"] * est_num_input_tokens
+        model_conversion_usd_per_record = self.embedding_model.get_usd_per_input_token() * est_num_input_tokens
 
         # estimate output cardinality using a constant assumption of the filter selectivity
         selectivity = NAIVE_EST_JOIN_SELECTIVITY
         cardinality = selectivity * (left_source_op_cost_estimates.cardinality * right_source_op_cost_estimates.cardinality)
 
         # estimate quality of output based on the strength of the model being used
-        quality = (MODEL_CARDS[self.model.value]["overall"] / 100.0) * self.naive_quality_adjustment
+        quality = (self.model.get_overall_score() / 100.0) * self.naive_quality_adjustment
 
         return OperatorCostEstimates(
             cardinality=cardinality,
@@ -589,11 +594,10 @@ class EmbeddingJoin(LLMJoin):
         total_embedding_input_tokens = 0
         embeddings = None
         if self.text_only:
-            client = OpenAI()
             inputs = [dr.to_json_str(bytes_to_str=True, project_cols=input_fields, sorted=True) for dr in candidates]
-            response = client.embeddings.create(input=inputs, model=self.embedding_model.value)
-            total_embedding_input_tokens = response.usage.total_tokens
-            embeddings = np.array([item.embedding for item in response.data])
+            response = litellm_embedding(input=inputs, model=self.embedding_model.value)
+            total_embedding_input_tokens = response.usage.total_tokens if response.usage is not None else 0
+            embeddings = np.array([item['embedding'] for item in response.data])
         else:
             model = self.locks.get_model(self.embedding_model.value)
             embeddings = np.zeros((len(candidates), 512))  # CLIP embeddings are 512-dimensional
@@ -617,16 +621,10 @@ class EmbeddingJoin(LLMJoin):
             embeddings /= num_input_fields_present
 
         # compute cost of embedding(s)
-        model_card = MODEL_CARDS[self.embedding_model.value]
-        total_embedding_cost = model_card["usd_per_input_token"] * total_embedding_input_tokens
+        total_embedding_cost = self.embedding_model.get_usd_per_input_token() * total_embedding_input_tokens
         embedding_gen_stats = GenerationStats(
             model_name=self.embedding_model.value,
-            total_input_tokens=0.0,
-            total_output_tokens=0.0,
-            total_embedding_input_tokens=total_embedding_input_tokens,
-            total_input_cost=0.0,
-            total_output_cost=0.0,
-            total_embedding_cost=total_embedding_cost,
+            embedding_input_tokens=total_embedding_input_tokens,
             cost_per_record=total_embedding_cost,
             llm_call_duration_secs=time.time() - start_time,
             total_llm_calls=1,
@@ -806,7 +804,6 @@ class EmbeddingJoin(LLMJoin):
         amortized_embedding_cost = total_embedding_cost / len(output_record_op_stats) if len(output_record_op_stats) > 0 else 0.0
         for record_op_stats in output_record_op_stats:
             record_op_stats.cost_per_record += amortized_embedding_cost
-            record_op_stats.total_embedding_cost = amortized_embedding_cost
 
         # store input records to join with new records added later
         if self.retain_inputs:

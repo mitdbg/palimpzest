@@ -1,7 +1,7 @@
 import logging
 import os
 from copy import deepcopy
-from itertools import combinations
+from itertools import combinations, product
 
 from palimpzest.constants import AggFunc, Model, PromptStrategy
 from palimpzest.core.data.context_manager import ContextManager
@@ -496,7 +496,7 @@ class ImplementationRule(Rule):
             return False
 
         # corner-case: Gemini models cannot handle multiple audio inputs
-        if model.is_vertex_model() and model.is_audio_model() and (num_audio_fields > 1 or has_list_audio_field):
+        if model.is_provider_vertex_ai() and model.is_audio_model() and (num_audio_fields > 1 or has_list_audio_field):
             return False
 
         # text-only input and text supporting model
@@ -522,6 +522,15 @@ class ImplementationRule(Rule):
         return False
 
     @classmethod
+    def _embedding_model_matches_input(cls, model: Model, logical_expression: LogicalExpression) -> bool:
+        """Returns True if the embedding model is capable of processing the input and False otherwise."""
+        if cls._is_text_image_multimodal_operation(logical_expression) and model.is_text_image_multimodal_embedding_model():
+            return True
+
+        is_text_embedding_model = model.is_embedding_model() and not model.is_text_image_multimodal_embedding_model()
+        return cls._is_text_only_operation(logical_expression) and is_text_embedding_model
+
+    @classmethod
     def _get_fixed_op_kwargs(cls, logical_expression: LogicalExpression, runtime_kwargs: dict) -> dict:
         """Get the fixed set of physical op kwargs provided by the logical expression and the runtime keyword arguments."""
         # get logical operator 
@@ -535,7 +544,6 @@ class ImplementationRule(Rule):
                 "logical_op_id": logical_op.get_logical_op_id(),
                 "unique_logical_op_id": logical_op.get_unique_logical_op_id(),
                 "logical_op_name": logical_op.logical_op_name(),
-                "api_base": runtime_kwargs["api_base"],
             }
         )
 
@@ -666,10 +674,13 @@ class RAGRule(ImplementationRule):
         # select physical operator class based on whether this is a map or filter operation
         phys_op_cls = RAGConvert if isinstance(logical_expression.operator, ConvertScan) else RAGFilter
 
-        # create variable physical operator kwargs for each model which can implement this logical_expression
-        models = [model for model in runtime_kwargs["available_models"] if cls._model_matches_input(model, logical_expression)]
+        # create variable physical operator kwargs for each (model, embedding_model) which can implement this logical_expression
+        provided_models: list[Model] = runtime_kwargs["available_models"]
+        models = [model for model in provided_models if cls._model_matches_input(model, logical_expression)]
+        embedding_models = [model for model in provided_models if cls._embedding_model_matches_input(model, logical_expression)]
+
         variable_op_kwargs = []
-        for model in models:
+        for (model, embedding_model) in product(models, embedding_models):
             reasoning_prompt_strategy = use_reasoning_prompt(runtime_kwargs["reasoning_effort"])
             if phys_op_cls is RAGConvert:
                 reasoning = PromptStrategy.MAP
@@ -683,6 +694,7 @@ class RAGRule(ImplementationRule):
                 [
                     {
                         "model": model,
+                        "embedding_model": embedding_model,
                         "prompt_strategy": prompt_strategy,
                         "num_chunks_per_field": num_chunks_per_field,
                         "chunk_size": chunk_size,
@@ -963,15 +975,19 @@ class EmbeddingJoinRule(ImplementationRule):
     def substitute(cls, logical_expression: LogicalExpression, **runtime_kwargs) -> set[PhysicalExpression]:
         logger.debug(f"Substituting EmbeddingJoinRule for {logical_expression}")
 
-        # create variable physical operator kwargs for each model which can implement this logical_expression
-        models = [model for model in runtime_kwargs["available_models"] if cls._model_matches_input(model, logical_expression)]
+        # create variable physical operator kwargs for each  (model, embedding_model) which can implement this logical_expression
+        provided_models: list[Model] = runtime_kwargs["available_models"]
+        models = [model for model in provided_models if cls._model_matches_input(model, logical_expression)]
+        embedding_models = [model for model in provided_models if cls._embedding_model_matches_input(model, logical_expression)]
         variable_op_kwargs = []
-        for model in models:
+
+        for (model, embedding_model) in product(models, embedding_models):
             reasoning_prompt_strategy = use_reasoning_prompt(runtime_kwargs["reasoning_effort"])
             prompt_strategy = PromptStrategy.JOIN if reasoning_prompt_strategy else PromptStrategy.JOIN_NO_REASONING
             variable_op_kwargs.append(
                 {
                     "model": model,
+                    "embedding_model": embedding_model,
                     "prompt_strategy": prompt_strategy,
                     "join_parallelism": runtime_kwargs["join_parallelism"],
                     "reasoning_effort": runtime_kwargs["reasoning_effort"],

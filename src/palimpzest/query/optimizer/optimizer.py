@@ -59,14 +59,6 @@ class Optimizer:
     - Andy Pavlo lecture with walkthrough example: https://www.youtube.com/watch?v=PXS49-tFLcI
 
     - Original Paper: https://www.cse.iitb.ac.in/infolab/Data/Courses/CS632/2015/Papers/Cascades-graefe.pdf
-
-    Notably, this optimization framework has served as the backbone of Microsoft SQL Server, CockroachDB,
-    and a few other important DBMS systems.
-
-    NOTE: the optimizer currently assumes that field names are unique across schemas; we do try to enforce
-          this by rewriting field names underneath-the-hood to be "{schema_name}.{field_name}", but this still
-          does not solve a situation in which -- for example -- a user uses the pz.URL schema twice in the same
-          program. In order to address that situation, we will need to augment our renaming scheme.
     """
 
     def __init__(
@@ -76,7 +68,6 @@ class Optimizer:
         available_models: list[Model],
         join_parallelism: int = 64,
         reasoning_effort: str = "default",
-        api_base: str | None = None,
         verbose: bool = False,
         allow_bonded_query: bool = True,
         allow_rag_reduction: bool = False,
@@ -85,7 +76,7 @@ class Optimizer:
         allow_split_merge: bool = False,
         optimizer_strategy: OptimizationStrategyType = OptimizationStrategyType.PARETO,
         execution_strategy: ExecutionStrategyType = ExecutionStrategyType.PARALLEL,
-        use_final_op_quality: bool = False, # TODO: make this func(plan) -> final_quality
+        use_final_op_quality: bool = False,
         **kwargs,
     ):
         # store the policy
@@ -130,7 +121,6 @@ class Optimizer:
         self.available_models = available_models
         self.join_parallelism = join_parallelism
         self.reasoning_effort = reasoning_effort
-        self.api_base = api_base
         self.allow_bonded_query = allow_bonded_query
         self.allow_rag_reduction = allow_rag_reduction
         self.allow_mixtures = allow_mixtures
@@ -180,7 +170,6 @@ class Optimizer:
             "available_models": self.available_models,
             "join_parallelism": self.join_parallelism,
             "reasoning_effort": self.reasoning_effort,
-            "api_base": self.api_base,
             "is_validation": self.optimizer_strategy == OptimizationStrategyType.SENTINEL,
         }
 
@@ -192,7 +181,6 @@ class Optimizer:
             available_models=self.available_models,
             join_parallelism=self.join_parallelism,
             reasoning_effort=self.reasoning_effort,
-            api_base=self.api_base,
             allow_bonded_query=self.allow_bonded_query,
             allow_rag_reduction=self.allow_rag_reduction,
             allow_mixtures=self.allow_mixtures,

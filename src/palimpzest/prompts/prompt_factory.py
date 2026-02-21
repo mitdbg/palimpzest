@@ -2,6 +2,7 @@
 
 import base64
 import json
+import os
 from typing import Any
 
 from pydantic import BaseModel
@@ -138,6 +139,32 @@ from palimpzest.prompts.utils import (
     THIRD_IMAGE_EXAMPLE_CONTEXT,
     THIRD_TEXT_EXAMPLE_CONTEXT,
 )
+
+
+def _detect_image_media_type(filepath: str | None = None, base64_data: str | None = None) -> str:
+    """Detect image media type from file extension or base64 magic bytes."""
+    if filepath:
+        ext = os.path.splitext(filepath)[1].lower()
+        ext_map = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+                   ".gif": "image/gif", ".webp": "image/webp"}
+        if ext in ext_map:
+            return ext_map[ext]
+
+    if base64_data:
+        try:
+            header = base64.b64decode(base64_data[:32])
+            if header[:8] == b"\x89PNG\r\n\x1a\n":
+                return "image/png"
+            if header[:3] == b"\xff\xd8\xff":
+                return "image/jpeg"
+            if header[:6] in (b"GIF87a", b"GIF89a"):
+                return "image/gif"
+            if header[:4] == b"RIFF" and header[8:12] == b"WEBP":
+                return "image/webp"
+        except Exception:
+            pass
+
+    return "image/jpeg"
 
 
 class PromptFactory:
@@ -889,8 +916,9 @@ class PromptFactory:
                 if field_type.annotation in [ImageFilepath, ImageFilepath | None, ImageFilepath | Any] and field_value is not None:
                     with open(field_value, "rb") as f:
                         base64_image_str = base64.b64encode(f.read()).decode("utf-8")
+                    media_type = _detect_image_media_type(filepath=field_value, base64_data=base64_image_str)
                     image_content.append(
-                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image_str}"}}
+                        {"type": "image_url", "image_url": {"url": f"data:{media_type};base64,{base64_image_str}"}}
                     )
 
                 elif field_type.annotation in [list[ImageFilepath], list[ImageFilepath] | None, list[ImageFilepath] | Any]:
@@ -899,8 +927,9 @@ class PromptFactory:
                             continue
                         with open(image_filepath, "rb") as f:
                             base64_image_str = base64.b64encode(f.read()).decode("utf-8")
+                        media_type = _detect_image_media_type(filepath=image_filepath, base64_data=base64_image_str)
                         image_content.append(
-                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image_str}"}}
+                            {"type": "image_url", "image_url": {"url": f"data:{media_type};base64,{base64_image_str}"}}
                         )
 
                 # image url (or list of image urls)
@@ -915,16 +944,18 @@ class PromptFactory:
 
                 # pre-encoded images (or list of pre-encoded images)
                 elif field_type.annotation in [ImageBase64, ImageBase64 | None, ImageBase64 | Any] and field_value is not None:
+                    media_type = _detect_image_media_type(base64_data=field_value)
                     image_content.append(
-                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{field_value}"}}
+                        {"type": "image_url", "image_url": {"url": f"data:{media_type};base64,{field_value}"}}
                     )
 
                 elif field_type.annotation in [list[ImageBase64], list[ImageBase64] | None, list[ImageBase64] | Any]:
                     for base64_image in field_value:
                         if base64_image is None:
                             continue
+                        media_type = _detect_image_media_type(base64_data=base64_image)
                         image_content.append(
-                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
+                            {"type": "image_url", "image_url": {"url": f"data:{media_type};base64,{base64_image}"}}
                         )
 
         return [{"role": "user", "type": "image", "content": image_content}] if len(image_content) > 0 else []

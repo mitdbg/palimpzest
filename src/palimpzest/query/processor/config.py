@@ -23,7 +23,7 @@ class QueryProcessorConfig(BaseModel):
     num_samples: int | None = Field(default=None)
     verbose: bool = Field(default=False)
     progress: bool = Field(default=True)
-    available_models: list[Model] | None = Field(default=None)
+    available_models: list[Model | str] | None = Field(default=None)
     remove_models: list[Model] | None = Field(default=None)
     max_workers: int | None = Field(default=64)
     join_parallelism: int = Field(default=64)
@@ -31,7 +31,6 @@ class QueryProcessorConfig(BaseModel):
     reasoning_effort: str = Field(default="default")  # Gemini: "disable", "low", "medium", "high"
     use_vertex: bool = Field(default=False)  # Whether to use Vertex models for Gemini or Google models
     gemini_credentials_path: str | None = Field(default=None)  # Path to Gemini credentials file
-    api_base: str | None = Field(default=None)  # API base URL for vLLM
 
     # operator flags
     allow_bonded_query: bool = Field(default=True)

@@ -1,6 +1,6 @@
 [project]
 name = "palimpzest"
-version = "1.3.4"
+version = "1.4.0"
 description = "Palimpzest is a system which enables anyone to process AI-powered analytical queries simply by defining them in a declarative language"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -9,14 +9,15 @@ authors = [
     {name="MIT DSG Semantic Management Lab", email="michjc@csail.mit.edu"},
 ]
 dependencies = [
-    "anthropic>=0.46.0",
+    "anthropic>=0.79.0",
     "beautifulsoup4>=4.13.4",
     "chromadb>=1.0.15",
     "colorama>=0.4.6",
     "datasets>=4.0.0",
-    "fastapi~=0.115.0",
+    "fastapi>=0.115.0",
+    "google-genai>=1.0.0",
     "gradio>=5.26.0",
-    "litellm>=1.76.1",
+    "litellm>=1.81.11",
     "numpy==2.0.2",
     "openai>=1.0",
     "pandas>=2.1.1",
@@ -63,8 +64,7 @@ where = ["src"]
 namespaces = false
 
 [tool.setuptools.package-data]
-"*" = ["*.txt", "*.rst", "*.md"]
-
+"*" = ["*.txt", "*.rst", "*.md", "*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests/pytest"]

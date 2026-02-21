@@ -5,7 +5,6 @@ import time
 from typing import Any
 
 from palimpzest.constants import (
-    MODEL_CARDS,
     NAIVE_EST_NUM_GROUPS,
     NAIVE_EST_NUM_INPUT_TOKENS,
     NAIVE_EST_NUM_OUTPUT_TOKENS,
@@ -539,7 +538,7 @@ class SemanticAggregate(AggregateOp):
         self.prompt_strategy = prompt_strategy
         self.reasoning_effort = reasoning_effort
         if model is not None:
-            self.generator = Generator(model, prompt_strategy, reasoning_effort, self.api_base)
+            self.generator = Generator(model, prompt_strategy, reasoning_effort)
 
     def __str__(self):
         op = super().__str__()
@@ -587,21 +586,20 @@ class SemanticAggregate(AggregateOp):
         est_num_output_tokens = NAIVE_EST_NUM_OUTPUT_TOKENS
 
         # get est. of conversion time per record from model card;
-        model_name = self.model.value
-        model_conversion_time_per_record = MODEL_CARDS[model_name]["seconds_per_output_token"] * est_num_output_tokens
+        model_conversion_time_per_record = self.model.get_seconds_per_output_token() * est_num_output_tokens
 
         # get est. of conversion cost (in USD) per record from model card
-        usd_per_input_token = MODEL_CARDS[model_name].get("usd_per_input_token")
-        if getattr(self, "prompt_strategy", None) is not None and self.prompt_strategy.is_audio_prompt():
-            usd_per_input_token = MODEL_CARDS[model_name]["usd_per_audio_input_token"]
+        usd_per_input_token = self.model.get_usd_per_input_token()
+        if getattr(self, "prompt_strategy", None) is not None and self.is_audio_op():
+            usd_per_input_token = self.model.get_usd_per_audio_input_token()
 
         model_conversion_usd_per_record = (
             usd_per_input_token * est_num_input_tokens
-            + MODEL_CARDS[model_name]["usd_per_output_token"] * est_num_output_tokens
+            + self.model.get_usd_per_output_token() * est_num_output_tokens
         )
 
         # estimate quality of output based on the strength of the model being used
-        quality = (MODEL_CARDS[model_name]["overall"] / 100.0)
+        quality = self.model.get_overall_score() / 100.0
 
         return OperatorCostEstimates(
             cardinality=1.0,
@@ -651,10 +649,13 @@ class SemanticAggregate(AggregateOp):
             answer={field: value},
             input_fields=input_fields,
             generated_fields=fields_to_generate,
-            total_input_tokens=generation_stats.total_input_tokens,
-            total_output_tokens=generation_stats.total_output_tokens,
-            total_input_cost=generation_stats.total_input_cost,
-            total_output_cost=generation_stats.total_output_cost,
+            input_text_tokens=generation_stats.input_text_tokens,
+            input_audio_tokens=generation_stats.input_audio_tokens,
+            input_image_tokens=generation_stats.input_image_tokens,
+            cache_read_tokens=generation_stats.cache_read_tokens,
+            cache_creation_tokens=generation_stats.cache_creation_tokens,
+            output_text_tokens=generation_stats.output_text_tokens,
+            embedding_input_tokens=generation_stats.embedding_input_tokens,
             llm_call_duration_secs=generation_stats.llm_call_duration_secs,
             fn_call_duration_secs=generation_stats.fn_call_duration_secs,
             total_llm_calls=generation_stats.total_llm_calls,
