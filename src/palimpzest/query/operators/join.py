@@ -511,7 +511,6 @@ class EmbeddingJoin(LLMJoin):
             for field_name, field in self.input_schema.model_fields.items()
             if field_name.split(".")[-1] in self.get_input_fields()
         ])
-        
         self.locks = Locks()
 
         # keep track of embedding costs that could not be amortized if no output records were produced
