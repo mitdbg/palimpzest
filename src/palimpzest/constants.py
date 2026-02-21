@@ -451,7 +451,7 @@ Model.GOOGLE_GEMINI_2_5_PRO = Model("gemini/gemini-2.5-pro")
 Model.LLAMA_4_MAVERICK = Model("vertex_ai/meta/llama-4-maverick-17b-128e-instruct-maas")
 Model.GPT_4o_AUDIO_PREVIEW = Model("openai/gpt-4o-audio-preview")
 Model.GPT_4o_MINI_AUDIO_PREVIEW = Model("openai/gpt-4o-mini-audio-preview")
-Model.TEXT_EMBEDDING_3_SMALL = Model("text-embedding-3-small")
+Model.TEXT_EMBEDDING_3_SMALL = Model("openai/text-embedding-3-small")
 Model.CLIP_VIT_B_32 = Model("clip-ViT-B-32")
 Model.NOMIC_EMBED_TEXT = Model("ollama/nomic-embed-text")
 

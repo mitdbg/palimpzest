@@ -104,9 +104,9 @@ def test_join(mocker, left_input_schema, right_input_schema, physical_op_class, 
         "condition": "Do the two inputs describe the same type of animal?",
         "logical_op_id": "test-join",
         "model": Model.GPT_5_MINI if os.getenv("NO_GEMINI") else Model.GEMINI_2_5_FLASH,
-        "embedding_model": embedding_model,
     }
     if physical_op_class == EmbeddingJoin:
+        physical_op_kwargs["embedding_model"] = embedding_model
         physical_op_kwargs["num_samples"] = 10
 
     # create join operator
