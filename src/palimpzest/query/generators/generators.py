@@ -386,7 +386,6 @@ class Generator(Generic[ContextType, InputType]):
         # parse usage statistics and create the GenerationStats
         generation_stats = None
         if completion_text is not None:
-            print(f"DEBUG usage: {usage}")
             # get cost per input/output token for the model
             usd_per_input_token = self.model.get_usd_per_input_token() or 0.0
             usd_per_audio_input_token = self.model.get_usd_per_audio_input_token() or 0.0
@@ -480,8 +479,6 @@ class Generator(Generic[ContextType, InputType]):
                     prompt += "<audio>\n" * len(content)
         logger.debug(f"PROMPT:\n{prompt}")
         logger.debug(Fore.GREEN + f"{completion_text}\n" + Style.RESET_ALL)
-        print(f"PROMPT:\n{prompt}")
-        print(Fore.GREEN + f"{completion_text}\n" + Style.RESET_ALL)
 
         # parse reasoning
         reasoning = None
