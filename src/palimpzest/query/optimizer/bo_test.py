@@ -10,6 +10,8 @@ from palimpzest.constants import Model
 from palimpzest.validator.validator import Validator
 import pandas as pd
 
+import logging
+
 if __name__ == "__main__":
     #litellm._turn_on_debug()
     initial_dataset = [
@@ -50,9 +52,11 @@ if __name__ == "__main__":
     # print("X_models:", bo_optimizer.X_models)
 
     # 2. two-objective example
+    logging.basicConfig(level=logging.WARNING, format="%(asctime)s | %(name)s | %(levelname)s | %(message)s")
+    logging.getLogger("BO_logger").setLevel(logging.INFO)
     bo_optimizer = BayesianOptimizer(initial_dataset, [pz.MaxQuality(), pz.MinCost()], cost_budget=8, cost_model=None,
-                                    input_schema=TextFile, output_schema=EmailFile, acq_func="EI",)
-    bo_optimizer.optimize_twoObj(email_dataset, save_name_prefix="gp_full_openai_MaxQuality_MinCost_worst", intermediate_save=[])
+                                    input_schema=TextFile, output_schema=EmailFile, acq_func="qlogNEHVI",)
+    bo_optimizer.optimize_twoObj(email_dataset, save_name_prefix="gp_full_openai_MaxQuality_MinCost_qlogNEHVI_worst", intermediate_save=[])
     print("Final datapoints:")
     print("X:", bo_optimizer.X)
     print("X_models:", bo_optimizer.X_models)

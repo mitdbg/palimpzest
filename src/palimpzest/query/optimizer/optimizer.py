@@ -4,6 +4,8 @@ import logging
 from copy import deepcopy
 
 #### for BO only ###
+import time as time_track
+
 import torch
 from botorch.models import SingleTaskGP
 from gpytorch.kernels import RBFKernel, ScaleKernel
@@ -13,10 +15,12 @@ from botorch.models.transforms import Normalize, Standardize
 from gpytorch.mlls import ExactMarginalLogLikelihood
 from botorch.fit import fit_gpytorch_mll
 from botorch.optim.optimize import optimize_acqf
+
 from botorch.acquisition.analytic import LogExpectedImprovement
-# from botorch.acquisition.logei import qLogExpectedImprovement
 from botorch.acquisition.objective import LinearMCObjective
 from botorch.acquisition.objective import ScalarizedPosteriorTransform
+from botorch.acquisition.multi_objective.logei import qLogNoisyExpectedHypervolumeImprovement
+# from botorch.acquisition.multi_objective.utils import prune_inferior_points
 
 from palimpzest.query.operators.convert import LLMConvertBonded
 
@@ -64,8 +68,7 @@ from palimpzest.query.optimizer.tasks import (
     OptimizePhysicalExpression,
 )
 
-logger = logging.getLogger(__name__)
-
+BO_logger = logging.getLogger("BO_logger")
 class BayesianOptimizer:
     """
     Attributes:
@@ -220,12 +223,15 @@ class BayesianOptimizer:
             return_best_only = True,
             options = {'seed': 42}  #maxiter, batch_limit
         )
-        return next_points
+        return next_points #(q, d)
     
-    def next_points_twoObj(self, num_candidates = 1):
+    def next_points_twoObj(self, acq_func, num_candidates = 1):
         '''
         returns list of points of shape (1,d)
         '''
+        assert acq_func in ["scalarize_logEI", "qlogNEHVI"], "acq_func must be one of ['scalarize_logEI', 'qlogNEHVI']"
+
+        start_time = time_track.perf_counter()
         bounds = torch.tensor([[55.0, 0.004, -1.0/1e6], [95, 0.02, 9.0/1e6]], dtype=torch.double)[:,self.embedding_idxs]
         self.gp = SingleTaskGP(
             self.X,
@@ -237,76 +243,107 @@ class BayesianOptimizer:
         self.gp.likelihood.train()
         mll = ExactMarginalLogLikelihood(self.gp.likelihood, self.gp)
         fit_gpytorch_mll(mll) #MAP hyperparameter fitting
+        gp_model_fit_time = time_track.perf_counter()
 
-        weight_grid = torch.linspace(0.0, 1.0, 11)
-        next_points = []
-        for w in weight_grid:
-            weights = torch.tensor([w, 1.0 - w], dtype=torch.double)
+        if acq_func == "scalarize_logEI":
+            weight_grid = torch.linspace(0.0, 1.0, 11)
+            next_points = []
+            for w in weight_grid:
+                weights = torch.tensor([w, 1.0 - w], dtype=torch.double)
 
-            # Linear scalarization in standardized space
-            # objective = LinearMCObjective(weights)
+                # Linear scalarization in standardized space
+                # objective = LinearMCObjective(weights)
 
-            # Compute best scaled (standardized) value from observed data
+                # Compute best scaled (standardized) value from observed data
+                with torch.no_grad():
+                    # train_Y_standardized = self.gp.outcome_transform(self.Y_all[:, self.embedding_idxs])[0]
+                    scalarized = self.gp.train_targets @ weights #train_targets: outcome_transform already applied
+                    best_scalarized_observed = scalarized.max().item()
+
+                acq_function = LogExpectedImprovement(
+                    model=self.gp,
+                    best_f=best_scalarized_observed,
+                    posterior_transform= ScalarizedPosteriorTransform(weights=weights)
+                )
+                w_next_points, _  = optimize_acqf(
+                    acq_function=acq_function,
+                    q=num_candidates, num_restarts=10, raw_samples=20,
+                    bounds = bounds,
+                    return_best_only = True,
+                    options = {'seed': 42}  #maxiter, batch_limit
+                )
+                next_points.append(w_next_points.detach())
+            print(f"suggested new points {next_points}")
+
+            #get unique weights
+            stacked = torch.stack(next_points)  # (n, d)
+            unique, inverse = torch.unique(
+                stacked,
+                dim=0,
+                return_inverse=True,
+                sorted=False  # preserves first appearance order
+            )
+            # group weights by identical next_points
+            grouped_weights = [
+                weight_grid[inverse == i]
+                for i in range(unique.size(0))
+            ]
+            print(f"pursuing unique new points {unique}")
+            print(f"corresponding weights {grouped_weights}")
+            return unique, grouped_weights
+        elif acq_func == "qlogNEHVI":
             with torch.no_grad():
-                train_Y_standardized = self.gp.outcome_transform(self.Y_all[:, self.embedding_idxs])[0]
-                scalarized = train_Y_standardized @ weights
-                best_scalarized_observed = scalarized.max().item()
+                posterior = self.gp.posterior(self.X)
+                mean = posterior.mean # (n,d)
+                std = posterior.variance.sqrt()
+                worst_mean = mean.min(dim=0).values # (d,)
+                avg_std = std.mean(dim=0) # (d,)
+                # Set reference point as slightly worse than current predicted worst
+                ref_point = worst_mean - 0.5 * avg_std
+                # X_baseline = prune_inferior_points(self.gp, self.X)
 
-            acq_function = LogExpectedImprovement(
+            acq = qLogNoisyExpectedHypervolumeImprovement(
                 model=self.gp,
-                best_f=best_scalarized_observed,
-                posterior_transform= ScalarizedPosteriorTransform(weights=weights)
+                ref_point=ref_point.tolist(),
+                # X_baseline=X_baseline, 
+                X_baseline = self.X,
+                prune_baseline = False
             )
-            w_next_points, _  = optimize_acqf(
-                acq_function=acq_function,
-                q=num_candidates, num_restarts=10, raw_samples=20,
-                bounds = bounds,
-                return_best_only = True,
-                options = {'seed': 42}  #maxiter, batch_limit
+
+            next_points, _ = optimize_acqf(
+                acq_function=acq,
+                bounds=bounds,
+                q=num_candidates,
+                num_restarts=10,
+                raw_samples=256,
             )
-            next_points.append(w_next_points.detach())
-        print(f"suggested new points {next_points}")
-
-        #get unique weights
-        stacked = torch.stack(next_points)  # (n, d)
-        unique, inverse = torch.unique(
-            stacked,
-            dim=0,
-            return_inverse=True,
-            sorted=False  # preserves first appearance order
-        )
-        # group weights by identical next_points
-        grouped_weights = [
-            weight_grid[inverse == i]
-            for i in range(unique.size(0))
-        ]
-        print(f"pursuing unique new points {unique}")
-        print(f"corresponding weights {grouped_weights}")
-        return unique, weights
+            acq_function_time = time_track.perf_counter()
+            BO_logger.info(f"GP fit time: {gp_model_fit_time - start_time:.2f}s \n acq_func runtime: {acq_function_time - gp_model_fit_time:.2f}s")
+            return next_points #(q,d)
 
 
-    # def get_obj(self, obj_values: list[float], weights: list[float] = [1.0,]):
-        '''
-        obj_values: list of values corresponding to the metrics (e.g. [quality, time, cost])
-        '''
-        assert sum(weights) == 1.0, "Weights must sum to 1.0"
-        assert len(obj_values) == len(weights), "Must provide a weight for each metric"
-        obj = 0
-        for idx, value in enumerate(obj_values):
-            obj += weights[idx] * value
-        return obj
-
-    def save_checkpoint(self, save_name: str):
-        torch.save({
-            'gp_state_dict': self.gp.state_dict(),
-            'X': self.X,
-            'X_models': self.X_models,
-            'Y_all': self.Y_all,
-            'weights': self.w,
-            'likelihood_state_dict': self.gp.likelihood.state_dict(),
-            'input_transform': self.gp.input_transform,
-            'outcome_transform': self.gp.outcome_transform,
-        }, f"{save_name}_{int(self.cost_so_far)}.pth")
+    def save_checkpoint(self, save_name: str, save_weights = False):
+        if save_weights:
+            torch.save({
+                'gp_state_dict': self.gp.state_dict(),
+                'X': self.X,
+                'X_models': self.X_models,
+                'Y_all': self.Y_all,
+                'weights': self.w,
+                'likelihood_state_dict': self.gp.likelihood.state_dict(),
+                'input_transform': self.gp.input_transform,
+                'outcome_transform': self.gp.outcome_transform,
+            }, f"{save_name}_{int(self.cost_so_far)}.pth")
+        else:
+            torch.save({
+                'gp_state_dict': self.gp.state_dict(),
+                'X': self.X,
+                'X_models': self.X_models,
+                'Y_all': self.Y_all,
+                'likelihood_state_dict': self.gp.likelihood.state_dict(),
+                'input_transform': self.gp.input_transform,
+                'outcome_transform': self.gp.outcome_transform,
+            }, f"{save_name}_{int(self.cost_so_far)}.pth")
 
     def get_optimal_singleObj_plan(self, method: str, save_name: str) -> PhysicalPlan:
         """
@@ -399,7 +436,7 @@ class BayesianOptimizer:
                 self.cost_so_far += cost
                 if self.cost_so_far in intermediate_save:
                     self.get_optimal_singleObj_plan("observed", save_name_prefix)
-                print(f"{self.cost_so_far}/{self.cost_budget} result: {model}, avg_Y {avg_Y_all.tolist()}")
+                print(f"{int(self.cost_so_far)}/{int(self.cost_budget)} result: {model}, avg_Y {avg_Y_all.tolist()}")
         return self.get_optimal_singleObj_plan("observed", save_name_prefix)
 
     def optimize_twoObj(self, data_samples: list, save_name_prefix: str, intermediate_save: list) -> PhysicalPlan:
@@ -408,16 +445,14 @@ class BayesianOptimizer:
         Only applies to single-objective policies.
         obj_weights: length-3 float corresponding to [quality, time, cost]
         """
-        #initialize objective values from initial dataset
-        # obj_values = []
-        # for quality, time, cost in self.Y_all:
-        #     obj_values.append(self.get_obj([quality, time, cost], obj_weights))
-        # self.obj_values = torch.tensor(obj_values, dtype=torch.double).unsqueeze(-1)
-        self.w = []
+        # self.w = []
         while not self.terminate():
-            points, weights = self.next_points_twoObj()
-            for point, weight in zip(points, weights):
-                point = point.to(torch.double) #shape (1, d)
+            # points, weights = self.next_points_twoObj()
+            points = self.next_points_twoObj(self.acq_func)
+            for point in points:
+                start_time = time_track.perf_counter()
+                # point = point.to(torch.double)
+                point = point.to(torch.double).unsqueeze(0) #shape (1, d)
                 if self.terminate(): break
                 model, model_embedding = self.point_to_model(point)
                 physical_op = LLMConvertBonded(model = model, input_schema = self.input_schema,
@@ -425,12 +460,18 @@ class BayesianOptimizer:
                 point_Y_all = []
                 # itereate through data samples and take average performance
                 for sample in data_samples:
+                    operator_start_time = time_track.perf_counter()
                     data_record_set = physical_op(sample)
+                    operator_end_time = time_track.perf_counter()
+                    BO_logger.info(f"Operator time, email {sample._source_indices[0]}: {operator_end_time - operator_start_time:.2f}s")
                     output = {"sender": data_record_set.data_records[0].sender, "subject": data_record_set.data_records[0].subject}
                     if output["sender"] is None or output["subject"] is None:
                         print(f"got None output for {model} on email {sample._source_indices[0]}")
+                    eval_start_time = time_track.perf_counter()
                     quality, gen_stats, full_hash = self.validator._score_map(physical_op, fields = ["sender", "subject"],
                                                                             input_record = sample, output = output, full_hash="abc123")
+                    eval_end_time = time_track.perf_counter()
+                    BO_logger.info(f"Evaluation time, email {sample._source_indices[0]}: {eval_end_time - eval_start_time:.2f}s")
                     #artificially generate quality data that correlates with MMLU-Pro quality
                     quality = (model_embedding[0][0].item()-60)/30 + np.random.normal(0, 1)*0.01
                     time = -data_record_set.record_op_stats[0].llm_call_duration_secs
@@ -443,7 +484,9 @@ class BayesianOptimizer:
                 self.X_models.append(model)
                 avg_Y_all = torch.tensor(point_Y_all, dtype=torch.double).mean(dim=0).unsqueeze(0) #shape (1, 3)
                 self.Y_all = torch.cat([self.Y_all, avg_Y_all], dim=0)
-                self.w.append(weight)
+                # self.w.append(weight)
+                end_time = time_track.perf_counter()
+                BO_logger.info(f"BO time on size {len(points)} batch: {end_time - start_time:.2f}s")
 
                 cost = len(data_samples) #4, temporary hard code
                 self.cost_so_far += cost
