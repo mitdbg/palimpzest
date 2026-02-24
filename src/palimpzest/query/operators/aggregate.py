@@ -697,12 +697,19 @@ class SemanticGroupByOp(AggregateOp):
     Implementation of a semantic GroupBy operator using LLMs. This operator groups records by a set 
     of fields and applies aggregation functions to each group using an LLM to determine the groups.
     """
-    def __init__(self, gby_fields: list[str], agg_fields: list[str], agg_funcs: list[str], 
+    def __init__(self, gby_fields: list[str] | list[dict], agg_fields: list[str] | list[dict], agg_funcs: list[str], 
                  model: Model | None = None, prompt_strategy: PromptStrategy = PromptStrategy.AGG, 
                  reasoning_effort: str | None = None, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.gby_fields = gby_fields
-        self.agg_fields = agg_fields
+        
+        # Store original field specifications (may be dicts or strings)
+        self.gby_fields_spec = gby_fields
+        self.agg_fields_spec = agg_fields
+        
+        # Extract field names for backward compatibility
+        self.gby_fields = [f['name'] if isinstance(f, dict) else f for f in gby_fields]
+        self.agg_fields = [f['name'] if isinstance(f, dict) else f for f in agg_fields]
+        
         self.agg_funcs = agg_funcs
         self.model = model
         self.prompt_strategy = prompt_strategy
@@ -899,9 +906,21 @@ class SemanticGroupByOp(AggregateOp):
             Tuple of (list of group labels, generation stats)
         """
         # Create a schema that just extracts the group-by field
+        # Use the description from the field spec if available
         from palimpzest.core.lib.schemas import create_schema_from_fields
+        
+        first_gby_spec = self.gby_fields_spec[0]
+        if isinstance(first_gby_spec, dict):
+            field_desc = first_gby_spec.get('desc', f"The semantic category for {first_gby_spec['name']}")
+            field_name = first_gby_spec['name']
+            field_type = first_gby_spec.get('type', str)
+        else:
+            field_desc = f"The semantic category for {first_gby_spec}"
+            field_name = first_gby_spec
+            field_type = str
+        
         groupby_schema = create_schema_from_fields([
-            {"name": self.gby_fields[0], "type": str, "desc": f"The semantic category for {self.gby_fields[0]}"}
+            {"name": field_name, "type": field_type, "desc": field_desc}
         ])
         
         # Process candidates to extract group labels
@@ -915,17 +934,22 @@ class SemanticGroupByOp(AggregateOp):
 
         fields = {self.gby_fields[0]: str}
         
+        # Build the aggregation instruction that includes the field description
+        # This tells the LLM HOW to categorize/group the values semantically
+        agg_instruction = f"Categorize this record into a semantic group based on the field '{field_name}' Return the category name (one of those specified in '{field_desc}'s)"
+        
         print(f"\nSemanticGroupByOp: Processing {len(candidates)} records for group assignment...")
+        print(f"  Grouping instruction: {agg_instruction}")
         for idx, candidate in enumerate(candidates):
             # Show progress every 10 records
             if idx % 10 == 0:
                 print(f"  Processing record {idx+1}/{len(candidates)}...")
             
-            # Ask LLM to extract/normalize the groupby field value - pass single candidate, not list
+            # Ask LLM to categorize the record according to the field description
             gen_kwargs = {
                 "project_cols": input_fields,
                 "output_schema": groupby_schema,
-                "agg_instruction": f"Extract the value of '{self.gby_fields[0]}' from this record."
+                "agg_instruction": agg_instruction
             }
             
             field_answers, _, gen_stats, _ = self.generator(candidate, fields, **gen_kwargs)

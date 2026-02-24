@@ -577,29 +577,135 @@ class Dataset:
         operator = GroupByAggregate(input_schema=self.schema, output_schema=output_schema, gby_fields=gby_fields, agg_fields=agg_fields, agg_funcs=agg_funcs)
         return Dataset(sources=[self], operator=operator, schema=output_schema)
 
-    def sem_groupby(self, gby_fields: list[str], agg_fields: list[str], agg_funcs: list[str]) -> Dataset:
+    def group_by(
+        self, 
+        group_cols: list[str] | list[dict],
+        agg_func: Callable,
+        output_col: str,
+    ) -> Dataset:
+        """
+        Apply a semantic group by operation with detailed field specifications.
+        
+        Args:
+            group_cols: List of group-by field specifications. Each can be:
+                       - A string (field name): Uses default grouping behavior
+                       - A dict with keys: 'name', 'desc', 'type', and optionally 'model'
+            agg_func: Aggregation function to apply (e.g., count, sum, average)
+            output_col: Name of the output aggregation column
+            
+        Example:
+            ds.group_by(
+                group_cols=[
+                    {'name': 'era', 'desc': 'Era bucket: pre-2000, 2000s, 2010s, or 2020s', 'type': str}
+                ],
+                agg_func=count_reviews,
+                output_col="review_count"
+            )
+        """
+        # Normalize group_cols to list of dicts
+        normalized_group_cols = []
+        for col in group_cols:
+            if isinstance(col, str):
+                normalized_group_cols.append({
+                    'name': col,
+                    'desc': f'Group by {col}',
+                    'type': str
+                })
+            elif isinstance(col, dict):
+                normalized_group_cols.append(col)
+            else:
+                raise ValueError("group_cols must be a list of strings or dicts")
+        
+        # Extract field names for the logical operator
+        gby_field_names = [col['name'] for col in normalized_group_cols]
+        
+        # Infer aggregation function name from the callable
+        # For now, we'll use 'count' as default - user can extend this
+        agg_func_name = agg_func.__name__ if hasattr(agg_func, '__name__') else 'count'
+        if 'count' in agg_func_name.lower():
+            agg_func_str = 'count'
+        else:
+            # Default to custom function - will need to be handled
+            agg_func_str = 'count'  # fallback
+        
+        # Create output schema
+        output_schema = create_groupby_schema_from_fields(gby_field_names, [output_col])
+        
+        # Create logical operator
+        operator = GroupByAggregate(
+            input_schema=self.schema,
+            is_semantic=True,
+            output_schema=output_schema,
+            gby_fields=normalized_group_cols,  # Pass full dict specifications
+            agg_fields=[output_col],
+            agg_funcs=[agg_func_str]
+        )
+        
+        return Dataset(sources=[self], operator=operator, schema=output_schema)
+
+    def sem_groupby(self, gby_fields: list[str] | list[dict], agg_fields: list[str] | list[dict], agg_funcs: list[str]) -> Dataset:
         """
         Apply a semantic group by operation to this set using an LLM. This operator groups records 
         by the specified `gby_fields` and applies the `agg_funcs` to the `agg_fields` for each group.
 
         Args:
-            gby_fields: List of field names to group by (e.g., ['complaint'])
-            agg_fields: List of field names to aggregate (e.g., ['contents'])
+            gby_fields: List of field specifications to group by. Each can be:
+                       - A string (field name): Uses default grouping behavior
+                       - A dict with keys: 'name', 'desc', 'type', and optionally 'model'
+            agg_fields: List of field specifications to aggregate. Each can be:
+                       - A string (field name): Uses default aggregation behavior  
+                       - A dict with keys: 'name', 'desc', 'type', and optionally 'model'
             agg_funcs: List of aggregation functions to apply (e.g., ['count'])
 
         Example:
             ds = pz.TextFileDataset(id="reviews", dir="product-reviews/")
-            ds = ds.sem_groupby(gby_fields=['complaint'], agg_fields=['contents'], agg_funcs=['count'])
+            ds = ds.sem_groupby(
+                gby_fields=[{'name': 'complaint', 'desc': 'Type of complaint', 'type': str}],
+                agg_fields=['contents'],
+                agg_funcs=['count']
+            )
         """
-        output_schema = create_groupby_schema_from_fields(gby_fields, agg_fields)
+        # Normalize gby_fields to list of dicts
+        normalized_gby_fields = []
+        for field in gby_fields:
+            if isinstance(field, str):
+                normalized_gby_fields.append({
+                    'name': field,
+                    'desc': f'Group by {field}',
+                    'type': str
+                })
+            elif isinstance(field, dict):
+                normalized_gby_fields.append(field)
+            else:
+                raise ValueError("gby_fields must be a list of strings or dicts")
         
-        # Create logical operator with direct parameters (no GroupBySig)
+        # Normalize agg_fields to list of dicts
+        normalized_agg_fields = []
+        for field in agg_fields:
+            if isinstance(field, str):
+                normalized_agg_fields.append({
+                    'name': field,
+                    'desc': f'Aggregate {field}',
+                    'type': str
+                })
+            elif isinstance(field, dict):
+                normalized_agg_fields.append(field)
+            else:
+                raise ValueError("agg_fields must be a list of strings or dicts")
+        
+        # Extract field names for schema creation
+        gby_field_names = [f['name'] for f in normalized_gby_fields]
+        agg_field_names = [f['name'] for f in normalized_agg_fields]
+        
+        output_schema = create_groupby_schema_from_fields(gby_field_names, agg_field_names)
+        
+        # Create logical operator with full dict specifications
         operator = GroupByAggregate(
             input_schema=self.schema,
             is_semantic=True,
             output_schema=output_schema,
-            gby_fields=gby_fields,
-            agg_fields=agg_fields,
+            gby_fields=normalized_gby_fields,
+            agg_fields=normalized_agg_fields,
             agg_funcs=agg_funcs
         )
         
@@ -697,6 +803,7 @@ class Dataset:
         """Invoke the QueryProcessor to execute the query. `kwargs` will be applied to the QueryProcessorConfig."""
         # TODO: this import currently needs to be here to avoid a circular import; we should fix this in a subsequent PR
         from palimpzest.query.processor.query_processor_factory import QueryProcessorFactory
+        print("Running Query Processor...")
 
         # as syntactic sugar, we will allow some keyword arguments to parameterize our policies
         policy = construct_policy_from_kwargs(**kwargs)
