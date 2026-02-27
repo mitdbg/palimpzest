@@ -17,12 +17,19 @@ from botorch.fit import fit_gpytorch_mll
 from botorch.optim.optimize import optimize_acqf
 
 from botorch.acquisition.analytic import LogExpectedImprovement
+from botorch.acquisition.logei import qLogExpectedImprovement
 from botorch.acquisition.objective import LinearMCObjective
+from botorch.acquisition.objective import GenericMCObjective
 from botorch.acquisition.objective import ScalarizedPosteriorTransform
 from botorch.acquisition.multi_objective.logei import qLogNoisyExpectedHypervolumeImprovement
 # from botorch.acquisition.multi_objective.utils import prune_inferior_points
+from botorch.acquisition.monte_carlo import qExpectedImprovement
+
+from botorch.sampling.normal import SobolQMCNormalSampler
 
 from palimpzest.query.operators.convert import LLMConvertBonded
+
+from gpytorch.constraints import GreaterThan
 
 import numpy as np
 ###########
@@ -227,7 +234,8 @@ class BayesianOptimizer:
     
     def next_points_twoObj(self, acq_func, num_candidates = 1):
         '''
-        returns list of points of shape (1,d)
+        Uses scarlarization over fixed weight grid
+        returns list of points of shape (1,d) and corresponding weights
         '''
         assert acq_func in ["scalarize_logEI", "qlogNEHVI"], "acq_func must be one of ['scalarize_logEI', 'qlogNEHVI']"
 
@@ -239,6 +247,11 @@ class BayesianOptimizer:
             input_transform=Normalize(self.X.shape[-1], bounds = bounds),
             outcome_transform=Standardize(m=self.Y_all[:, self.embedding_idxs].shape[-1]),
         )
+
+        # self.gp.likelihood.noise_covar.register_constraint(
+        #     "raw_noise",
+        #     GreaterThan(1e-4),
+        # )
         self.gp.train()
         self.gp.likelihood.train()
         mll = ExactMarginalLogLikelihood(self.gp.likelihood, self.gp)
@@ -250,20 +263,18 @@ class BayesianOptimizer:
             next_points = []
             for w in weight_grid:
                 weights = torch.tensor([w, 1.0 - w], dtype=torch.double)
-
-                # Linear scalarization in standardized space
-                # objective = LinearMCObjective(weights)
+                objective = LinearMCObjective(weights)
 
                 # Compute best scaled (standardized) value from observed data
                 with torch.no_grad():
-                    # train_Y_standardized = self.gp.outcome_transform(self.Y_all[:, self.embedding_idxs])[0]
-                    scalarized = self.gp.train_targets @ weights #train_targets: outcome_transform already applied
-                    best_scalarized_observed = scalarized.max().item()
-
-                acq_function = LogExpectedImprovement(
+                    Y_transformed = self.gp.outcome_transform(self.Y_all[:, self.embedding_idxs])[0]
+                    best_f = (Y_transformed * weights).sum(dim=-1).max().detach()
+                    
+                acq_function = qLogExpectedImprovement(
                     model=self.gp,
-                    best_f=best_scalarized_observed,
-                    posterior_transform= ScalarizedPosteriorTransform(weights=weights)
+                    best_f=best_f,
+                    sampler=SobolQMCNormalSampler(sample_shape=torch.Size([128])),
+                    objective=objective,
                 )
                 w_next_points, _  = optimize_acqf(
                     acq_function=acq_function,
@@ -445,14 +456,14 @@ class BayesianOptimizer:
         Only applies to single-objective policies.
         obj_weights: length-3 float corresponding to [quality, time, cost]
         """
-        # self.w = []
+        self.w = []
         while not self.terminate():
-            # points, weights = self.next_points_twoObj()
-            points = self.next_points_twoObj(self.acq_func)
-            for point in points:
+            points, weights = self.next_points_twoObj(self.acq_func)
+            # points = self.next_points_twoObj(self.acq_func)
+            for point, weight in zip(points, weights):
                 start_time = time_track.perf_counter()
-                # point = point.to(torch.double)
-                point = point.to(torch.double).unsqueeze(0) #shape (1, d)
+                point = point.to(torch.double)
+                # point = point.to(torch.double).unsqueeze(0) #shape (1, d)
                 if self.terminate(): break
                 model, model_embedding = self.point_to_model(point)
                 physical_op = LLMConvertBonded(model = model, input_schema = self.input_schema,
@@ -484,16 +495,16 @@ class BayesianOptimizer:
                 self.X_models.append(model)
                 avg_Y_all = torch.tensor(point_Y_all, dtype=torch.double).mean(dim=0).unsqueeze(0) #shape (1, 3)
                 self.Y_all = torch.cat([self.Y_all, avg_Y_all], dim=0)
-                # self.w.append(weight)
+                self.w.append(weight)
                 end_time = time_track.perf_counter()
                 BO_logger.info(f"BO time on size {len(points)} batch: {end_time - start_time:.2f}s")
 
                 cost = len(data_samples) #4, temporary hard code
                 self.cost_so_far += cost
-                if self.cost_so_far in intermediate_save:
-                    self.save_checkpoint(f"{save_name_prefix}_{int(self.cost_so_far)}")
+                if int(self.cost_so_far) in intermediate_save:
+                    self.save_checkpoint(save_name_prefix, save_weights=True)
                 print(f"{self.cost_so_far}/{self.cost_budget} result: {model}, avg_Y {avg_Y_all.tolist()}")
-        self.save_checkpoint(f"{save_name_prefix}")
+        self.save_checkpoint(f"{save_name_prefix}", save_weights=True)
 
 
 class Optimizer:
