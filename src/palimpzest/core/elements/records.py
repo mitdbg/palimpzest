@@ -337,7 +337,7 @@ class DataRecord:
 
         for attr in ["_index"]:
             if hasattr(self, attr):
-                dct[attr] = getattr(self, attr)
+                dct = {attr: getattr(self, attr)} | dct
 
         if project_cols is not None and len(project_cols) > 0:
             project_field_names = set(field.split(".")[-1] for field in project_cols)
