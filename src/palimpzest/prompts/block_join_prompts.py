@@ -2,7 +2,7 @@
 
 ### BASE PROMPTS ###
 BLOCK_JOIN_BASE_SYSTEM_PROMPT = """You are a helpful assistant whose job is to {job_instruction}.
-You will be presented with two collections of data records and a join condition. Find all pairs of records that satisfy the join condition. Output indexes x,y where x is the number of a record in the left collection and y the number of a record in the right collection such that the two records satisfy the join condition. Make sure to catch all pairs!
+You will be presented with two collections of data records and a join condition. Find all pairs of records that satisfy the join condition. Output indexes x,y where x is the number of a record in the left collection and y the number of a record in the right collection such that the two records satisfy the join condition. Make sure to catch all pairs! If there are no pairs, output "None".
 
 Separate index pairs by semicolons. Finish your response with a newline character followed by ---
 
@@ -31,7 +31,7 @@ ANSWER: {example_answer}
 """
 
 BLOCK_JOIN_NO_REASONING_BASE_SYSTEM_PROMPT = """You are a helpful assistant whose job is to {job_instruction}.
-You will be presented with two collections of data records and a join condition. Find all pairs of records that satisfy the join condition. Output indexes x,y where x is the number of a record in the left collection and y the number of a record in the right collection such that the two records satisfy the join condition. Make sure to catch all pairs!
+You will be presented with two collections of data records and a join condition. Find all pairs of records that satisfy the join condition. Output indexes x,y where x is the number of a record in the left collection and y the number of a record in the right collection such that the two records satisfy the join condition. Make sure to catch all pairs! If there are no pairs, output "None".
 
 Separate index pairs by semicolons. Finish your response with a newline character followed by ---
 
@@ -56,7 +56,7 @@ ANSWER: {example_answer}
 """
 
 BLOCK_JOIN_BASE_USER_PROMPT = """You are a helpful assistant whose job is to {job_instruction}.
-You will be presented with two collections of data records and a join condition. Find all pairs of records that satisfy the join condition. Output indexes x,y where x is the number of a record in the left collection and y the number of a record in the right collection such that the two records satisfy the join condition. Make sure to catch all pairs!
+You will be presented with two collections of data records and a join condition. Find all pairs of records that satisfy the join condition. Output indexes x,y where x is the number of a record in the left collection and y the number of a record in the right collection such that the two records satisfy the join condition. Make sure to catch all pairs! If there are no pairs, output "None".
 {desc_section}
 Separate index pairs by semicolons. Finish your response with a newline character followed by ---
 ---
@@ -79,7 +79,7 @@ Let's think step-by-step in order to evaluate the join condition.
 REASONING: """
 
 BLOCK_JOIN_NO_REASONING_BASE_USER_PROMPT = """You are a helpful assistant whose job is to {job_instruction}.
-You will be presented with two collections of data records and a join condition. Find all pairs of records that satisfy the join condition. Output indexes x,y where x is the number of a record in the left collection and y the number of a record in the right collection such that the two records satisfy the join condition. Make sure to catch all pairs!
+You will be presented with two collections of data records and a join condition. Find all pairs of records that satisfy the join condition. Output indexes x,y where x is the number of a record in the left collection and y the number of a record in the right collection such that the two records satisfy the join condition. Make sure to catch all pairs! If there are no pairs, output "None".
 {desc_section}
 Separate index pairs by semicolons. Finish your response with a newline character followed by ---
 ---

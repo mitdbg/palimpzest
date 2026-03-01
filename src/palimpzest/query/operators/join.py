@@ -790,6 +790,9 @@ class BlockNestedLoopsJoin(LLMJoin):
             final: bool = False
         ) -> tuple[DataRecordSet, int]:
         def _find_answer(completion_text: str) -> str:
+            # check if "none" is in the completion text
+            if "none" in completion_text.lower():
+                return ""
             # list of indicators to try
             indicators = ["answer:", "answer is:", "index pairs is:", "index pairs are:", "join condition are:", "output:"]
             for indicator in indicators:
