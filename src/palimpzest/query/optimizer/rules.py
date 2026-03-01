@@ -978,14 +978,14 @@ class BlockNestedLoopsJoinRule(ImplementationRule):
         models = [model for model in runtime_kwargs["available_models"] if cls._model_matches_input(model, logical_expression)]
         variable_op_kwargs = []
         for model in models:
-            use_reasoning_prompt, reasoning_effort = resolve_reasoning_settings(model, runtime_kwargs["reasoning_effort"])
-            prompt_strategy = PromptStrategy.JOIN_BLOCK if use_reasoning_prompt else PromptStrategy.JOIN_BLOCK_NO_REASONING
+            reasoning_prompt_strategy = use_reasoning_prompt(runtime_kwargs["reasoning_effort"])
+            prompt_strategy = PromptStrategy.JOIN_BLOCK if reasoning_prompt_strategy else PromptStrategy.JOIN_BLOCK_NO_REASONING
             variable_op_kwargs.append(
                 {
                     "model": model,
                     "prompt_strategy": prompt_strategy,
                     "join_parallelism": runtime_kwargs["join_parallelism"],
-                    "reasoning_effort": reasoning_effort,
+                    "reasoning_effort": runtime_kwargs["reasoning_effort"],
                     "retain_inputs": not runtime_kwargs["is_validation"],
                     # "batch_sizes": (3,3)
                 }
