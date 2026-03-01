@@ -537,18 +537,18 @@ class BlockNestedLoopsJoin(LLMJoin):
 
         # get est. of conversion time per record from model card;
         model_conversion_time_per_record = (
-            MODEL_CARDS[self.model.value]["seconds_per_output_token"] * est_num_output_tokens
+            self.model.get_seconds_per_output_token() * est_num_output_tokens
         )
 
         # get est. of conversion cost (in USD) per record from model card
         usd_per_input_token = (
-            MODEL_CARDS[self.model.value]["usd_per_audio_input_token"]
+            self.model.get_usd_per_audio_input_token()
             if self.is_audio_op()
-            else MODEL_CARDS[self.model.value]["usd_per_input_token"]
+            else self.model.get_usd_per_input_token()
         )
         model_conversion_usd_per_record = (
             usd_per_input_token * est_num_input_tokens
-            + MODEL_CARDS[self.model.value]["usd_per_output_token"] * est_num_output_tokens
+            + self.model.get_usd_per_output_token() * est_num_output_tokens
         )
 
         # estimate output cardinality using a constant assumption of the filter selectivity
@@ -556,7 +556,7 @@ class BlockNestedLoopsJoin(LLMJoin):
         cardinality = selectivity * (left_source_op_cost_estimates.cardinality * right_source_op_cost_estimates.cardinality)
 
         # estimate quality of output based on the strength of the model being used
-        quality = (MODEL_CARDS[self.model.value]["overall"] / 100.0)
+        quality = (self.model.get_overall_score() / 100.0)
 
         return OperatorCostEstimates(
             cardinality=cardinality,
@@ -764,17 +764,18 @@ class BlockNestedLoopsJoin(LLMJoin):
                     cost_per_record=generation_stats.cost_per_record / (len(left_candidate) * len(right_candidate)),
                     model_name=self.get_model_name(),
                     join_condition=self.condition,
-                    total_input_tokens=generation_stats.total_input_tokens / (len(left_candidate) * len(right_candidate)),
-                    total_output_tokens=generation_stats.total_output_tokens / (len(left_candidate) * len(right_candidate)),
-                    total_embedding_input_tokens=generation_stats.total_embedding_input_tokens / (len(left_candidate) * len(right_candidate)),
-                    total_input_cost=generation_stats.total_input_cost / (len(left_candidate) * len(right_candidate)),
-                    total_output_cost=generation_stats.total_output_cost / (len(left_candidate) * len(right_candidate)),
-                    total_embedding_cost=generation_stats.total_embedding_cost / (len(left_candidate) * len(right_candidate)),
+                    input_text_tokens=generation_stats.input_text_tokens / (len(left_candidate) * len(right_candidate)),
+                    input_audio_tokens=generation_stats.input_audio_tokens / (len(left_candidate) * len(right_candidate)),
+                    input_image_tokens=generation_stats.input_image_tokens / (len(left_candidate) * len(right_candidate)),
+                    cache_read_tokens=generation_stats.cache_read_tokens / (len(left_candidate) * len(right_candidate)),
+                    cache_creation_tokens=generation_stats.cache_creation_tokens / (len(left_candidate) * len(right_candidate)),
+                    output_text_tokens=generation_stats.output_text_tokens / (len(left_candidate) * len(right_candidate)),
+                    embedding_input_tokens=generation_stats.embedding_input_tokens / (len(left_candidate) * len(right_candidate)),
                     llm_call_duration_secs=generation_stats.llm_call_duration_secs,
                     fn_call_duration_secs=generation_stats.fn_call_duration_secs,
                     total_llm_calls=generation_stats.total_llm_calls,
                     total_embedding_llm_calls=generation_stats.total_embedding_llm_calls,
-                    # answer=field_answers,
+                    answer=field_answers,
                     passed_operator=passed_operator,
                     op_details={k: str(v) for k, v in self.get_id_params().items()},
                 )
