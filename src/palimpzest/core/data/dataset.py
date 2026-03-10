@@ -708,8 +708,161 @@ class Dataset:
             agg_fields=normalized_agg_fields,
             agg_funcs=agg_funcs
         )
-        
+
         return Dataset(sources=[self], operator=operator, schema=output_schema)
+
+    def hierarchical_groupby(
+        self,
+        groupby_fields: list[list[str]],
+        agg_fields: list[list[str]],
+        agg_funcs: list[list[str]],
+    ) -> dict:
+        """
+        Perform hierarchical (nested) exact groupby operations across multiple levels.
+
+        At each level except the last, records are partitioned by the groupby fields
+        without aggregation; the last level applies full aggregation.
+
+        Args:
+            groupby_fields: List of lists of field names to group by at each level.
+            agg_fields: List of lists of field names to aggregate at each level.
+            agg_funcs: List of lists of aggregation function names at each level.
+
+        Returns:
+            A DataRecordSet for a single level, or a nested dict
+            ``{group_key: <result_for_next_level>}`` for multiple levels.
+        """
+        from palimpzest.core.lib.schemas import create_groupby_schema_from_fields
+        from palimpzest.query.operators.aggregate import ApplyGroupByOp
+
+        assert len(groupby_fields) == len(agg_fields) == len(agg_funcs), \
+            "groupby_fields, agg_fields, and agg_funcs must all have the same length"
+
+        result = self.run()
+        candidates = result.data_records
+
+        def run_level(candidates, level):
+            gby_names = groupby_fields[level]
+            agg_names = agg_fields[level]
+            funcs = agg_funcs[level]
+            output_schema = create_groupby_schema_from_fields(gby_names, agg_names)
+            op = ApplyGroupByOp(
+                gby_fields=gby_names,
+                agg_fields=agg_names,
+                agg_funcs=funcs,
+                output_schema=output_schema,
+                input_schema=self.schema,
+            )
+            if level == len(groupby_fields) - 1:
+                return op(candidates)
+            # Intermediate level: partition candidates by exact field values
+            outer_groups = {}
+            for candidate in candidates:
+                key = tuple(getattr(candidate, f, None) for f in gby_names)
+                outer_groups.setdefault(key, []).append(candidate)
+            return {key: run_level(grp, level + 1) for key, grp in outer_groups.items()}
+
+        return run_level(candidates, 0)
+
+    def hierarchical_sem_groupby(
+        self,
+        groupby_fields: list[list[str | dict]],
+        agg_fields: list[list[str | dict]],
+        agg_funcs: list[list[str]],
+        model=None,
+        prompt_strategy=None,
+        reasoning_effort=None,
+    ) -> dict:
+        """
+        Perform hierarchical (nested) semantic groupby operations using LLMs.
+
+        At each intermediate level the LLM assigns group labels to the original records
+        (without aggregation) so that inner levels can operate on the same raw records.
+        The final level runs a full semantic groupby with aggregation.
+
+        Args:
+            groupby_fields: List of lists of field specs (str or dict with name/desc/type) per level.
+            agg_fields: List of lists of field specs to aggregate per level.
+            agg_funcs: List of lists of aggregation function names per level.
+            model: Optional LLM model override.
+            prompt_strategy: Optional prompt strategy override.
+            reasoning_effort: Optional reasoning effort override.
+
+        Returns:
+            A DataRecordSet for a single level, or a nested dict
+            ``{group_key: <result_for_next_level>}`` for multiple levels.
+        """
+        from palimpzest.constants import Model, PromptStrategy
+        from palimpzest.core.lib.schemas import create_groupby_schema_from_fields
+        from palimpzest.query.operators.aggregate import SemanticGroupByOp
+
+        assert len(groupby_fields) == len(agg_fields) == len(agg_funcs), \
+            "groupby_fields, agg_fields, and agg_funcs must all have the same length"
+
+        # Default to GPT-4o if no model specified; sem_groupby requires an explicit model
+        # because hierarchical_sem_groupby bypasses the query optimizer / policy system.
+        _model = model if model is not None else Model.GPT_4o
+        _prompt_strategy = prompt_strategy if prompt_strategy is not None else PromptStrategy.AGG
+
+        from palimpzest.core.models import GenerationStats
+
+        result = self.run()
+        candidates = result.data_records
+
+        # Accumulate GenerationStats across all levels so callers can track
+        # total cost / token usage for the entire hierarchical operation.
+        accumulated_stats = GenerationStats()
+
+        def normalize_fields(fields):
+            out = []
+            for f in fields:
+                if isinstance(f, str):
+                    out.append({'name': f, 'desc': f'Group by {f}', 'type': str})
+                else:
+                    out.append(f)
+            return out
+
+        def run_level(candidates, level):
+            nonlocal accumulated_stats
+            gby_specs = normalize_fields(groupby_fields[level])
+            agg_specs = normalize_fields(agg_fields[level])
+            funcs = agg_funcs[level]
+            gby_names = [s['name'] for s in gby_specs]
+            agg_names = [s['name'] for s in agg_specs]
+            output_schema = create_groupby_schema_from_fields(gby_names, agg_names)
+            op = SemanticGroupByOp(
+                gby_fields=gby_specs,
+                agg_fields=agg_specs,
+                agg_funcs=funcs,
+                model=_model,
+                prompt_strategy=_prompt_strategy,
+                reasoning_effort=reasoning_effort,
+                output_schema=output_schema,
+                input_schema=self.schema,
+            )
+            if level == len(groupby_fields) - 1:
+                # Final level: full groupby with aggregation.
+                # Extract per-group RecordOpStats and fold into accumulated_stats.
+                dataset_result = op(candidates)
+                for ros in dataset_result.record_op_stats:
+                    accumulated_stats.total_input_tokens  += ros.total_input_tokens
+                    accumulated_stats.total_output_tokens += ros.total_output_tokens
+                    accumulated_stats.total_input_cost    += ros.total_input_cost
+                    accumulated_stats.total_output_cost   += ros.total_output_cost
+                    accumulated_stats.llm_call_duration_secs += ros.llm_call_duration_secs
+                return dataset_result
+            # Intermediate level: LLM assigns group labels without aggregation.
+            # Capture and accumulate the GenerationStats that were previously discarded.
+            group_labels, gen_stats = op._assign_groups_llm(candidates)
+            accumulated_stats += gen_stats
+            outer_groups = {}
+            for candidate, label in zip(candidates, group_labels):
+                key = (label,) if not isinstance(label, tuple) else label
+                outer_groups.setdefault(key, []).append(candidate)
+            return {key: run_level(grp, level + 1) for key, grp in outer_groups.items()}
+
+        nested_result = run_level(candidates, 0)
+        return nested_result, accumulated_stats
 
     def sem_agg(self, col: dict | type[BaseModel], agg: str, depends_on: str | list[str] | None = None) -> Dataset:
         """

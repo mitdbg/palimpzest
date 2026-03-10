@@ -103,7 +103,7 @@ def main():
     agg_fields = ["scoreSentiment"]
     agg_funcs = ["count"]  # We'll use count initially to demonstrate grouping
     
-    grouped_reviews = reviews.groupby(gby_fields, agg_fields, agg_funcs)
+    grouped_reviews = reviews.sem_groupby(gby_fields, agg_fields, agg_funcs)
 
     # Configure and run the query
     config = pz.QueryProcessorConfig(

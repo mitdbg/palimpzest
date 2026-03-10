@@ -53,7 +53,7 @@ def main():
     script_dir = Path(__file__).parent
 
     # Load and filter data
-    reviews_df = pd.read_csv(script_dir / "../movie_reviews.csv").head(500)
+    reviews_df = pd.read_csv(script_dir / "../movie_reviews.csv")
     movies_df = pd.read_csv(script_dir / "../movies.csv")
 
     filtered_movies = movies_df[
@@ -68,8 +68,26 @@ def main():
 
     # sem_groupby: LLM reads reviewText and groups by emotional tone, count reviewId
     grouped = reviews.sem_groupby(
-        gby_fields=["reviewText"],
-        agg_fields=["reviewId"],
+        gby_fields=[
+            {
+                "name": "reviewText",
+                "type": str,
+                "desc": (
+                    "The emotional tone of the review. "
+                    "Must be exactly one of these three values — no other labels are allowed: "
+                    "'Enthusiastic', "
+                    "'Measured', "
+                    "'Disappointed'."
+                ),
+            }
+        ],
+        agg_fields=[
+            {
+                "name": "reviewId",
+                "type": int,
+                "desc": "Identifier of the review",
+            }
+        ],
         agg_funcs=["count"],
     )
 

@@ -209,6 +209,55 @@ class ApplyGroupByOp(AggregateOp):
         # construct and return DataRecordSet
         return DataRecordSet(drs, record_op_stats_lst)
 
+    def hierarchical_groupby(
+        self,
+        candidates: list[DataRecord],
+        groupby_fields: list[list[str]],
+        agg_fields: list[list[str]],
+        agg_funcs: list[list[str]],
+    ) -> dict:
+        """
+        Perform hierarchical (nested) exact groupby operations across multiple levels.
+
+        At each intermediate level records are partitioned by exact field values without
+        aggregation; the final level applies full aggregation via ApplyGroupByOp.__call__.
+
+        Args:
+            candidates: Input DataRecords.
+            groupby_fields: List of lists of field names per level.
+            agg_fields: List of lists of aggregate field names per level.
+            agg_funcs: List of lists of aggregation function names per level.
+
+        Returns:
+            A DataRecordSet for a single level, or a nested dict for multiple levels.
+        """
+        from palimpzest.core.lib.schemas import create_groupby_schema_from_fields
+
+        assert len(groupby_fields) == len(agg_fields) == len(agg_funcs), \
+            "groupby_fields, agg_fields, and agg_funcs must all have the same length"
+
+        def run_level(candidates, level):
+            gby_names = groupby_fields[level]
+            agg_names = agg_fields[level]
+            funcs = agg_funcs[level]
+            output_schema = create_groupby_schema_from_fields(gby_names, agg_names)
+            op = ApplyGroupByOp(
+                gby_fields=gby_names,
+                agg_fields=agg_names,
+                agg_funcs=funcs,
+                output_schema=output_schema,
+                input_schema=self.input_schema,
+            )
+            if level == len(groupby_fields) - 1:
+                return op(candidates)
+            outer_groups = {}
+            for candidate in candidates:
+                key = tuple(getattr(candidate, f, None) for f in gby_names)
+                outer_groups.setdefault(key, []).append(candidate)
+            return {key: run_level(grp, level + 1) for key, grp in outer_groups.items()}
+
+        return run_level(candidates, 0)
+
 
 class AverageAggregateOp(AggregateOp):
     # NOTE: we don't actually need / use agg_func here (yet)
@@ -889,6 +938,7 @@ class SemanticGroupByOp(AggregateOp):
                 llm_call_duration_secs=gen_stats.llm_call_duration_secs,
                 fn_call_duration_secs=gen_stats.fn_call_duration_secs,
                 total_llm_calls=gen_stats.total_llm_calls,
+                total_embedding_llm_calls=gen_stats.total_embedding_llm_calls,
                 op_details={k: str(v) for k, v in self.get_id_params().items()},
             )
             record_op_stats_lst.append(record_op_stats)
@@ -911,7 +961,7 @@ class SemanticGroupByOp(AggregateOp):
         
         first_gby_spec = self.gby_fields_spec[0]
         if isinstance(first_gby_spec, dict):
-            field_desc = first_gby_spec.get('desc', f"The semantic category for {first_gby_spec['name']}")
+            field_desc = first_gby_spec["desc"]
             field_name = first_gby_spec['name']
             field_type = first_gby_spec.get('type', str)
         else:
@@ -934,7 +984,7 @@ class SemanticGroupByOp(AggregateOp):
 
         fields = {self.gby_fields[0]: str}
         
-        # Build the aggregation instruction that includes the field description
+        # Build the aggregation instruction that includes the field descriptions from field spec 
         # This tells the LLM HOW to categorize/group the values semantically
         agg_instruction = f"Categorize this record into a semantic group based on the field '{field_name}' Return the category name (one of those specified in '{field_desc}'s)"
         
@@ -955,10 +1005,11 @@ class SemanticGroupByOp(AggregateOp):
             field_answers, _, gen_stats, _ = self.generator(candidate, fields, **gen_kwargs)
             
             # Extract the group label - field_answers returns dict with field->list mapping
-            group_label = field_answers.get(self.gby_fields[0], [None])[0]
-            if group_label is None:
-                # Fallback: use a default group
+            field_answer = field_answers.get(self.gby_fields[0])
+            if field_answer is None or not isinstance(field_answer, list) or len(field_answer) == 0:
                 group_label = "unknown"
+            else:
+                group_label = field_answer[0]
             group_labels.append(group_label)
             
             # Accumulate stats
@@ -966,3 +1017,79 @@ class SemanticGroupByOp(AggregateOp):
         
         print(f"  Completed! Found {len(set(group_labels))} unique groups from {len(candidates)} records")
         return group_labels, total_stats
+
+    def hierarchical_groupby(
+        self,
+        candidates: list[DataRecord],
+        groupby_fields: list[list[str | dict]],
+        agg_fields: list[list[str | dict]],
+        agg_funcs: list[list[str]],
+        model: Model = None,
+        prompt_strategy: PromptStrategy = PromptStrategy.AGG,
+        reasoning_effort: str | None = None,
+    ) -> dict:
+        """
+        Perform hierarchical (nested) semantic groupby operations using LLMs.
+
+        At each intermediate level the LLM assigns group labels to the original records
+        (without aggregation) so that inner levels operate on the same raw records.
+        The final level runs a full semantic groupby with aggregation.
+
+        Args:
+            candidates: Input DataRecords.
+            groupby_fields: List of lists of field specs per level.
+            agg_fields: List of lists of aggregate field specs per level.
+            agg_funcs: List of lists of aggregation function names per level.
+            model: Optional LLM model override (falls back to self.model).
+            prompt_strategy: Prompt strategy (defaults to AGG).
+            reasoning_effort: Optional reasoning effort override.
+
+        Returns:
+            A DataRecordSet for a single level, or a nested dict for multiple levels.
+        """
+        from palimpzest.core.lib.schemas import create_groupby_schema_from_fields
+
+        assert len(groupby_fields) == len(agg_fields) == len(agg_funcs), \
+            "groupby_fields, agg_fields, and agg_funcs must all have the same length"
+
+        def normalize_fields(fields):
+            out = []
+            for f in fields:
+                if isinstance(f, str):
+                    out.append({'name': f, 'desc': f'Group by {f}', 'type': str})
+                else:
+                    out.append(f)
+            return out
+
+        _model = model or self.model
+        _prompt_strategy = prompt_strategy or self.prompt_strategy
+        _reasoning_effort = reasoning_effort or self.reasoning_effort
+
+        def run_level(candidates, level):
+            gby_specs = normalize_fields(groupby_fields[level])
+            agg_specs = normalize_fields(agg_fields[level])
+            funcs = agg_funcs[level]
+            gby_names = [s['name'] for s in gby_specs]
+            agg_names = [s['name'] for s in agg_specs]
+            output_schema = create_groupby_schema_from_fields(gby_names, agg_names)
+            op = SemanticGroupByOp(
+                gby_fields=gby_specs,
+                agg_fields=agg_specs,
+                agg_funcs=funcs,
+                model=_model,
+                prompt_strategy=_prompt_strategy,
+                reasoning_effort=_reasoning_effort,
+                output_schema=output_schema,
+                input_schema=self.input_schema,
+            )
+            if level == len(groupby_fields) - 1:
+                return op(candidates)
+            # Intermediate: LLM assigns labels, original records are forwarded
+            group_labels, _ = op._assign_groups_llm(candidates)
+            outer_groups = {}
+            for candidate, label in zip(candidates, group_labels):
+                key = (label,) if not isinstance(label, tuple) else label
+                outer_groups.setdefault(key, []).append(candidate)
+            return {key: run_level(grp, level + 1) for key, grp in outer_groups.items()}
+
+        return run_level(candidates, 0)

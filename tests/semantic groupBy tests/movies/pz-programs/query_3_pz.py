@@ -10,7 +10,7 @@ Pipeline:
   2. sem_groupby – LLM semantically normalises the MPAA rating into
      audience-type buckets (Children, Teen, Adult, Unrated); lists
      scoreSentiment per group.
-  3. Post-process list → frac_positive.
+  3. Post-process list for frac_positive.
 """
 
 import argparse
@@ -56,7 +56,7 @@ def main():
     script_dir = Path(__file__).parent
 
     # Load and filter data
-    reviews_df = pd.read_csv(script_dir / "../movie_reviews.csv").head(500)
+    reviews_df = pd.read_csv(script_dir / "../movie_reviews.csv")
     movies_df = pd.read_csv(script_dir / "../movies.csv")
 
     # Filter for director's movies and keep the rating column
@@ -71,8 +71,20 @@ def main():
 
     # sem_groupby: LLM maps MPAA rating → audience type bucket, list scoreSentiment
     grouped = reviews.sem_groupby(
-        gby_fields=["rating"],
-        agg_fields=["scoreSentiment"],
+        gby_fields=[
+            {
+                "name": "rating",
+                "type": str,
+                "desc": "MPAA rating string (e.g., 'Adult', 'Teen', 'Children', 'Unrated')",
+            }
+        ],
+        agg_fields=[
+            {
+                "name": "scoreSentiment",
+                "type": str,
+                "desc": "Sentiment label for the review (e.g., 'POSITIVE'/'NEGATIVE')",
+            }
+        ],
         agg_funcs=["list"],
     )
 

@@ -30,7 +30,7 @@ load_dotenv()
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Query 2: Reviews by Era")
+    parser = argparse.ArgumentParser(description="Reviews can be categorized into pre-2000, 2000s, 2010s, 2020s, or unknown. Return which era category the review falls into")
     parser.add_argument("--verbose", default=False, action="store_true")
     parser.add_argument("--policy", type=str, default="maxquality")
     parser.add_argument("--output", type=str, default="query2_pz_output.csv")
@@ -61,8 +61,20 @@ def main():
 
     # sem_groupby: LLM infers era from releaseDateTheaters, count reviewId per era
     grouped = reviews.sem_groupby(
-        gby_fields=["releaseDateTheaters"],
-        agg_fields=["reviewId"],
+        gby_fields=[
+            {
+                "name": "releaseDateTheaters",
+                "type": str,
+                "desc": "Reviews can be categorized into pre-2000, 2000s, 2010s, 2020s, or unknown. Return which era category the review falls into)",
+            }
+        ],
+        agg_fields=[
+            {
+                "name": "reviewId",
+                "type": int,
+                "desc": "Identifier of the review",
+            }
+        ],
         agg_funcs=["count"],
     )
 
@@ -71,7 +83,8 @@ def main():
     config = pz.QueryProcessorConfig(
         policy=policy,
         verbose=args.verbose,
-        execution_strategy=args.execution_strategy,
+        execution_strategy="sequential",
+        available_models=[pz.Model.GPT_5],
     )
     data_record_collection = grouped.run(config)
     exec_time = time.time() - start_time
