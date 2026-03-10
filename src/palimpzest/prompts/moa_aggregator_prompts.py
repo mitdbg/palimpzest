@@ -74,13 +74,13 @@ You will be provided with a description of each input field and each output fiel
 
 {output_format_instruction} Finish your response with a newline character followed by ---
 ---
-{model_responses}
-
 INPUT FIELDS:
 {input_fields_desc}
 
 OUTPUT FIELDS:
 {output_fields_desc}
+
+<<cache-boundary>>{model_responses}
 
 Let's think step-by-step in order to answer the question.
 
@@ -94,12 +94,12 @@ You will also be provided with a description of each input field and the filter 
 
 Remember, your answer must be TRUE or FALSE. Finish your response with a newline character followed by ---
 ---
-{model_responses}
-
 INPUT FIELDS:
 {input_fields_desc}
 
 FILTER CONDITION: {filter_condition}
+
+<<cache-boundary>>{model_responses}
 
 Let's think step-by-step in order to answer the question.
 

@@ -183,6 +183,7 @@ class TestOptimizer:
         assert isinstance(physical_plan[1], LLMConvertBonded)
 
     def test_simple_vllm_convert(self, enron_eval_tiny, email_schema, opt_strategy):
+        vllm_model = Model("hosted_vllm/qwen/Qwen1.5-0.5B-Chat", api_base="http://localhost:8000/v1")
         plan = enron_eval_tiny
         plan = plan.sem_add_columns(email_schema)
         policy = MinTime()
@@ -191,7 +192,7 @@ class TestOptimizer:
             policy=policy,
             cost_model=cost_model,
             verbose=True,
-            available_models=[Model.VLLM_QWEN_1_5_0_5B_CHAT],
+            available_models=[vllm_model],
             optimizer_strategy=opt_strategy,
         )
         physical_plans = optimizer.optimize(plan)

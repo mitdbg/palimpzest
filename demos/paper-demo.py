@@ -202,7 +202,7 @@ if __name__ == "__main__":
     # create pz plan
     if workload == "enron":
         plan = pz.TextFileDataset(id="enron", path=dataset)
-        plan = plan.sem_add_columns(email_cols)
+        plan = plan.sem_map(email_cols)
         plan = plan.sem_filter(
             "The email is not quoting from a news article or an article written by someone outside of Enron",
             depends_on=["contents"],
@@ -214,8 +214,8 @@ if __name__ == "__main__":
 
     elif workload == "real-estate":
         plan = RealEstateListingDataset(dataset)
-        plan = plan.sem_add_columns(real_estate_text_cols, depends_on="text_content")
-        plan = plan.sem_add_columns(real_estate_image_cols, depends_on="image_filepaths")
+        plan = plan.sem_map(real_estate_text_cols, depends_on="text_content")
+        plan = plan.sem_map(real_estate_image_cols, depends_on="image_filepaths")
         plan = plan.sem_filter(
             "The interior is modern and attractive, and has lots of natural sunlight",
             depends_on=["is_modern_and_attractive", "has_natural_sunlight"],
@@ -226,7 +226,7 @@ if __name__ == "__main__":
     elif workload == "medical-schema-matching":
         plan = dataset.add_columns(xls_to_tables, cols=table_cols, cardinality=pz.Cardinality.ONE_TO_MANY)
         plan = plan.sem_filter("The rows of the table contain the patient age")
-        plan = plan.sem_add_columns(case_data_cols, cardinality=pz.Cardinality.ONE_TO_MANY)
+        plan = plan.sem_map(case_data_cols, cardinality=pz.Cardinality.ONE_TO_MANY)
 
     # construct config and run plan
     config = pz.QueryProcessorConfig(

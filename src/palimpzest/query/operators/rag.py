@@ -3,16 +3,12 @@ from __future__ import annotations
 import time
 from typing import Any
 
+from litellm import embedding as litellm_embedding
 from numpy import dot
 from numpy.linalg import norm
-from openai import OpenAI
 from pydantic.fields import FieldInfo
 
-from palimpzest.constants import (
-    MODEL_CARDS,
-    NAIVE_EST_NUM_OUTPUT_TOKENS,
-    Model,
-)
+from palimpzest.constants import NAIVE_EST_NUM_OUTPUT_TOKENS, Model
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.models import GenerationStats, OperatorCostEstimates
 from palimpzest.query.operators.convert import LLMConvert
@@ -20,11 +16,9 @@ from palimpzest.query.operators.filter import LLMFilter
 
 
 class RAGConvert(LLMConvert):
-    def __init__(self, num_chunks_per_field: int, chunk_size: int = 1000, *args, **kwargs):
+    def __init__(self, embedding_model: Model, num_chunks_per_field: int, chunk_size: int = 1000, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # NOTE: in the future, we should abstract the embedding model to allow for different models
-        self.client = None
-        self.embedding_model = Model.TEXT_EMBEDDING_3_SMALL
+        self.embedding_model = embedding_model
         self.num_chunks_per_field = num_chunks_per_field
         self.chunk_size = chunk_size
 
@@ -33,19 +27,30 @@ class RAGConvert(LLMConvert):
 
     def __str__(self):
         op = super().__str__()
+        op += f"    Embedding Model: {self.embedding_model.value}\n"
         op += f"    Number of Chunks: {str(self.num_chunks_per_field)}\n"
         op += f"    Chunk Size: {str(self.chunk_size)}\n"
         return op
 
     def get_id_params(self):
         id_params = super().get_id_params()
-        id_params = {"num_chunks_per_field": self.num_chunks_per_field, "chunk_size": self.chunk_size, **id_params}
-
+        id_params = {
+            "embedding_model": self.embedding_model.value,
+            "num_chunks_per_field": self.num_chunks_per_field,
+            "chunk_size": self.chunk_size,
+            **id_params,
+        }
         return id_params
 
     def get_op_params(self):
         op_params = super().get_op_params()
-        return {"num_chunks_per_field": self.num_chunks_per_field, "chunk_size": self.chunk_size, **op_params}
+        op_params = {
+            "embedding_model": self.embedding_model,
+            "num_chunks_per_field": self.num_chunks_per_field,
+            "chunk_size": self.chunk_size,
+            **op_params,
+        }
+        return op_params
 
     def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         """
@@ -62,8 +67,8 @@ class RAGConvert(LLMConvert):
         est_num_input_tokens = self.num_chunks_per_field * self.chunk_size
         est_num_output_tokens = NAIVE_EST_NUM_OUTPUT_TOKENS
         model_conversion_usd_per_record = (
-            MODEL_CARDS[self.model.value]["usd_per_input_token"] * est_num_input_tokens
-            + MODEL_CARDS[self.model.value]["usd_per_output_token"] * est_num_output_tokens
+            self.model.get_usd_per_input_token() * est_num_input_tokens
+            + self.model.get_usd_per_output_token() * est_num_output_tokens
         )
 
         # set refined estimate of cost per record
@@ -101,24 +106,18 @@ class RAGConvert(LLMConvert):
 
         # compute the embedding
         start_time = time.time()
-        response = self.client.embeddings.create(input=text, model=model_name)
+        response = litellm_embedding(model=model_name, input=text)
         total_time = time.time() - start_time
 
         # extract the embedding
-        embedding = response.data[0].embedding
+        embedding = response.data[0]['embedding']
 
         # compute the generation stats object
-        model_card = MODEL_CARDS[model_name]
-        total_embedding_input_tokens = response.usage.total_tokens
-        total_embedding_cost = model_card["usd_per_input_token"] * total_embedding_input_tokens
+        total_embedding_input_tokens = response.usage.total_tokens if response.usage is not None else 0
+        total_embedding_cost = self.embedding_model.get_usd_per_input_token() * total_embedding_input_tokens
         embed_stats = GenerationStats(
             model_name=model_name,  # NOTE: this should be overwritten by generation model in convert()
-            total_input_tokens=0.0,
-            total_output_tokens=0.0,
-            total_embedding_input_tokens=total_embedding_input_tokens,
-            total_input_cost=0.0,
-            total_output_cost=0.0,
-            total_embedding_cost=total_embedding_cost,
+            embedding_input_tokens=total_embedding_input_tokens,
             cost_per_record=total_embedding_cost,
             llm_call_duration_secs=total_time,
             total_llm_calls=1,
@@ -194,9 +193,6 @@ class RAGConvert(LLMConvert):
         return candidate, embed_stats
 
     def convert(self, candidate: DataRecord, fields: dict[str, FieldInfo]) -> tuple[dict[str, list], GenerationStats]:
-        # set client
-        self.client = OpenAI() if self.client is None else self.client
-
         # get the set of input fields to use for the convert operation
         input_fields = self.get_input_fields()
         output_fields = list(fields.keys())
@@ -231,11 +227,9 @@ class RAGConvert(LLMConvert):
 
 
 class RAGFilter(LLMFilter):
-    def __init__(self, num_chunks_per_field: int, chunk_size: int = 1000, *args, **kwargs):
+    def __init__(self, embedding_model: Model, num_chunks_per_field: int, chunk_size: int = 1000, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # NOTE: in the future, we should abstract the embedding model to allow for different models
-        self.client = None
-        self.embedding_model = Model.TEXT_EMBEDDING_3_SMALL
+        self.embedding_model = embedding_model
         self.num_chunks_per_field = num_chunks_per_field
         self.chunk_size = chunk_size
 
@@ -244,19 +238,30 @@ class RAGFilter(LLMFilter):
 
     def __str__(self):
         op = super().__str__()
+        op += f"    Embedding Model: {self.embedding_model.value}\n"
         op += f"    Number of Chunks: {str(self.num_chunks_per_field)}\n"
         op += f"    Chunk Size: {str(self.chunk_size)}\n"
         return op
 
     def get_id_params(self):
         id_params = super().get_id_params()
-        id_params = {"num_chunks_per_field": self.num_chunks_per_field, "chunk_size": self.chunk_size, **id_params}
-
+        id_params = {
+            "embedding_model": self.embedding_model.value,
+            "num_chunks_per_field": self.num_chunks_per_field,
+            "chunk_size": self.chunk_size,
+            **id_params,
+        }
         return id_params
 
     def get_op_params(self):
         op_params = super().get_op_params()
-        return {"num_chunks_per_field": self.num_chunks_per_field, "chunk_size": self.chunk_size, **op_params}
+        op_params = {
+            "embedding_model": self.embedding_model,
+            "num_chunks_per_field": self.num_chunks_per_field,
+            "chunk_size": self.chunk_size,
+            **op_params,
+        }
+        return op_params
 
     def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates) -> OperatorCostEstimates:
         """
@@ -273,8 +278,8 @@ class RAGFilter(LLMFilter):
         est_num_input_tokens = self.num_chunks_per_field * self.chunk_size
         est_num_output_tokens = NAIVE_EST_NUM_OUTPUT_TOKENS
         model_conversion_usd_per_record = (
-            MODEL_CARDS[self.model.value]["usd_per_input_token"] * est_num_input_tokens
-            + MODEL_CARDS[self.model.value]["usd_per_output_token"] * est_num_output_tokens
+            self.model.get_usd_per_input_token() * est_num_input_tokens
+            + self.model.get_usd_per_output_token() * est_num_output_tokens
         )
 
         # set refined estimate of cost per record
@@ -312,24 +317,18 @@ class RAGFilter(LLMFilter):
 
         # compute the embedding
         start_time = time.time()
-        response = self.client.embeddings.create(input=text, model=model_name)
+        response = litellm_embedding(model=model_name, input=text)
         total_time = time.time() - start_time
 
         # extract the embedding
-        embedding = response.data[0].embedding
+        embedding = response.data[0]['embedding']
 
         # compute the generation stats object
-        model_card = MODEL_CARDS[model_name]
-        total_embedding_input_tokens = response.usage.total_tokens
-        total_embedding_cost = model_card["usd_per_input_token"] * total_embedding_input_tokens
+        total_embedding_input_tokens = response.usage.total_tokens if response.usage is not None else 0
+        total_embedding_cost = self.embedding_model.get_usd_per_input_token() * total_embedding_input_tokens
         embed_stats = GenerationStats(
             model_name=model_name,  # NOTE: this should be overwritten by generation model in filter()
-            total_input_tokens=0.0,
-            total_output_tokens=0.0,
-            total_embedding_input_tokens=total_embedding_input_tokens,
-            total_input_cost=0.0,
-            total_output_cost=0.0,
-            total_embedding_cost=total_embedding_cost,
+            embedding_input_tokens=total_embedding_input_tokens,
             cost_per_record=total_embedding_cost,
             llm_call_duration_secs=total_time,
             total_llm_calls=1,
@@ -401,9 +400,6 @@ class RAGFilter(LLMFilter):
         return candidate, embed_stats
 
     def filter(self, candidate: DataRecord) -> tuple[dict[str, bool], GenerationStats]:
-        # set client
-        self.client = OpenAI() if self.client is None else self.client
-
         # get the set of input fields to use for the filter operation
         input_fields = self.get_input_fields()
 
