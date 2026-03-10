@@ -168,8 +168,6 @@ class ApplyGroupByOp(AggregateOp):
         # return list of data records (one per group)
         drs: list[DataRecord] = []
         group_by_fields = self.gby_fields
-        # Construct aggregation field names: "func(field)"
-        agg_field_names = [f"{field}" for field in self.agg_fields]
         for g in agg_state:
             # build up data item
             data_item = {}
@@ -179,7 +177,7 @@ class ApplyGroupByOp(AggregateOp):
             vals = agg_state[g]
             for i in range(0, len(vals)):
                 v = ApplyGroupByOp.agg_final(self.agg_funcs[i], vals[i])
-                data_item[agg_field_names[i]] = v
+                data_item[self.agg_fields[i]] = v
 
             # create new DataRecord
             schema = self.output_schema
@@ -809,22 +807,9 @@ class SemanticGroupByOp(AggregateOp):
         model_conversion_time_per_record = MODEL_CARDS[model_name]["seconds_per_output_token"] * est_num_output_tokens
 
         # get est. of conversion cost (in USD) per record from model card
-        # Check for audio models first
-        if "usd_per_audio_input_token" in MODEL_CARDS[model_name]:
-            usd_per_input_token = MODEL_CARDS[model_name]["usd_per_audio_input_token"]
-        else:
-            usd_per_input_token = MODEL_CARDS[model_name].get("usd_per_input_token")
-        
-        if usd_per_input_token is None:
-            raise ValueError(
-                f"Model '{model_name}' has usd_per_input_token=None in MODEL_CARDS. "
-                f"This model may not support cost estimation. Model card: {MODEL_CARDS[model_name]}"
-            )
-        
-        model_conversion_usd_per_record = (
-            usd_per_input_token * est_num_input_tokens
-            + MODEL_CARDS[model_name]["usd_per_output_token"] * est_num_output_tokens
-        )
+        usd_per_input_token = self.model.get_usd_per_input_token()
+        if getattr(self, "prompt_strategy", None) is not None and self.is_audio_op():
+            usd_per_input_token = self.model.get_usd_per_audio_input_token()
 
         # estimate quality of output based on the strength of the model being used
         quality = (MODEL_CARDS[model_name]["overall"] / 100.0)
@@ -887,7 +872,7 @@ class SemanticGroupByOp(AggregateOp):
         record_op_stats_lst = []
         
         # Get the output field names from the output schema
-        output_field_names = [f for f in self.output_schema.model_fields.keys() if f not in self.gby_fields]
+        output_field_names = [f for f in self.output_schema.model_fields if f not in self.gby_fields]
         
         for group_key in agg_state:
             # Build aggregated data item for this group
@@ -938,7 +923,7 @@ class SemanticGroupByOp(AggregateOp):
         
         return DataRecordSet(drs, record_op_stats_lst)
     
-    def _assign_groups_llm(self, candidates: list[DataRecord]) -> tuple[list[str], any]:
+    def _assign_groups_llm(self, candidates: list[DataRecord]) -> tuple[list[str], GenerationStats]:
         """
         Phase 1: Use LLM to assign each candidate to a semantic group.
         
