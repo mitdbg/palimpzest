@@ -61,12 +61,13 @@ def bonded_llm_convert_plan(email_schema, enron_eval_tiny):
 
 
 @pytest.fixture
-def rag_convert_plan(email_schema, enron_eval_tiny):
+def rag_convert_plan(email_schema, enron_eval_tiny, embedding_text_only_model):
     scan_op = MarshalAndScanDataOp(output_schema=TextFile, datasource=enron_eval_tiny, logical_op_id="scan1")
     convert_op_llm = RAGConvert(
         input_schema=TextFile,
         output_schema=email_schema,
         model=Model.GPT_4o_MINI,
+        embedding_model=embedding_text_only_model,
         num_chunks_per_field=1,
         chunk_size=1000,
         logical_op_id="rag_convert1",

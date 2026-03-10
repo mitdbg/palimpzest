@@ -19,6 +19,9 @@ paper-imgs/
 testdata/enron-tiny.csv
 testdata/*/
 testdata/*.tar.gz
+tests/pytest/data/generator_messages/
+scripts/provider_stats/
+scripts/litellm_stats/
 
 # python artifacts
 *.egg-info
@@ -53,8 +56,14 @@ testdata/enron-eval/*.txt
 pyrightconfig.json
 
 myenv/
+pz-env/
 
 # abacus-research data
 abacus-research/cuad-data/*
 abacus-research/opt-profiling-data/*
 abacus-research/parse-answer-errors/*
+
+# stats
+scripts/litellm_stats/
+scripts/provider_stats/
+tests/pytest/data/generator_messages/

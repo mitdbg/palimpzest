@@ -58,7 +58,7 @@ def mock_generator_call(candidate, fields, right_candidate=None, json_output=Tru
     [LLMFilter, RAGFilter, SplitFilter, CritiqueAndRefineFilter, MixtureOfAgentsFilter],
     ids=["llm-filter", "rag-filter", "split-filter", "critique-and-refine-filter", "mixture-of-agents-filter"],
 )
-def test_filter(mocker, input_schema, physical_op_class):
+def test_filter(mocker, input_schema, physical_op_class, embedding_text_only_model):
     """Test filter operators on simple input"""
     # RAGFilter and SplitFilter only support text input currently
     if physical_op_class in [RAGFilter, SplitFilter] and input_schema != TextInputSchema:
@@ -68,6 +68,7 @@ def test_filter(mocker, input_schema, physical_op_class):
         pytest.skip("Skipping multi-modal audio tests on CI which does not have access to gemini models")
 
     model = Model.GPT_5_MINI if os.getenv("NO_GEMINI") else Model.GEMINI_2_5_FLASH
+    embedding_model = embedding_text_only_model
     proposer_models = [Model.GPT_5, Model.GPT_5_NANO] if os.getenv("NO_GEMINI") else [Model.GEMINI_2_5_PRO, Model.GEMINI_2_0_FLASH]
     critic_model = Model.GPT_5_NANO if os.getenv("NO_GEMINI") else Model.GEMINI_2_0_FLASH
     refine_model = Model.GPT_5 if os.getenv("NO_GEMINI") else Model.GEMINI_2_5_PRO
@@ -79,6 +80,7 @@ def test_filter(mocker, input_schema, physical_op_class):
         physical_op_kwargs["model"] = model
     elif physical_op_class is RAGFilter:
         physical_op_kwargs["model"] = model
+        physical_op_kwargs["embedding_model"] = embedding_model
         physical_op_kwargs["num_chunks_per_field"] = 1
         physical_op_kwargs["chunk_size"] = 1000
     elif physical_op_class is SplitFilter:

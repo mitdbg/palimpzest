@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pydantic.fields import FieldInfo
 
-from palimpzest.constants import MODEL_CARDS, Cardinality, Model, PromptStrategy
+from palimpzest.constants import Cardinality, Model, PromptStrategy
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.models import GenerationStats, OperatorCostEstimates
 from palimpzest.query.generators.generators import Generator
@@ -33,10 +33,10 @@ class MixtureOfAgentsConvert(LLMConvert):
 
         # create generators
         self.proposer_generators = [
-            Generator(model, PromptStrategy.MAP_MOA_PROPOSER, self.reasoning_effort, self.api_base, self.cardinality, self.desc, self.verbose)
+            Generator(model, PromptStrategy.MAP_MOA_PROPOSER, self.reasoning_effort, self.cardinality, self.desc, self.verbose)
             for model in proposer_models
         ]
-        self.aggregator_generator = Generator(aggregator_model, PromptStrategy.MAP_MOA_AGG, self.reasoning_effort, self.api_base, self.cardinality, self.desc, self.verbose)
+        self.aggregator_generator = Generator(aggregator_model, PromptStrategy.MAP_MOA_AGG, self.reasoning_effort, self.cardinality, self.desc, self.verbose)
 
     def __str__(self):
         op = super().__str__()
@@ -90,7 +90,7 @@ class MixtureOfAgentsConvert(LLMConvert):
 
         # for naive setting, estimate quality as mean of all model qualities
         model_qualities = [
-            MODEL_CARDS[model.value]["overall"] / 100.0
+            model.get_overall_score() / 100.0
             for model in self.proposer_models + [self.aggregator_model]
         ]
         naive_op_cost_estimates.quality = sum(model_qualities)/(len(self.proposer_models) + 1)
@@ -150,10 +150,10 @@ class MixtureOfAgentsFilter(LLMFilter):
 
         # create generators
         self.proposer_generators = [
-            Generator(model, PromptStrategy.FILTER_MOA_PROPOSER, self.reasoning_effort, self.api_base, Cardinality.ONE_TO_ONE, self.desc, self.verbose)
+            Generator(model, PromptStrategy.FILTER_MOA_PROPOSER, self.reasoning_effort, Cardinality.ONE_TO_ONE, self.desc, self.verbose)
             for model in proposer_models
         ]
-        self.aggregator_generator = Generator(aggregator_model, PromptStrategy.FILTER_MOA_AGG, self.reasoning_effort, self.api_base, Cardinality.ONE_TO_ONE, self.desc, self.verbose)
+        self.aggregator_generator = Generator(aggregator_model, PromptStrategy.FILTER_MOA_AGG, self.reasoning_effort, Cardinality.ONE_TO_ONE, self.desc, self.verbose)
 
     def __str__(self):
         op = super().__str__()
@@ -206,7 +206,7 @@ class MixtureOfAgentsFilter(LLMFilter):
 
         # for naive setting, estimate quality as mean of all model qualities
         model_qualities = [
-            MODEL_CARDS[model.value]["overall"] / 100.0
+            model.get_overall_score() / 100.0
             for model in self.proposer_models + [self.aggregator_model]
         ]
         naive_op_cost_estimates.quality = sum(model_qualities)/(len(self.proposer_models) + 1)
