@@ -5,13 +5,22 @@ from palimpzest.core.models import PlanCost
 from palimpzest.policy import Policy
 
 
-def get_models(include_embedding: bool = False, use_vertex: bool = False, gemini_credentials_path: str | None = None) -> list[Model]:
+def get_models(include_embedding: bool = False, use_vertex: bool = False, use_azure: bool = False, gemini_credentials_path: str | None = None, azure_endpoint: str | None = None, azure_api_version: str | None = None) -> list[Model]:
     """
     Return the set of models which the system has access to based on the set environment variables.
+    
+    Args:
+        include_embedding: Whether to include embedding models
+        use_vertex: Whether to use Vertex AI for Google models
+        use_azure: Whether to use Azure for OpenAI models
+        gemini_credentials_path: Path to Google credentials
+        azure_endpoint: Azure endpoint URL (optional, defaults to AZURE_API_BASE env var)
+        azure_api_version: Azure API version (optional, defaults to AZURE_API_VERSION env var)
     """
     models = []
     all_models = Model.get_all_models()
 
+    azure_key = os.getenv("AZURE_API_KEY") or os.getenv("AZURE_OPENAI_API_KEY")
     if os.getenv("OPENAI_API_KEY") not in [None, ""]:
         openai_models = [model for model in all_models if model.is_provider_openai()]
         if not include_embedding:
@@ -19,6 +28,14 @@ def get_models(include_embedding: bool = False, use_vertex: bool = False, gemini
                 model for model in openai_models if not model.is_embedding_model()
             ]
         models.extend(openai_models)
+
+    elif azure_key not in [None, ""] and use_azure:
+        azure_models = [model for model in all_models if model.is_provider_azure()]
+        if not include_embedding:
+            azure_models = [
+                model for model in azure_models if not model.is_embedding_model()
+            ]
+        models.extend(azure_models)
 
     if os.getenv("TOGETHER_API_KEY") not in [None, ""]:
         together_models = [model for model in all_models if model.is_provider_together_ai()]
@@ -58,19 +75,31 @@ def get_models(include_embedding: bool = False, use_vertex: bool = False, gemini
 
     return models
 
-def get_optimal_models(policy: Policy, include_embedding: bool = False, use_vertex: bool = False, gemini_credentials_path: str | None = None) -> list[Model]:
+def get_optimal_models(policy: Policy, include_embedding: bool = False, use_vertex: bool = False, use_azure: bool = False, gemini_credentials_path: str | None = None, azure_endpoint: str | None = None, azure_api_version: str | None = None) -> list[Model]:
     """
     Selects the top models from the available list based on the user's policy.
 
     Post-condition: This function will never return an empty list unless there are
     no available models at all. If policy constraints filter out all models, it
     falls back to returning the best model(s) based on the policy's primary metric.
+    
+    Args:
+        policy: Policy to use for model selection
+        include_embedding: Whether to include embedding models
+        use_vertex: Whether to use Vertex AI for Google models
+        use_azure: Whether to use Azure for OpenAI models
+        gemini_credentials_path: Path to Google credentials
+        azure_endpoint: Azure endpoint URL (optional, defaults to AZURE_API_BASE env var)
+        azure_api_version: Azure API version (optional, defaults to AZURE_API_VERSION env var)
     """
     # gather available models
     available_models = get_models(
         include_embedding=include_embedding,
         use_vertex=use_vertex,
+        use_azure=use_azure,
         gemini_credentials_path=gemini_credentials_path,
+        azure_endpoint=azure_endpoint,
+        azure_api_version=azure_api_version,
     )
 
     if not available_models:
@@ -187,7 +216,7 @@ def resolve_reasoning_effort(model: Model, reasoning_effort: str) -> str | None:
             reasoning_effort = "low"
         elif reasoning_effort is None:
             reasoning_effort = "disable"
-    elif model.is_provider_openai():
+    elif model.is_provider_openai() or model.is_provider_azure():
         reasoning_effort = "low" if reasoning_effort in [None, "disable", "minimal", "low"] else reasoning_effort
 
     return reasoning_effort

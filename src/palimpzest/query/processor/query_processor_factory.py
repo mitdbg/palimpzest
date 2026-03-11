@@ -78,7 +78,10 @@ class QueryProcessorFactory:
             current_available_models = get_optimal_models(
                 policy = config.policy,
                 use_vertex = config.use_vertex,
+                use_azure = config.use_azure,
                 gemini_credentials_path = config.gemini_credentials_path,
+                azure_endpoint = config.azure_endpoint,
+                azure_api_version = config.azure_api_version,
             )
 
         # get the list of models to remove (if provided by the user's config)
@@ -132,6 +135,7 @@ class QueryProcessorFactory:
             raise ValueError("No available models found.")
 
         openai_key = os.getenv("OPENAI_API_KEY")
+        azure_key = os.getenv("AZURE_API_KEY") or os.getenv("AZURE_OPENAI_API_KEY")
         anthropic_key = os.getenv("ANTHROPIC_API_KEY")
         together_key = os.getenv("TOGETHER_API_KEY")
         gemini_key = os.getenv("GEMINI_API_KEY")
@@ -144,6 +148,8 @@ class QueryProcessorFactory:
         for model in config.available_models:
             if model.is_provider_openai() and not openai_key:
                 raise ValueError("OPENAI_API_KEY must be set to use OpenAI models.")
+            if model.is_provider_azure() and not azure_key:
+                raise ValueError("AZURE_API_KEY or AZURE_OPENAI_API_KEY must be set to use Azure OpenAI models.")
             if model.is_provider_anthropic() and not anthropic_key:
                 raise ValueError("ANTHROPIC_API_KEY must be set to use Anthropic models.")
             if model.is_provider_together_ai() and not together_key:

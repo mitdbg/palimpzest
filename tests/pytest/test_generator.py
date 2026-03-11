@@ -37,8 +37,9 @@ def output_schema():
     "model",
     [
         pytest.param(Model.GPT_4o_MINI, marks=pytest.mark.skipif(os.getenv("OPENAI_API_KEY") is None, reason="OPENAI_API_KEY not present")),
+        pytest.param(Model.AZURE_GPT_4o_MINI, marks=pytest.mark.skipif(os.getenv("AZURE_API_KEY") is None and os.getenv("AZURE_OPENAI_API_KEY") is None, reason="AZURE_API_KEY/AZURE_OPENAI_API_KEY not present")),
         pytest.param(Model.DEEPSEEK_V3, marks=pytest.mark.skipif(os.getenv("TOGETHER_API_KEY") is None, reason="TOGETHER_API_KEY not present")),
-        pytest.param(Model.LLAMA3_2_3B, marks=pytest.mark.skipif(os.getenv("TOGETHER_API_KEY") is None, reason="TOGETHER_API_KEY not present")),
+        pytest.param(Model.LLAMA3_1_8B, marks=pytest.mark.skipif(os.getenv("TOGETHER_API_KEY") is None, reason="TOGETHER_API_KEY not present")),
         pytest.param(Model.CLAUDE_4_5_HAIKU, marks=pytest.mark.skipif(os.getenv("ANTHROPIC_API_KEY") is None, reason="ANTHROPIC_API_KEY not present")),
     ]
 )
@@ -241,6 +242,43 @@ EXPECTED_STATS = {
         },
     },
     ("openai", "image-only"): {
+        "first_request": {
+            "input_text_tokens": 2220,
+            "input_image_tokens": 0,
+            "input_audio_tokens": 0,
+            "cache_read_tokens": 0,
+            "cache_creation_tokens": 0,
+            "output_tokens": 85,
+        },
+        "second_request": {
+            "input_text_tokens": 428,
+            "input_image_tokens": 0,
+            "input_audio_tokens": 0,
+            "cache_read_tokens": 1792,
+            "cache_creation_tokens": 0,
+            "output_tokens": 75,
+        },
+    },
+    # Azure OpenAI - azure/gpt-4o-2024-08-06 (same model as OpenAI, same expected stats)
+    ("azure", "text-only"): {
+        "first_request": {
+            "input_text_tokens": 1856,
+            "input_image_tokens": 0,
+            "input_audio_tokens": 0,
+            "cache_read_tokens": 0,
+            "cache_creation_tokens": 0,
+            "output_tokens": 131,
+        },
+        "second_request": {
+            "input_text_tokens": 832,
+            "input_image_tokens": 0,
+            "input_audio_tokens": 0,
+            "cache_read_tokens": 1024,
+            "cache_creation_tokens": 0,
+            "output_tokens": 88,
+        },
+    },
+    ("azure", "image-only"): {
         "first_request": {
             "input_text_tokens": 2220,
             "input_image_tokens": 0,
@@ -463,6 +501,8 @@ def get_model_for_provider(provider: str) -> Model:
         return Model.GPT_4o
     elif provider == "openai-audio":
         return Model.GPT_4o_AUDIO_PREVIEW
+    elif provider == "azure":
+        return Model.AZURE_GPT_4o
     elif provider == "gemini":
         return Model.GOOGLE_GEMINI_2_5_FLASH
     elif provider == "vertex_ai":
@@ -514,10 +554,15 @@ PROVIDER_CONFIG = {
         "supported_modalities": ["text-only", "image-only", "audio-only", "text-image-audio"],
         "api_key_env": ["GOOGLE_APPLICATION_CREDENTIALS", "VERTEX_PROJECT"],
     },
+    "azure": {
+        "model": Model.AZURE_GPT_4o,
+        "supported_modalities": ["text-only", "image-only"],
+        "api_key_env": ["AZURE_API_KEY", "AZURE_OPENAI_API_KEY"],
+    },
 }
 
 ALL_MODALITIES = ["text-only", "image-only", "audio-only", "text-image-audio"]
-ALL_PROVIDERS = ["anthropic", "openai", "openai-audio", "gemini", "vertex_ai"]
+ALL_PROVIDERS = ["anthropic", "openai", "openai-audio", "gemini", "vertex_ai", "azure"]
 
 CACHE_WAIT_SECONDS = 10
 
@@ -551,7 +596,7 @@ def assert_stats_match(gen_stats, expected: dict, request_name: str, provider: s
     So for cache_read_tokens we accept anywhere in [0, expected+5%],
     and input_text_tokens is validated as: total logical input ≈ input_text + cache_read.
     """
-    has_implicit_caching = provider.startswith("openai") or provider.startswith("gemini")
+    has_implicit_caching = provider.startswith("openai") or provider.startswith("gemini") or provider == "azure"
 
     if has_implicit_caching and expected.get("cache_read_tokens") is not None and expected["cache_read_tokens"] > 0:
         # Implicit caching (OpenAI/Gemini): cache hit is non-deterministic, accept 0..expected+tolerance
