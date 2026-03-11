@@ -116,9 +116,9 @@ def main():
         preds = set(pred_docs)
         labels = set(gt_docs)
 
-        tp = sum(1 for p in preds if p in labels)
+        tp = sum(1 for pred in preds if pred in labels)
         fp = len(preds) - tp
-        fn = sum(1 for l in labels if l not in preds)
+        fn = sum(1 for label in labels if label not in preds)
 
         precision = tp / (tp + fp) if (tp + fp) > 0 else 0
         recall = tp / (tp + fn) if (tp + fn) > 0 else 0
