@@ -68,6 +68,7 @@ PROVIDER_MAPPING = {
 # API key environment variable mapping
 API_KEY_MAPPING = {
     "openai": "OPENAI_API_KEY",
+    "azure": "AZURE_API_KEY",
     "anthropic": "ANTHROPIC_API_KEY",
     "vertex_ai": "GOOGLE_APPLICATION_CREDENTIALS",
     "gemini": "GEMINI_API_KEY",
@@ -126,7 +127,7 @@ def extract_provider(model_id: str) -> str:
     model_lower = model_id.lower()
     
     # OpenAI
-    if any(x in model_lower for x in ["gpt", "o1-", "o3-", "dall-e", "whisper"]):
+    if any(x in model_lower for x in ["gpt", "o1-", "o3-", "o4-", "dall-e", "whisper"]):
         return "openai"
     
     # Anthropic

@@ -17,6 +17,7 @@ Supported providers:
 - Google/Vertex AI: gemini-2.5-flash (all seven modality combinations)
 - OpenAI: gpt-4o-2024-08-06 (text, image, text+image)
 - OpenAI: gpt-4o-audio-preview (text+audio, audio)
+- Azure: gpt-4o-2024-08-06 via Azure OpenAI (text, image, text+image)
 
 Output files are saved to: tests/pytest/scripts/provider_stats/
 """
@@ -107,6 +108,10 @@ PROVIDER_MODALITY_SUPPORT = {
             "image-audio",
             "text-image-audio",
         ],
+    },
+    "azure": {
+        "model": "gpt-4o-2024-08-06",
+        "supported_modalities": ["text-only", "image-only", "text-image"],
     },
 }
 
@@ -437,6 +442,77 @@ def call_openai_api(messages: list[dict], model: str, cache_key: str | None = No
     }
 
 
+# NOTE: this function was generated speculatively and has not been tested, so it may have errors
+def call_azure_api(messages: list[dict], model: str, cache_key: str | None = None) -> dict[str, Any]:
+    """
+    Call Azure OpenAI API directly and return usage statistics.
+
+    Uses the same message format as OpenAI, but routes through Azure endpoints.
+
+    Args:
+        messages: List of message dicts
+        model: Model name (deployment name)
+        cache_key: Optional prompt_cache_key for sticky routing to same cache shard
+
+    Returns dict with:
+    - completion_tokens
+    - prompt_tokens
+    - prompt_tokens_details (cached_tokens, text_tokens, image_tokens, audio_tokens)
+    - total_tokens
+    """
+    import openai
+
+    api_key = os.environ.get("AZURE_API_KEY") or os.environ.get("AZURE_OPENAI_API_KEY")
+    azure_endpoint = os.environ.get("AZURE_API_BASE")
+    api_version = os.environ.get("AZURE_API_VERSION", "2024-12-01-preview")
+
+    if not api_key:
+        raise ValueError("AZURE_API_KEY or AZURE_OPENAI_API_KEY must be set")
+    if not azure_endpoint:
+        raise ValueError("AZURE_API_BASE must be set")
+
+    client = openai.AzureOpenAI(
+        api_key=api_key,
+        azure_endpoint=azure_endpoint,
+        api_version=api_version,
+    )
+
+    openai_messages = transform_messages_for_openai(messages)
+
+    kwargs = {"model": model, "messages": openai_messages, "temperature": 0.0}
+
+    # Add prompt_cache_key for caching (ensures requests route to same cache shard)
+    if cache_key:
+        kwargs["extra_body"] = {"prompt_cache_key": cache_key}
+
+    response = client.chat.completions.create(**kwargs)
+
+    # Extract complete usage stats
+    usage_dict = {}
+    if response.usage:
+        usage_dict = response.usage.model_dump()
+
+    # Get response text safely
+    try:
+        response_text = response.choices[0].message.content[:200] if response.choices and response.choices[0].message.content else None
+    except Exception:
+        response_text = None
+
+    # Serialize the full response
+    try:
+        raw_response = response.model_dump()
+    except Exception:
+        raw_response = str(response)
+
+    return {
+        "provider": "azure",
+        "model": model,
+        "usage": usage_dict,
+        "response_content": response_text,
+        "raw_response": raw_response,
+    }
+
+
 def call_anthropic_api(messages: list[dict], model: str) -> dict[str, Any]:
     """
     Call Anthropic API directly and return usage statistics.
@@ -602,12 +678,14 @@ def capture_stats_for_provider(
     - first_request: stats from first request
     - second_request: stats from second request (should show cache hits)
     """
-    # Generate a unique cache key for OpenAI (ensures both requests hit the same cache shard)
-    openai_cache_key = f"pz-test-{uuid.uuid4().hex[:12]}" if provider in ("openai", "openai-audio") else None
+    # Generate a unique cache key for OpenAI/Azure (ensures both requests hit the same cache shard)
+    openai_cache_key = f"pz-test-{uuid.uuid4().hex[:12]}" if provider in ("openai", "openai-audio", "azure") else None
 
     print("    First request...")
     if provider == "openai" or provider == "openai-audio":
         first_stats = call_openai_api(messages, model, cache_key=openai_cache_key)
+    elif provider == "azure":
+        first_stats = call_azure_api(messages, model, cache_key=openai_cache_key)
     elif provider == "anthropic":
         first_stats = call_anthropic_api(messages, model)
     elif provider == "gemini":
@@ -625,6 +703,8 @@ def capture_stats_for_provider(
     print("    Second request (should show cache hits)...")
     if provider == "openai" or provider == "openai-audio":
         second_stats = call_openai_api(messages, model, cache_key=openai_cache_key)
+    elif provider == "azure":
+        second_stats = call_azure_api(messages, model, cache_key=openai_cache_key)
     elif provider == "anthropic":
         second_stats = call_anthropic_api(messages, model)
     elif provider == "gemini":
