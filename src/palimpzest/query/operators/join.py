@@ -1,39 +1,34 @@
 from __future__ import annotations
 
-import regex as re
 import threading
 import time
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from dotenv import load_dotenv
-
 import numpy as np
+import regex as re
+import tiktoken
 from litellm import embedding as litellm_embedding
 from numpy.linalg import norm
 from PIL import Image
 from pydantic.fields import FieldInfo
 from sentence_transformers import SentenceTransformer
 from transformers import AutoTokenizer
-import tiktoken
 
 from palimpzest.constants import (
-    NAIVE_EST_JOIN_SELECTIVITY,
-    NAIVE_EST_NUM_INPUT_TOKENS,
-    Cardinality,
-    Model,
-    PromptStrategy,
+     NAIVE_EST_JOIN_SELECTIVITY,
+     NAIVE_EST_NUM_INPUT_TOKENS,
+     Cardinality,
+     Model,
+     PromptStrategy,
 )
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.core.lib.schemas import AUDIO_FIELD_TYPES, IMAGE_FIELD_TYPES, ImageFilepath
 from palimpzest.core.models import GenerationStats, OperatorCostEstimates, RecordOpStats
+from palimpzest.prompts.block_join_prompts import BLOCK_JOIN_BASE_USER_PROMPT, BLOCK_JOIN_NO_REASONING_BASE_USER_PROMPT
 from palimpzest.query.generators.generators import Generator
 from palimpzest.query.operators.physical import PhysicalOperator
 
-from palimpzest.prompts.block_join_prompts import (
-    BLOCK_JOIN_BASE_USER_PROMPT,
-    BLOCK_JOIN_NO_REASONING_BASE_USER_PROMPT
-)
 
 class Singleton:
      def __new__(cls, *args, **kw):
@@ -820,8 +815,8 @@ class BlockNestedLoopsJoin(LLMJoin):
                         left_pair_str, right_pair_str = pair_str.split(",")
                         index_pairs.append((int(left_pair_str.strip()), int(right_pair_str.strip())))
                 return {"all_matches": index_pairs}
-            except Exception:
-                raise Exception(f"Could not parse answer from completion text: {answer_text}")
+            except Exception as e:
+                raise Exception(f"Could not parse answer from completion text: {answer_text}") from e
 
         # get batch sizes
         left_batch_size, right_batch_size = self.batch_sizes if self.batch_sizes is not None else self._find_batch_sizes(left_candidates, right_candidates, self.known_selectivity)
