@@ -442,6 +442,7 @@ def call_openai_api(messages: list[dict], model: str, cache_key: str | None = No
     }
 
 
+# NOTE: this function was generated speculatively and has not been tested, so it may have errors
 def call_azure_api(messages: list[dict], model: str, cache_key: str | None = None) -> dict[str, Any]:
     """
     Call Azure OpenAI API directly and return usage statistics.
