@@ -30,7 +30,7 @@ class PromptManager:
     def __init__(self, model: Model):
         self.model = model
         # Instance-level state ensures thread safety if we use one manager per plan/execution
-        self.openai_cache_key = f"pz-cache-{uuid.uuid4().hex[:12]}" if self.model.is_provider_openai() else None
+        self.openai_cache_key = f"pz-cache-{uuid.uuid4().hex[:12]}" if (self.model.is_provider_openai() or self.model.is_provider_azure()) else None
 
     def get_cache_kwargs(self) -> dict[str, Any]:
         """
@@ -41,9 +41,9 @@ class PromptManager:
         """
         if not self.model.supports_prompt_caching():
             return {}
-        # OpenAI: https://platform.openai.com/docs/guides/prompt-caching
+        # OpenAI and Azure OpenAI: https://platform.openai.com/docs/guides/prompt-caching
         # Use prompt_cache_key for sticky routing to the same cache shard
-        if self.model.is_provider_openai():
+        if self.model.is_provider_openai() or self.model.is_provider_azure():
             return {"extra_body": {"prompt_cache_key": self.openai_cache_key}}
         else:
             return {}
@@ -79,10 +79,10 @@ class PromptManager:
         # https://platform.claude.com/docs/en/build-with-claude/prompt-caching
         if self.model.is_provider_anthropic():
             return self._transform_messages_for_anthropic(messages)
-        # implicit caching for Gemini/OpenAI models that currently support caching
+        # implicit caching for Gemini/OpenAI/Azure models that currently support caching
         # OpenAI: https://platform.openai.com/docs/guides/prompt-caching
         # Gemini: https://ai.google.dev/gemini-api/docs/caching
-        elif (self.model.is_provider_openai() or
+        elif (self.model.is_provider_openai() or self.model.is_provider_azure() or
               self.model.is_provider_google_ai_studio() or self.model.is_provider_vertex_ai()):
             return self._remove_cache_boundary_markers(messages)
 
@@ -103,7 +103,7 @@ class PromptManager:
 
         details = usage.get("prompt_tokens_details") or {}
 
-        if self.model.is_provider_openai():
+        if self.model.is_provider_openai() or self.model.is_provider_azure():
             # only realtime audio models do, but they are not supported by PZ
             if self.model.supports_prompt_caching() and not is_audio_op:
                 stats["cache_read_tokens"] = details.get("cached_tokens") or 0

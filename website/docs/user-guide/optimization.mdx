@@ -53,7 +53,7 @@ emails = pz.TextFileDataset(id="enron-emails", path="emails/")
 
 # filter for emails matching natural language criteria
 emails = emails.sem_filter(
-    'The email refers to one of the following business transactions: "Raptor", "Deathstar", "Chewco", and/or "Fat Boy")',
+    'The email refers to one of the following business transactions: "Raptor", "Deathstar", "Chewco", and/or "Fat Boy"',
 )
 emails = emails.sem_filter(
     "The email contains a first-hand discussion of the business transaction",
@@ -218,7 +218,7 @@ train_dataset = pz.TextFileDataset(id="enron-emails", path="train-emails/")
 # construct plan
 emails = pz.TextFileDataset(id="enron-emails", path="test-emails/")
 emails = emails.sem_filter(
-    'The email refers to one of the following business transactions: "Raptor", "Deathstar", "Chewco", and/or "Fat Boy")',
+    'The email refers to one of the following business transactions: "Raptor", "Deathstar", "Chewco", and/or "Fat Boy"',
 )
 emails = emails.sem_filter(
     "The email contains a first-hand discussion of the business transaction",
@@ -260,7 +260,7 @@ emails = pz.TextFileDataset(id="enron-emails", path="emails/")
 
 # filter for emails matching natural language criteria
 emails = emails.sem_filter(
-    'The email refers to one of the following business transactions: "Raptor", "Deathstar", "Chewco", and/or "Fat Boy")',
+    'The email refers to one of the following business transactions: "Raptor", "Deathstar", "Chewco", and/or "Fat Boy"',
 )
 emails = emails.sem_filter(
     "The email contains a first-hand discussion of the business transaction",

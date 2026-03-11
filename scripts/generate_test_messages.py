@@ -12,6 +12,7 @@ Supported provider/modality combinations:
 - OpenAI-Audio: audio-only, text-audio
 - Gemini: all 7 modality combinations
 - Vertex AI: all 7 modality combinations
+- Azure: text-only, image-only, text-image
 
 Output files are saved to: tests/pytest/data/generator_messages/
 Format: {modality}_{provider}.json (e.g., text-only_anthropic.json)
@@ -243,6 +244,10 @@ PROVIDER_CONFIGS = {
             "text-only", "image-only", "audio-only",
             "text-image", "text-audio", "image-audio", "text-image-audio",
         ],
+    },
+    "azure": {
+        "model": Model.AZURE_GPT_4o,
+        "supported_modalities": ["text-only", "image-only", "text-image"],
     },
 }
 

@@ -40,7 +40,7 @@ def enron_workload(enron_eval_tiny, email_schema):
     emails = enron_eval_tiny
     emails = emails.sem_add_columns(email_schema)
     emails = emails.sem_filter(
-        'The email refers to a fraudulent scheme (i.e., "Raptor", "Deathstar", "Chewco", and/or "Fat Boy")'
+        'The email refers to a fraudulent scheme (i.e., "Raptor", "Deathstar", "Chewco", and/or "Fat Boy"'
     )
     emails = emails.sem_filter(
         "The email is not quoting from a news article or an article written by someone outside of Enron"
