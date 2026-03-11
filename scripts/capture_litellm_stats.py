@@ -18,6 +18,7 @@ Supported providers:
 - Google/Gemini: gemini-2.5-flash (all seven modality combinations)
 - OpenAI: gpt-4o-2024-08-06 (text, image, text+image)
 - OpenAI: gpt-4o-audio-preview (text+audio, audio)
+- Azure: gpt-4o via Azure OpenAI (text, image, text+image)
 
 Output files are saved to: scripts/litellm_stats/
 """
@@ -168,6 +169,10 @@ PROVIDER_MODALITY_SUPPORT = {
             "text-image-audio",
         ],
     },
+    "azure": {
+        "model": Model.AZURE_GPT_4o,
+        "supported_modalities": ["text-only", "image-only", "text-image"],
+    },
 }
 
 
@@ -305,7 +310,7 @@ def call_litellm_api(
 
     # Apply provider-specific caching configuration
     # Messages from generator_messages already have cache_control markers for Anthropic
-    if model.is_provider_openai() and cache_key:
+    if (model.is_provider_openai() or model.is_provider_azure()) and cache_key:
         # OpenAI: Use prompt_cache_key for sticky routing to the same cache shard
         # https://platform.openai.com/docs/guides/prompt-caching
         completion_kwargs["extra_body"] = {"prompt_cache_key": cache_key}
@@ -395,7 +400,7 @@ def capture_stats_for_provider(
     """
     # Generate a unique cache key for OpenAI (ensures both requests hit the same cache shard)
     # Reference: capture_provider_stats.py and PromptManager.__init__
-    openai_cache_key = f"pz-test-{uuid.uuid4().hex[:12]}" if provider in ("openai", "openai-audio") else None
+    openai_cache_key = f"pz-test-{uuid.uuid4().hex[:12]}" if provider in ("openai", "openai-audio", "azure") else None
 
     print("    First request...")
     first_stats = call_litellm_api(messages, model, provider, cache_key=openai_cache_key)

@@ -281,6 +281,8 @@ class Model:
         """
         if self.provider == "gemini":
             return "GEMINI_API_KEY" if os.getenv("GEMINI_API_KEY") else "GOOGLE_API_KEY"
+        if self.provider == "azure":
+            return "AZURE_API_KEY" if os.getenv("AZURE_API_KEY") else "AZURE_OPENAI_API_KEY"
         mapping = {
             "openai": "OPENAI_API_KEY",
             "vertex_ai": "GOOGLE_APPLICATION_CREDENTIALS",
@@ -330,6 +332,9 @@ class Model:
     def is_provider_openai(self) -> bool:
         return self.provider == "openai"
     
+    def is_provider_azure(self) -> bool:
+        return self.provider == "azure"
+    
     def is_provider_together_ai(self) -> bool:
         return self.provider == "together_ai"
     
@@ -370,7 +375,7 @@ class Model:
         return self.is_audio_model() and self.is_text_model()
 
     def supports_prompt_caching(self) -> bool:
-        return (self.is_provider_anthropic() or self.is_provider_google_ai_studio() or self.is_provider_vertex_ai or self.is_provider_openai()) \
+        return (self.is_provider_anthropic() or self.is_provider_google_ai_studio() or self.is_provider_vertex_ai or self.is_provider_openai() or self.is_provider_azure()) \
             and self.model_specs.get("supports_prompt_caching", False)
 
     def get_usd_per_input_token(self) -> float:
@@ -416,7 +421,7 @@ class Model:
     def get_overall_score(self) -> float:
         return self.model_specs.get("MMLU_Pro_score", 0.0)
 
-Model.LLAMA3_2_3B = Model("together_ai/meta-llama/Llama-3.2-3B-Instruct-Turbo")
+# Model.LLAMA3_2_3B = Model("together_ai/meta-llama/Llama-3.2-3B-Instruct-Turbo") - seems to be deprecated
 Model.LLAMA3_1_8B = Model("together_ai/meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo")
 Model.LLAMA3_3_70B = Model("together_ai/meta-llama/Llama-3.3-70B-Instruct-Turbo")
 Model.LLAMA3_2_90B_V = Model("together_ai/meta-llama/Llama-3.2-90B-Vision-Instruct-Turbo")
@@ -451,6 +456,14 @@ Model.GOOGLE_GEMINI_2_5_PRO = Model("gemini/gemini-2.5-pro")
 Model.LLAMA_4_MAVERICK = Model("vertex_ai/meta/llama-4-maverick-17b-128e-instruct-maas")
 Model.GPT_4o_AUDIO_PREVIEW = Model("openai/gpt-4o-audio-preview")
 Model.GPT_4o_MINI_AUDIO_PREVIEW = Model("openai/gpt-4o-mini-audio-preview")
+Model.AZURE_GPT_4o = Model("azure/gpt-4o-2024-08-06")
+Model.AZURE_GPT_4o_MINI = Model("azure/gpt-4o-mini-2024-07-18")
+Model.AZURE_GPT_4_1 = Model("azure/gpt-4.1-2025-04-14")
+Model.AZURE_GPT_4_1_MINI = Model("azure/gpt-4.1-mini-2025-04-14")
+Model.AZURE_GPT_4_1_NANO = Model("azure/gpt-4.1-nano-2025-04-14")
+Model.AZURE_o4_MINI = Model("azure/o4-mini-2025-04-16")  # noqa: N815
+Model.AZURE_GPT_4o_AUDIO_PREVIEW = Model("azure/gpt-4o-audio-preview")
+Model.AZURE_GPT_4o_MINI_AUDIO_PREVIEW = Model("azure/gpt-4o-mini-audio-preview")
 Model.TEXT_EMBEDDING_3_SMALL = Model("openai/text-embedding-3-small")
 Model.CLIP_VIT_B_32 = Model("clip-ViT-B-32")
 Model.NOMIC_EMBED_TEXT = Model("ollama/nomic-embed-text")
