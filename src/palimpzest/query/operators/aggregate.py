@@ -732,6 +732,9 @@ class SemanticAggregate(AggregateOp):
 
         return DataRecordSet([dr], [record_op_stats])
     
+# group by and aggregate functions must follow a prespecified spec 
+    # how do I enforce this
+     
 class SemanticGroupByOp(AggregateOp):
     """
     Implementation of a semantic GroupBy operator using LLMs. This operator groups records by a set 
@@ -820,6 +823,47 @@ class SemanticGroupByOp(AggregateOp):
             cost_per_record=model_conversion_usd_per_record,
             quality=quality,
         )
+
+    def __updated_call__(self, candidates: list[DataRecord]) -> DataRecordSet:
+        """
+        Update: Group By now handles the following:
+        1. multi-col groupBys (doesn't check semantic or not, but instead makes one LLM over the groups)
+        2. differentiates between semantic and non-semantic group bys and aggregates. 
+
+        The groupBy call specifies the group by field as well as the description of the type of grouping 
+        to be performed on the field. For example, if the field is "product name", the description might be "group products by their category". 
+
+        Args:
+            candidates: List of DataRecords to group and aggregate
+        
+        Returns:
+            DataRecordSet containing one DataRecord per group with aggregated values
+        """
+        start_time = time.time()
+        
+        # Handle empty input
+        if len(candidates) == 0:
+            return DataRecordSet([], [])
+        
+        # Check if there are any semantic group by fields
+        is_semantic_gby = any(isinstance(f, dict) for f in self.gby_fields_spec)
+        
+        # Check if there are any semantic aggregation functions
+        is_semantic_agg = any(f not in ["avg", "count", "sum", "min", "max", "list", "set"] for f in self.agg_funcs)
+        
+        # Phase 1: Perform grouping (semantic or non-semantic)
+        group_assignments, groupby_stats = self._perform_groupby(candidates, is_semantic_gby)
+        
+        # Phase 2: Perform aggregation for each group (semantic or non-semantic)
+        grouped_records = self._group_candidates_by_assignment(candidates, group_assignments)
+        
+        # Phase 3: Apply aggregation functions to each group
+        drs, agg_stats_list = self._perform_aggregation(
+            grouped_records, is_semantic_agg, groupby_stats, start_time
+        )
+        
+        return DataRecordSet(drs, agg_stats_list)
+
 
     def __call__(self, candidates: list[DataRecord]) -> DataRecordSet:
         """
