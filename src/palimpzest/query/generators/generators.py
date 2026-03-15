@@ -479,6 +479,9 @@ class Generator(Generic[ContextType, InputType]):
         logger.debug(f"PROMPT:\n{prompt}")
         logger.debug(Fore.GREEN + f"{completion_text}\n" + Style.RESET_ALL)
 
+        print(f"PROMPT:\n{prompt}")
+        print(Fore.GREEN + f"{completion_text}\n" + Style.RESET_ALL)
+
         # parse reasoning
         reasoning = None
         try:
