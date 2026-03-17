@@ -253,13 +253,14 @@ class PromptFactory:
         self.cardinality = cardinality
         self.desc = desc
 
-    def _get_context(self, candidate: DataRecord | list[DataRecord], input_fields: list[str]) -> str:
+    def _get_context(self, candidate: DataRecord | list[DataRecord], input_fields: list[str], add_index: bool = False) -> str:
         """
         Returns the context for the prompt.
 
         Args:
             candidate (DataRecord): The input record.
             input_fields (list[str]): The input fields.
+            add_index (bool): Whether to add record indices to the context. This is used in block joins.
 
         Returns:
             str: The context.
@@ -268,6 +269,13 @@ class PromptFactory:
         # get context from input record (project_cols will be None if not provided in kwargs)
         if isinstance(candidate, list):
             context: list[dict] = [record.to_dict(include_bytes=False, project_cols=input_fields, mask_filepaths=True) for record in candidate]
+            if add_index:
+                new_context: list[dict] = []
+                for idx, record_context in enumerate(context):
+                    new_record = {"_index": str(idx + 1)} | record_context
+                    new_context.append(new_record)
+                context = new_context
+
         else:
             context: dict = candidate.to_dict(include_bytes=False, project_cols=input_fields, mask_filepaths=True)
 
@@ -371,17 +379,20 @@ class PromptFactory:
         elif input_modalities == {Modality.TEXT, Modality.IMAGE, Modality.AUDIO}:
             return "text, image(s), and/or audio"
 
-    def _get_input_fields_desc(self, candidate: DataRecord, input_fields: list[str]) -> str:
+    def _get_input_fields_desc(self, candidate: DataRecord, input_fields: list[str], add_index: bool = False) -> str:
         """
         Returns a multi-line description of each input field for the prompt.
 
         Args:
             input_fields (list[str]): The input fields.
+            add_index (bool): Whether to add record indices to the field descriptions. This is used in block joins.
 
         Returns:
             str: The input fields description.
         """
         input_fields_desc = ""
+        if add_index:
+            input_fields_desc += "- _index: The index of the record in the collection\n"
         for field_name in input_fields:
             input_fields_desc += f"- {field_name}: {candidate.get_field_type(field_name).description}\n"
 
@@ -817,8 +828,8 @@ class PromptFactory:
         """
         # get format kwargs which depend on the input data
         input_format_kwargs = {
-            "context": self._get_context(candidate, input_fields),
-            "input_fields_desc": self._get_input_fields_desc(candidate[0] if isinstance(candidate, list) else candidate, input_fields),
+            "context": self._get_context(candidate, input_fields, kwargs.get("add_index", False)),
+            "input_fields_desc": self._get_input_fields_desc(candidate[0] if isinstance(candidate, list) else candidate, input_fields, kwargs.get("add_index", False)),
             "output_fields_desc": self._get_output_fields_desc(output_fields, **kwargs),
             "agg_instruction": self._get_agg_instruction(**kwargs),
             "filter_condition": self._get_filter_condition(**kwargs),
@@ -832,8 +843,8 @@ class PromptFactory:
         # if a right candidate is provided, we also get the context and input field descriptions for the right candidate
         if right_candidate is not None:
             input_format_kwargs.update({
-                "right_context": self._get_context(right_candidate, right_input_fields),
-                "right_input_fields_desc": self._get_input_fields_desc(right_candidate[0] if isinstance(right_candidate, list) else right_candidate, right_input_fields),
+                "right_context": self._get_context(right_candidate, right_input_fields, kwargs.get("add_index", False)),
+                "right_input_fields_desc": self._get_input_fields_desc(right_candidate[0] if isinstance(right_candidate, list) else right_candidate, right_input_fields, kwargs.get("add_index", False)),
             })
 
         # get format kwargs which depend on the prompt strategy
