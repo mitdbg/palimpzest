@@ -581,7 +581,7 @@ class BlockNestedLoopsJoin(LLMJoin):
             Model.GPT_5_MINI: (TIKTOKEN, "o200k_base"),
             Model.GPT_5_NANO: (TIKTOKEN, "o200k_base"),
             Model.o4_MINI: (TIKTOKEN, "o200k_base"),
-            Model.CLAUDE_3_5_SONNET: (TIKTOKEN, "cl100k_base"),
+            # Model.CLAUDE_3_5_SONNET: (TIKTOKEN, "cl100k_base"), retired
             Model.CLAUDE_3_7_SONNET: (TIKTOKEN, "cl100k_base"),
             Model.CLAUDE_3_5_HAIKU: (TIKTOKEN, "cl100k_base"),
             Model.GEMINI_2_0_FLASH: (TIKTOKEN, "o200k_base"),
@@ -593,7 +593,7 @@ class BlockNestedLoopsJoin(LLMJoin):
             Model.LLAMA_4_MAVERICK: (TRANSFORMERS, "meta-llama/Llama-4-Maverick-17B-128E-Instruct"),
             Model.GPT_4o_AUDIO_PREVIEW: (TIKTOKEN, "o200k_base"),
             Model.GPT_4o_MINI_AUDIO_PREVIEW: (TIKTOKEN, "o200k_base"),
-            Model.VLLM_QWEN_1_5_0_5B_CHAT: (TRANSFORMERS, "Qwen/Qwen1.5-0.5B-Chat"),
+            # Model.VLLM_QWEN_1_5_0_5B_CHAT: (TRANSFORMERS, "Qwen/Qwen1.5-0.5B-Chat"),
             Model.TEXT_EMBEDDING_3_SMALL: (TIKTOKEN, "cl100k_base"),
             Model.CLIP_VIT_B_32: (TRANSFORMERS, "openai/clip-vit-base-patch32")
         }
