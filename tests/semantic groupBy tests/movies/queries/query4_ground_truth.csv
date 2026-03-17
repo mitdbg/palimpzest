@@ -1,0 +1,22 @@
+primaryGenre,isTopCritic,frac_positive,review_count
+Action,False,0.38461538461538464,13
+Action,True,0.0,4
+Adventure,False,0.5,6
+Adventure,True,1.0,1
+Comedy,False,0.3888888888888889,36
+Comedy,True,0.2777777777777778,18
+Crime,False,0.8,5
+Crime,True,1.0,2
+Documentary,False,0.8823529411764706,34
+Documentary,True,0.8571428571428571,21
+Drama,False,0.8072289156626506,83
+Drama,True,0.7017543859649122,57
+History,False,0.8181818181818182,11
+History,True,0.6,5
+Mystery & thriller,False,0.8333333333333334,42
+Mystery & thriller,True,0.6,20
+Romance,False,0.6493506493506493,77
+Romance,True,0.6296296296296297,27
+Sci-fi,False,1.0,2
+Sci-fi,True,1.0,1
+War,False,1.0,1

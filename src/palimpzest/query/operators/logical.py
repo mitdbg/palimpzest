@@ -381,8 +381,8 @@ class GroupByAggregate(LogicalOperator):
     def __init__(
         self,
         is_semantic: bool = False,
-        gby_fields: list[str] | None = None,
-        agg_fields: list[str] | None = None,
+        gby_fields: list[str] | list[dict] | None = None,
+        agg_fields: list[str] | list[dict] | None = None,
         agg_funcs: list[str] | None = None,
         *args,
         **kwargs,
@@ -395,14 +395,21 @@ class GroupByAggregate(LogicalOperator):
         if gby_fields is None or agg_fields is None or agg_funcs is None:
             raise ValueError("Must provide all of (gby_fields, agg_fields, agg_funcs)")
         
-        for f in agg_fields:
+        # Store original field specifications (may be dicts or strings)
+        self.gby_fields_spec = gby_fields
+        self.agg_fields_spec = agg_fields
+        self.agg_funcs = agg_funcs
+        
+        # Extract field names for ID computation and validation
+        self.gby_fields = [f['name'] if isinstance(f, dict) else f for f in gby_fields]
+        self.agg_fields = [f['name'] if isinstance(f, dict) else f for f in agg_fields]
+        
+        # Validate agg fields exist in schema
+        for f in self.agg_fields:
             if f not in self.input_schema.model_fields:
                 raise TypeError(f"Supplied schema has no field {f}")
         
         self.is_semantic = is_semantic
-        self.gby_fields = gby_fields
-        self.agg_fields = agg_fields
-        self.agg_funcs = agg_funcs
 
     def __str__(self):
         return f"GroupBy(gby_fields={self.gby_fields}, agg_fields={self.agg_fields}, agg_funcs={self.agg_funcs})"
@@ -423,8 +430,8 @@ class GroupByAggregate(LogicalOperator):
         logical_op_params = super().get_logical_op_params()
         logical_op_params = {
             "is_semantic": self.is_semantic,
-            "gby_fields": self.gby_fields,
-            "agg_fields": self.agg_fields,
+            "gby_fields": self.gby_fields_spec,  # Pass full dict specs to physical operators
+            "agg_fields": self.agg_fields_spec,  # Pass full dict specs to physical operators
             "agg_funcs": self.agg_funcs,
             **logical_op_params,
         }
