@@ -52,7 +52,7 @@ class PromptStrategy(str, Enum):
         return "filter" in self.value
 
     def is_join_prompt(self):
-        return "join" in self.value and "block" not in self.value
+        return "join" in self.value
 
     def is_map_prompt(self):
         return "map" in self.value
@@ -174,6 +174,9 @@ NAIVE_EST_NUM_INPUT_TOKENS = 1000
 
 # a naive estimate for the number of output tokens processed per record
 NAIVE_EST_NUM_OUTPUT_TOKENS = 100
+
+# a naive estimate for the token overhead for reasoning output for join queries
+NAIVE_EST_JOIN_REASONING_OVERHEAD_TOKENS = 200
 
 # a naive estimate for the number of groups returned by a group by
 NAIVE_EST_NUM_GROUPS = 3

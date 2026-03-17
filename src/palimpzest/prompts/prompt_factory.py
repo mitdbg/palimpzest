@@ -444,7 +444,7 @@ class PromptFactory:
             str | None: The join condition (if applicable).
         """
         join_condition = kwargs.get("join_condition")
-        if self.prompt_strategy.is_join_prompt() or self.prompt_strategy.is_block_join_prompt():
+        if self.prompt_strategy.is_join_prompt():
             assert join_condition is not None, "Join condition must be provided for join operations."
 
         return join_condition
@@ -552,7 +552,7 @@ class PromptFactory:
             job_instruction = MAP_JOB_INSTRUCTION
         elif self.prompt_strategy.is_filter_prompt():
             job_instruction = FILTER_JOB_INSTRUCTION
-        elif self.prompt_strategy.is_join_prompt():
+        elif self.prompt_strategy.is_join_prompt() and not self.prompt_strategy.is_block_join_prompt():
             job_instruction = JOIN_JOB_INSTRUCTION
         elif self.prompt_strategy.is_block_join_prompt():
             job_instruction = BLOCK_JOIN_JOB_INSTRUCTION
@@ -744,7 +744,7 @@ class PromptFactory:
         """
         if self.prompt_strategy.is_filter_prompt():
             return FILTER_EXAMPLE_REASONING
-        elif self.prompt_strategy.is_join_prompt():
+        elif self.prompt_strategy.is_join_prompt() and not self.prompt_strategy.is_block_join_prompt():
             return JOIN_EXAMPLE_REASONING
         elif self.prompt_strategy.is_block_join_prompt():
             return BLOCK_JOIN_EXAMPLE_REASONING
@@ -1035,7 +1035,7 @@ class PromptFactory:
 
         # get any right image / audio messages for the chat payload (will be an empty list if image / audio not present)
         right_image_messages, right_audio_messages = [], []
-        if self.prompt_strategy.is_join_prompt() or self.prompt_strategy.is_block_join_prompt():
+        if self.prompt_strategy.is_join_prompt():
             assert right_candidate is not None, "Right candidate must be provided for join prompts."
             right_image_messages = self._create_image_messages(right_candidate, right_input_fields)
             right_audio_messages = self._create_audio_messages(right_candidate, right_input_fields)

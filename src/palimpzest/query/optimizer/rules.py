@@ -987,6 +987,7 @@ class BlockNestedLoopsJoinRule(ImplementationRule):
                     "join_parallelism": runtime_kwargs["join_parallelism"],
                     "reasoning_effort": runtime_kwargs["reasoning_effort"],
                     "retain_inputs": not runtime_kwargs["is_validation"],
+                    "est_selectivity": runtime_kwargs.get("est_selectivity", None),
                 }
             )
         

@@ -16,11 +16,12 @@ from sentence_transformers import SentenceTransformer
 from transformers import AutoTokenizer
 
 from palimpzest.constants import (
-     NAIVE_EST_JOIN_SELECTIVITY,
-     NAIVE_EST_NUM_INPUT_TOKENS,
-     Cardinality,
-     Model,
-     PromptStrategy,
+    NAIVE_EST_JOIN_SELECTIVITY,
+    NAIVE_EST_NUM_INPUT_TOKENS,
+    NAIVE_EST_JOIN_REASONING_OVERHEAD_TOKENS,
+    Cardinality,
+    Model,
+    PromptStrategy,
 )
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.core.lib.schemas import AUDIO_FIELD_TYPES, IMAGE_FIELD_TYPES, ImageFilepath
@@ -497,22 +498,22 @@ class BlockNestedLoopsJoin(LLMJoin):
     def __init__(
         self,
         batch_sizes: tuple[int, int] | None = None,
-        known_selectivity: float = 0.001,
+        est_selectivity: float = 0.001,
         max_context_size: int = 8192,
         reasoning: bool = True,
-        is_demo: bool = False,
+        # is_demo: bool = False,
         *args,
         **kwargs
     ):
         self.batch_sizes = batch_sizes
-        self.known_selectivity = known_selectivity
+        self.est_selectivity = est_selectivity
         self.max_context_size = max_context_size
         self.reasoning = reasoning
-        if is_demo:
-            if reasoning:
-                kwargs['prompt_strategy'] = PromptStrategy.JOIN_BLOCK
-            else:
-                kwargs['prompt_strategy'] = PromptStrategy.JOIN_BLOCK_NO_REASONING
+        # if is_demo:
+        #     if reasoning:
+        #         kwargs['prompt_strategy'] = PromptStrategy.JOIN_BLOCK
+        #     else:
+        #         kwargs['prompt_strategy'] = PromptStrategy.JOIN_BLOCK_NO_REASONING
         super().__init__(*args, **kwargs)
     
     def naive_cost_estimates(
@@ -626,7 +627,7 @@ class BlockNestedLoopsJoin(LLMJoin):
         index_token_overhead = self._number_of_tokens('\"_index\": \"1\"\n')
         left_average_tokens = self._number_of_tokens(str(left_candidates)) / left_rows + index_token_overhead # s_1
         right_average_tokens = self._number_of_tokens(str(right_candidates)) / right_rows + index_token_overhead # s_2
-        reasoning_token_overhead = 200 if self.reasoning else 0
+        reasoning_token_overhead = NAIVE_EST_JOIN_REASONING_OVERHEAD_TOKENS if self.reasoning else 0
         output_average_tokens = self._number_of_tokens('1,1;') + reasoning_token_overhead / (left_rows * right_rows * selectivity) # s_3
 
         left_batch_size = ((-left_average_tokens * right_average_tokens + 
@@ -819,7 +820,7 @@ class BlockNestedLoopsJoin(LLMJoin):
                 raise Exception(f"Could not parse answer from completion text: {answer_text}") from e
 
         # get batch sizes
-        left_batch_size, right_batch_size = self.batch_sizes if self.batch_sizes is not None else self._find_batch_sizes(left_candidates, right_candidates, self.known_selectivity)
+        left_batch_size, right_batch_size = self.batch_sizes if self.batch_sizes is not None else self._find_batch_sizes(left_candidates, right_candidates, self.est_selectivity)
 
         # add indices to records
         self._add_indices_to_records(left_candidates, right_candidates, left_batch_size, right_batch_size)
