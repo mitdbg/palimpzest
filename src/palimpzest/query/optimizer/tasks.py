@@ -14,6 +14,25 @@ from palimpzest.query.optimizer.rules import ImplementationRule, Rule, Transform
 
 logger = logging.getLogger(__name__)
 
+
+def _filter_expressions_by_physical(expressions, physical):
+    """
+    Filter physical expressions based on a ``physical`` dict from the logical operator.
+
+    Only the ``"implementation"`` key is used for filtering (exact class match).
+    All other keys are constructor kwargs — they are forwarded to the matching
+    physical operator by ``_perform_substitution`` in rules.py.
+    """
+    if not isinstance(physical, dict):
+        return list(expressions)
+
+    impl_cls = physical.get("implementation")
+    if impl_cls is None:
+        return list(expressions)
+
+    return [e for e in expressions if type(e.operator) is impl_cls]
+
+
 class Task:
     """
     Base class for a task. Each task has a method called perform() which executes the task.
@@ -246,6 +265,19 @@ class ApplyRule(Task):
         else:
             # apply implementation rule
             new_expressions = self.rule.substitute(self.logical_expression, **physical_op_params)
+
+            # filter physical expressions by physical dict (if present on the logical operator)
+            physical = getattr(self.logical_expression.operator, "physical", None)
+            if physical is not None:
+                pre_filter_count = len(new_expressions)
+                new_expressions = _filter_expressions_by_physical(new_expressions, physical)
+                if pre_filter_count > 0 and len(new_expressions) == 0:
+                    logger.warning(
+                        f"physical= hint {physical} on {self.logical_expression.operator.logical_op_name()} "
+                        f"filtered out all {pre_filter_count} candidate(s) from {self.rule.get_rule_id()}. "
+                        f"If no other rule produces a match, optimization will fail."
+                    )
+
             new_expressions = [expr for expr in new_expressions if expr.expr_id not in expressions]
 
             # get the costed_full_op_ids from the context (if provided) and compute whether this

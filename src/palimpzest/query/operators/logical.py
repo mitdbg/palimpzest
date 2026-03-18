@@ -40,11 +40,15 @@ class LogicalOperator:
         output_schema: type[BaseModel],
         input_schema: type[BaseModel] | None = None,
         depends_on: list[str] | None = None,
+        physical: dict | None = None,
     ):
         # TODO: can we eliminate input_schema?
         self.output_schema = output_schema
         self.input_schema = input_schema
         self.depends_on = [] if depends_on is None else sorted(depends_on)
+        self.physical = physical
+        if physical is not None:
+            self._validate_physical(physical)
         self.logical_op_id: str | None = None
         self.unique_logical_op_id: str | None = None
 
@@ -53,6 +57,21 @@ class LogicalOperator:
         self.generated_fields = sorted(
             [field_name for field_name in self.output_schema.model_fields if field_name not in input_field_names]
         )
+
+    @staticmethod
+    def _validate_physical(physical: dict) -> None:
+        """Validate the physical= dict at query construction time."""
+        if not isinstance(physical, dict):
+            raise TypeError(f"physical must be a dict, got {type(physical).__name__}")
+
+        if "implementation" not in physical:
+            raise ValueError("physical dict must contain an 'implementation' key")
+
+        impl_cls = physical["implementation"]
+        if not isinstance(impl_cls, type):
+            raise TypeError(
+                f"physical['implementation'] must be a class, got {type(impl_cls).__name__}"
+            )
 
     def __str__(self) -> str:
         raise NotImplementedError("Abstract method")
@@ -107,6 +126,7 @@ class LogicalOperator:
             "input_schema": self.input_schema,
             "output_schema": self.output_schema,
             "depends_on": self.depends_on,
+            "physical": self.physical,
         }
 
     def get_logical_op_id(self):

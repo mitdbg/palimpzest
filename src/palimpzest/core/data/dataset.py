@@ -266,7 +266,7 @@ class Dataset:
 
         return Dataset(sources=[self, other], operator=operator, schema=combined_schema)
 
-    def sem_join(self, other: Dataset, condition: str, desc: str | None = None, depends_on: str | list[str] | None = None, how: str = "inner") -> Dataset:
+    def sem_join(self, other: Dataset, condition: str, desc: str | None = None, depends_on: str | list[str] | None = None, how: str = "inner", physical: dict | None = None) -> Dataset:
         """
         Perform a semantic (inner) join on the specified join predicate
         """
@@ -285,6 +285,7 @@ class Dataset:
             how=how,
             desc=desc,
             depends_on=depends_on,
+            physical=physical,
         )
 
         return Dataset(sources=[self, other], operator=operator, schema=combined_schema)
@@ -319,6 +320,7 @@ class Dataset:
         filter: str,
         desc: str | None = None,
         depends_on: str | list[str] | None = None,
+        physical: dict | None = None,
     ) -> Dataset:
         """Add a natural language description of a filter to the Set. This filter will possibly restrict the items that are returned later."""
         # construct Filter object
@@ -333,14 +335,15 @@ class Dataset:
             depends_on = [depends_on]
 
         # construct logical operator
-        operator = FilteredScan(input_schema=self.schema, output_schema=self.schema, filter=f, desc=desc, depends_on=depends_on)
+        operator = FilteredScan(input_schema=self.schema, output_schema=self.schema, filter=f, desc=desc, depends_on=depends_on, physical=physical)
 
         return Dataset(sources=[self], operator=operator, schema=self.schema)
 
     def _sem_map(self, cols: list[dict] | type[BaseModel] | None,
                  cardinality: Cardinality,
                  desc: str | None = None,
-                 depends_on: str | list[str] | None = None) -> Dataset:
+                 depends_on: str | list[str] | None = None,
+                 physical: dict | None = None) -> Dataset:
         """Execute the semantic map operation with the appropriate cardinality."""
         # construct new output schema
         new_output_schema = None
@@ -366,6 +369,7 @@ class Dataset:
             udf=None,
             desc=desc,
             depends_on=depends_on,
+            physical=physical,
         )
 
         return Dataset(sources=[self], operator=operator, schema=new_output_schema)
@@ -399,7 +403,7 @@ class Dataset:
 
         return self._sem_map(cols, cardinality, desc, depends_on)
 
-    def sem_map(self, cols: list[dict] | type[BaseModel], desc: str | None = None, depends_on: str | list[str] | None = None) -> Dataset:
+    def sem_map(self, cols: list[dict] | type[BaseModel], desc: str | None = None, depends_on: str | list[str] | None = None, physical: dict | None = None) -> Dataset:
         """
         Compute new field(s) by specifying their names, descriptions, and types. For each input there will
         be one output. The field(s) will be computed during the execution of the Dataset.
@@ -411,9 +415,9 @@ class Dataset:
                  {'name': 'full_name', 'desc': 'The name of the person', 'type': str}]
             )
         """
-        return self._sem_map(cols, Cardinality.ONE_TO_ONE, desc, depends_on)
+        return self._sem_map(cols, Cardinality.ONE_TO_ONE, desc, depends_on, physical)
 
-    def sem_flat_map(self, cols: list[dict] | type[BaseModel], desc: str | None = None, depends_on: str | list[str] | None = None) -> Dataset:
+    def sem_flat_map(self, cols: list[dict] | type[BaseModel], desc: str | None = None, depends_on: str | list[str] | None = None, physical: dict | None = None) -> Dataset:
         """
         Compute new field(s) by specifying their names, descriptions, and types. For each input there will
         be one or more output(s). The field(s) will be computed during the execution of the Dataset.
@@ -427,7 +431,7 @@ class Dataset:
                 ]
             )
         """
-        return self._sem_map(cols, Cardinality.ONE_TO_MANY, desc, depends_on)
+        return self._sem_map(cols, Cardinality.ONE_TO_MANY, desc, depends_on, physical)
 
     def _map(self, udf: Callable,
             cols: list[dict] | type[BaseModel] | None,
@@ -577,7 +581,7 @@ class Dataset:
         operator = GroupByAggregate(input_schema=self.schema, output_schema=output_schema, group_by_sig=groupby)
         return Dataset(sources=[self], operator=operator, schema=output_schema)
 
-    def sem_agg(self, col: dict | type[BaseModel], agg: str, depends_on: str | list[str] | None = None) -> Dataset:
+    def sem_agg(self, col: dict | type[BaseModel], agg: str, depends_on: str | list[str] | None = None, physical: dict | None = None) -> Dataset:
         """
         Apply a semantic aggregation to this set. The `agg` string will be applied using an LLM
         over the entire set of inputs' fields specified in `depends_on` to generate the output `col`.
@@ -604,7 +608,7 @@ class Dataset:
             depends_on = [depends_on]
 
         # construct logical operator
-        operator = Aggregate(input_schema=self.schema, output_schema=new_output_schema, agg_str=agg, depends_on=depends_on)
+        operator = Aggregate(input_schema=self.schema, output_schema=new_output_schema, agg_str=agg, depends_on=depends_on, physical=physical)
 
         return Dataset(sources=[self], operator=operator, schema=operator.output_schema)
 
