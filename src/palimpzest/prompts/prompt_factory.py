@@ -31,6 +31,12 @@ from palimpzest.prompts.aggregate_prompts import (
     AGG_NO_REASONING_BASE_SYSTEM_PROMPT,
     AGG_NO_REASONING_BASE_USER_PROMPT,
 )
+from palimpzest.prompts.block_join_prompts import (
+    BLOCK_JOIN_BASE_SYSTEM_PROMPT,
+    BLOCK_JOIN_BASE_USER_PROMPT,
+    BLOCK_JOIN_NO_REASONING_BASE_SYSTEM_PROMPT,
+    BLOCK_JOIN_NO_REASONING_BASE_USER_PROMPT,
+)
 from palimpzest.prompts.convert_prompts import (
     MAP_BASE_SYSTEM_PROMPT,
     MAP_BASE_USER_PROMPT,
@@ -99,8 +105,12 @@ from palimpzest.prompts.utils import (
     AUDIO_EXAMPLE_OUTPUT_FIELDS,
     AUDIO_EXAMPLE_REASONING,
     AUDIO_SENTENCE_EXAMPLE_ANSWER,
+    BLOCK_JOIN_EXAMPLE_ANSWER,
+    BLOCK_JOIN_EXAMPLE_REASONING,
+    BLOCK_JOIN_JOB_INSTRUCTION,
     DESC_SECTION,
     EXAMPLE_AGG_INSTRUCTION,
+    EXAMPLE_BLOCK_JOIN_CONDITION,
     EXAMPLE_FILTER_CONDITION,
     EXAMPLE_JOIN_CONDITION,
     FILTER_EXAMPLE_REASONING,
@@ -124,11 +134,15 @@ from palimpzest.prompts.utils import (
     RIGHT_IMAGE_DISCLAIMER,
     RIGHT_IMAGE_EXAMPLE_CONTEXT,
     RIGHT_IMAGE_EXAMPLE_INPUT_FIELDS,
+    RIGHT_TEXT_COLLECTION_EXAMPLE_CONTEXT,
+    RIGHT_TEXT_COLLECTION_EXAMPLE_INPUT_FIELDS,
     RIGHT_TEXT_EXAMPLE_CONTEXT,
     RIGHT_TEXT_EXAMPLE_INPUT_FIELDS,
     SECOND_AUDIO_EXAMPLE_CONTEXT,
     SECOND_IMAGE_EXAMPLE_CONTEXT,
     SECOND_TEXT_EXAMPLE_CONTEXT,
+    TEXT_COLLECTION_EXAMPLE_CONTEXT,
+    TEXT_COLLECTION_EXAMPLE_INPUT_FIELDS,
     TEXT_EXAMPLE_ANSWER,
     TEXT_EXAMPLE_CONTEXT,
     TEXT_EXAMPLE_INPUT_FIELDS,
@@ -188,6 +202,8 @@ class PromptFactory:
         # join system prompts
         PromptStrategy.JOIN: JOIN_BASE_SYSTEM_PROMPT,
         PromptStrategy.JOIN_NO_REASONING: JOIN_NO_REASONING_BASE_SYSTEM_PROMPT,
+        PromptStrategy.JOIN_BLOCK: BLOCK_JOIN_BASE_SYSTEM_PROMPT,
+        PromptStrategy.JOIN_BLOCK_NO_REASONING: BLOCK_JOIN_NO_REASONING_BASE_SYSTEM_PROMPT,
 
         # map system prompts
         PromptStrategy.MAP: MAP_BASE_SYSTEM_PROMPT,
@@ -217,6 +233,8 @@ class PromptFactory:
         # join user prompts
         PromptStrategy.JOIN: JOIN_BASE_USER_PROMPT,
         PromptStrategy.JOIN_NO_REASONING: JOIN_NO_REASONING_BASE_USER_PROMPT,
+        PromptStrategy.JOIN_BLOCK: BLOCK_JOIN_BASE_USER_PROMPT,
+        PromptStrategy.JOIN_BLOCK_NO_REASONING: BLOCK_JOIN_NO_REASONING_BASE_USER_PROMPT,
 
         # map user prompts
         PromptStrategy.MAP: MAP_BASE_USER_PROMPT,
@@ -235,13 +253,14 @@ class PromptFactory:
         self.cardinality = cardinality
         self.desc = desc
 
-    def _get_context(self, candidate: DataRecord | list[DataRecord], input_fields: list[str]) -> str:
+    def _get_context(self, candidate: DataRecord | list[DataRecord], input_fields: list[str], add_index: bool = False) -> str:
         """
         Returns the context for the prompt.
 
         Args:
             candidate (DataRecord): The input record.
             input_fields (list[str]): The input fields.
+            add_index (bool): Whether to add record indices to the context. This is used in block joins.
 
         Returns:
             str: The context.
@@ -250,6 +269,13 @@ class PromptFactory:
         # get context from input record (project_cols will be None if not provided in kwargs)
         if isinstance(candidate, list):
             context: list[dict] = [record.to_dict(include_bytes=False, project_cols=input_fields, mask_filepaths=True) for record in candidate]
+            if add_index:
+                new_context: list[dict] = []
+                for idx, record_context in enumerate(context):
+                    new_record = {"_index": str(idx + 1)} | record_context
+                    new_context.append(new_record)
+                context = new_context
+
         else:
             context: dict = candidate.to_dict(include_bytes=False, project_cols=input_fields, mask_filepaths=True)
 
@@ -353,17 +379,20 @@ class PromptFactory:
         elif input_modalities == {Modality.TEXT, Modality.IMAGE, Modality.AUDIO}:
             return "text, image(s), and/or audio"
 
-    def _get_input_fields_desc(self, candidate: DataRecord, input_fields: list[str]) -> str:
+    def _get_input_fields_desc(self, candidate: DataRecord, input_fields: list[str], add_index: bool = False) -> str:
         """
         Returns a multi-line description of each input field for the prompt.
 
         Args:
             input_fields (list[str]): The input fields.
+            add_index (bool): Whether to add record indices to the field descriptions. This is used in block joins.
 
         Returns:
             str: The input fields description.
         """
         input_fields_desc = ""
+        if add_index:
+            input_fields_desc += "- _index: The index of the record in the collection\n"
         for field_name in input_fields:
             input_fields_desc += f"- {field_name}: {candidate.get_field_type(field_name).description}\n"
 
@@ -420,7 +449,7 @@ class PromptFactory:
 
     def _get_join_condition(self, **kwargs) -> str | None:
         """
-        Returns the join condition for the join operation.
+        Returns the join condition for the join operation / block join operation.
 
         Returns:
             str | None: The join condition (if applicable).
@@ -534,8 +563,10 @@ class PromptFactory:
             job_instruction = MAP_JOB_INSTRUCTION
         elif self.prompt_strategy.is_filter_prompt():
             job_instruction = FILTER_JOB_INSTRUCTION
-        elif self.prompt_strategy.is_join_prompt():
+        elif self.prompt_strategy.is_join_prompt() and not self.prompt_strategy.is_block_join_prompt():
             job_instruction = JOIN_JOB_INSTRUCTION
+        elif self.prompt_strategy.is_block_join_prompt():
+            job_instruction = BLOCK_JOIN_JOB_INSTRUCTION
         elif self.prompt_strategy.is_agg_prompt():
             job_instruction = AGG_JOB_INSTRUCTION
 
@@ -612,7 +643,11 @@ class PromptFactory:
             str: The example input fields.
         """
         input_modality_to_example_input_fields = {
-            Modality.TEXT: RIGHT_TEXT_EXAMPLE_INPUT_FIELDS if right else TEXT_EXAMPLE_INPUT_FIELDS,
+            Modality.TEXT: (
+                (RIGHT_TEXT_COLLECTION_EXAMPLE_INPUT_FIELDS if self.prompt_strategy.is_block_join_prompt() else RIGHT_TEXT_EXAMPLE_INPUT_FIELDS)
+                if right else 
+                (TEXT_COLLECTION_EXAMPLE_INPUT_FIELDS if self.prompt_strategy.is_block_join_prompt() else TEXT_EXAMPLE_INPUT_FIELDS)
+            ),
             Modality.IMAGE: RIGHT_IMAGE_EXAMPLE_INPUT_FIELDS if right else IMAGE_EXAMPLE_INPUT_FIELDS,
             Modality.AUDIO: RIGHT_AUDIO_EXAMPLE_INPUT_FIELDS if right else AUDIO_EXAMPLE_INPUT_FIELDS,
         }
@@ -669,7 +704,11 @@ class PromptFactory:
             audio_example_context = THIRD_AUDIO_EXAMPLE_CONTEXT
 
         input_modality_to_example_context = {
-            Modality.TEXT: RIGHT_TEXT_EXAMPLE_CONTEXT if right else text_example_context,
+            Modality.TEXT: (
+                (RIGHT_TEXT_COLLECTION_EXAMPLE_CONTEXT if self.prompt_strategy.is_block_join_prompt() else RIGHT_TEXT_EXAMPLE_CONTEXT)
+                if right else
+                (TEXT_COLLECTION_EXAMPLE_CONTEXT if self.prompt_strategy.is_block_join_prompt() else text_example_context)
+            ),
             Modality.IMAGE: RIGHT_IMAGE_EXAMPLE_CONTEXT if right else image_example_context,
             Modality.AUDIO: RIGHT_AUDIO_EXAMPLE_CONTEXT if right else audio_example_context,
         }
@@ -716,8 +755,10 @@ class PromptFactory:
         """
         if self.prompt_strategy.is_filter_prompt():
             return FILTER_EXAMPLE_REASONING
-        elif self.prompt_strategy.is_join_prompt():
+        elif self.prompt_strategy.is_join_prompt() and not self.prompt_strategy.is_block_join_prompt():
             return JOIN_EXAMPLE_REASONING
+        elif self.prompt_strategy.is_block_join_prompt():
+            return BLOCK_JOIN_EXAMPLE_REASONING
         elif self.prompt_strategy.is_agg_prompt():
             return AGG_EXAMPLE_REASONING
 
@@ -746,7 +787,9 @@ class PromptFactory:
 
         use_sentence_answers = self.prompt_strategy.is_split_proposer_prompt() or self.prompt_strategy.is_moa_proposer_prompt()
         input_modality_to_example_answer = {
-            Modality.TEXT: TEXT_SENTENCE_EXAMPLE_ANSWER if use_sentence_answers else TEXT_EXAMPLE_ANSWER,
+            Modality.TEXT: TEXT_SENTENCE_EXAMPLE_ANSWER if use_sentence_answers else (
+                BLOCK_JOIN_EXAMPLE_ANSWER if self.prompt_strategy.is_block_join_prompt() else TEXT_EXAMPLE_ANSWER
+            ),
             Modality.IMAGE: IMAGE_SENTENCE_EXAMPLE_ANSWER if use_sentence_answers else IMAGE_EXAMPLE_ANSWER,
             Modality.AUDIO: AUDIO_SENTENCE_EXAMPLE_ANSWER if use_sentence_answers else AUDIO_EXAMPLE_ANSWER,
         }
@@ -766,7 +809,7 @@ class PromptFactory:
         input_fields: list[str],
         input_modalities: set[Modality],
         output_fields: list[str],
-        right_candidate: DataRecord | None,
+        right_candidate: DataRecord | list[DataRecord] | None,
         right_input_fields: list[str],
         right_input_modalities: set[Modality],
         **kwargs,
@@ -785,8 +828,8 @@ class PromptFactory:
         """
         # get format kwargs which depend on the input data
         input_format_kwargs = {
-            "context": self._get_context(candidate, input_fields),
-            "input_fields_desc": self._get_input_fields_desc(candidate[0] if isinstance(candidate, list) else candidate, input_fields),
+            "context": self._get_context(candidate, input_fields, kwargs.get("add_index", False)),
+            "input_fields_desc": self._get_input_fields_desc(candidate[0] if isinstance(candidate, list) else candidate, input_fields, kwargs.get("add_index", False)),
             "output_fields_desc": self._get_output_fields_desc(output_fields, **kwargs),
             "agg_instruction": self._get_agg_instruction(**kwargs),
             "filter_condition": self._get_filter_condition(**kwargs),
@@ -800,8 +843,8 @@ class PromptFactory:
         # if a right candidate is provided, we also get the context and input field descriptions for the right candidate
         if right_candidate is not None:
             input_format_kwargs.update({
-                "right_context": self._get_context(right_candidate, right_input_fields),
-                "right_input_fields_desc": self._get_input_fields_desc(right_candidate, right_input_fields),
+                "right_context": self._get_context(right_candidate, right_input_fields, kwargs.get("add_index", False)),
+                "right_input_fields_desc": self._get_input_fields_desc(right_candidate[0] if isinstance(right_candidate, list) else right_candidate, right_input_fields, kwargs.get("add_index", False)),
             })
 
         # get format kwargs which depend on the prompt strategy
@@ -827,6 +870,7 @@ class PromptFactory:
             "example_agg_instruction": EXAMPLE_AGG_INSTRUCTION,
             "example_filter_condition": EXAMPLE_FILTER_CONDITION,
             "example_join_condition": EXAMPLE_JOIN_CONDITION,
+            "example_block_join_condition": EXAMPLE_BLOCK_JOIN_CONDITION,
             "example_reasoning": self._get_example_reasoning(input_modalities),
             "example_answer": self._get_example_answer(input_modalities),
         }
@@ -977,7 +1021,7 @@ class PromptFactory:
 
         return base_prompt.format(**format_kwargs)
 
-    def _get_user_messages(self, candidate: DataRecord | list[DataRecord], input_fields: list[str], right_candidate: DataRecord | None, right_input_fields: list[str], **kwargs) -> str:
+    def _get_user_messages(self, candidate: DataRecord | list[DataRecord], input_fields: list[str], right_candidate: DataRecord | list[DataRecord] | None, right_input_fields: list[str], **kwargs) -> str:
         """
         Returns a list of messages for the chat payload based on the prompt strategy.
 
@@ -1071,7 +1115,7 @@ class PromptFactory:
 
         return user_messages
 
-    def create_messages(self, candidate: DataRecord | list[DataRecord], output_fields: list[str], right_candidate: DataRecord | None = None, **kwargs) -> list[dict]:
+    def create_messages(self, candidate: DataRecord | list[DataRecord], output_fields: list[str], right_candidate: DataRecord | list[DataRecord] | None = None, **kwargs) -> list[dict]:
         """
         Creates the messages for the chat payload based on the prompt strategy.
 
@@ -1093,11 +1137,11 @@ class PromptFactory:
         """
         # compute the set of input fields
         input_fields = self._get_input_fields(candidate[0] if isinstance(candidate, list) else candidate, **kwargs)
-        right_input_fields = [] if right_candidate is None else self._get_input_fields(right_candidate, **kwargs)
+        right_input_fields = [] if right_candidate is None else self._get_input_fields(right_candidate[0] if isinstance(right_candidate, list) else right_candidate, **kwargs)
 
         # use input fields to determine the left / right input modalities
         input_modalities = self._get_input_modalities(candidate[0] if isinstance(candidate, list) else candidate, input_fields)
-        right_input_modalities = set() if right_candidate is None else self._get_input_modalities(right_candidate, right_input_fields)
+        right_input_modalities = set() if right_candidate is None else self._get_input_modalities(right_candidate[0] if isinstance(right_candidate, list) else right_candidate, right_input_fields)
 
         # initialize messages
         messages = []

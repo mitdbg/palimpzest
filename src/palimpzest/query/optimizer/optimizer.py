@@ -34,6 +34,7 @@ from palimpzest.query.optimizer.rules import (
     MixtureOfAgentsRule,
     RAGRule,
     SplitRule,
+    BlockNestedLoopsJoinRule,
 )
 from palimpzest.query.optimizer.tasks import (
     ApplyRule,
@@ -74,6 +75,7 @@ class Optimizer:
         allow_mixtures: bool = True,
         allow_critic: bool = False,
         allow_split_merge: bool = False,
+        allow_block_join: bool = False,
         optimizer_strategy: OptimizationStrategyType = OptimizationStrategyType.PARETO,
         execution_strategy: ExecutionStrategyType = ExecutionStrategyType.PARALLEL,
         use_final_op_quality: bool = False,
@@ -114,6 +116,7 @@ class Optimizer:
             self.allow_mixtures = False
             self.allow_critic = False
             self.allow_split_merge = False
+            self.allow_block_join = False
             self.available_models = [available_models[0]]
 
         # store optimization hyperparameters
@@ -126,6 +129,7 @@ class Optimizer:
         self.allow_mixtures = allow_mixtures
         self.allow_critic = allow_critic
         self.allow_split_merge = allow_split_merge
+        self.allow_block_join = allow_block_join
         self.optimizer_strategy = optimizer_strategy
         self.execution_strategy = execution_strategy
         self.use_final_op_quality = use_final_op_quality
@@ -157,20 +161,25 @@ class Optimizer:
             self.implementation_rules = [
                 rule for rule in self.implementation_rules if not issubclass(rule, SplitRule)
             ]
-
+        
+        if not self.allow_block_join:
+            self.implementation_rules = [
+                rule for rule in self.implementation_rules if not issubclass(rule, BlockNestedLoopsJoinRule)
+            ]
         logger.info(f"Initialized Optimizer with verbose={self.verbose}")
         logger.debug(f"Initialized Optimizer with params: {self.__dict__}")
 
     def update_cost_model(self, cost_model: BaseCostModel):
         self.cost_model = cost_model
 
-    def get_physical_op_params(self):
+    def get_physical_op_params(self, logical_op_id: str) -> dict:
         return {
             "verbose": self.verbose,
             "available_models": self.available_models,
             "join_parallelism": self.join_parallelism,
             "reasoning_effort": self.reasoning_effort,
             "is_validation": self.optimizer_strategy == OptimizationStrategyType.SENTINEL,
+            "est_selectivity": self.cost_model.get_est_selectivity(logical_op_id),
         }
 
     def deepcopy_clean(self):
@@ -186,6 +195,7 @@ class Optimizer:
             allow_mixtures=self.allow_mixtures,
             allow_critic=self.allow_critic,
             allow_split_merge=self.allow_split_merge,
+            allow_block_join=self.allow_block_join,
             optimizer_strategy=self.optimizer_strategy,
             execution_strategy=self.execution_strategy,
             use_final_op_quality=self.use_final_op_quality,
@@ -401,8 +411,9 @@ class Optimizer:
                 new_tasks = task.perform(self.transformation_rules, self.implementation_rules)
             elif isinstance(task, ApplyRule):
                 context = {"costed_full_op_ids": self.cost_model.get_costed_full_op_ids()}
+                logical_op_id = task.logical_expression.operator.get_logical_op_id()
                 new_tasks = task.perform(
-                    self.groups, self.expressions, context=context, **self.get_physical_op_params(),
+                    self.groups, self.expressions, context=context, **self.get_physical_op_params(logical_op_id),
                 )
             elif isinstance(task, OptimizePhysicalExpression):
                 context = {"optimizer_strategy": self.optimizer_strategy, "execution_strategy": self.execution_strategy}

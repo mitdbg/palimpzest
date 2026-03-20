@@ -26,7 +26,7 @@ from palimpzest.query.operators.convert import LLMConvertBonded, NonLLMConvert
 from palimpzest.query.operators.critique_and_refine import CritiqueAndRefineConvert, CritiqueAndRefineFilter
 from palimpzest.query.operators.distinct import DistinctOp
 from palimpzest.query.operators.filter import LLMFilter, NonLLMFilter
-from palimpzest.query.operators.join import EmbeddingJoin, NestedLoopsJoin, RelationalJoin
+from palimpzest.query.operators.join import EmbeddingJoin, NestedLoopsJoin, RelationalJoin, BlockNestedLoopsJoin
 from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.operators.logical import (
     Aggregate,
@@ -959,6 +959,39 @@ class NestedLoopsJoinRule(ImplementationRule):
 
         return cls._perform_substitution(logical_expression, NestedLoopsJoin, runtime_kwargs, variable_op_kwargs)
 
+class BlockNestedLoopsJoinRule(ImplementationRule):
+    """
+    Substitute a logical expression for a JoinOp with a (LLM) BlockNestedLoopsJoin physical implementation.
+    """
+
+    @classmethod
+    def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
+        is_match = isinstance(logical_expression.operator, JoinOp) and logical_expression.operator.condition != ""
+        logger.debug(f"BlockNestedLoopsJoinRule matches_pattern: {is_match} for {logical_expression}")
+        return is_match
+
+    @classmethod
+    def substitute(cls, logical_expression: LogicalExpression, **runtime_kwargs) -> set[PhysicalExpression]:
+        logger.debug(f"Substituting BlockNestedLoopsJoinRule for {logical_expression}")
+
+        # create variable physical operator kwargs for each model which can implement this logical_expression
+        models = [model for model in runtime_kwargs["available_models"] if cls._model_matches_input(model, logical_expression)]
+        variable_op_kwargs = []
+        for model in models:
+            reasoning_prompt_strategy = use_reasoning_prompt(runtime_kwargs["reasoning_effort"])
+            prompt_strategy = PromptStrategy.JOIN_BLOCK if reasoning_prompt_strategy else PromptStrategy.JOIN_BLOCK_NO_REASONING
+            variable_op_kwargs.append(
+                {
+                    "model": model,
+                    "prompt_strategy": prompt_strategy,
+                    "join_parallelism": runtime_kwargs["join_parallelism"],
+                    "reasoning_effort": runtime_kwargs["reasoning_effort"],
+                    "retain_inputs": not runtime_kwargs["is_validation"],
+                    "est_selectivity": runtime_kwargs.get("est_selectivity", None),
+                }
+            )
+        
+        return cls._perform_substitution(logical_expression, BlockNestedLoopsJoin, runtime_kwargs, variable_op_kwargs)
 
 class EmbeddingJoinRule(ImplementationRule):
     """
