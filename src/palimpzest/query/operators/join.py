@@ -18,6 +18,7 @@ from transformers import AutoTokenizer
 from palimpzest.constants import (
     NAIVE_EST_JOIN_SELECTIVITY,
     NAIVE_EST_NUM_INPUT_TOKENS,
+    NAIVE_EST_SAFE_CONTEXT_WINDOW,
     NAIVE_EST_JOIN_REASONING_OVERHEAD_TOKENS,
     Cardinality,
     Model,
@@ -498,17 +499,17 @@ class BlockNestedLoopsJoin(LLMJoin):
     def __init__(
         self,
         batch_sizes: tuple[int, int] | None = None,
-        est_selectivity: float = 0.001,
-        max_context_size: int = 8192,
-        reasoning: bool = True,
+        est_selectivity: float | None = None,
+        max_context_size: int | None = None,
+        reasoning: bool | None = None,
         # is_demo: bool = False,
         *args,
         **kwargs
     ):
         self.batch_sizes = batch_sizes
-        self.est_selectivity = est_selectivity
-        self.max_context_size = max_context_size
-        self.reasoning = reasoning
+        self.est_selectivity = NAIVE_EST_JOIN_SELECTIVITY if est_selectivity is None else est_selectivity
+        self.max_context_size = NAIVE_EST_SAFE_CONTEXT_WINDOW if max_context_size is None else max_context_size
+        self.reasoning = True if reasoning is None else reasoning
         # if is_demo:
         #     if reasoning:
         #         kwargs['prompt_strategy'] = PromptStrategy.JOIN_BLOCK

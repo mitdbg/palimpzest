@@ -175,6 +175,9 @@ NAIVE_EST_NUM_INPUT_TOKENS = 1000
 # a naive estimate for the number of output tokens processed per record
 NAIVE_EST_NUM_OUTPUT_TOKENS = 100
 
+# a conservative estimate for the context window of an LLM
+NAIVE_EST_SAFE_CONTEXT_WINDOW = 8192
+
 # a naive estimate for the token overhead for reasoning output for join queries
 NAIVE_EST_JOIN_REASONING_OVERHEAD_TOKENS = 200
 
