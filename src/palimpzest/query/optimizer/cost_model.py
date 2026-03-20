@@ -34,6 +34,12 @@ class BaseCostModel:
         Return the set of full op ids which the cost model has cost estimates for.
         """
         raise NotImplementedError("Calling get_costed_full_op_ids from abstract method")
+    
+    def get_est_selectivity(self, logical_op_id: str) -> float:
+        """
+        Return the estimated selectivity for a given logical operator id.
+        """
+        raise NotImplementedError("Calling get_est_selectivity from abstract method")
 
     def __call__(self, operator: PhysicalOperator) -> PlanCost:
         """
@@ -41,7 +47,6 @@ class BaseCostModel:
         additional arguments in order to make their predictions.
         """
         raise NotImplementedError("Calling __call__ from abstract method")
-
 
 class SampleBasedCostModel:
     """
@@ -57,6 +62,9 @@ class SampleBasedCostModel:
 
         # store experiment name if one is provided
         self.exp_name = exp_name
+
+        # maps logical op ids to estimated selectivity
+        self.id_to_selectivity = {}
 
         # construct cost, time, quality, and selectivity matrices for each operator set;
         self.operator_to_stats = self._compute_operator_stats(sentinel_plan_stats)
@@ -76,6 +84,9 @@ class SampleBasedCostModel:
 
     def get_costed_full_op_ids(self):
         return self.costed_full_op_ids
+
+    def get_est_selectivity(self, logical_op_id: str) -> float:
+        return self.id_to_selectivity.get(logical_op_id, 0.5);
 
     def _compute_operator_stats(self, sentinel_plan_stats: SentinelPlanStats | None) -> dict:
         logger.debug("Computing operator statistics")
@@ -135,6 +146,7 @@ class SampleBasedCostModel:
                 op_name = physical_op_df.op_name.iloc[0].lower()
                 if selectivity == 1.0 and "filter" in op_name:
                     selectivity -= 1e-3
+                self.id_to_selectivity[unique_logical_op_id] = selectivity
 
                 # compute quality; if all qualities are None then this will be NaN
                 quality = physical_op_df.quality.mean()

@@ -172,13 +172,14 @@ class Optimizer:
     def update_cost_model(self, cost_model: BaseCostModel):
         self.cost_model = cost_model
 
-    def get_physical_op_params(self):
+    def get_physical_op_params(self, logical_op_id: str) -> dict:
         return {
             "verbose": self.verbose,
             "available_models": self.available_models,
             "join_parallelism": self.join_parallelism,
             "reasoning_effort": self.reasoning_effort,
             "is_validation": self.optimizer_strategy == OptimizationStrategyType.SENTINEL,
+            "est_selectivity": self.cost_model.get_est_selectivity(logical_op_id),
         }
 
     def deepcopy_clean(self):
@@ -410,8 +411,9 @@ class Optimizer:
                 new_tasks = task.perform(self.transformation_rules, self.implementation_rules)
             elif isinstance(task, ApplyRule):
                 context = {"costed_full_op_ids": self.cost_model.get_costed_full_op_ids()}
+                logical_op_id = task.logical_expression.operator.get_logical_op_id()
                 new_tasks = task.perform(
-                    self.groups, self.expressions, context=context, **self.get_physical_op_params(),
+                    self.groups, self.expressions, context=context, **self.get_physical_op_params(logical_op_id),
                 )
             elif isinstance(task, OptimizePhysicalExpression):
                 context = {"optimizer_strategy": self.optimizer_strategy, "execution_strategy": self.execution_strategy}
