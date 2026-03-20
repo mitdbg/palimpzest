@@ -502,7 +502,6 @@ class BlockNestedLoopsJoin(LLMJoin):
         est_selectivity: float | None = None,
         max_context_size: int | None = None,
         reasoning: bool | None = None,
-        # is_demo: bool = False,
         *args,
         **kwargs
     ):
@@ -510,11 +509,6 @@ class BlockNestedLoopsJoin(LLMJoin):
         self.est_selectivity = NAIVE_EST_JOIN_SELECTIVITY if est_selectivity is None else est_selectivity
         self.max_context_size = NAIVE_EST_SAFE_CONTEXT_WINDOW if max_context_size is None else max_context_size
         self.reasoning = True if reasoning is None else reasoning
-        # if is_demo:
-        #     if reasoning:
-        #         kwargs['prompt_strategy'] = PromptStrategy.JOIN_BLOCK
-        #     else:
-        #         kwargs['prompt_strategy'] = PromptStrategy.JOIN_BLOCK_NO_REASONING
         super().__init__(*args, **kwargs)
     
     def naive_cost_estimates(
