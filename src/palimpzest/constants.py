@@ -421,6 +421,7 @@ class Model:
     def get_overall_score(self) -> float:
         return self.model_specs.get("MMLU_Pro_score", 0.0)
 
+# TODO: investigate which (if any llama3 models are still supported by TogetherAI)
 # Model.LLAMA3_2_3B = Model("together_ai/meta-llama/Llama-3.2-3B-Instruct-Turbo") - seems to be deprecated
 Model.LLAMA3_1_8B = Model("together_ai/meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo")
 Model.LLAMA3_3_70B = Model("together_ai/meta-llama/Llama-3.3-70B-Instruct-Turbo")
