@@ -1,5 +1,6 @@
-from pydantic import BaseModel, Field
 import pandas as pd
+from pydantic import BaseModel, Field
+
 import palimpzest as pz
 from palimpzest.query.operators.join import NestedLoopsJoin
 

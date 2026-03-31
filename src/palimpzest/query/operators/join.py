@@ -16,13 +16,13 @@ from sentence_transformers import SentenceTransformer
 from transformers import AutoTokenizer
 
 from palimpzest.constants import (
-    NAIVE_EST_JOIN_SELECTIVITY,
-    NAIVE_EST_NUM_INPUT_TOKENS,
-    NAIVE_EST_SAFE_CONTEXT_WINDOW,
-    NAIVE_EST_JOIN_REASONING_OVERHEAD_TOKENS,
-    Cardinality,
-    Model,
-    PromptStrategy,
+     NAIVE_EST_JOIN_REASONING_OVERHEAD_TOKENS,
+     NAIVE_EST_JOIN_SELECTIVITY,
+     NAIVE_EST_NUM_INPUT_TOKENS,
+     NAIVE_EST_SAFE_CONTEXT_WINDOW,
+     Cardinality,
+     Model,
+     PromptStrategy,
 )
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.core.lib.schemas import AUDIO_FIELD_TYPES, IMAGE_FIELD_TYPES, ImageFilepath
@@ -558,9 +558,9 @@ class BlockNestedLoopsJoin(LLMJoin):
 
     def _number_of_tokens(self, text: str):
         # Map internal model Enums to tokenizer tool and identifier
-        TRANSFORMERS = "transformers"
-        TIKTOKEN = "tiktoken"
-        TOKENIZER_TOOL = {
+        TRANSFORMERS = "transformers"  # noqa: N806
+        TIKTOKEN = "tiktoken"  # noqa: N806
+        TOKENIZER_TOOL = {  # noqa: N806
             Model.LLAMA3_2_3B: (TRANSFORMERS, "meta-llama/Llama-3.2-3B-Instruct"),
             Model.LLAMA3_1_8B: (TRANSFORMERS, "meta-llama/Meta-Llama-3.1-8B-Instruct"),
             Model.LLAMA3_3_70B: (TRANSFORMERS, "meta-llama/Llama-3.3-70B-Instruct"),

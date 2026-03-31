@@ -26,7 +26,7 @@ from palimpzest.query.operators.convert import LLMConvertBonded, NonLLMConvert
 from palimpzest.query.operators.critique_and_refine import CritiqueAndRefineConvert, CritiqueAndRefineFilter
 from palimpzest.query.operators.distinct import DistinctOp
 from palimpzest.query.operators.filter import LLMFilter, NonLLMFilter
-from palimpzest.query.operators.join import EmbeddingJoin, NestedLoopsJoin, RelationalJoin, BlockNestedLoopsJoin
+from palimpzest.query.operators.join import BlockNestedLoopsJoin, EmbeddingJoin, NestedLoopsJoin, RelationalJoin
 from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.operators.logical import (
     Aggregate,
@@ -987,10 +987,10 @@ class BlockNestedLoopsJoinRule(ImplementationRule):
                     "join_parallelism": runtime_kwargs["join_parallelism"],
                     "reasoning_effort": runtime_kwargs["reasoning_effort"],
                     "retain_inputs": not runtime_kwargs["is_validation"],
-                    "est_selectivity": runtime_kwargs.get("est_selectivity", None),
+                    "est_selectivity": runtime_kwargs.get("est_selectivity"),
                 }
             )
-        
+
         return cls._perform_substitution(logical_expression, BlockNestedLoopsJoin, runtime_kwargs, variable_op_kwargs)
 
 class EmbeddingJoinRule(ImplementationRule):

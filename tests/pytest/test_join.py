@@ -5,16 +5,13 @@ import os
 import pytest
 from pydantic import BaseModel, Field
 
+import palimpzest as pz
 from palimpzest.constants import Model
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.lib.schemas import AudioFilepath, ImageFilepath, union_schemas
 from palimpzest.core.models import GenerationStats
 from palimpzest.query.generators.generators import Generator
-from palimpzest.query.operators.join import EmbeddingJoin, NestedLoopsJoin
-
-import pandas as pd
-import palimpzest as pz
-from palimpzest.query.operators.join import BlockNestedLoopsJoin
+from palimpzest.query.operators.join import BlockNestedLoopsJoin, EmbeddingJoin, NestedLoopsJoin
 
 if not os.environ.get("OPENAI_API_KEY"):
     from palimpzest.utils.env_helpers import load_env
