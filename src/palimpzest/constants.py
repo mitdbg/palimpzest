@@ -32,6 +32,8 @@ class PromptStrategy(str, Enum):
     # join prompt strategies
     JOIN = "join"
     JOIN_NO_REASONING = "join-no-reasoning"
+    JOIN_BLOCK = "join-block"
+    JOIN_BLOCK_NO_REASONING = "join-block-no-reasoning"
 
     # map prompt strategies
     MAP = "map"
@@ -72,6 +74,9 @@ class PromptStrategy(str, Enum):
 
     def is_split_merger_prompt(self):
         return "split-merger" in self.value
+
+    def is_block_join_prompt(self):
+        return "join-block" in self.value
 
     def is_no_reasoning_prompt(self):
         return "no-reasoning" in self.value
@@ -169,6 +174,12 @@ NAIVE_EST_NUM_INPUT_TOKENS = 1000
 
 # a naive estimate for the number of output tokens processed per record
 NAIVE_EST_NUM_OUTPUT_TOKENS = 100
+
+# a conservative estimate for the context window of an LLM
+NAIVE_EST_SAFE_CONTEXT_WINDOW = 8192
+
+# a naive estimate for the token overhead for reasoning output for join queries
+NAIVE_EST_JOIN_REASONING_OVERHEAD_TOKENS = 200
 
 # a naive estimate for the number of groups returned by a group by
 NAIVE_EST_NUM_GROUPS = 3

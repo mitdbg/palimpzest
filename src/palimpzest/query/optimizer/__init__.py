@@ -6,6 +6,9 @@ from palimpzest.query.optimizer.rules import (
     BasicSubstitutionRule as _BasicSubstitutionRule,
 )
 from palimpzest.query.optimizer.rules import (
+    BlockNestedLoopsJoinRule as _BlockNestedLoopsJoinRule,
+)
+from palimpzest.query.optimizer.rules import (
     CritiqueAndRefineRule as _CritiqueAndRefineRule,
 )
 from palimpzest.query.optimizer.rules import (
@@ -64,6 +67,7 @@ ALL_RULES = [
     _AddContextsBeforeComputeRule,
     _AggregateRule,
     _BasicSubstitutionRule,
+    _BlockNestedLoopsJoinRule,
     _CritiqueAndRefineRule,
     _EmbeddingJoinRule,
     _ImplementationRule,

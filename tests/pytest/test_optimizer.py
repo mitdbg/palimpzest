@@ -135,6 +135,7 @@ class TestOptimizer:
             allow_mixtures=False,
             allow_critic=False,
             allow_split_merge=False,
+            allow_block_join=False,
         )
         physical_plans = optimizer.optimize(plan)
         physical_plan = physical_plans[0]
@@ -258,6 +259,7 @@ class TestOptimizer:
             allow_mixtures=False,
             allow_critic=False,
             allow_split_merge=False,
+            allow_block_join=False,
             optimizer_strategy=opt_strategy,
         )
         physical_plans = optimizer.optimize(small_real_estate_workload)
@@ -281,6 +283,7 @@ class TestOptimizer:
             allow_mixtures=False,
             allow_critic=False,
             allow_split_merge=False,
+            allow_block_join=False,
             optimizer_strategy=opt_strategy,
         )
         physical_plans = optimizer.optimize(real_estate_workload)
@@ -317,6 +320,7 @@ class TestOptimizer:
             allow_mixtures=False,
             allow_critic=False,
             allow_split_merge=False,
+            allow_block_join=False,
             optimizer_strategy=opt_strategy,
         )
         physical_plans = optimizer.optimize(plan)
@@ -464,6 +468,7 @@ class TestParetoOptimizer:
             allow_mixtures=False,
             allow_critic=False,
             allow_split_merge=False,
+            allow_block_join=False,
         )
         # run optimizer to get physical plan
         physical_plans = optimizer.optimize(workload)

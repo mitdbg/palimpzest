@@ -5,7 +5,7 @@ import warnings
 
 import pandas as pd
 
-from palimpzest.constants import NAIVE_BYTES_PER_RECORD
+from palimpzest.constants import NAIVE_BYTES_PER_RECORD, NAIVE_EST_JOIN_SELECTIVITY
 from palimpzest.core.models import OperatorCostEstimates, PlanCost, SentinelPlanStats
 from palimpzest.query.operators.join import JoinOp
 from palimpzest.query.operators.physical import PhysicalOperator
@@ -34,6 +34,12 @@ class BaseCostModel:
         Return the set of full op ids which the cost model has cost estimates for.
         """
         raise NotImplementedError("Calling get_costed_full_op_ids from abstract method")
+    
+    def get_est_selectivity(self, unique_logical_op_id: str) -> float:
+        """
+        Return the estimated selectivity for a given logical operator id.
+        """
+        raise NotImplementedError("Calling get_est_selectivity from abstract method")
 
     def __call__(self, operator: PhysicalOperator) -> PlanCost:
         """
@@ -41,7 +47,6 @@ class BaseCostModel:
         additional arguments in order to make their predictions.
         """
         raise NotImplementedError("Calling __call__ from abstract method")
-
 
 class SampleBasedCostModel:
     """
@@ -57,6 +62,9 @@ class SampleBasedCostModel:
 
         # store experiment name if one is provided
         self.exp_name = exp_name
+
+        # maps logical op ids to estimated selectivity
+        self.unique_logical_op_id_to_selectivity = {}
 
         # construct cost, time, quality, and selectivity matrices for each operator set;
         self.operator_to_stats = self._compute_operator_stats(sentinel_plan_stats)
@@ -76,6 +84,9 @@ class SampleBasedCostModel:
 
     def get_costed_full_op_ids(self):
         return self.costed_full_op_ids
+
+    def get_est_selectivity(self, unique_logical_op_id: str) -> float:
+        return self.unique_logical_op_id_to_selectivity.get(unique_logical_op_id, NAIVE_EST_JOIN_SELECTIVITY)
 
     def _compute_operator_stats(self, sentinel_plan_stats: SentinelPlanStats | None) -> dict:
         logger.debug("Computing operator statistics")
@@ -121,6 +132,16 @@ class SampleBasedCostModel:
             logger.debug(f"Computing operator statistics for unique_logical_op_id: {unique_logical_op_id}")
             operator_to_stats[unique_logical_op_id] = {}
 
+            # compute the selectivity of the logical operator and store it in unique_logical_op_id_to_selectivity;
+            # we compute this as the average selectivity across all physical operators associated with this logical operator
+            num_source_records = (
+                logical_op_df.record_parent_ids.apply(tuple).nunique()
+                if not logical_op_df.record_parent_ids.isna().all()
+                else logical_op_df.source_indices.apply(tuple).nunique()
+            )
+            selectivity = logical_op_df.passed_operator.sum() / num_source_records
+            self.unique_logical_op_id_to_selectivity[unique_logical_op_id] = selectivity
+
             for full_op_id, physical_op_df in logical_op_df.groupby("full_op_id"):
                 # compute the number of input records processed by this operator; use source_indices for scan operator(s)
                 num_source_records = (
@@ -129,7 +150,7 @@ class SampleBasedCostModel:
                     else physical_op_df.source_indices.apply(tuple).nunique()
                 )
 
-                # compute selectivity; for filters this may be 1.0 on smalle samples;
+                # compute selectivity; for filters this may be 1.0 on small samples;
                 # always put something slightly less than 1.0 to ensure that filters are pushed down when possible
                 selectivity = physical_op_df.passed_operator.sum() / num_source_records
                 op_name = physical_op_df.op_name.iloc[0].lower()
