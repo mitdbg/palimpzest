@@ -1,0 +1,62 @@
+SemBench: A Benchmark for Semantic Query Processing Engines
+Jiale Lao
+Cornell University
+jiale@cs.cornell.edu
+Andreas Zimmerer
+University of Technology Nuremberg
+andreas.zimmerer@utn.de
+Olga Ovcharenko
+BIFOLD & TU Berlin
+ovcharenko@tu-berlin.de
+Tianji Cong
+University of Michigan
+congtj@umich.edu
+Matthew Russo
+MIT CSAIL
+mdrusso@mit.edu
+Gerardo Vitagliano
+MIT CSAIL
+gerarvit@mit.edu
+Michael Cochez
+Vrije Universiteit Amsterdam
+m.cochez@vu.nl
+Fatma Özcan
+Google
+fozcan@google.com
+Gautam Gupta
+Google
+gautamguptag@google.com
+Thibaud Hottelier
+Google
+tbh@google.com
+H. V. Jagadish
+University of Michigan
+jag@umich.edu
+Kris Kissel
+Google
+kriskissel@google.com
+Sebastian Schelter
+BIFOLD & TU Berlin
+schelter@tu-berlin.de
+Andreas Kipf
+University of Technology Nuremberg
+andreas.kipf@utn.de
+Immanuel Trummer
+Cornell University
+itrummer@cornell.edu
+ABSTRACT
+We present a benchmark targeting a novel class of systems: semantic query processing engines. Those systems rely inherently
+on generative and reasoning capabilities of state-of-the-art large
+language models (LLMs). They extend SQL with semantic operators,
+configured by natural language instructions, that are evaluated via
+LLMs and enable users to perform various operations on multimodal data.
+Our benchmark introduces diversity across three key dimensions: scenarios, modalities, and operators. Included are scenarios
+ranging from movie review analysis to medical question-answering.
+Within these scenarios, we cover different data modalities, including images, audio, and text. Finally, the queries involve a diverse set
+of operators, including semantic filters, joins, mappings, ranking,
+and classification operators.
+We evaluated our benchmark on three academic systems (LOTUS,
+Palimpzest, and ThalamusDB) and one industrial system, Google
+BigQuery. Although these results reflect a snapshot of systems
+under continuous development, our study offers crucial insights
+into their current strengths and weak
