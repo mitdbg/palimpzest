@@ -172,6 +172,9 @@ class MockProgressManager(ProgressManager):
     def finish(self):
         pass
 
+    def incr_overall_progress_cost(self, cost_delta: float):
+        pass
+ 
 class PZProgressManager(ProgressManager):
     """Progress manager for command line interface using rich"""
     
