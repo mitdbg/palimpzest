@@ -1,6 +1,6 @@
 """
 Logical Plan:
-    TextFile -> (summarizer, subject_extractor, sender_extractor) -> SSSFile
+    TextFile -> (subject_extractor, sender_extractor) -> SSFile
     -> (fraud_classifier, internal_classifier) -> is_Fraud, is_Internal
 Scoring (per email):
     - labeled email:   correct iff is_fraud=True AND is_internal=True AND sender+subject match GT
@@ -11,7 +11,7 @@ import glob
 import json
 import os
 from datetime import datetime
-from itertools import combinations, product as iproduct
+from itertools import combinations, product
 
 import pandas as pd
 from pydantic import BaseModel, Field
@@ -37,13 +37,14 @@ class Subject(BaseModel):
 class Sender(BaseModel):
     sender: str = Field(description="The email address of the email's sender")
 
-class Summary(BaseModel):
-    summary: str = Field(description= "A brief summary of the email contents.")
+# class Summary(BaseModel):
+#     summary: str = Field(description= "A brief summary of the email contents.")
 
-class SSSFile(BaseModel):
+class SSFile(BaseModel):
     sender: str = Field(description="The email address of the email's sender")
     subject: str = Field(description="The subject of the email")
-    summary: str = Field(description= "A brief summary of the email contents.")
+    contents: str = Field(description="The contents of the email")
+    # summary: str = Field(description= "A brief summary of the email contents.")
 
 class is_Fraud(BaseModel):
     is_fraud: bool = Field(
@@ -125,7 +126,9 @@ print(f"Small dataset: {len(small_dataset)} emails.")
 # ---------------------------------------------------------------------------
 
 STRONG = Model.GPT_5_MINI
+STRONG_MEDIUM = Model.GPT_4_1
 MEDIUM = Model.GPT_5_NANO
+WEAK_MEDIUM = Model.GPT_4o_MINI
 WEAK   = Model.GPT_4_1_NANO
 
 MOA_TEMPS = [0.7, 0.7]
@@ -185,15 +188,15 @@ def make_op(cfg, input_schema, output_schema, logical_op_id, depends_on=None):
             proposer_models=cfg["agents"], temperatures=MOA_TEMPS, aggregator_model=cfg["agg"], **kwargs
         )
 
-def run_email_plan(op_summarizer, op_subject, op_sender, op_fraud, op_internal, plan_label, combo_idx, n_combos, dataset, labels):
+def run_email_plan(op_subject, op_sender, op_fraud, op_internal, plan_label, combo_idx, n_combos, dataset, labels):
     print(
         f"\n[{combo_idx}/{n_combos}] {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} {plan_label}",
         flush=True,
     )
     try:
-        op_latency = [0.0 for _ in range(5)]
+        op_latency = [0.0 for _ in range(4)]
         total_latency = 0.0
-        op_cost = [0.0 for _ in range(5)]
+        op_cost = [0.0 for _ in range(4)]
         total_cost = 0.0
         correct = 0
 
@@ -204,53 +207,50 @@ def run_email_plan(op_summarizer, op_subject, op_sender, op_fraud, op_internal, 
 
             drs_sender = op_sender(record)
             sender_stats = drs_sender.record_op_stats[0]
-            sender = drs_sender.data_records[0].sender or ""
+            sender = drs_sender.data_records[0].sender
 
             drs_subject = op_subject(record)
             subject_stats = drs_subject.record_op_stats[0]
-            subject = drs_subject.data_records[0].subject or ""
+            subject = drs_subject.data_records[0].subject
 
-            drs_summary = op_summarizer(record)
-            summary_stats = drs_summary.record_op_stats[0]
-            summary = drs_summary.data_records[0].summary or ""
-            if "" in (sender, subject, summary):
+            # drs_summary = op_summarizer(record)
+            # summary_stats = drs_summary.record_op_stats[0]
+            # summary = drs_summary.data_records[0].summary or ""
+            if "" in (sender, subject):
                 print("MISSING sender, subject, or summary", flush=True)
                 print("sender:", sender)
                 print("subject:", subject)
-                print("summary:", summary)
                 continue
 
-            sss_record = DataRecord(
-                data_item=SSSFile(
+            ss_record = DataRecord(
+                data_item=SSFile(
                     subject = subject,
                     sender = sender,
-                    summary = summary
+                    contents = record.contents
                 ),
                 source_indices=filename,
             )
-            drs_fraud = op_fraud(sss_record)
+            drs_fraud = op_fraud(ss_record)
             fraud_stats = drs_fraud.record_op_stats[0]
-            is_fraud = drs_fraud.data_records[0].is_fraud or ""
+            is_fraud = drs_fraud.data_records[0].is_fraud
 
-            drs_internal = op_internal(sss_record)
+            drs_internal = op_internal(ss_record)
             internal_stats = drs_internal.record_op_stats[0]
-            is_internal = drs_internal.data_records[0].is_internal or ""
+            is_internal = drs_internal.data_records[0].is_internal
             print(f"sender={sender}, is_fraud={is_fraud}, is_internal={is_internal}", flush=True)
 
             latency = [sender_stats.llm_call_duration_secs,
                        subject_stats.llm_call_duration_secs,
-                       summary_stats.llm_call_duration_secs,
                        fraud_stats.llm_call_duration_secs,
                        internal_stats.llm_call_duration_secs]
-            op_latency = [op_latency[j] + latency[j] for j in range(5)]
+            op_latency = [op_latency[j] + latency[j] for j in range(4)]
             total_latency += sum(latency)
 
             cost = [sender_stats.total_input_cost + sender_stats.total_output_cost,
                     subject_stats.total_input_cost + subject_stats.total_output_cost,
-                    summary_stats.total_input_cost + summary_stats.total_output_cost,
                     fraud_stats.total_input_cost + fraud_stats.total_output_cost,
                     internal_stats.total_input_cost + internal_stats.total_output_cost]
-            op_cost = [op_cost[j] + cost[j] for j in range(5)]
+            op_cost = [op_cost[j] + cost[j] for j in range(4)]
             total_cost += sum(cost)
 
             if gt_is_labeled:
@@ -401,18 +401,24 @@ def config_to_summary_config(cfg):
 # pd.to_csv("email_summaries.csv", index=False)
 
 combo_idx = 1
-num_combos = 2 ** 5
+num_combos = 32
+combos = tuple(product(["S", "W"], ["S", "W"], ["S", "M", "WM", "W"], ["S", "W"]))
+fraud_strengths = [STRONG, MEDIUM, WEAK_MEDIUM, WEAK]
+other_strengths = [STRONG, WEAK]
+
+plan_strengths = list(product(other_strengths, other_strengths, fraud_strengths, other_strengths))
 results = []
-for model_summarizer, model_subject, model_sender, model_fraud, model_internal in iproduct([STRONG, WEAK], repeat=5):
-    label = (model_summarizer.name, model_subject.name, model_sender.name, model_fraud.name, model_internal.name)
-    op_summarizer = make_op({"type": "LCB", "model": model_summarizer},  TextFile, Summary, "summary_extracter")
+# for model_subject, model_sender, model_fraud, model_internal in iproduct([STRONG,], repeat=4):
+for model_subject, model_sender, model_fraud, model_internal in plan_strengths:
+    print(combos[combo_idx-1])
+    label = (model_subject.name, model_sender.name, model_fraud.name, model_internal.name)
+    # op_summarizer = make_op({"type": "LCB", "model": model_summarizer},  TextFile, Summary, "summary_extracter")
     op_subject = make_op({"type": "LCB", "model": model_subject},  TextFile, Subject, "subject_extracter")
     op_sender = make_op({"type": "LCB", "model": model_sender},  TextFile, Sender, "sender_extracter")
-    op_fraud = make_op({"type": "LCB", "model": model_fraud},  SSSFile, is_Fraud, "fraud_classifier")
-    op_internal = make_op({"type": "LCB", "model": model_internal},  SSSFile, is_Internal, "internal_classifier")
-    plan_results = run_email_plan(op_summarizer, op_subject, op_sender, op_fraud, op_internal,
-                                  (model_summarizer.name, model_subject.name, model_sender.name, model_fraud.name, model_internal.name),
-                                  combo_idx, num_combos, small_dataset, SMALL_LABELS)
+    op_fraud = make_op({"type": "LCB", "model": model_fraud},  SSFile, is_Fraud, "fraud_classifier")
+    op_internal = make_op({"type": "LCB", "model": model_internal},  SSFile, is_Internal, "internal_classifier")
+    plan_results = run_email_plan(op_subject, op_sender, op_fraud, op_internal,
+                                  label, combo_idx, num_combos, small_dataset, SMALL_LABELS)
     results.append(plan_results)
     combo_idx += 1
 df = pd.DataFrame(results)
