@@ -717,6 +717,8 @@ class Dataset:
         if policy is not None:
             kwargs["policy"] = policy
 
+        config.policy = policy
+
         # construct unique logical op ids for all operators in this dataset
         self._generate_unique_logical_op_ids()
 
