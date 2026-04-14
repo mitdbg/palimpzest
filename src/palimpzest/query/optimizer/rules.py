@@ -26,6 +26,7 @@ from palimpzest.query.operators.convert import LLMConvertBonded, NonLLMConvert
 from palimpzest.query.operators.critique_and_refine import CritiqueAndRefineConvert, CritiqueAndRefineFilter
 from palimpzest.query.operators.distinct import DistinctOp
 from palimpzest.query.operators.filter import LLMFilter, NonLLMFilter
+from palimpzest.query.operators.image_filter import RescaledImageFilter
 from palimpzest.query.operators.join import EmbeddingJoin, NestedLoopsJoin, RelationalJoin
 from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.operators.logical import (
@@ -907,6 +908,64 @@ class LLMFilterRule(ImplementationRule):
             )
 
         return cls._perform_substitution(logical_expression, LLMFilter, runtime_kwargs, variable_op_kwargs)
+
+
+class RescaledImageFilterRule(ImplementationRule):
+    """
+    Substitute a logical expression for a FilteredScan with an LLM filter operating on rescaled images.
+    """
+
+    rescale_factors = [2, 3, 4]
+
+    @classmethod
+    def matches_pattern(cls, logical_expression: LogicalExpression) -> bool:
+        logical_op = logical_expression.operator
+        is_match = (
+            isinstance(logical_op, FilteredScan)
+            and logical_op.filter.filter_fn is None
+            and cls._is_image_operation(logical_expression)
+        )
+        logger.debug(
+            f"RescaledImageFilterRule matches_pattern: {is_match} for {logical_expression}"
+        )
+        return is_match
+
+    @classmethod
+    def substitute(
+        cls, logical_expression: LogicalExpression, **runtime_kwargs
+    ) -> set[PhysicalExpression]:
+        logger.debug(f"Substituting RescaledImageFilterRule for {logical_expression}")
+
+        models = [
+            model
+            for model in runtime_kwargs["available_models"]
+            if cls._model_matches_input(model, logical_expression)
+        ]
+        variable_op_kwargs = []
+        for model in models:
+            reasoning_prompt_strategy = use_reasoning_prompt(
+                runtime_kwargs["reasoning_effort"]
+            )
+            prompt_strategy = (
+                PromptStrategy.FILTER
+                if reasoning_prompt_strategy
+                else PromptStrategy.FILTER_NO_REASONING
+            )
+            variable_op_kwargs.extend(
+                [
+                    {
+                        "model": model,
+                        "prompt_strategy": prompt_strategy,
+                        "reasoning_effort": runtime_kwargs["reasoning_effort"],
+                        "rescale_factor": rescale_factor,
+                    }
+                    for rescale_factor in cls.rescale_factors
+                ]
+            )
+
+        return cls._perform_substitution(
+            logical_expression, RescaledImageFilter, runtime_kwargs, variable_op_kwargs
+        )
 
 
 class RelationalJoinRule(ImplementationRule):

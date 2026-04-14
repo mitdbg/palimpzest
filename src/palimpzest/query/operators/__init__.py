@@ -16,6 +16,9 @@ from palimpzest.query.operators.distinct import DistinctOp as _DistinctOp
 from palimpzest.query.operators.filter import FilterOp as _FilterOp
 from palimpzest.query.operators.filter import LLMFilter as _LLMFilter
 from palimpzest.query.operators.filter import NonLLMFilter as _NonLLMFilter
+from palimpzest.query.operators.image_filter import (
+    RescaledImageFilter as _RescaledImageFilter,
+)
 from palimpzest.query.operators.join import EmbeddingJoin as _EmbeddingJoin
 from palimpzest.query.operators.join import JoinOp as _JoinOp
 from palimpzest.query.operators.join import NestedLoopsJoin as _NestedLoopsJoin
@@ -81,7 +84,16 @@ LOGICAL_OPERATORS = [
 
 PHYSICAL_OPERATORS = (
     # aggregate
-    [_AggregateOp, _ApplyGroupByOp, _AverageAggregateOp, _CountAggregateOp, _MaxAggregateOp, _MinAggregateOp, _SemanticAggregate, _SumAggregateOp]
+    [
+        _AggregateOp,
+        _ApplyGroupByOp,
+        _AverageAggregateOp,
+        _CountAggregateOp,
+        _MaxAggregateOp,
+        _MinAggregateOp,
+        _SemanticAggregate,
+        _SumAggregateOp,
+    ]
     # convert
     + [_ConvertOp, _NonLLMConvert, _LLMConvert, _LLMConvertBonded]
     # critique and refine
@@ -91,7 +103,7 @@ PHYSICAL_OPERATORS = (
     # scan
     + [_ScanPhysicalOp, _MarshalAndScanDataOp]
     # filter
-    + [_FilterOp, _NonLLMFilter, _LLMFilter]
+    + [_FilterOp, _NonLLMFilter, _LLMFilter, _RescaledImageFilter]
     # join
     + [_EmbeddingJoin, _JoinOp, _NestedLoopsJoin]
     # limit

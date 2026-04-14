@@ -45,6 +45,9 @@ from palimpzest.query.optimizer.rules import (
     ReorderConverts as _ReorderConverts,
 )
 from palimpzest.query.optimizer.rules import (
+    RescaledImageFilterRule as _RescaledImageFilterRule,
+)
+from palimpzest.query.optimizer.rules import (
     Rule as _Rule,
 )
 from palimpzest.query.optimizer.rules import (
@@ -77,6 +80,7 @@ ALL_RULES = [
     _RAGRule,
     _RelationalJoinRule,
     _ReorderConverts,
+    _RescaledImageFilterRule,
     _TopKRule,
     _Rule,
     _SemanticAggregateRule,
