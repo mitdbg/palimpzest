@@ -1,10 +1,9 @@
 import logging
-
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.models import PlanStats
 from palimpzest.query.execution.execution_strategy import ExecutionStrategy
 from palimpzest.query.operators.aggregate import AggregateOp
-from palimpzest.query.operators.batched import BatchedOperator, BatchedOperator
+from palimpzest.query.operators.batched import BatchedOperator
 from palimpzest.query.operators.join import JoinOp
 from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.operators.scan import ContextScanOp, ScanPhysicalOp

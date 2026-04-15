@@ -86,9 +86,6 @@ class BatchedOperator(LLMFilter, BatchedOperator):
         # estimate quality of output based on the strength of the model being used
         quality = (self.model.get_overall_score() / 100.0)
 
-        model_conversion_time_per_batch = 0
-        model_conversion_usd_per_batch = 0
-        quality = 1
         return OperatorCostEstimates(
             cardinality=cardinality,
             time_per_record=model_conversion_time_per_batch / self.batch_size,
