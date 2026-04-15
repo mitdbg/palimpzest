@@ -14,9 +14,17 @@ from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.core.models import OperatorCostEstimates
 from palimpzest.query.generators.generators import get_json_from_answer
 from palimpzest.query.operators.filter import LLMFilter
+from palimpzest.query.operators.physical import PhysicalOperator
 
 
-class BatchedFilter(LLMFilter):
+class BatchedOperator(PhysicalOperator):
+    def flush(self) -> DataRecordSet:
+        raise NotImplementedError(
+            "flush method must be implemented by BatchedOperator subclasses"
+        )
+
+
+class BatchedOperator(LLMFilter, BatchedOperator):
     def __init__(
         self,
         batch_size: int,
@@ -168,7 +176,7 @@ class BatchedFilter(LLMFilter):
                 batch = list(self._buffer)
                 self._buffer.clear()
 
-        # release the lock before processing 
+        # release the lock before processing
         return self._process_batch(batch)
 
     def flush(self) -> DataRecordSet:

@@ -13,7 +13,7 @@ from palimpzest.query.operators.convert import NonLLMConvert as _NonLLMConvert
 from palimpzest.query.operators.critique_and_refine import CritiqueAndRefineConvert as _CritiqueAndRefineConvert
 from palimpzest.query.operators.critique_and_refine import CritiqueAndRefineFilter as _CritiqueAndRefineFilter
 from palimpzest.query.operators.distinct import DistinctOp as _DistinctOp
-from palimpzest.query.operators.batched import BatchedFilter as _BatchedFilter
+from palimpzest.query.operators.batched import BatchedOperator as _BatchedFilter
 from palimpzest.query.operators.filter import FilterOp as _FilterOp
 from palimpzest.query.operators.filter import LLMFilter as _LLMFilter
 from palimpzest.query.operators.filter import NonLLMFilter as _NonLLMFilter

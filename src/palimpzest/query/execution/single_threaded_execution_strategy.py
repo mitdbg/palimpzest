@@ -4,7 +4,7 @@ from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.models import PlanStats
 from palimpzest.query.execution.execution_strategy import ExecutionStrategy
 from palimpzest.query.operators.aggregate import AggregateOp
-from palimpzest.query.operators.batched import BatchedFilter
+from palimpzest.query.operators.batched import BatchedOperator, BatchedOperator
 from palimpzest.query.operators.join import JoinOp
 from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.operators.scan import ContextScanOp, ScanPhysicalOp
@@ -76,7 +76,7 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
                     record_set, num_inputs_processed = operator([], [], final=True)
                     records.extend(record_set.data_records)
                     record_op_stats.extend(record_set.record_op_stats)
-      
+
                 num_outputs = sum(record._passed_operator for record in records)
 
                 # update the progress manager
@@ -101,7 +101,7 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
                     if isinstance(operator, LimitScanOp) and len(records) == operator.limit:
                         break
 
-                if isinstance(operator, BatchedFilter):
+                if isinstance(operator, BatchedOperator):
                     record_set = operator.flush()
                     if len(record_set) > 0:
                         records.extend(record_set.data_records)
@@ -148,7 +148,7 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
 
         # NOTE: we must handle progress manager outside of _execute_plan to ensure that it is shut down correctly;
         #       if we don't have the `finally:` branch, then program crashes can cause future program runs to fail
-        #       because the progress manager cannot get a handle to the console 
+        #       because the progress manager cannot get a handle to the console
         try:
             # execute plan
             output_records, plan_stats = self._execute_plan(plan, input_queues, plan_stats)
@@ -197,7 +197,6 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
         upstream_input_queues = {upstream_unique_full_op_id: input_queues[upstream_unique_full_op_id] for upstream_unique_full_op_id in upstream_unique_full_op_ids}
         return not self._any_queue_not_empty(upstream_input_queues)
 
-
     def _execute_plan(self, plan: PhysicalPlan, input_queues: dict[str, dict[str, list]], plan_stats: PlanStats) -> tuple[list[DataRecord], PlanStats]:
         # execute the plan until either:
         # 1. all records have been processed, or
@@ -205,7 +204,9 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
         final_output_records = []
         def any_pending_batched_filters() -> bool:
             return any(
-                isinstance(op, BatchedFilter) and op.has_pending_batch() and not op.flushed
+                isinstance(op, BatchedOperator)
+                and op.has_pending_batch()
+                and not op.flushed
                 for op in plan
             )
 
@@ -223,10 +224,15 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
                 agg_op_not_ready = isinstance(operator, AggregateOp) and not self._upstream_ops_finished(plan, unique_full_op_id, input_queues)
                 join_op_not_ready = isinstance(operator, JoinOp) and not self._upstream_ops_finished(plan, unique_full_op_id, input_queues)
                 batched_filter_ready_to_flush = (
-                    isinstance(operator, BatchedFilter)
+                    isinstance(operator, BatchedOperator)
                     and operator.has_pending_batch()
-                    and self._upstream_ops_finished(plan, unique_full_op_id, input_queues)
-                    and all(len(inputs) == 0 for inputs in input_queues[unique_full_op_id].values())
+                    and self._upstream_ops_finished(
+                        plan, unique_full_op_id, input_queues
+                    )
+                    and all(
+                        len(inputs) == 0
+                        for inputs in input_queues[unique_full_op_id].values()
+                    )
                 )
                 if (num_inputs == 0 and not batched_filter_ready_to_flush) or agg_op_not_ready or join_op_not_ready:
                     continue
@@ -274,7 +280,11 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
                     num_outputs = sum(record._passed_operator for record in records)
 
                     if len(record_set) > 0:
-                        num_inputs_processed = len(record_set) if isinstance(operator, BatchedFilter) else 1
+                        num_inputs_processed = (
+                            len(record_set)
+                            if isinstance(operator, BatchedOperator)
+                            else 1
+                        )
                         self.progress_manager.incr(
                             unique_full_op_id,
                             num_inputs=num_inputs_processed,
@@ -307,7 +317,7 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
                         num_outputs += sum(record._passed_operator for record in record_set.data_records)
                         operator.set_finished()
 
-                if isinstance(operator, BatchedFilter) and not operator.flushed:
+                if isinstance(operator, BatchedOperator) and not operator.flushed:
                     op_upstream_finished = self._upstream_ops_finished(plan, unique_full_op_id, input_queues)
                     op_input_queues_empty = all(len(inputs) == 0 for inputs in input_queues[unique_full_op_id].values())
                     if op_upstream_finished and op_input_queues_empty and operator.has_pending_batch():
@@ -364,7 +374,7 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
 
         # NOTE: we must handle progress manager outside of _execute_plan to ensure that it is shut down correctly;
         #       if we don't have the `finally:` branch, then program crashes can cause future program runs to fail
-        #       because the progress manager cannot get a handle to the console 
+        #       because the progress manager cannot get a handle to the console
         try:
             # execute plan
             output_records, plan_stats = self._execute_plan(plan, input_queues, plan_stats)

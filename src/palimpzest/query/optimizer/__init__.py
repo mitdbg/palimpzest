@@ -3,6 +3,9 @@ from palimpzest.query.optimizer.rules import (
     AggregateRule as _AggregateRule,
 )
 from palimpzest.query.optimizer.rules import (
+    BatchedFilterRule as _BatchedFilterRule,
+)
+from palimpzest.query.optimizer.rules import (
     BasicSubstitutionRule as _BasicSubstitutionRule,
 )
 from palimpzest.query.optimizer.rules import (
@@ -67,6 +70,7 @@ ALL_RULES = [
     _AddContextsBeforeComputeRule,
     _AggregateRule,
     _BasicSubstitutionRule,
+    _BatchedFilterRule,
     _CritiqueAndRefineRule,
     _EmbeddingJoinRule,
     _ImplementationRule,
