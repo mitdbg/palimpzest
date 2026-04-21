@@ -533,11 +533,15 @@ class ImplementationRule(Rule):
     @classmethod
     def _get_fixed_op_kwargs(cls, logical_expression: LogicalExpression, runtime_kwargs: dict) -> dict:
         """Get the fixed set of physical op kwargs provided by the logical expression and the runtime keyword arguments."""
-        # get logical operator 
+        # get logical operator
         logical_op = logical_expression.operator
 
         # set initial set of parameters for physical op
         op_kwargs = logical_op.get_logical_op_params()
+
+        # remove physical — it's used by the optimizer, not the physical operator
+        op_kwargs.pop("physical", None)
+
         op_kwargs.update(
             {
                 "verbose": runtime_kwargs["verbose"],
@@ -581,6 +585,16 @@ class ImplementationRule(Rule):
         # get physical operator kwargs which are fixed for each instance of the physical operator
         fixed_op_kwargs = cls._get_fixed_op_kwargs(logical_expression, runtime_kwargs)
 
+        # if the user specified a physical= dict, only inject extra kwargs when
+        # this rule is building the requested implementation class
+        physical = getattr(logical_expression.operator, "physical", None) or {}
+        impl_cls = physical.get("implementation")
+        extra_physical_kwargs = {}
+        if impl_cls is None or physical_op_class is impl_cls:
+            extra_physical_kwargs = {
+                k: v for k, v in physical.items() if k != "implementation"
+            }
+
         # make variable_op_kwargs a list of dictionaries
         if variable_op_kwargs is None:
             variable_op_kwargs = [{}]
@@ -591,7 +605,8 @@ class ImplementationRule(Rule):
         physical_expressions = []
         for var_op_kwargs in variable_op_kwargs:
             # get kwargs for this physical operator instance
-            op_kwargs = {**fixed_op_kwargs, **var_op_kwargs}
+            # extra_physical_kwargs override rule-generated values when user specified them
+            op_kwargs = {**fixed_op_kwargs, **var_op_kwargs, **extra_physical_kwargs}
 
             # construct the physical operator
             op = physical_op_class(**op_kwargs)
