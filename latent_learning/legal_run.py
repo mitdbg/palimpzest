@@ -44,7 +44,7 @@ from palimpzest.query.operators.convert import LLMConvertBonded
 # ---------------------------------------------------------------------------
 
 class Span(BaseModel):
-    span: str = Field(default="", description="""Highlight the parts (if any) of this contract related to "Termination For Convenience"
+    span: str | None = Field(default=None, description="""Highlight the parts (if any) of this contract related to "Termination For Convenience"
                 that should be reviewed by a lawyer. Details: Can a party terminate this contract without cause
                 (solely by giving a notice and allowing a waiting period to expire)? If no such part exists,
                 return an empty string.""")
@@ -85,15 +85,15 @@ for _, row in df_cuad.iterrows():
 # ---------------------------------------------------------------------------
 
 all_models = [
-#     Model.GPT_5,
-#     Model.GPT_5_MINI,
-#     Model.o4_MINI,
+    Model.GPT_5,
+    Model.GPT_5_MINI,
+    Model.o4_MINI,
     Model.GPT_4_1,
-#     Model.GPT_5_NANO,
-#     Model.GPT_4_1_MINI,
-#     Model.GPT_4o,
-#     Model.GPT_4o_MINI,
-#     Model.GPT_4_1_NANO,
+    Model.GPT_5_NANO,
+    Model.GPT_4_1_MINI,
+    Model.GPT_4o,
+    Model.GPT_4o_MINI,
+    Model.GPT_4_1_NANO,
 ]  # decreasing mmlupro_overall score
 
 EVAL_MODEL = Model.GPT_5_4  # for summary sufficiency evaluation
@@ -158,17 +158,12 @@ def make_lcb(model, input_schema, output_schema, logical_op_id):
 
 
 def run_legal_plan(op_extractor, op_summarizer, op_classifier, plan_label, combo_idx, n_combos):
-    print(
-        f"\n[{combo_idx}/{n_combos}] {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} {plan_label}",
-        flush=True,
-    )
+    lines = [f"\n[{combo_idx}/{n_combos}] {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} {plan_label}"]
     rows = []
     try:
         for contract_idx, record, gt in cuad_dataset:
             gt_label = bool(gt["label"])
             gt_span = gt["span"]
-
-            print(f"  contract={contract_idx}", end=" ", flush=True)
 
             # --- Extractor ---
             ext_drs = op_extractor(record)
@@ -200,9 +195,9 @@ def run_legal_plan(op_extractor, op_summarizer, op_classifier, plan_label, combo
                 predicted_label = cls_drs.data_records[0].is_TFC
 
             classifier_quality = int(predicted_label == gt_label)
-            print(
-                f"span_f1={extractor_quality:.3f}  sum_q={summarizer_quality}  cls_q={classifier_quality}",
-                flush=True,
+            lines.append(
+                f"  contract={contract_idx:<5} "
+                f"span_f1={extractor_quality:.3f}  sum_q={summarizer_quality}  cls_q={classifier_quality}"
             )
 
             rows.append({
@@ -218,10 +213,10 @@ def run_legal_plan(op_extractor, op_summarizer, op_classifier, plan_label, combo
             })
 
     except Exception as exc:
-        print(f"  ERROR: {type(exc).__name__}: {exc}", flush=True)
+        lines.append(f"  ERROR contract={contract_idx} plan={plan_label}: {type(exc).__name__}: {exc}")
         rows.append({
             "plan_label": str(plan_label),
-            "contract_idx": None,
+            "contract_idx": contract_idx,
             "extractor_quality": None,
             "summarizer_quality": None,
             "classifier_quality": None,
@@ -232,7 +227,7 @@ def run_legal_plan(op_extractor, op_summarizer, op_classifier, plan_label, combo
             "error": str(exc),
         })
 
-    return rows
+    return rows, "\n".join(lines)
 
 
 # ---------------------------------------------------------------------------
@@ -241,9 +236,9 @@ def run_legal_plan(op_extractor, op_summarizer, op_classifier, plan_label, combo
 
 N_SAMPLE   = 300
 N_WORKERS  = 10
-SAVE_EVERY = 30
+SAVE_EVERY = 10
 SEED       = 42
-OUT_PATH   = "legal_results.csv"
+OUT_PATH   = "debug_legal_results.csv"
 
 random.seed(SEED)
 all_plans = list(product(all_models, repeat=3))
@@ -252,7 +247,7 @@ n_combos = len(sampled_plans)
 print(f"Running {n_combos} sampled plans (seed={SEED}) over {len(cuad_dataset)} contracts.")
 
 
-def run_plan_task(combo_idx: int, plan: tuple) -> list[dict]:
+def run_plan_task(combo_idx: int, plan: tuple) -> tuple[list[dict], str]:
     model_ext, model_sum, model_cls = plan
     plan_label = (model_ext.name, model_sum.name, model_cls.name)
     op_extractor  = make_lcb(model_ext, TextFile, Span,    "tfc_extractor")
@@ -269,7 +264,8 @@ with ThreadPoolExecutor(max_workers=N_WORKERS) as executor:
     }
     completed = 0
     for future in as_completed(futures):
-        rows = future.result()
+        rows, output = future.result()
+        print(output, flush=True)
         all_results.extend(rows)
         completed += 1
         if completed % SAVE_EVERY == 0:
