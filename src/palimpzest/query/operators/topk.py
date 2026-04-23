@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import threading
 import time
@@ -10,7 +11,11 @@ from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunct
 from chromadb.utils.embedding_functions.openai_embedding_function import OpenAIEmbeddingFunction
 from openai import OpenAI
 from pydantic import BaseModel
-from sentence_transformers import SentenceTransformer
+
+try:
+    from sentence_transformers import SentenceTransformer
+except ModuleNotFoundError:
+    logging.getLogger().info("sentence-transformers not found; sem_join, sem_topk unavailable!")
 
 from palimpzest.constants import Model
 from palimpzest.core.elements.records import DataRecord, DataRecordSet

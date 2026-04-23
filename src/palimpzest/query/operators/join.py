@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import threading
 import time
 from abc import ABC, abstractmethod
@@ -10,7 +11,11 @@ from litellm import embedding as litellm_embedding
 from numpy.linalg import norm
 from PIL import Image
 from pydantic.fields import FieldInfo
-from sentence_transformers import SentenceTransformer
+
+try:
+    from sentence_transformers import SentenceTransformer
+except ModuleNotFoundError:
+    logging.getLogger().info("sentence-transformers not found; sem_join, sem_topk unavailable!")
 
 from palimpzest.constants import (
     NAIVE_EST_JOIN_SELECTIVITY,

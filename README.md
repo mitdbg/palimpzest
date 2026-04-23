@@ -15,19 +15,19 @@ Our [full documentation](https://palimpzest.org) is the definitive resource for 
 ## 🚀 Getting started
 You can find a stable version of the PZ package on PyPI [here](https://pypi.org/project/palimpzest/). To install the package, run:
 ```bash
-$ pip install palimpzest
+$ pip install palimpzest --extra join-topk
 ```
 
 You can also install PZ with [uv](https://docs.astral.sh/uv/) for a faster installation:
 ```bash
-$ uv pip install palimpzest
+$ uv pip install palimpzest --extra join-topk
 ```
 
 Alternatively, to install the latest version of the package from this repository, you can clone this repository and run the following commands:
 ```bash
 $ git clone git@github.com:mitdbg/palimpzest.git
 $ cd palimpzest
-$ pip install .
+$ pip install . --extra join-topk
 ```
 
 ## 🙋🏽 Join the PZ Community
