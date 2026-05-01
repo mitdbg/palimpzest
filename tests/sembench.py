@@ -1,8 +1,9 @@
-import sys
 import importlib
+import sys
 from pathlib import Path
 
-SCENARIOS = ["movie", "animals"] #"cars", "ecomm", "medical", "mmqa"
+SCENARIOS = ["movie", "animals"]  # "cars", "ecomm", "medical", "mmqa"
+
 
 def main():
     root = Path(__file__).resolve().parent.parent
@@ -14,14 +15,15 @@ def main():
         module = importlib.import_module(
             f"scenario.{scenario}.runner.palimpzest_runner.palimpzest_runner"
         )
-        PalimpzestRunner = module.PalimpzestRunner
+        palimpzest_runner = module.PalimpzestRunner
 
-        runner = PalimpzestRunner(
+        runner = palimpzest_runner(
             use_case=scenario,
-            scale_factor=1
+            scale_factor=1,
         )
 
         runner.run_all_queries()
+
 
 if __name__ == "__main__":
     main()
