@@ -67,3 +67,4 @@ abacus-research/parse-answer-errors/*
 scripts/litellm_stats/
 scripts/provider_stats/
 tests/pytest/data/generator_messages/
+SemBench/
