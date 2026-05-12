@@ -9,6 +9,7 @@ import tarfile
 import tempfile
 import time
 from collections import defaultdict, Counter
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from math import comb
 
 import litellm
@@ -20,20 +21,18 @@ from rouge_score import rouge_scorer
 from src.palimpzest.constants import Model
 
 # ── Models to evaluate ────────────────────────────────────────────────────────
-MODELS = [
-    Model.GPT_4o,
-    # Model.GPT_4o_MINI,
-    # Model.GPT_4_1,
-    # Model.GPT_4_1_MINI,
-    # Model.GPT_4_1_NANO,
-    # Model.GPT_5,
-    # Model.GPT_5_MINI,
-    # Model.GPT_5_NANO,
-    # Model.o4_MINI,
-]
+MODELS = [Model.GPT_5,
+        Model.GPT_5_MINI,
+        Model.o4_MINI,
+        Model.GPT_4_1,
+        Model.GPT_5_NANO,
+        Model.GPT_4_1_MINI,
+        Model.GPT_4o,
+        Model.GPT_4o_MINI,
+        Model.GPT_4_1_NANO] #dec mmlu order
 
 # ── Benchmark config ───────────────────────────────────────────────────────────
-TOTAL_QUESTIONS = 1
+TOTAL_QUESTIONS = 100
 RANDOM_SEED = 42
 
 # ── Benchmark registry ─────────────────────────────────────────────────────────
@@ -44,63 +43,63 @@ BENCHMARKS = {
     #     "dataset_kwargs": {"split": "test"},
     #     "sample_fn": lambda ds, n, seed: MMLUPro_sample_questions(ds, n, seed),
     #     "run_fn": lambda models, qs: run_MMLUPro(models, qs),
-    #     "output_path": "LLM_benchmark/mmlupro.csv",
+    #     "output_path": "LLM_benchmark/mmlupro",
     # },
     # "hotpotqa": {
     #     "dataset_name": "hotpot_qa",
     #     "dataset_kwargs": {"name": "distractor", "split": "train", "trust_remote_code": True},
     #     "sample_fn": lambda ds, n, seed: HotpotQA_sample_questions(ds, n, seed),
     #     "run_fn": lambda models, qs: run_HotpotQA(models, qs),
-    #     "output_path": "LLM_benchmark/hotpotqa.csv",
+    #     "output_path": "LLM_benchmark/hotpotqa",
     # },
     # "narrativeqa": {
     #     "dataset_name": "deepmind/narrativeqa",
     #     "dataset_kwargs": {"split": "test"},
     #     "sample_fn": lambda ds, n, seed: NarrativeQA_sample_questions(ds, n, seed),
     #     "run_fn": lambda models, qs: run_NarrativeQA(models, qs),
-    #     "output_path": "LLM_benchmark/narrativeqa.csv",
+    #     "output_path": "LLM_benchmark/narrativeqa",
     # },
     # "qasper": {
     #     # QASPER uses a custom loader (S3 download) instead of load_dataset
     #     "loader_fn": lambda: QASPER_load_dataset(),
     #     "sample_fn": lambda ds, n, seed: QASPER_sample_questions(ds, n, seed),
     #     "run_fn": lambda models, qs: run_QASPER(models, qs),
-    #     "output_path": "LLM_benchmark/qasper.csv",
+    #     "output_path": "LLM_benchmark/qasper",
     # },
     # "fever": {
     #     # FEVER uses a custom loader: local JSONL + HuggingFace wiki pages
     #     "loader_fn": lambda: FEVER_load_dataset(),
     #     "sample_fn": lambda ds, n, seed: FEVER_sample_questions(ds, n, seed),
     #     "run_fn": lambda models, qs: run_FEVER(models, qs),
-    #     "output_path": "LLM_benchmark/fever.csv",
+    #     "output_path": "LLM_benchmark/fever",
     # },
     # "cnn_dailymail": {
     #     "dataset_name": "abisee/cnn_dailymail",
     #     "dataset_kwargs": {"name": "3.0.0", "split": "test"},
     #     "sample_fn": lambda ds, n, seed: CNNDailyMail_sample_questions(ds, n, seed),
     #     "run_fn": lambda models, qs: run_CNNDailyMail(models, qs),
-    #     "output_path": "LLM_benchmark/cnn_dailymail.csv",
+    #     "output_path": "LLM_benchmark/cnn_dailymail",
     # },
     # "math": {
     #     "dataset_name": "nlile/hendrycks-MATH-benchmark",
     #     "dataset_kwargs": {"split": "test"},
     #     "sample_fn": lambda ds, n, seed: MATH_sample_questions(ds, n, seed),
     #     "run_fn": lambda models, qs: run_MATH(models, qs),
-    #     "output_path": "LLM_benchmark/math.csv",
+    #     "output_path": "LLM_benchmark/math",
     # },
     # "drop": {
     #     "dataset_name": "ucinlp/drop",
     #     "dataset_kwargs": {"split": "validation"},
     #     "sample_fn": lambda ds, n, seed: DROP_sample_questions(ds, n, seed),
     #     "run_fn": lambda models, qs: run_DROP(models, qs),
-    #     "output_path": "LLM_benchmark/drop.csv",
+    #     "output_path": "LLM_benchmark/drop",
     # },
     "humaneval": {
         "dataset_name": "openai/openai_humaneval",
         "dataset_kwargs": {"split": "test"},
         "sample_fn": lambda ds, n, seed: HumanEval_sample_questions(ds, n, seed),
         "run_fn": lambda models, qs: run_HumanEval(models, qs),
-        "output_path": "LLM_benchmark/humaneval.csv",
+        "output_path": "LLM_benchmark/first_humaneval",
     },
 }
 
@@ -1327,12 +1326,10 @@ def run_DROP(models: list[Model], questions: list[dict]) -> pd.DataFrame:
 
 
 ### ── HumanEval ───────────────────────────────────────────────────────────────
-
-# Number of completions per problem used to estimate pass@k.
-# The original paper uses 200; reduce for faster/cheaper runs.
-HUMANEVAL_NUM_SAMPLES = 40
+HUMANEVAL_NUM_SAMPLES = 20
 HUMANEVAL_TEMPERATURE = 0.8   # temperature from the original Chen et al. paper
 HUMANEVAL_TIMEOUT_SEC = 10    # per-execution wall-clock timeout
+HUMANEVAL_MAX_WORKERS = 10    # parallel questions in flight at once
 
 HumanEval_SYSTEM_PROMPT = (
     "You are an expert Python programmer. "
@@ -1399,6 +1396,9 @@ def _call_model_n(
     for models or providers that do not support batched sampling.
     """
     try:
+        completion_kwargs = {}
+        if not model.is_o_model() and not model.is_gpt_5_model():
+            completion_kwargs["temperature"] = temperature
         response = litellm.completion(
             model=model.value,
             messages=[
@@ -1406,7 +1406,7 @@ def _call_model_n(
                 {"role": "user", "content": user_prompt},
             ],
             n=n,
-            temperature=temperature,
+            **completion_kwargs
         )
         return [choice.message.content.strip() for choice in response.choices]
     except Exception:
@@ -1416,13 +1416,16 @@ def _call_model_n(
     results = []
     for _ in range(n):
         try:
+            completion_kwargs = {}
+            if not model.is_o_model() and not model.is_gpt_5_model():
+                completion_kwargs["temperature"] = temperature
             response = litellm.completion(
                 model=model.value,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
                 ],
-                temperature=temperature,
+                **completion_kwargs,
             )
             results.append(response.choices[0].message.content.strip())
         except Exception as e:
@@ -1447,71 +1450,87 @@ def HumanEval_sample_questions(dataset, n_total: int, seed: int) -> list[dict]:
             "prompt": item["prompt"],
         }
         for item in items
-    ]).to_csv("LLM_benchmark/humaneval_questions.csv", index=False)
-    print("  Sampled questions saved to LLM_benchmark/humaneval_questions.csv")
+    ]).to_csv("LLM_benchmark/first_humaneval_questions.csv", index=False)
+    print("  Sampled questions saved to LLM_benchmark/first_humaneval_questions.csv")
 
     return items
+
+
+def _run_humaneval_one(
+    model: Model, item: dict, idx: int, n_samples: int, ks: list[int]
+) -> tuple[int, dict]:
+    """Generate and evaluate all samples for one HumanEval problem. Returns (original_idx, row)."""
+    completions = _call_model_n(
+        model,
+        HumanEval_SYSTEM_PROMPT,
+        item["prompt"],
+        n_samples,
+        HUMANEVAL_TEMPERATURE,
+    )
+    n_got = len(completions)
+    n_pass = 0
+    for completion in completions:
+        code = _extract_full_code(item["prompt"], completion, item["entry_point"])
+        full_code = code + "\n\n" + item["test"] + f"\ncheck({item['entry_point']})\n"
+        if _execute_humaneval(full_code):
+            n_pass += 1
+    pass_rate = n_pass / n_got if n_got > 0 else 0.0
+    row = {
+        "model": model.name,
+        "task_id": item["task_id"],
+        "entry_point": item["entry_point"],
+        "n_samples": n_got,
+        "n_pass": n_pass,
+        "pass_rate": pass_rate,
+    }
+    for k in ks:
+        row[f"pass@{k}"] = _estimate_pass_at_k(n_got, n_pass, k)
+    return idx, row
 
 
 def run_HumanEval(models: list[Model], questions: list[dict]) -> pd.DataFrame:
     """
     For each problem generate HUMANEVAL_NUM_SAMPLES completions, execute each against
-    the HumanEval test suite, then report pass@1 / pass@10 / pass@100 using the
+    the HumanEval test suite, then report pass@1 / pass@4 / pass@10 using the
     unbiased estimator from Chen et al. 2021.
+    Questions are evaluated in parallel (HUMANEVAL_MAX_WORKERS at a time).
     """
-    ks = [1, 10, 20]
+    ks = [1, 4, 10]
     n_samples = HUMANEVAL_NUM_SAMPLES
     records = []
 
     for model in models:
         print(
             f"\nEvaluating {model} on {len(questions)} HumanEval problems "
-            f"({n_samples} samples each, temperature={HUMANEVAL_TEMPERATURE})..."
+            f"({n_samples} samples each, temperature={HUMANEVAL_TEMPERATURE}, "
+            f"workers={HUMANEVAL_MAX_WORKERS})..."
         )
 
-        for idx, item in enumerate(questions):
-            completions = _call_model_n(
-                model,
-                HumanEval_SYSTEM_PROMPT,
-                item["prompt"],
-                n_samples,
-                HUMANEVAL_TEMPERATURE,
-            )
-
-            n_got = len(completions)
-            n_pass = 0
-            for completion in completions:
-                code = _extract_full_code(item["prompt"], completion, item["entry_point"])
-                full_code = code + "\n\n" + item["test"] + f"\ncheck({item['entry_point']})\n"
-                if _execute_humaneval(full_code):
-                    n_pass += 1
-
-            pass_rate = n_pass / n_got if n_got > 0 else 0.0
-            row = {
-                "model": model.name,
-                "task_id": item["task_id"],
-                "entry_point": item["entry_point"],
-                "n_samples": n_got,
-                "n_pass": n_pass,
-                "pass_rate": pass_rate,
+        indexed_results: dict[int, dict] = {}
+        with ThreadPoolExecutor(max_workers=HUMANEVAL_MAX_WORKERS) as executor:
+            futures = {
+                executor.submit(_run_humaneval_one, model, item, idx, n_samples, ks): idx
+                for idx, item in enumerate(questions)
             }
-            for k in ks:
-                row[f"pass@{k}"] = _estimate_pass_at_k(n_got, n_pass, k)
-            records.append(row)
+            for future in as_completed(futures):
+                idx, row = future.result()
+                indexed_results[idx] = row
 
-            if (idx + 1) % 10 == 0 or idx == 0:
-                model_so_far = [r for r in records if r["model"] == model.name]
-                parts = [f"[{idx+1}/{len(questions)}]"]
-                for k in ks:
-                    avg = sum(r[f"pass@{k}"] for r in model_so_far) / len(model_so_far)
-                    parts.append(f"pass@{k}={avg:.3f}")
-                avg_rate = sum(r["pass_rate"] for r in model_so_far) / len(model_so_far)
-                parts.append(f"pass_rate={avg_rate:.3f}")
-                print("  " + "  ".join(parts))
+                n_done = len(indexed_results)
+                if n_done % 10 == 0 or n_done == 1 or n_done == len(questions):
+                    so_far = list(indexed_results.values())
+                    parts = [f"[{n_done}/{len(questions)}]"]
+                    for k in ks:
+                        avg = sum(r[f"pass@{k}"] for r in so_far) / n_done
+                        parts.append(f"pass@{k}={avg:.3f}")
+                    avg_rate = sum(r["pass_rate"] for r in so_far) / n_done
+                    parts.append(f"pass_rate={avg_rate:.3f}")
+                    print("  " + "  ".join(parts))
 
-            time.sleep(0.5)
+        # Restore original question order before appending
+        model_records = [indexed_results[i] for i in range(len(questions))]
+        records.extend(model_records)
 
-        model_records = [r for r in records if r["model"] == model.name]
         n = len(model_records)
         avg_rate = sum(r["pass_rate"] for r in model_records) / n
         print(f"\n  Final [{model}]:")
@@ -1552,5 +1571,6 @@ def main():
 
 
 if __name__ == "__main__":
+    # litellm._turn_on_debug()
     main()
     
