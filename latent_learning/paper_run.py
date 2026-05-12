@@ -169,7 +169,7 @@ def run_paper_plan(op_summary, op_f1, plan_label, combo_idx, n_combos):
                 data_item=Summary(summary=summary),
                 source_indices=filename,
             )
-            f1_drs = op_f1(record)
+            f1_drs = op_f1(summary_record)
             f1_stats = f1_drs.record_op_stats[0]
             is_f1 = f1_drs.data_records[0].is_f1
 
@@ -218,32 +218,6 @@ def run_paper_plan(op_summary, op_f1, plan_label, combo_idx, n_combos):
 
 
 # ---------------------------------------------------------------------------
-# Main loop: 17 summarizer configs × 17 classifier configs = 289 plans
-# ---------------------------------------------------------------------------
-
-# all_results = []
-# N_TOTAL = len(OP_CONFIGS) ** 2  # 289
-
-# for global_idx, (sum_cfg, cls_cfg) in enumerate(iproduct(OP_CONFIGS, OP_CONFIGS), start=1):
-#     label = f"summarizer={sum_cfg['label']} | classifier={cls_cfg['label']}"
-
-#     op_summarizer = make_op(sum_cfg, TextFile,  PaperFile,           "paper_summarizer")
-#     op_classifier = make_op(cls_cfg, PaperFile, PaperClassification, "paper_classifier", depends_on=["summary"])
-
-#     result = run_plan(op_summarizer, op_classifier, label, global_idx, N_TOTAL)
-#     result["summarizer_impl"] = sum_cfg["label"]
-#     result["classifier_impl"] = cls_cfg["label"]
-#     all_results.append(result)
-
-#     # Intermediate save every 10 completed plans
-#     if global_idx % 10 == 0:
-#         out_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"paper_results_{global_idx}.csv")
-#         pd.DataFrame(all_results).to_csv(out_path, index=False)
-
-# pd.DataFrame(all_results).to_csv("paper_results.csv", index=False)
-
-
-# ---------------------------------------------------------------------------
 # Get summaries from 9 LCB summarizer configs for all 3 papers
 # ---------------------------------------------------------------------------
 # rows = []
@@ -274,10 +248,11 @@ def run_paper_plan(op_summary, op_f1, plan_label, combo_idx, n_combos):
 combo_idx = 1
 num_combos = 9**2
 combos = tuple(product(range(9), repeat=2))
-plan_strengths = tuple(product(all_models, repeat=2))
+plans = tuple(product(all_models, repeat=2))
+print(plans)
 results = []
 
-for model_summary, model_f1 in plan_strengths:
+for model_summary, model_f1 in plans:
     print(combos[combo_idx-1])
     plan_label = (model_summary.name, model_f1.name)
     op_summary = make_op({"type": "LCB", "model": model_summary},  TextFile, Summary, "summary_extracter")
@@ -287,4 +262,4 @@ for model_summary, model_f1 in plan_strengths:
     results.append(plan_results)
     combo_idx += 1
 df = pd.DataFrame(results)
-df.to_csv(f"new_paper_results.csv", index=False)
+df.to_csv(f"paper_results.csv", index=False)

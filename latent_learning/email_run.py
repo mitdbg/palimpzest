@@ -37,14 +37,10 @@ class Subject(BaseModel):
 class Sender(BaseModel):
     sender: str = Field(description="The email address of the email's sender")
 
-# class Summary(BaseModel):
-#     summary: str = Field(description= "A brief summary of the email contents.")
-
 class SSFile(BaseModel):
     sender: str = Field(description="The email address of the email's sender")
     subject: str = Field(description="The subject of the email")
     contents: str = Field(description="The contents of the email")
-    # summary: str = Field(description= "A brief summary of the email contents.")
 
 class is_Fraud(BaseModel):
     is_fraud: bool = Field(
@@ -130,12 +126,21 @@ STRONG_MEDIUM = Model.GPT_4_1
 MEDIUM = Model.GPT_5_NANO
 WEAK_MEDIUM = Model.GPT_4o_MINI
 WEAK   = Model.GPT_4_1_NANO
+all_models = [Model.GPT_5,
+        Model.GPT_5_MINI,
+        Model.o4_MINI,
+        Model.GPT_4_1,
+        Model.GPT_5_NANO,
+        Model.GPT_4_1_MINI,
+        Model.GPT_4o,
+        Model.GPT_4o_MINI,
+        Model.GPT_4_1_NANO] #decreasing MMLU-Pro values
 
 MOA_TEMPS = [0.7, 0.7]
 
 
 # ---------------------------------------------------------------------------
-# Build OP_CONFIGS (17 entries, same structure as paper_run.py)
+# Build OP_CONFIGS (17 entries)
 # ---------------------------------------------------------------------------
 
 OP_CONFIGS = []
@@ -149,7 +154,7 @@ for model in [STRONG, MEDIUM, WEAK]:
     })
 
 # CritiqueAndRefine: (base, critic, refine) ∈ {S, W}³  (2³ = 8 configs)
-for base, critic, refine in iproduct([STRONG, WEAK], repeat=3):
+for base, critic, refine in product([STRONG, WEAK], repeat=3):
     OP_CONFIGS.append({
         "type": "CAR",
         "label": f"CAR({base.name}, {critic.name}, {refine.name})",
@@ -171,8 +176,6 @@ for agent_a, agent_b in combinations([STRONG, MEDIUM, WEAK], 2):
 assert len(OP_CONFIGS) == 17, f"Expected 17 configs, got {len(OP_CONFIGS)}"
 print(f"Built {len(OP_CONFIGS)} operator configs  (3 LLM + 8 CAR + 6 MOA).")
 
-
-
 def make_op(cfg, input_schema, output_schema, logical_op_id, depends_on=None):
     kwargs = dict(input_schema=input_schema, output_schema=output_schema, logical_op_id=logical_op_id)
     if depends_on:
@@ -183,10 +186,12 @@ def make_op(cfg, input_schema, output_schema, logical_op_id, depends_on=None):
         return CritiqueAndRefineConvert(
             model=cfg["model"], critic_model=cfg["critic"], refine_model=cfg["refine"], **kwargs
         )
-    else:  # MOA
+    elif cfg["type"] == "MOA":
         return MixtureOfAgentsConvert(
             proposer_models=cfg["agents"], temperatures=MOA_TEMPS, aggregator_model=cfg["agg"], **kwargs
         )
+    else:
+        raise ValueError(f"Unknown config type: {cfg['type']}")
 
 def run_email_plan(op_subject, op_sender, op_fraud, op_internal, plan_label, combo_idx, n_combos, dataset, labels):
     print(
@@ -213,9 +218,6 @@ def run_email_plan(op_subject, op_sender, op_fraud, op_internal, plan_label, com
             subject_stats = drs_subject.record_op_stats[0]
             subject = drs_subject.data_records[0].subject
 
-            # drs_summary = op_summarizer(record)
-            # summary_stats = drs_summary.record_op_stats[0]
-            # summary = drs_summary.data_records[0].summary or ""
             if "" in (sender, subject):
                 print("MISSING sender, subject, or summary", flush=True)
                 print("sender:", sender)
@@ -347,7 +349,9 @@ def run_email_plan(op_subject, op_sender, op_fraud, op_internal, plan_label, com
 # pd.DataFrame(small_results).to_csv("email_results_small.csv", index=False)
 
 
-## look at summaries of 17 operators for 4 emails
+# ---------------------------------------------------------------------------
+# Get summaries from 17 summarizer configs for all 4 emails
+# ---------------------------------------------------------------------------
 def config_to_summary_config(cfg):
     """
     Convert an operator config dict into the desired summary_config format:
@@ -400,6 +404,10 @@ def config_to_summary_config(cfg):
 # pd = pd.DataFrame(rows)
 # pd.to_csv("email_summaries.csv", index=False)
 
+
+# ---------------------------------------------------------------------------
+# main loop: get plan results
+# ---------------------------------------------------------------------------
 combo_idx = 1
 num_combos = 32
 combos = tuple(product(["S", "W"], ["S", "W"], ["S", "M", "WM", "W"], ["S", "W"]))
@@ -408,11 +416,10 @@ other_strengths = [STRONG, WEAK]
 
 plan_strengths = list(product(other_strengths, other_strengths, fraud_strengths, other_strengths))
 results = []
-# for model_subject, model_sender, model_fraud, model_internal in iproduct([STRONG,], repeat=4):
+
 for model_subject, model_sender, model_fraud, model_internal in plan_strengths:
     print(combos[combo_idx-1])
     label = (model_subject.name, model_sender.name, model_fraud.name, model_internal.name)
-    # op_summarizer = make_op({"type": "LCB", "model": model_summarizer},  TextFile, Summary, "summary_extracter")
     op_subject = make_op({"type": "LCB", "model": model_subject},  TextFile, Subject, "subject_extracter")
     op_sender = make_op({"type": "LCB", "model": model_sender},  TextFile, Sender, "sender_extracter")
     op_fraud = make_op({"type": "LCB", "model": model_fraud},  SSFile, is_Fraud, "fraud_classifier")

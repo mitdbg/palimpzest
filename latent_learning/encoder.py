@@ -163,7 +163,7 @@ DATA_DIR = os.path.dirname(os.path.abspath(__file__))
 
 def load_paper_data(csv_path: str | None = None) -> pd.DataFrame:
     if csv_path is None:
-        csv_path = os.path.join(DATA_DIR, "new_paper_results.csv")
+        csv_path = os.path.join(DATA_DIR, "latent_learning_data/new_paper_results.csv")
     df = pd.read_csv(csv_path, usecols=["plan_label", "quality"])
     df = df.dropna(subset=["quality"])
     # drop outliers

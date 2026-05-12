@@ -4,7 +4,8 @@ legal_run.py
 Exhaustive evaluation of a 3-operator LLM pipeline on CUAD TFC classification.
 
 Logical plan:
-    TextFile -> extractor -> Span -> summarizer -> Summary -> classifier -> is_TFC
+    ESC: span_extractor -> summarizer -> classifier
+    EC: span_extractor -> classifier
 
 All operators: LLMConvertBonded with models from all_models (9 models).
 300 plans randomly sampled from 9^3 = 729, run in parallel.
@@ -50,7 +51,7 @@ class Span(BaseModel):
                 return an empty string.""")
 
 class Summary(BaseModel):
-    summary: str = Field(description="""A concise summary of the contract's provisions
+    summary: str | None = Field(default=None, description="""A concise summary of the contract's provisions
                          related to Termination For Convenience""")
 
 class is_TFC(BaseModel):
@@ -156,15 +157,66 @@ def make_lcb(model, input_schema, output_schema, logical_op_id):
         logical_op_id=logical_op_id,
     )
 
-
-def run_legal_plan(op_extractor, op_summarizer, op_classifier, plan_label, combo_idx, n_combos):
+def run_legal_plan_ec(op_extractor, op_classifier, plan_label, combo_idx, n_combos):
     lines = [f"\n[{combo_idx}/{n_combos}] {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} {plan_label}"]
     rows = []
-    try:
-        for contract_idx, record, gt in cuad_dataset:
-            gt_label = bool(gt["label"])
-            gt_span = gt["span"]
+    for contract_idx, record, gt in cuad_dataset:
+        gt_label = bool(gt["label"])
+        gt_span = gt["span"]
+        try:
+            # --- Extractor ---
+            ext_drs = op_extractor(record)
+            produced_span = ext_drs.data_records[0].span or ""
+            extractor_quality = f1_token_match(produced_span, gt_span)
 
+            no_span = produced_span.strip() == ""
+
+            # --- Classifier ---
+            span_record = DataRecord(
+                data_item=Span(span=produced_span),
+                source_indices=str(contract_idx),
+            )
+            cls_drs = op_classifier(span_record)
+            predicted_label = cls_drs.data_records[0].is_TFC
+
+            classifier_quality = int(predicted_label == gt_label)
+            lines.append(
+                f"  contract={contract_idx:<5} "
+                f"span_f1={extractor_quality:.3f} cls_q={classifier_quality}"
+            )
+
+            rows.append({
+                "plan_label": str(plan_label),
+                "contract_idx": contract_idx,
+                "extractor_quality": extractor_quality,
+                "classifier_quality": classifier_quality,
+                "produced_span": produced_span,
+                "gt_label": int(gt_label),
+                "gt_span": gt_span,
+            })
+
+        except Exception as exc:
+            lines.append(f"  ERROR contract={contract_idx}: {type(exc).__name__}: {exc}")
+            rows.append({
+                "plan_label": str(plan_label),
+                "contract_idx": contract_idx,
+                "extractor_quality": None,
+                "classifier_quality": None,
+                "produced_span": None,
+                "gt_label": int(gt_label),
+                "gt_span": gt_span,
+                "error": str(exc),
+            })
+
+    return rows, "\n".join(lines)
+
+def run_legal_plan_esc(op_extractor, op_summarizer, op_classifier, plan_label, combo_idx, n_combos):
+    lines = [f"\n[{combo_idx}/{n_combos}] {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} {plan_label}"]
+    rows = []
+    for contract_idx, record, gt in cuad_dataset:
+        gt_label = bool(gt["label"])
+        gt_span = gt["span"]
+        try:
             # --- Extractor ---
             ext_drs = op_extractor(record)
             produced_span = ext_drs.data_records[0].span or ""
@@ -212,48 +264,48 @@ def run_legal_plan(op_extractor, op_summarizer, op_classifier, plan_label, combo
                 "gt_span": gt_span,
             })
 
-    except Exception as exc:
-        lines.append(f"  ERROR contract={contract_idx} plan={plan_label}: {type(exc).__name__}: {exc}")
-        rows.append({
-            "plan_label": str(plan_label),
-            "contract_idx": contract_idx,
-            "extractor_quality": None,
-            "summarizer_quality": None,
-            "classifier_quality": None,
-            "produced_span": None,
-            "produced_summary": None,
-            "gt_label": None,
-            "gt_span": None,
-            "error": str(exc),
-        })
+        except Exception as exc:
+            lines.append(f"  ERROR contract={contract_idx}: {type(exc).__name__}: {exc}")
+            rows.append({
+                "plan_label": str(plan_label),
+                "contract_idx": contract_idx,
+                "extractor_quality": None,
+                "summarizer_quality": None,
+                "classifier_quality": None,
+                "produced_span": None,
+                "produced_summary": None,
+                "gt_label": int(gt_label),
+                "gt_span": gt_span,
+                "error": str(exc),
+            })
 
     return rows, "\n".join(lines)
 
 
 # ---------------------------------------------------------------------------
-# Main loop: 300 randomly sampled plans from 9^3 = 729, run in parallel
+# Main loop: 400 randomly sampled plans from 9^3 = 729, run in parallel
 # ---------------------------------------------------------------------------
 
-N_SAMPLE   = 300
+N_SAMPLE   = 400
 N_WORKERS  = 10
 SAVE_EVERY = 10
 SEED       = 42
-OUT_PATH   = "debug_legal_results.csv"
+OUT_PATH   = "legal_results_ec.csv"
 
 random.seed(SEED)
-all_plans = list(product(all_models, repeat=3))
-sampled_plans = random.sample(all_plans, N_SAMPLE)
+all_plans = list(product(all_models, repeat=2))
+# sampled_plans = random.sample(all_plans, N_SAMPLE)
+sampled_plans = all_plans
 n_combos = len(sampled_plans)
 print(f"Running {n_combos} sampled plans (seed={SEED}) over {len(cuad_dataset)} contracts.")
 
 
 def run_plan_task(combo_idx: int, plan: tuple) -> tuple[list[dict], str]:
-    model_ext, model_sum, model_cls = plan
-    plan_label = (model_ext.name, model_sum.name, model_cls.name)
-    op_extractor  = make_lcb(model_ext, TextFile, Span,    "tfc_extractor")
-    op_summarizer = make_lcb(model_sum, Span,     Summary, "tfc_summarizer")
-    op_classifier = make_lcb(model_cls, Summary,  is_TFC,  "tfc_classifier")
-    return run_legal_plan(op_extractor, op_summarizer, op_classifier, plan_label, combo_idx, n_combos)
+    model_ext, model_cls = plan
+    plan_label = (model_ext.name, model_cls.name)
+    op_extractor  = make_lcb(model_ext, TextFile, Span, "tfc_extractor")
+    op_classifier = make_lcb(model_cls, Span, is_TFC, "tfc_classifier")
+    return run_legal_plan_ec(op_extractor, op_classifier, plan_label, combo_idx, n_combos)
 
 
 all_results = []
