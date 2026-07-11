@@ -288,7 +288,8 @@ class Model:
             "vertex_ai": "GOOGLE_APPLICATION_CREDENTIALS",
             "anthropic": "ANTHROPIC_API_KEY",
             "together_ai": "TOGETHER_API_KEY",
-            "hosted_vllm": "VLLM_API_KEY"
+            "hosted_vllm": "VLLM_API_KEY",
+            "openrouter": "OPENROUTER_API_KEY",
         }
         return mapping.get(self.provider)
 
@@ -343,6 +344,9 @@ class Model:
 
     def is_provider_ollama(self) -> bool:
         return self.provider == "ollama"
+
+    def is_provider_openrouter(self) -> bool:
+        return self.provider == "openrouter"
 
     def is_model_gemini(self) -> bool:
         return "gemini" in self.value.lower()
@@ -438,6 +442,24 @@ Model.GPT_5_MINI = Model("openai/gpt-5-mini-2025-08-07")
 Model.GPT_5_NANO = Model("openai/gpt-5-nano-2025-08-07")
 Model.GPT_5_2 = Model("openai/gpt-5.2-2025-12-11")
 Model.o4_MINI = Model("openai/o4-mini-2025-04-16")  # noqa: N815
+Model.OPENROUTER_GPT_5 = Model("openrouter/openai/gpt-5")
+Model.OPENROUTER_GPT_5_MINI = Model("openrouter/openai/gpt-5-mini")
+Model.OPENROUTER_GPT_5_NANO = Model("openrouter/openai/gpt-5-nano")
+Model.OPENROUTER_GPT_5_6_SOL = Model("openrouter/openai/gpt-5.6-sol")
+Model.OPENROUTER_GPT_5_6_TERRA = Model("openrouter/openai/gpt-5.6-terra")
+Model.OPENROUTER_GPT_5_6_LUNA = Model("openrouter/openai/gpt-5.6-luna")
+Model.OPENROUTER_GPT_5_4 = Model("openrouter/openai/gpt-5.4")
+Model.OPENROUTER_GPT_5_4_PRO = Model("openrouter/openai/gpt-5.4-pro")
+Model.OPENROUTER_GPT_5_4_MINI = Model("openrouter/openai/gpt-5.4-mini")
+Model.OPENROUTER_GPT_5_4_NANO = Model("openrouter/openai/gpt-5.4-nano")
+Model.OPENROUTER_GPT_5_4_IMAGE_2 = Model("openrouter/openai/gpt-5.4-image-2")
+Model.OPENROUTER_CLAUDE_SONNET_5 = Model("openrouter/anthropic/claude-sonnet-5")
+Model.OPENROUTER_GROK_4_5 = Model("openrouter/x-ai/grok-4.5")
+Model.OPENROUTER_GEMINI_3_1_FLASH_IMAGE = Model("openrouter/google/gemini-3.1-flash-image")
+Model.OPENROUTER_GEMINI_3_PRO_IMAGE = Model("openrouter/google/gemini-3-pro-image")
+Model.OPENROUTER_DEEPSEEK_R1 = Model("openrouter/deepseek/deepseek-r1")
+Model.OPENROUTER_QWEN3_MAX = Model("openrouter/qwen/qwen3-max")
+Model.OPENROUTER_GEMINI_3_5_FLASH = Model("openrouter/google/gemini-3.5-flash")
 # Model.CLAUDE_3_5_SONNET = Model("anthropic/claude-3-5-sonnet-20241022") - retired 10/28/2025
 Model.CLAUDE_3_7_SONNET = Model("anthropic/claude-3-7-sonnet-20250219")
 Model.CLAUDE_4_SONNET = Model("anthropic/claude-sonnet-4-20250514")

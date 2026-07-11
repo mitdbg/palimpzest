@@ -8,7 +8,9 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import numpy as np
 from litellm import embedding as litellm_embedding
 from numpy.linalg import norm
-from PIL import Image
+from PIL import Image, ImageFile
+ImageFile.LOAD_TRUNCATED_IMAGES = True
+
 from pydantic.fields import FieldInfo
 from sentence_transformers import SentenceTransformer
 

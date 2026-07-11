@@ -7,7 +7,8 @@ import tempfile
 from typing import Any
 from urllib.request import urlopen
 
-from PIL import Image
+from PIL import Image, ImageFile
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 from pydantic.fields import FieldInfo
 
 from palimpzest.constants import (

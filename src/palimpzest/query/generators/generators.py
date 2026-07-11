@@ -121,7 +121,7 @@ class Generator(Generic[ContextType, InputType]):
 
         # Initialize GeminiClient for direct Gemini API calls (Google AI Studio and Vertex AI)
         self.gemini_client = None
-        if model.is_model_gemini():
+        if model.is_provider_google_ai_studio() or model.is_provider_vertex_ai():
             from palimpzest.query.generators.gemini_client import GeminiClient
             self.gemini_client = GeminiClient.get_instance(
                 model=model.get_model_name(),

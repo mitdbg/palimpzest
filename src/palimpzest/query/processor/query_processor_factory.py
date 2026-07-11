@@ -140,6 +140,7 @@ class QueryProcessorFactory:
         together_key = os.getenv("TOGETHER_API_KEY")
         gemini_key = os.getenv("GEMINI_API_KEY")
         google_key = os.getenv("GOOGLE_API_KEY")
+        openrouter_key = os.getenv("OPENROUTER_API_KEY")
 
         vllm_models = [model for model in config.available_models if model.is_vllm_model()]
         if len(vllm_models) > 1:
@@ -156,6 +157,8 @@ class QueryProcessorFactory:
                 raise ValueError("TOGETHER_API_KEY must be set to use Together models.")
             if model.is_provider_google_ai_studio() and not (gemini_key or google_key or config.gemini_credentials_path):
                 raise ValueError("GEMINI_API_KEY, GOOGLE_API_KEY, or gemini_credentials path must be set to use Google Gemini models.")
+            if model.is_provider_openrouter() and not openrouter_key:
+                raise ValueError("OPENROUTER_API_KEY must be set to use OpenRouter models.")
             if model.is_vllm_model() and model.api_base is None:
                 raise ValueError("api_base must be set on the Model instance to use vLLM models.")
         return config, validator
