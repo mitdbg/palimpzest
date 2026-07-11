@@ -25,7 +25,7 @@ from palimpzest.query.operators.compute import SmolAgentsCompute
 from palimpzest.query.operators.convert import LLMConvertBonded, NonLLMConvert
 from palimpzest.query.operators.critique_and_refine import CritiqueAndRefineConvert, CritiqueAndRefineFilter
 from palimpzest.query.operators.distinct import DistinctOp
-from palimpzest.query.operators.batched import BatchedOperator
+from palimpzest.query.operators.batched import BatchedFilter
 from palimpzest.query.operators.filter import LLMFilter, NonLLMFilter
 from palimpzest.query.operators.image_filter import RescaledImageFilter
 from palimpzest.query.operators.join import EmbeddingJoin, NestedLoopsJoin, RelationalJoin
@@ -961,7 +961,7 @@ class BatchedFilterRule(ImplementationRule):
                 )
 
         return cls._perform_substitution(
-            logical_expression, BatchedOperator, runtime_kwargs, variable_op_kwargs
+            logical_expression, BatchedFilter, runtime_kwargs, variable_op_kwargs
         )
 
 

@@ -68,7 +68,7 @@ class ScanPhysicalOp(PhysicalOperator, ABC):
 
         # check that item covers fields in output schema
         output_field_names = list(self.output_schema.model_fields)
-        assert all([field in item for field in output_field_names]), f"Some fields in Dataset schema not present in item!\n - Dataset fields: {output_field_names}\n - Item fields: {list(item.keys())}"
+        assert all([field in item for field in output_field_names]), f"Some fields in Dataset schema not present in item!\n - Dataset fields: {output_field_names}\n - Item fields: {list(item.keys())}\n Missing from item: {[field for field in output_field_names if field not in item]}"
 
         # construct a DataRecord from the item
         data_item = self.output_schema(**{field: item[field] for field in output_field_names})

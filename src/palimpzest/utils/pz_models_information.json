@@ -686,6 +686,24 @@
         "provider": "gemini",
         "sources": ["https://ai.google.dev/gemini-api/docs/pricing"]
     },
+    "gemini/gemini-3.5-flash": {
+        "usd_per_input_token": 1.5e-06,
+        "usd_per_output_token": 9e-06,
+        "usd_per_audio_input_token": 1e-06,
+        "usd_per_cache_read_token": 5e-08,
+        "usd_per_cached_token_per_hour": 1e-06,
+        "seconds_per_output_token": 0.00457247,
+        "MMLU_Pro_score": 87.63,
+        "is_reasoning_model": true,
+        "is_text_model": true,
+        "is_vision_model": true,
+        "is_audio_model": true,
+        "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
+        "supports_prompt_caching": true,
+        "provider": "gemini",
+        "sources": ["https://ai.google.dev/gemini-api/docs/pricing"]
+    },
     "gemini/gemini-3-flash-preview": {
         "usd_per_input_token": 5e-07,
         "usd_per_output_token": 3e-06,
@@ -807,6 +825,23 @@
         "is_text_image_multimodal_embedding_model": false,
         "provider": "openai",
         "sources": ["https://platform.openai.com/docs/models/gpt-4o-mini-audio-preview"]
+    },
+    "openai/gpt-audio-1.5": {
+        "usd_per_input_token": 2.5e-06,
+        "usd_per_output_token": 1.0e-05,
+        "usd_per_audio_input_token": 3.2e-05,
+        "usd_per_audio_output_token": 6.4e-05,
+        "seconds_per_output_token": 0.008,
+        "MMLU_Pro_score": 74.1,
+        "is_reasoning_model": false,
+        "is_text_model": true,
+        "is_vision_model": false,
+        "is_audio_model": true,
+        "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
+        "supports_prompt_caching": false,
+        "provider": "openai",
+        "sources": ["https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json"]
     },
     "hosted_vllm/qwen/Qwen1.5-0.5B-Chat": {
         "usd_per_input_token": 0.0,

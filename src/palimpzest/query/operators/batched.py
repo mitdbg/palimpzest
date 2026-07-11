@@ -24,7 +24,7 @@ class BatchedOperator(PhysicalOperator):
         )
 
 
-class BatchedOperator(LLMFilter, BatchedOperator):
+class BatchedFilter(LLMFilter, BatchedOperator):
     def __init__(
         self,
         batch_size: int,
@@ -54,18 +54,17 @@ class BatchedOperator(LLMFilter, BatchedOperator):
 
     def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates):
         # estimate number of input tokens from source
-        est_num_input_tokens = NAIVE_EST_NUM_INPUT_TOKENS * self.batch_size
-        if self.is_image_op():
-            est_num_input_tokens = (765 / 10) * self.batch_size  # 1024x1024 image is 765 tokens
+        est_input_tokens = NAIVE_EST_NUM_INPUT_TOKENS if not self.is_image_op() else (765 / 10)
+        batch_num_input_tokens = 0.1 * est_input_tokens + (0.9*self.batch_size * est_input_tokens)
 
         # NOTE: the output often generates an entire reasoning sentence, thus the true value may be higher
         # the filter operation's LLM call should only output TRUE or FALSE, thus we expect its
         # number of output tokens to be ~1.25
-        est_num_output_tokens = 1.25 * self.batch_size
+        batch_est_num_output_tokens = self.batch_size + (0.25 * est_input_tokens)
 
         # get est. of conversion time per batch from model card
         model_conversion_time_per_batch = (
-            self.model.get_seconds_per_output_token() * est_num_output_tokens
+            self.model.get_seconds_per_output_token() * batch_est_num_output_tokens
         )
 
         # get est. of conversion cost (in USD) per batch from model card
@@ -75,8 +74,8 @@ class BatchedOperator(LLMFilter, BatchedOperator):
             else self.model.get_usd_per_input_token()
         )
         model_conversion_usd_per_batch = (
-            usd_per_input_token * est_num_input_tokens
-            + self.model.get_usd_per_output_token() * est_num_output_tokens
+            usd_per_input_token * batch_num_input_tokens
+            + self.model.get_usd_per_output_token() * batch_est_num_output_tokens
         )
 
         # estimate output cardinality using a constant assumption of the filter selectivity
