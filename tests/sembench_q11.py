@@ -18,7 +18,7 @@ sys.path.append(".")
 
 
 PZ_K = 3
-PZ_BUDGET = 10
+PZ_BUDGET = 3
 MAX_WORKERS = 8
 
 CAR_ID = {"name": "car_id", "type": int, "desc": "The integer id for the car"}
@@ -123,7 +123,8 @@ pz_config = pz.QueryProcessorConfig(
     sample_budget=PZ_BUDGET,
 )
 
-output = dataset.run(pz_config)
+validator = pz.Validator(model=pz.Model.GPT_5)
+output = dataset.optimize_and_run(validator=validator, config=pz_config)
 result_df = output.to_df()
 
 stats = output.execution_stats

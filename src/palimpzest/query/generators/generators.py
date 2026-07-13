@@ -401,8 +401,8 @@ class Generator(Generic[ContextType, InputType]):
                 # Usage already processed by GeminiClient
                 output_text_tokens = usage_stats.get("output_text_tokens", 0)
             else:
-                # litellm response format
-                output_text_tokens = usage.get("completion_tokens") or 0
+                # litellm response format/ anthropic keys
+                output_text_tokens = usage.get("completion_tokens") or usage.get("output_tokens") or 0
                 usage_stats = self.prompt_manager.extract_usage_stats(usage, is_audio_op)
 
             input_text_tokens = usage_stats["input_text_tokens"]

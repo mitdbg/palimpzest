@@ -73,6 +73,14 @@ def get_models(include_embedding: bool = False, use_vertex: bool = False, use_az
         else:
             models.extend(google_ai_studio_models)
 
+    if os.getenv("OPENROUTER_API_KEY") not in [None, ""]:
+        openrouter_models = [model for model in all_models if model.is_provider_openrouter()]
+        if not include_embedding:
+            openrouter_models = [
+                model for model in openrouter_models if not model.is_embedding_model()
+            ]
+        models.extend(openrouter_models)
+
     return models
 
 def get_optimal_models(policy: Policy, include_embedding: bool = False, use_vertex: bool = False, use_azure: bool = False, gemini_credentials_path: str | None = None, azure_endpoint: str | None = None, azure_api_version: str | None = None) -> list[Model]:
