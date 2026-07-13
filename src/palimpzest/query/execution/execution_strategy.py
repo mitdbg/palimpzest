@@ -10,6 +10,7 @@ from palimpzest.core.data.dataset import Dataset
 from palimpzest.core.elements.records import DataRecord, DataRecordSet
 from palimpzest.core.models import GenerationStats, PlanStats, SentinelPlanStats
 from palimpzest.policy import Policy
+from palimpzest.query.operators.batched import BatchedOperator
 from palimpzest.query.operators.convert import LLMConvert
 from palimpzest.query.operators.filter import LLMFilter
 from palimpzest.query.operators.join import JoinOp
@@ -185,13 +186,40 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
                     # create future for filter
                     elif isinstance(op, LLMFilter):
                         filter_str = op.filter_obj.filter_condition
-                        input_record: DataRecord = record_set.input
-                        output = record_set.data_records[0]._passed_operator
-                        full_hash = f"{filter_str}{hash(input_record)}"
-                        if full_hash not in full_hashes:
-                            full_hash_to_bool_output[full_hash] = output
-                            full_hashes.add(full_hash)
-                            futures.append(executor.submit(validator._score_filter, op, filter_str, input_record, output, full_hash))
+                        if isinstance(record_set.input, list):
+                            for input_record, data_record in zip(record_set.input, record_set.data_records):
+                                output = data_record._passed_operator
+                                full_hash = f"{filter_str}{hash(input_record)}"
+                                if full_hash not in full_hashes:
+                                    full_hash_to_bool_output[full_hash] = output
+                                    full_hashes.add(full_hash)
+                                    futures.append(
+                                        executor.submit(
+                                            validator._score_filter,
+                                            op,
+                                            filter_str,
+                                            input_record,
+                                            output,
+                                            full_hash,
+                                        )
+                                    )
+                        else:
+                            input_record: DataRecord = record_set.input
+                            output = record_set.data_records[0]._passed_operator
+                            full_hash = f"{filter_str}{hash(input_record)}"
+                            if full_hash not in full_hashes:
+                                full_hash_to_bool_output[full_hash] = output
+                                full_hashes.add(full_hash)
+                                futures.append(
+                                    executor.submit(
+                                        validator._score_filter,
+                                        op,
+                                        filter_str,
+                                        input_record,
+                                        output,
+                                        full_hash,
+                                    )
+                                )
 
                     # create future for join
                     elif isinstance(op, JoinOp):
@@ -211,6 +239,8 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
         for future in as_completed(futures):
             score, gen_stats, full_hash = future.result()
             full_hash_to_score[full_hash] = score
+            # TODO this score does not work with the future if it's a batched operator
+            # because the future was created before the operator was flushed and thus does not account for the total cost of the generation which includes the flush;
             validation_gen_stats += gen_stats
 
         # compute quality of each output computed by this operator
@@ -249,13 +279,33 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
 
                 elif isinstance(op, LLMFilter):
                     filter_str = op.filter_obj.filter_condition
-                    input_record: DataRecord = record_set.input
-                    output = record_set.data_records[0]._passed_operator
-                    full_hash = f"{filter_str}{hash(input_record)}"
-                    if output == full_hash_to_bool_output[full_hash]:
-                        record_set.record_op_stats[0].quality = full_hash_to_score[full_hash]
+                    if isinstance(record_set.input, list):
+                        for input_record, data_record, record_op_stats in zip(
+                            record_set.input,
+                            record_set.data_records,
+                            record_set.record_op_stats,
+                        ):
+                            output = data_record._passed_operator
+                            full_hash = f"{filter_str}{hash(input_record)}"
+                            score = full_hash_to_score.get(full_hash)
+                            if score is None:
+                                record_op_stats.quality = 0.0
+                                continue
+                            if output == full_hash_to_bool_output[full_hash]:
+                                record_op_stats.quality = score
+                            else:
+                                record_op_stats.quality = 1.0 - score
                     else:
-                        record_set.record_op_stats[0].quality = 1.0 - full_hash_to_score[full_hash]
+                        input_record: DataRecord = record_set.input
+                        output = record_set.data_records[0]._passed_operator
+                        full_hash = f"{filter_str}{hash(input_record)}"
+                        score = full_hash_to_score.get(full_hash)
+                        if score is None:
+                            record_set.record_op_stats[0].quality = 0.0
+                        elif output == full_hash_to_bool_output[full_hash]:
+                            record_set.record_op_stats[0].quality = score
+                        else:
+                            record_set.record_op_stats[0].quality = 1.0 - score
 
                 elif isinstance(op, JoinOp):
                     condition = op.condition
@@ -275,6 +325,7 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
     def _execute_op_set(self, unique_logical_op_id: str, op_inputs: list[tuple[PhysicalOperator, str | tuple, int | DataRecord | list[DataRecord] | tuple[list[DataRecord]]]]) -> tuple[dict[int, list[tuple[DataRecordSet, PhysicalOperator, bool]]], dict[str, int]]:
         def execute_op_wrapper(operator: PhysicalOperator, source_indices: str | tuple, input: int | DataRecord | list[DataRecord] | tuple[list[DataRecord]]) -> tuple[DataRecordSet, PhysicalOperator, list[DataRecord] | list[int]]:
             # operator is a join
+            print("Sampling operator:", operator.__class__.__name__)
             record_set = operator(input[0], input[1]) if isinstance(operator, JoinOp) else operator(input)
             return record_set, operator, source_indices, input
 
@@ -323,19 +374,67 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
                 if isinstance(operator, JoinOp):
                     record_set = record_set[0]
 
+                if isinstance(operator, BatchedOperator) and len(record_set) == 0:
+                    continue
+
                 output_record_sets.append((record_set, operator, source_indices, input))
 
                 # update cache
-                op_input_hash = get_hash(operator, input)
-                self.cache[op_input_hash] = (record_set, operator)
+                if not isinstance(operator, BatchedOperator):
+                    op_input_hash = get_hash(operator, input)
+                    self.cache[op_input_hash] = (record_set, operator)
 
                 # update progress manager
+                if self._is_llm_op(operator) and len(record_set) > 0:
+                    num_llm_ops += 1
+                    self.progress_manager.incr(
+                        unique_logical_op_id,
+                        num_samples=1,
+                        total_cost=record_set.get_total_cost(),
+                    )
+
+            batched_ops = {
+                op for op, _, _ in final_op_inputs if isinstance(op, BatchedOperator)
+            }
+            for operator in batched_ops:
+                record_set = operator.flush()
+                if len(record_set) == 0:
+                    continue
+                output_record_sets.append((record_set, operator, None, None))
                 if self._is_llm_op(operator):
                     num_llm_ops += 1
                     self.progress_manager.incr(unique_logical_op_id, num_samples=1, total_cost=record_set.get_total_cost())
 
             # update mapping from source_indices to record sets and operators
             for record_set, operator, source_indices, input in output_record_sets:
+                if isinstance(operator, BatchedOperator) and isinstance(
+                    record_set.input, list
+                ):
+                    input_by_parent_id = {
+                        record._id: record for record in record_set.input
+                    }
+                    for record, record_op_stats in zip(
+                        record_set.data_records, record_set.record_op_stats
+                    ):
+                        record_input = input_by_parent_id.get(
+                            record._parent_ids[0] if record._parent_ids else None
+                        )
+                        source_key = (
+                            record._source_indices[0]
+                            if len(record._source_indices) == 1
+                            else tuple(record._source_indices)
+                        )
+                        single_record_set = DataRecordSet(
+                            [record], [record_op_stats], input=record_input
+                        )
+                        source_indices_to_record_sets_and_ops.setdefault(
+                            source_key, []
+                        ).append((single_record_set, operator, True))
+                        if record_input is not None:
+                            op_input_hash = get_hash(operator, record_input)
+                            self.cache[op_input_hash] = (single_record_set, operator)
+                    continue
+
                 # add record_set to mapping from source_indices --> record_sets
                 record_set.input = input
                 source_indices_to_record_sets_and_ops[source_indices].append((record_set, operator, True))

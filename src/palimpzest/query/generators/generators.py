@@ -121,7 +121,7 @@ class Generator(Generic[ContextType, InputType]):
 
         # Initialize GeminiClient for direct Gemini API calls (Google AI Studio and Vertex AI)
         self.gemini_client = None
-        if model.is_model_gemini():
+        if model.is_provider_google_ai_studio() or model.is_provider_vertex_ai():
             from palimpzest.query.generators.gemini_client import GeminiClient
             self.gemini_client = GeminiClient.get_instance(
                 model=model.get_model_name(),
@@ -401,8 +401,8 @@ class Generator(Generic[ContextType, InputType]):
                 # Usage already processed by GeminiClient
                 output_text_tokens = usage_stats.get("output_text_tokens", 0)
             else:
-                # litellm response format
-                output_text_tokens = usage.get("completion_tokens") or 0
+                # litellm response format/ anthropic keys
+                output_text_tokens = usage.get("completion_tokens") or usage.get("output_tokens") or 0
                 usage_stats = self.prompt_manager.extract_usage_stats(usage, is_audio_op)
 
             input_text_tokens = usage_stats["input_text_tokens"]

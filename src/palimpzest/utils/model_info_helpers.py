@@ -1,4 +1,6 @@
+import json
 import logging
+import os
 import re
 from typing import Any
 
@@ -475,12 +477,22 @@ class ModelMetricsManager:
 
     def _load_data(self):
         if self._metrics_cache is None:
+            local_path = os.path.join(os.path.dirname(__file__), "pz_models_information.json")
+            with open(local_path, encoding="utf-8") as handle:
+                local_data = json.load(handle)
+
             logger.info(f"Fetching data from URL: {self.data_url}")
             try:
-                self._metrics_cache = requests.get(self.data_url).json()
+                remote_data = requests.get(self.data_url).json()
             except Exception as e:
                 logger.error(f"Error fetching data: {e}")
-                self._metrics_cache = {}
+                remote_data = {}
+
+            if isinstance(remote_data, dict):
+                remote_data.update(local_data)
+                self._metrics_cache = remote_data
+            else:
+                self._metrics_cache = local_data
 
     def get_model_metrics(self, model_name) -> dict[str, Any]:
         self._load_data()

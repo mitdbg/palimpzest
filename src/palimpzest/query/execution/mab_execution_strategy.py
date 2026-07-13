@@ -1,4 +1,3 @@
-
 import logging
 
 import numpy as np
@@ -91,7 +90,6 @@ class OpFrontier:
         self.source_indices_to_inputs = {source_unique_logical_op_id: {} for source_unique_logical_op_id in source_unique_logical_op_ids}
         if self.is_scan_op:
             self.source_indices_to_inputs["source"] = {source_idx: [int(source_idx.split("-")[-1])] for source_idx in source_indices}
-        
 
     def get_frontier_ops(self) -> list[PhysicalOperator]:
         """
@@ -162,7 +160,7 @@ class OpFrontier:
 
             # set minimum distance for this operator
             op_id_to_pareto_distance[op_id] = min_dist
-        
+
         return op_id_to_pareto_distance
 
     def _compute_naive_priors(self, op_set: list[PhysicalOperator]) -> dict[str, dict[str, float]]:
@@ -209,6 +207,7 @@ class OpFrontier:
 
         # NOTE: self.priors is a dictionary with format:
         # {op_id: {"quality": quality, "cost": cost, "time": time}}
+        # TODO: GV refactor this method to use at least a dataframe if not numpy array
 
         # compute mean and std. dev. for each field
         qualities = [op_priors["quality"] for op_priors in self.priors.values()]

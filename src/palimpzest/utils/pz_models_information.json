@@ -410,7 +410,7 @@
         "seconds_per_output_token": 0.008,
         "MMLU_Pro_score": 74.1,
         "is_reasoning_model": false,
-        "is_text_model": true,
+        "is_text_model": false,
         "is_vision_model": false,
         "is_audio_model": true,
         "is_embedding_model": false,
@@ -427,7 +427,7 @@
         "seconds_per_output_token": 0.0159,
         "MMLU_Pro_score": 62.7,
         "is_reasoning_model": false,
-        "is_text_model": true,
+        "is_text_model": false,
         "is_vision_model": false,
         "is_audio_model": true,
         "is_embedding_model": false,
@@ -686,6 +686,24 @@
         "provider": "gemini",
         "sources": ["https://ai.google.dev/gemini-api/docs/pricing"]
     },
+    "gemini/gemini-3.5-flash": {
+        "usd_per_input_token": 1.5e-06,
+        "usd_per_output_token": 9e-06,
+        "usd_per_audio_input_token": 1e-06,
+        "usd_per_cache_read_token": 5e-08,
+        "usd_per_cached_token_per_hour": 1e-06,
+        "seconds_per_output_token": 0.00457247,
+        "MMLU_Pro_score": 87.63,
+        "is_reasoning_model": true,
+        "is_text_model": true,
+        "is_vision_model": true,
+        "is_audio_model": true,
+        "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
+        "supports_prompt_caching": true,
+        "provider": "gemini",
+        "sources": ["https://ai.google.dev/gemini-api/docs/pricing"]
+    },
     "gemini/gemini-3-flash-preview": {
         "usd_per_input_token": 5e-07,
         "usd_per_output_token": 3e-06,
@@ -783,7 +801,7 @@
         "seconds_per_output_token": 0.008,
         "MMLU_Pro_score": 74.1,
         "is_reasoning_model": false,
-        "is_text_model": true,
+        "is_text_model": false,
         "is_vision_model": false,
         "is_audio_model": true,
         "is_embedding_model": false,
@@ -800,13 +818,30 @@
         "seconds_per_output_token": 0.0159,
         "MMLU_Pro_score": 62.7,
         "is_reasoning_model": false,
-        "is_text_model": true,
+        "is_text_model": false,
         "is_vision_model": false,
         "is_audio_model": true,
         "is_embedding_model": false,
         "is_text_image_multimodal_embedding_model": false,
         "provider": "openai",
         "sources": ["https://platform.openai.com/docs/models/gpt-4o-mini-audio-preview"]
+    },
+    "openai/gpt-audio-1.5": {
+        "usd_per_input_token": 2.5e-06,
+        "usd_per_output_token": 1.0e-05,
+        "usd_per_audio_input_token": 3.2e-05,
+        "usd_per_audio_output_token": 6.4e-05,
+        "seconds_per_output_token": 0.008,
+        "MMLU_Pro_score": 74.1,
+        "is_reasoning_model": false,
+        "is_text_model": true,
+        "is_vision_model": false,
+        "is_audio_model": true,
+        "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
+        "supports_prompt_caching": false,
+        "provider": "openai",
+        "sources": ["https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json"]
     },
     "hosted_vllm/qwen/Qwen1.5-0.5B-Chat": {
         "usd_per_input_token": 0.0,
@@ -884,5 +919,897 @@
         "provider": "ollama",
         "sources": [],
         "note": "copied text-embedding-3-small model card and made numbers slightly worse to protect default behavior for max quality and min latency"
+    },
+    "openrouter/openai/gpt-5": {
+        "usd_per_input_token": 1.25e-06,
+        "usd_per_output_token": 1e-05,
+        "seconds_per_output_token": 0.026455,
+        "MMLU_Pro_score": 34.7,
+        "is_reasoning_model": true,
+        "is_text_model": true,
+        "is_vision_model": true,
+        "is_audio_model": false,
+        "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
+        "supports_prompt_caching": true,
+        "provider": "openrouter",
+        "openrouter_id": "openai/gpt-5",
+        "openrouter_canonical_slug": "openai/gpt-5-2025-08-07",
+        "openrouter_context_length": 400000,
+        "openrouter_supported_parameters": [
+            "include_reasoning",
+            "max_completion_tokens",
+            "max_tokens",
+            "reasoning",
+            "reasoning_effort",
+            "response_format",
+            "seed",
+            "structured_outputs",
+            "tool_choice",
+            "tools"
+        ],
+        "openrouter_reasoning": {
+            "mandatory": true,
+            "supported_efforts": [
+                "high",
+                "medium",
+                "low",
+                "minimal"
+            ],
+            "default_effort": "medium"
+        },
+        "openrouter_artificial_analysis": {
+            "intelligence_index": 34.7,
+            "coding_index": 37.8,
+            "agentic_index": 25.7
+        },
+        "sources": [
+            "https://openrouter.ai/api/v1/models",
+            "https://openrouter.ai/openai/gpt-5"
+        ],
+        "usd_per_cache_read_token": 1.25e-07,
+        "is_gpt_5_model": true
+    },
+    "openrouter/openai/gpt-5-mini": {
+        "usd_per_input_token": 2.5e-07,
+        "usd_per_output_token": 2e-06,
+        "seconds_per_output_token": 0.064103,
+        "MMLU_Pro_score": 25.3,
+        "is_reasoning_model": true,
+        "is_text_model": true,
+        "is_vision_model": true,
+        "is_audio_model": false,
+        "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
+        "supports_prompt_caching": true,
+        "provider": "openrouter",
+        "openrouter_id": "openai/gpt-5-mini",
+        "openrouter_canonical_slug": "openai/gpt-5-mini-2025-08-07",
+        "openrouter_context_length": 400000,
+        "openrouter_supported_parameters": [
+            "include_reasoning",
+            "max_completion_tokens",
+            "max_tokens",
+            "reasoning",
+            "reasoning_effort",
+            "response_format",
+            "seed",
+            "structured_outputs",
+            "tool_choice",
+            "tools"
+        ],
+        "openrouter_reasoning": {
+            "mandatory": true,
+            "supported_efforts": [
+                "high",
+                "medium",
+                "low",
+                "minimal"
+            ],
+            "default_effort": "medium"
+        },
+        "openrouter_artificial_analysis": {
+            "intelligence_index": 25.3,
+            "coding_index": 15.6,
+            "agentic_index": 19.4
+        },
+        "sources": [
+            "https://openrouter.ai/api/v1/models",
+            "https://openrouter.ai/openai/gpt-5-mini"
+        ],
+        "usd_per_cache_read_token": 2.5e-08,
+        "is_gpt_5_model": true
+    },
+    "openrouter/openai/gpt-5-nano": {
+        "usd_per_input_token": 5e-08,
+        "usd_per_output_token": 4e-07,
+        "seconds_per_output_token": 0.01,
+        "MMLU_Pro_score": 50.0,
+        "is_reasoning_model": true,
+        "is_text_model": true,
+        "is_vision_model": true,
+        "is_audio_model": false,
+        "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
+        "supports_prompt_caching": true,
+        "provider": "openrouter",
+        "openrouter_id": "openai/gpt-5-nano",
+        "openrouter_canonical_slug": "openai/gpt-5-nano-2025-08-07",
+        "openrouter_context_length": 400000,
+        "openrouter_supported_parameters": [
+            "include_reasoning",
+            "max_completion_tokens",
+            "max_tokens",
+            "reasoning",
+            "reasoning_effort",
+            "response_format",
+            "seed",
+            "structured_outputs",
+            "tool_choice",
+            "tools"
+        ],
+        "openrouter_reasoning": {
+            "mandatory": true,
+            "supported_efforts": [
+                "high",
+                "medium",
+                "low",
+                "minimal"
+            ],
+            "default_effort": "medium"
+        },
+        "openrouter_artificial_analysis": null,
+        "sources": [
+            "https://openrouter.ai/api/v1/models",
+            "https://openrouter.ai/openai/gpt-5-nano"
+        ],
+        "usd_per_cache_read_token": 1e-08,
+        "is_gpt_5_model": true
+    },
+    "openrouter/openai/gpt-5.6-sol": {
+        "usd_per_input_token": 5e-06,
+        "usd_per_output_token": 3e-05,
+        "seconds_per_output_token": 0.01292,
+        "MMLU_Pro_score": 58.9,
+        "is_reasoning_model": true,
+        "is_text_model": true,
+        "is_vision_model": true,
+        "is_audio_model": false,
+        "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
+        "supports_prompt_caching": true,
+        "provider": "openrouter",
+        "openrouter_id": "openai/gpt-5.6-sol",
+        "openrouter_canonical_slug": "openai/gpt-5.6-sol-20260709",
+        "openrouter_context_length": 1050000,
+        "openrouter_supported_parameters": [
+            "include_reasoning",
+            "max_completion_tokens",
+            "max_tokens",
+            "reasoning",
+            "reasoning_effort",
+            "response_format",
+            "seed",
+            "structured_outputs",
+            "tool_choice",
+            "tools"
+        ],
+        "openrouter_reasoning": {
+            "mandatory": false,
+            "default_enabled": true,
+            "supported_efforts": [
+                "max",
+                "xhigh",
+                "high",
+                "medium",
+                "low",
+                "none"
+            ],
+            "default_effort": "medium"
+        },
+        "openrouter_artificial_analysis": {
+            "intelligence_index": 58.9,
+            "coding_index": 77.4,
+            "agentic_index": 54
+        },
+        "sources": [
+            "https://openrouter.ai/api/v1/models",
+            "https://openrouter.ai/openai/gpt-5.6-sol"
+        ],
+        "usd_per_cache_read_token": 5e-07,
+        "usd_per_cache_creation_token": 6.25e-06,
+        "is_gpt_5_model": true
+    },
+    "openrouter/openai/gpt-5.6-terra": {
+        "usd_per_input_token": 2.5e-06,
+        "usd_per_output_token": 1.5e-05,
+        "seconds_per_output_token": 0.013038,
+        "MMLU_Pro_score": 55,
+        "is_reasoning_model": true,
+        "is_text_model": true,
+        "is_vision_model": true,
+        "is_audio_model": false,
+        "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
+        "supports_prompt_caching": true,
+        "provider": "openrouter",
+        "openrouter_id": "openai/gpt-5.6-terra",
+        "openrouter_canonical_slug": "openai/gpt-5.6-terra-20260709",
+        "openrouter_context_length": 1050000,
+        "openrouter_supported_parameters": [
+            "include_reasoning",
+            "max_completion_tokens",
+            "max_tokens",
+            "reasoning",
+            "reasoning_effort",
+            "response_format",
+            "seed",
+            "structured_outputs",
+            "tool_choice",
+            "tools"
+        ],
+        "openrouter_reasoning": {
+            "mandatory": false,
+            "default_enabled": true,
+            "supported_efforts": [
+                "max",
+                "xhigh",
+                "high",
+                "medium",
+                "low",
+                "none"
+            ],
+            "default_effort": "medium"
+        },
+        "openrouter_artificial_analysis": {
+            "intelligence_index": 55,
+            "coding_index": 76.7,
+            "agentic_index": 47.4
+        },
+        "sources": [
+            "https://openrouter.ai/api/v1/models",
+            "https://openrouter.ai/openai/gpt-5.6-terra"
+        ],
+        "usd_per_cache_read_token": 2.5e-07,
+        "usd_per_cache_creation_token": 3.125e-06,
+        "is_gpt_5_model": true
+    },
+    "openrouter/openai/gpt-5.6-luna": {
+        "usd_per_input_token": 1e-06,
+        "usd_per_output_token": 6e-06,
+        "seconds_per_output_token": 0.014006,
+        "MMLU_Pro_score": 51.2,
+        "is_reasoning_model": true,
+        "is_text_model": true,
+        "is_vision_model": true,
+        "is_audio_model": false,
+        "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
+        "supports_prompt_caching": true,
+        "provider": "openrouter",
+        "openrouter_id": "openai/gpt-5.6-luna",
+        "openrouter_canonical_slug": "openai/gpt-5.6-luna-20260709",
+        "openrouter_context_length": 1050000,
+        "openrouter_supported_parameters": [
+            "include_reasoning",
+            "max_completion_tokens",
+            "max_tokens",
+            "reasoning",
+            "reasoning_effort",
+            "response_format",
+            "seed",
+            "structured_outputs",
+            "tool_choice",
+            "tools"
+        ],
+        "openrouter_reasoning": {
+            "mandatory": false,
+            "default_enabled": true,
+            "supported_efforts": [
+                "max",
+                "xhigh",
+                "high",
+                "medium",
+                "low",
+                "none"
+            ],
+            "default_effort": "medium"
+        },
+        "openrouter_artificial_analysis": {
+            "intelligence_index": 51.2,
+            "coding_index": 71.4,
+            "agentic_index": 45.6
+        },
+        "sources": [
+            "https://openrouter.ai/api/v1/models",
+            "https://openrouter.ai/openai/gpt-5.6-luna"
+        ],
+        "usd_per_cache_read_token": 1e-07,
+        "usd_per_cache_creation_token": 1.25e-06,
+        "is_gpt_5_model": true
+    },
+    "openrouter/anthropic/claude-sonnet-5": {
+        "usd_per_input_token": 2e-06,
+        "usd_per_output_token": 1e-05,
+        "seconds_per_output_token": 0.013986,
+        "MMLU_Pro_score": 53.4,
+        "is_reasoning_model": true,
+        "is_text_model": true,
+        "is_vision_model": true,
+        "is_audio_model": false,
+        "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
+        "supports_prompt_caching": true,
+        "provider": "openrouter",
+        "openrouter_id": "anthropic/claude-sonnet-5",
+        "openrouter_canonical_slug": "anthropic/claude-sonnet-5-20260630",
+        "openrouter_context_length": 1000000,
+        "openrouter_supported_parameters": [
+            "include_reasoning",
+            "max_completion_tokens",
+            "max_tokens",
+            "reasoning",
+            "reasoning_effort",
+            "response_format",
+            "stop",
+            "structured_outputs",
+            "tool_choice",
+            "tools",
+            "verbosity"
+        ],
+        "openrouter_reasoning": {
+            "mandatory": false,
+            "supported_efforts": [
+                "max",
+                "xhigh",
+                "high",
+                "medium",
+                "low"
+            ],
+            "default_effort": "medium"
+        },
+        "openrouter_artificial_analysis": {
+            "intelligence_index": 53.4,
+            "coding_index": 71.5,
+            "agentic_index": 46.7
+        },
+        "sources": [
+            "https://openrouter.ai/api/v1/models",
+            "https://openrouter.ai/anthropic/claude-sonnet-5"
+        ],
+        "usd_per_cache_read_token": 2e-07,
+        "usd_per_cache_creation_token": 2.5e-06
+    },
+    "openrouter/x-ai/grok-4.5": {
+        "usd_per_input_token": 2e-06,
+        "usd_per_output_token": 6e-06,
+        "seconds_per_output_token": 0.013812,
+        "MMLU_Pro_score": 53.8,
+        "is_reasoning_model": true,
+        "is_text_model": true,
+        "is_vision_model": true,
+        "is_audio_model": false,
+        "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
+        "supports_prompt_caching": true,
+        "provider": "openrouter",
+        "openrouter_id": "x-ai/grok-4.5",
+        "openrouter_canonical_slug": "x-ai/grok-4.5-20260708",
+        "openrouter_context_length": 500000,
+        "openrouter_supported_parameters": [
+            "frequency_penalty",
+            "include_reasoning",
+            "logprobs",
+            "max_tokens",
+            "presence_penalty",
+            "reasoning",
+            "reasoning_effort",
+            "response_format",
+            "seed",
+            "stop",
+            "structured_outputs",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_logprobs",
+            "top_p"
+        ],
+        "openrouter_reasoning": {
+            "mandatory": true,
+            "default_enabled": true,
+            "supported_efforts": [
+                "high",
+                "medium",
+                "low"
+            ],
+            "default_effort": "high"
+        },
+        "openrouter_artificial_analysis": {
+            "intelligence_index": 53.8,
+            "coding_index": 72.4,
+            "agentic_index": 45.7
+        },
+        "sources": [
+            "https://openrouter.ai/api/v1/models",
+            "https://openrouter.ai/x-ai/grok-4.5"
+        ],
+        "usd_per_cache_read_token": 5e-07
+    },
+    "openrouter/google/gemini-3.1-flash-image": {
+        "usd_per_input_token": 5e-07,
+        "usd_per_output_token": 3e-06,
+        "seconds_per_output_token": 0.01,
+        "MMLU_Pro_score": 50.0,
+        "is_reasoning_model": true,
+        "is_text_model": true,
+        "is_vision_model": true,
+        "is_audio_model": false,
+        "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
+        "supports_prompt_caching": false,
+        "provider": "openrouter",
+        "openrouter_id": "google/gemini-3.1-flash-image",
+        "openrouter_canonical_slug": "google/gemini-3.1-flash-image-20260528",
+        "openrouter_context_length": 131072,
+        "openrouter_supported_parameters": [
+            "include_reasoning",
+            "max_tokens",
+            "reasoning",
+            "reasoning_effort",
+            "response_format",
+            "seed",
+            "structured_outputs",
+            "temperature",
+            "top_p"
+        ],
+        "openrouter_reasoning": {
+            "mandatory": false,
+            "default_enabled": true,
+            "supported_efforts": [
+                "high",
+                "minimal"
+            ],
+            "default_effort": "minimal"
+        },
+        "openrouter_artificial_analysis": null,
+        "sources": [
+            "https://openrouter.ai/api/v1/models",
+            "https://openrouter.ai/google/gemini-3.1-flash-image"
+        ]
+    },
+    "openrouter/google/gemini-3-pro-image": {
+        "usd_per_input_token": 2e-06,
+        "usd_per_output_token": 1.2e-05,
+        "seconds_per_output_token": 0.01,
+        "MMLU_Pro_score": 50.0,
+        "is_reasoning_model": true,
+        "is_text_model": true,
+        "is_vision_model": true,
+        "is_audio_model": false,
+        "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
+        "supports_prompt_caching": true,
+        "provider": "openrouter",
+        "openrouter_id": "google/gemini-3-pro-image",
+        "openrouter_canonical_slug": "google/gemini-3-pro-image-20260528",
+        "openrouter_context_length": 65536,
+        "openrouter_supported_parameters": [
+            "include_reasoning",
+            "max_tokens",
+            "reasoning",
+            "response_format",
+            "seed",
+            "stop",
+            "structured_outputs",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_p"
+        ],
+        "openrouter_reasoning": {
+            "mandatory": true
+        },
+        "openrouter_artificial_analysis": null,
+        "sources": [
+            "https://openrouter.ai/api/v1/models",
+            "https://openrouter.ai/google/gemini-3-pro-image"
+        ],
+        "usd_per_cache_read_token": 2e-07,
+        "usd_per_cache_creation_token": 3.75e-07,
+        "usd_per_image_input_token": 2e-06,
+        "usd_per_audio_input_token": 2e-06
+    },
+    "openrouter/deepseek/deepseek-r1": {
+        "usd_per_input_token": 7e-07,
+        "usd_per_output_token": 2.5e-06,
+        "seconds_per_output_token": 0.04065,
+        "MMLU_Pro_score": 18.5,
+        "is_reasoning_model": true,
+        "is_text_model": true,
+        "is_vision_model": false,
+        "is_audio_model": false,
+        "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
+        "supports_prompt_caching": false,
+        "provider": "openrouter",
+        "openrouter_id": "deepseek/deepseek-r1",
+        "openrouter_canonical_slug": "deepseek/deepseek-r1",
+        "openrouter_context_length": 163840,
+        "openrouter_supported_parameters": [
+            "frequency_penalty",
+            "include_reasoning",
+            "max_completion_tokens",
+            "max_tokens",
+            "presence_penalty",
+            "reasoning",
+            "repetition_penalty",
+            "response_format",
+            "seed",
+            "stop",
+            "structured_outputs",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_k",
+            "top_p"
+        ],
+        "openrouter_reasoning": {
+            "mandatory": true
+        },
+        "openrouter_artificial_analysis": {
+            "intelligence_index": 18.5,
+            "coding_index": 24.6,
+            "agentic_index": 3.1
+        },
+        "sources": [
+            "https://openrouter.ai/api/v1/models",
+            "https://openrouter.ai/deepseek/deepseek-r1"
+        ]
+    },
+    "openrouter/qwen/qwen3-max": {
+        "usd_per_input_token": 7.8e-07,
+        "usd_per_output_token": 3.9e-06,
+        "seconds_per_output_token": 0.01,
+        "MMLU_Pro_score": 50.0,
+        "is_reasoning_model": false,
+        "is_text_model": true,
+        "is_vision_model": false,
+        "is_audio_model": false,
+        "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
+        "supports_prompt_caching": true,
+        "provider": "openrouter",
+        "openrouter_id": "qwen/qwen3-max",
+        "openrouter_canonical_slug": "qwen/qwen3-max",
+        "openrouter_context_length": 262144,
+        "openrouter_supported_parameters": [
+            "logprobs",
+            "max_tokens",
+            "presence_penalty",
+            "response_format",
+            "seed",
+            "structured_outputs",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_logprobs",
+            "top_p"
+        ],
+        "openrouter_reasoning": {
+            "mandatory": false
+        },
+        "openrouter_artificial_analysis": null,
+        "sources": [
+            "https://openrouter.ai/api/v1/models",
+            "https://openrouter.ai/qwen/qwen3-max"
+        ],
+        "usd_per_cache_read_token": 1.56e-07,
+        "usd_per_cache_creation_token": 9.75e-07
+    },
+    "openrouter/openai/gpt-5.4": {
+        "usd_per_input_token": 2.5e-06,
+        "usd_per_output_token": 1.5e-05,
+        "seconds_per_output_token": 0.014065,
+        "MMLU_Pro_score": 51.4,
+        "is_reasoning_model": true,
+        "is_text_model": true,
+        "is_vision_model": true,
+        "is_audio_model": false,
+        "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
+        "supports_prompt_caching": true,
+        "provider": "openrouter",
+        "openrouter_id": "openai/gpt-5.4",
+        "openrouter_canonical_slug": "openai/gpt-5.4-20260305",
+        "openrouter_context_length": 1050000,
+        "openrouter_supported_parameters": [
+            "include_reasoning",
+            "max_completion_tokens",
+            "max_tokens",
+            "reasoning",
+            "reasoning_effort",
+            "response_format",
+            "seed",
+            "structured_outputs",
+            "tool_choice",
+            "tools"
+        ],
+        "openrouter_reasoning": {
+            "mandatory": false,
+            "default_enabled": false,
+            "supported_efforts": [
+                "xhigh",
+                "high",
+                "medium",
+                "low",
+                "none"
+            ],
+            "default_effort": "medium"
+        },
+        "openrouter_artificial_analysis": {
+            "intelligence_index": 51.4,
+            "coding_index": 71.1,
+            "agentic_index": 41.1
+        },
+        "sources": [
+            "https://openrouter.ai/api/v1/models",
+            "https://openrouter.ai/openai/gpt-5.4"
+        ],
+        "usd_per_cache_read_token": 2.5e-07,
+        "is_gpt_5_model": true
+    },
+    "openrouter/openai/gpt-5.4-pro": {
+        "usd_per_input_token": 3e-05,
+        "usd_per_output_token": 0.00018,
+        "seconds_per_output_token": 0.01,
+        "MMLU_Pro_score": 50.0,
+        "is_reasoning_model": true,
+        "is_text_model": true,
+        "is_vision_model": true,
+        "is_audio_model": false,
+        "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
+        "supports_prompt_caching": false,
+        "provider": "openrouter",
+        "openrouter_id": "openai/gpt-5.4-pro",
+        "openrouter_canonical_slug": "openai/gpt-5.4-pro-20260305",
+        "openrouter_context_length": 1050000,
+        "openrouter_supported_parameters": [
+            "include_reasoning",
+            "max_completion_tokens",
+            "max_tokens",
+            "reasoning",
+            "reasoning_effort",
+            "response_format",
+            "seed",
+            "structured_outputs",
+            "tool_choice",
+            "tools"
+        ],
+        "openrouter_reasoning": {
+            "mandatory": true,
+            "supported_efforts": [
+                "xhigh",
+                "high",
+                "medium"
+            ],
+            "default_effort": "medium"
+        },
+        "openrouter_artificial_analysis": null,
+        "sources": [
+            "https://openrouter.ai/api/v1/models",
+            "https://openrouter.ai/openai/gpt-5.4-pro"
+        ],
+        "is_gpt_5_model": true
+    },
+    "openrouter/openai/gpt-5.4-mini": {
+        "usd_per_input_token": 7.5e-07,
+        "usd_per_output_token": 4.5e-06,
+        "seconds_per_output_token": 0.017825,
+        "MMLU_Pro_score": 40,
+        "is_reasoning_model": true,
+        "is_text_model": true,
+        "is_vision_model": true,
+        "is_audio_model": false,
+        "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
+        "supports_prompt_caching": true,
+        "provider": "openrouter",
+        "openrouter_id": "openai/gpt-5.4-mini",
+        "openrouter_canonical_slug": "openai/gpt-5.4-mini-20260317",
+        "openrouter_context_length": 400000,
+        "openrouter_supported_parameters": [
+            "include_reasoning",
+            "max_completion_tokens",
+            "max_tokens",
+            "reasoning",
+            "reasoning_effort",
+            "response_format",
+            "seed",
+            "structured_outputs",
+            "tool_choice",
+            "tools"
+        ],
+        "openrouter_reasoning": {
+            "mandatory": false,
+            "default_enabled": false,
+            "supported_efforts": [
+                "xhigh",
+                "high",
+                "medium",
+                "low",
+                "none"
+            ],
+            "default_effort": "medium"
+        },
+        "openrouter_artificial_analysis": {
+            "intelligence_index": 40,
+            "coding_index": 56.1,
+            "agentic_index": 30.2
+        },
+        "sources": [
+            "https://openrouter.ai/api/v1/models",
+            "https://openrouter.ai/openai/gpt-5.4-mini"
+        ],
+        "usd_per_cache_read_token": 7.5e-08,
+        "is_gpt_5_model": true
+    },
+    "openrouter/openai/gpt-5.4-nano": {
+        "usd_per_input_token": 2e-07,
+        "usd_per_output_token": 1.25e-06,
+        "seconds_per_output_token": 0.017825,
+        "MMLU_Pro_score": 38.2,
+        "is_reasoning_model": true,
+        "is_text_model": true,
+        "is_vision_model": true,
+        "is_audio_model": false,
+        "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
+        "supports_prompt_caching": true,
+        "provider": "openrouter",
+        "openrouter_id": "openai/gpt-5.4-nano",
+        "openrouter_canonical_slug": "openai/gpt-5.4-nano-20260317",
+        "openrouter_context_length": 400000,
+        "openrouter_supported_parameters": [
+            "include_reasoning",
+            "max_completion_tokens",
+            "max_tokens",
+            "reasoning",
+            "reasoning_effort",
+            "response_format",
+            "seed",
+            "structured_outputs",
+            "tool_choice",
+            "tools"
+        ],
+        "openrouter_reasoning": {
+            "mandatory": false,
+            "default_enabled": false,
+            "supported_efforts": [
+                "xhigh",
+                "high",
+                "medium",
+                "low",
+                "none"
+            ],
+            "default_effort": "medium"
+        },
+        "openrouter_artificial_analysis": {
+            "intelligence_index": 38.2,
+            "coding_index": 56.1,
+            "agentic_index": 27.5
+        },
+        "sources": [
+            "https://openrouter.ai/api/v1/models",
+            "https://openrouter.ai/openai/gpt-5.4-nano"
+        ],
+        "usd_per_cache_read_token": 2e-08,
+        "is_gpt_5_model": true
+    },
+    "openrouter/openai/gpt-5.4-image-2": {
+        "usd_per_input_token": 8e-06,
+        "usd_per_output_token": 1.5e-05,
+        "seconds_per_output_token": 0.01,
+        "MMLU_Pro_score": 50.0,
+        "is_reasoning_model": true,
+        "is_text_model": true,
+        "is_vision_model": true,
+        "is_audio_model": false,
+        "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
+        "supports_prompt_caching": true,
+        "provider": "openrouter",
+        "openrouter_id": "openai/gpt-5.4-image-2",
+        "openrouter_canonical_slug": "openai/gpt-5.4-image-2-20260421",
+        "openrouter_context_length": 272000,
+        "openrouter_supported_parameters": [
+            "frequency_penalty",
+            "include_reasoning",
+            "logit_bias",
+            "logprobs",
+            "max_tokens",
+            "presence_penalty",
+            "reasoning",
+            "reasoning_effort",
+            "response_format",
+            "seed",
+            "stop",
+            "structured_outputs",
+            "top_logprobs"
+        ],
+        "openrouter_reasoning": {
+            "mandatory": false,
+            "default_enabled": false,
+            "supported_efforts": [
+                "xhigh",
+                "high",
+                "medium",
+                "low",
+                "none"
+            ],
+            "default_effort": "medium"
+        },
+        "openrouter_artificial_analysis": null,
+        "sources": [
+            "https://openrouter.ai/api/v1/models",
+            "https://openrouter.ai/openai/gpt-5.4-image-2"
+        ],
+        "usd_per_cache_read_token": 2e-06,
+        "is_gpt_5_model": true
+    },
+    "openrouter/google/gemini-3.5-flash": {
+        "usd_per_input_token": 1.5e-06,
+        "usd_per_output_token": 9e-06,
+        "seconds_per_output_token": 0.014265,
+        "MMLU_Pro_score": 50.2,
+        "is_reasoning_model": true,
+        "is_text_model": true,
+        "is_vision_model": true,
+        "is_audio_model": true,
+        "is_embedding_model": false,
+        "is_text_image_multimodal_embedding_model": false,
+        "supports_prompt_caching": true,
+        "provider": "openrouter",
+        "openrouter_id": "google/gemini-3.5-flash",
+        "openrouter_canonical_slug": "google/gemini-3.5-flash-20260519",
+        "openrouter_context_length": 1048576,
+        "openrouter_supported_parameters": [
+            "include_reasoning",
+            "max_tokens",
+            "reasoning",
+            "reasoning_effort",
+            "response_format",
+            "seed",
+            "stop",
+            "structured_outputs",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_p"
+        ],
+        "openrouter_reasoning": {
+            "mandatory": true,
+            "default_enabled": true,
+            "supported_efforts": [
+                "high",
+                "medium",
+                "low",
+                "minimal"
+            ],
+            "default_effort": "medium"
+        },
+        "openrouter_artificial_analysis": {
+            "intelligence_index": 50.2,
+            "coding_index": 70.1,
+            "agentic_index": 37.4
+        },
+        "sources": [
+            "https://openrouter.ai/api/v1/models",
+            "https://openrouter.ai/google/gemini-3.5-flash"
+        ],
+        "usd_per_cache_read_token": 1.5e-07,
+        "usd_per_cache_creation_token": 8.333333333333334e-08,
+        "usd_per_image_input_token": 1.5e-06,
+        "usd_per_audio_input_token": 3e-06
     }
 }

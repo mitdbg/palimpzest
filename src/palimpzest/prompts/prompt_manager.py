@@ -127,7 +127,11 @@ class PromptManager:
         elif self.model.is_provider_anthropic():
             stats["cache_creation_tokens"] = usage.get("cache_creation_input_tokens") or 0
             stats["cache_read_tokens"] = usage.get("cache_read_input_tokens") or 0
-            stats["input_text_tokens"] = max(0, (usage.get("prompt_tokens") or 0) - stats["cache_read_tokens"] - stats["cache_creation_tokens"])
+            prompt_tokens = usage.get("prompt_tokens")
+            if prompt_tokens is None:
+                # compatibility for Anthropic models
+                prompt_tokens = usage.get("input_tokens") or 0
+            stats["input_text_tokens"] = max(0, prompt_tokens - stats["cache_read_tokens"] - stats["cache_creation_tokens"])
 
         elif self.model.is_vllm_model():
             # vLLM does not seem to provide cache statistics through litellm, so we currently have no way

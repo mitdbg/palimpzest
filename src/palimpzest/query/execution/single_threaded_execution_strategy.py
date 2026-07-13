@@ -1,9 +1,9 @@
 import logging
-
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.models import PlanStats
 from palimpzest.query.execution.execution_strategy import ExecutionStrategy
 from palimpzest.query.operators.aggregate import AggregateOp
+from palimpzest.query.operators.batched import BatchedOperator
 from palimpzest.query.operators.join import JoinOp
 from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.operators.scan import ContextScanOp, ScanPhysicalOp
@@ -75,7 +75,7 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
                     record_set, num_inputs_processed = operator([], [], final=True)
                     records.extend(record_set.data_records)
                     record_op_stats.extend(record_set.record_op_stats)
-      
+
                 num_outputs = sum(record._passed_operator for record in records)
 
                 # update the progress manager
@@ -86,16 +86,32 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
                 source_unique_full_op_id = source_unique_full_op_ids[0]
                 for input_record in input_queues[unique_full_op_id][source_unique_full_op_id]:
                     record_set = operator(input_record)
+                    if len(record_set) == 0:
+                        continue
                     records.extend(record_set.data_records)
                     record_op_stats.extend(record_set.record_op_stats)
                     num_outputs = sum(record._passed_operator for record in record_set.data_records)
+                    num_inputs_processed = len(record_set)
 
                     # update the progress manager
-                    self.progress_manager.incr(unique_full_op_id, num_inputs=1, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
+                    self.progress_manager.incr(unique_full_op_id, num_inputs=num_inputs_processed, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
 
                     # finish early if this is a limit
                     if isinstance(operator, LimitScanOp) and len(records) == operator.limit:
                         break
+
+                if isinstance(operator, BatchedOperator):
+                    record_set = operator.flush()
+                    if len(record_set) > 0:
+                        records.extend(record_set.data_records)
+                        record_op_stats.extend(record_set.record_op_stats)
+                        num_outputs = sum(record._passed_operator for record in record_set.data_records)
+                        self.progress_manager.incr(
+                            unique_full_op_id,
+                            num_inputs=len(record_set),
+                            num_outputs=num_outputs,
+                            total_cost=record_set.get_total_cost(),
+                        )
 
             # update plan stats
             plan_stats.add_record_op_stats(unique_full_op_id, record_op_stats)
@@ -131,7 +147,7 @@ class SequentialSingleThreadExecutionStrategy(ExecutionStrategy):
 
         # NOTE: we must handle progress manager outside of _execute_plan to ensure that it is shut down correctly;
         #       if we don't have the `finally:` branch, then program crashes can cause future program runs to fail
-        #       because the progress manager cannot get a handle to the console 
+        #       because the progress manager cannot get a handle to the console
         try:
             # execute plan
             output_records, plan_stats = self._execute_plan(plan, input_queues, plan_stats)
@@ -180,13 +196,20 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
         upstream_input_queues = {upstream_unique_full_op_id: input_queues[upstream_unique_full_op_id] for upstream_unique_full_op_id in upstream_unique_full_op_ids}
         return not self._any_queue_not_empty(upstream_input_queues)
 
-
     def _execute_plan(self, plan: PhysicalPlan, input_queues: dict[str, dict[str, list]], plan_stats: PlanStats) -> tuple[list[DataRecord], PlanStats]:
         # execute the plan until either:
         # 1. all records have been processed, or
         # 2. the final limit operation has completed (we break out of the loop if this happens)
         final_output_records = []
-        while self._any_queue_not_empty(input_queues):
+        def any_pending_batched_filters() -> bool:
+            return any(
+                isinstance(op, BatchedOperator)
+                and op.has_pending_batch()
+                and not op.flushed
+                for op in plan
+            )
+
+        while self._any_queue_not_empty(input_queues) or any_pending_batched_filters():
             for topo_idx, operator in enumerate(plan):
                 # if this operator does not have enough inputs to execute, then skip it
                 source_unique_full_op_ids = (
@@ -199,7 +222,18 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
                 num_inputs = sum(len(input_queues[unique_full_op_id][source_unique_full_op_id]) for source_unique_full_op_id in source_unique_full_op_ids)
                 agg_op_not_ready = isinstance(operator, AggregateOp) and not self._upstream_ops_finished(plan, unique_full_op_id, input_queues)
                 join_op_not_ready = isinstance(operator, JoinOp) and not self._upstream_ops_finished(plan, unique_full_op_id, input_queues)
-                if num_inputs == 0 or agg_op_not_ready or join_op_not_ready:
+                batched_filter_ready_to_flush = (
+                    isinstance(operator, BatchedOperator)
+                    and operator.has_pending_batch()
+                    and self._upstream_ops_finished(
+                        plan, unique_full_op_id, input_queues
+                    )
+                    and all(
+                        len(inputs) == 0
+                        for inputs in input_queues[unique_full_op_id].values()
+                    )
+                )
+                if (num_inputs == 0 and not batched_filter_ready_to_flush) or agg_op_not_ready or join_op_not_ready:
                     continue
 
                 # create empty lists for records and execution stats generated by executing this operator on its next input(s)
@@ -236,7 +270,7 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
                     self.progress_manager.incr(unique_full_op_id, num_inputs=num_inputs_processed, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
 
                 # otherwise, process the next record in the input queue for this operator
-                else:
+                elif not batched_filter_ready_to_flush:
                     source_unique_full_op_id = source_unique_full_op_ids[0]
                     input_record = input_queues[unique_full_op_id][source_unique_full_op_id].pop(0)
                     record_set = operator(input_record)
@@ -244,8 +278,31 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
                     record_op_stats = record_set.record_op_stats
                     num_outputs = sum(record._passed_operator for record in records)
 
-                    # update the progress manager
-                    self.progress_manager.incr(unique_full_op_id, num_inputs=1, num_outputs=num_outputs, total_cost=record_set.get_total_cost())
+                    if len(record_set) > 0:
+                        num_inputs_processed = (
+                            len(record_set)
+                            if isinstance(operator, BatchedOperator)
+                            else 1
+                        )
+                        self.progress_manager.incr(
+                            unique_full_op_id,
+                            num_inputs=num_inputs_processed,
+                            num_outputs=num_outputs,
+                            total_cost=record_set.get_total_cost(),
+                        )
+                else:
+                    record_set = operator.flush()
+                    records = record_set.data_records
+                    record_op_stats = record_set.record_op_stats
+                    num_outputs = sum(record._passed_operator for record in records)
+                    if len(record_set) > 0:
+                        self.progress_manager.incr(
+                            unique_full_op_id,
+                            num_inputs=len(record_set),
+                            num_outputs=num_outputs,
+                            total_cost=record_set.get_total_cost(),
+                        )
+                    operator.set_flushed()
 
                 # if this is a join operator with no more inputs to process, then finish it
                 if isinstance(operator, JoinOp) and operator.how in ("left", "right", "outer"):
@@ -258,6 +315,23 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
                         record_op_stats.extend(record_set.record_op_stats)
                         num_outputs += sum(record._passed_operator for record in record_set.data_records)
                         operator.set_finished()
+
+                if isinstance(operator, BatchedOperator) and not operator.flushed:
+                    op_upstream_finished = self._upstream_ops_finished(plan, unique_full_op_id, input_queues)
+                    op_input_queues_empty = all(len(inputs) == 0 for inputs in input_queues[unique_full_op_id].values())
+                    if op_upstream_finished and op_input_queues_empty and operator.has_pending_batch():
+                        record_set = operator.flush()
+                        if len(record_set) > 0:
+                            records.extend(record_set.data_records)
+                            record_op_stats.extend(record_set.record_op_stats)
+                            num_outputs += sum(record._passed_operator for record in record_set.data_records)
+                            self.progress_manager.incr(
+                                unique_full_op_id,
+                                num_inputs=len(record_set),
+                                num_outputs=num_outputs,
+                                total_cost=record_set.get_total_cost(),
+                            )
+                        operator.set_flushed()
 
                 # update plan stats
                 plan_stats.add_record_op_stats(unique_full_op_id, record_op_stats)
@@ -299,7 +373,7 @@ class PipelinedSingleThreadExecutionStrategy(ExecutionStrategy):
 
         # NOTE: we must handle progress manager outside of _execute_plan to ensure that it is shut down correctly;
         #       if we don't have the `finally:` branch, then program crashes can cause future program runs to fail
-        #       because the progress manager cannot get a handle to the console 
+        #       because the progress manager cannot get a handle to the console
         try:
             # execute plan
             output_records, plan_stats = self._execute_plan(plan, input_queues, plan_stats)

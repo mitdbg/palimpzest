@@ -6,6 +6,7 @@ from palimpzest.core.elements.records import DataRecord
 from palimpzest.core.models import PlanStats
 from palimpzest.query.execution.execution_strategy import ExecutionStrategy
 from palimpzest.query.operators.aggregate import AggregateOp
+from palimpzest.query.operators.batched import BatchedOperator
 from palimpzest.query.operators.distinct import DistinctOp
 from palimpzest.query.operators.join import JoinOp
 from palimpzest.query.operators.limit import LimitScanOp
@@ -55,6 +56,36 @@ class ParallelExecutionStrategy(ExecutionStrategy):
                 future_queues[unique_full_op_id].append(future)
                 operator.set_finished()
 
+    def _finish_batched_op(
+        self,
+        executor: ThreadPoolExecutor,
+        plan: PhysicalPlan,
+        unique_full_op_id: str,
+        input_queues: dict[str, dict[str, list]],
+        future_queues: dict[str, list],
+    ) -> None:
+        """
+        This method handles flushing the batched operator once all of its inputs have been processed.
+        We need to do this because batched operators may have received some inputs that didn't fill up an entire batch and thus haven't been processed yet.
+        We first check if the operator's upstream operators have finished and if there are no more inputs or pending futures for this operator.
+        If so, we submit a flush task to the executor to process any remaining buffered inputs in the batched operator.
+        """
+
+        op_upstream_finished = self._upstream_ops_finished(
+            plan, unique_full_op_id, input_queues, future_queues
+        )
+        op_input_queues_empty = all(
+            len(inputs) == 0 for inputs in input_queues[unique_full_op_id].values()
+        )
+        op_future_queue_empty = len(future_queues[unique_full_op_id]) == 0
+        if op_upstream_finished and op_input_queues_empty and op_future_queue_empty:
+            operator = self.unique_full_op_id_to_operator[unique_full_op_id]
+            if not self.batched_op_flushed.get(unique_full_op_id, False):
+                future = executor.submit(operator.flush)
+                future_queues[unique_full_op_id].append(future)
+                self.batched_op_flushed[unique_full_op_id] = True
+                operator.set_flushed()
+
     def _process_future_results(self, unique_full_op_id: str, future_queues: dict[str, list], plan_stats: PlanStats) -> list[DataRecord]:
         """
         Helper function which takes a full operator id, the future queues, and plan stats, and performs
@@ -71,9 +102,16 @@ class ParallelExecutionStrategy(ExecutionStrategy):
         output_records, total_inputs_processed, total_cost = [], 0, 0.0
         for future in done_futures:
             output = future.result()
-            record_set, num_inputs_processed = output if self.is_join_op[unique_full_op_id] else (output, 1)
+            if self.is_join_op[unique_full_op_id]:
+                record_set, num_inputs_processed = output
+            elif self.is_batched_op[unique_full_op_id]:
+                record_set = output
+                num_inputs_processed = len(record_set)
+            else:
+                record_set, num_inputs_processed = output, 1
 
             # record set can be empty if one side of join has no input records yet
+            # or if batched operator has not yet received a full batch of records to process
             if len(record_set) == 0:
                 continue
 
@@ -132,6 +170,14 @@ class ParallelExecutionStrategy(ExecutionStrategy):
                             # if the source is a left/right/outer join operator with no more inputs to process, then finish it
                             if self.is_outer_join_op[source_unique_full_op_id]:
                                 self._finish_outer_join(executor, plan, source_unique_full_op_id, input_queues, future_queues)
+                            if self.is_batched_op[source_unique_full_op_id]:
+                                self._finish_batched_op(
+                                    executor,
+                                    plan,
+                                    source_unique_full_op_id,
+                                    input_queues,
+                                    future_queues,
+                                )
 
                     # for the final operator, add any finished futures to the output_records
                     if unique_full_op_id == f"{topo_idx}-{final_op.get_full_op_id()}":
@@ -141,6 +187,14 @@ class ParallelExecutionStrategy(ExecutionStrategy):
                         # if this is a left/right/outer join operator with no more inputs to process, then finish it
                         if self.is_outer_join_op[unique_full_op_id]:
                             self._finish_outer_join(executor, plan, unique_full_op_id, input_queues, future_queues)
+                        if self.is_batched_op[unique_full_op_id]:
+                            self._finish_batched_op(
+                                executor,
+                                plan,
+                                unique_full_op_id,
+                                input_queues,
+                                future_queues,
+                            )
 
                     # if this operator does not have enough inputs to execute, then skip it
                     num_inputs = sum(len(inputs) for inputs in input_queues[unique_full_op_id].values())
@@ -246,12 +300,22 @@ class ParallelExecutionStrategy(ExecutionStrategy):
         future_queues = {f"{topo_idx}-{op.get_full_op_id()}": [] for topo_idx, op in enumerate(plan)}
 
         # precompute which operators are (outer) joins and which joins have downstream limit ops
-        self.is_join_op = {f"{topo_idx}-{op.get_full_op_id()}": isinstance(op, JoinOp) for topo_idx, op in enumerate(plan)}
-        self.is_outer_join_op = {f"{topo_idx}-{op.get_full_op_id()}": isinstance(op, JoinOp) and op.how in ("left", "right", "outer") for topo_idx, op in enumerate(plan)}
+        self.is_join_op = {}
+        self.is_outer_join_op = {}
+        self.is_batched_op = {}
+        self.batched_op_flushed = {}
         self.join_has_downstream_limit_op = {}
+        self.unique_full_op_id_to_operator = {}
+
         for topo_idx, op in enumerate(plan):
+            unique_full_op_id = f"{topo_idx}-{op.get_full_op_id()}"
+            self.unique_full_op_id_to_operator[unique_full_op_id] = op
+
             if isinstance(op, JoinOp):
-                unique_full_op_id = f"{topo_idx}-{op.get_full_op_id()}"
+                self.is_join_op[unique_full_op_id] = True
+                self.is_outer_join_op[unique_full_op_id] = isinstance(
+                    op, JoinOp
+                ) and op.how in ("left", "right", "outer")
                 has_downstream_limit_op = False
                 for inner_topo_idx, op in enumerate(plan):
                     if inner_topo_idx <= topo_idx:
@@ -260,9 +324,15 @@ class ParallelExecutionStrategy(ExecutionStrategy):
                         has_downstream_limit_op = True
                         break
                 self.join_has_downstream_limit_op[unique_full_op_id] = has_downstream_limit_op
+            else:
+                self.is_join_op[unique_full_op_id] = False
+                self.is_outer_join_op[unique_full_op_id] = False
 
-        # precompute mapping from unique_full_op_id to operator instance
-        self.unique_full_op_id_to_operator = {f"{topo_idx}-{op.get_full_op_id()}": op for topo_idx, op in enumerate(plan)}
+            if isinstance(op, BatchedOperator):
+                self.is_batched_op[unique_full_op_id] = True
+                self.batched_op_flushed[unique_full_op_id] = False
+            else:
+                self.is_batched_op[unique_full_op_id] = False
 
         # initialize and start the progress manager
         self.progress_manager = create_progress_manager(plan, num_samples=self.num_samples, progress=self.progress)
@@ -270,7 +340,7 @@ class ParallelExecutionStrategy(ExecutionStrategy):
 
         # NOTE: we must handle progress manager outside of _execute_plan to ensure that it is shut down correctly;
         #       if we don't have the `finally:` branch, then program crashes can cause future program runs to fail
-        #       because the progress manager cannot get a handle to the console 
+        #       because the progress manager cannot get a handle to the console
         try:
             # execute plan
             output_records, plan_stats = self._execute_plan(plan, input_queues, future_queues, plan_stats)

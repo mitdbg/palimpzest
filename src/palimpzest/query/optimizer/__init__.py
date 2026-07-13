@@ -3,6 +3,9 @@ from palimpzest.query.optimizer.rules import (
     AggregateRule as _AggregateRule,
 )
 from palimpzest.query.optimizer.rules import (
+    BatchedFilterRule as _BatchedFilterRule,
+)
+from palimpzest.query.optimizer.rules import (
     BasicSubstitutionRule as _BasicSubstitutionRule,
 )
 from palimpzest.query.optimizer.rules import (
@@ -45,6 +48,9 @@ from palimpzest.query.optimizer.rules import (
     ReorderConverts as _ReorderConverts,
 )
 from palimpzest.query.optimizer.rules import (
+    RescaledImageFilterRule as _RescaledImageFilterRule,
+)
+from palimpzest.query.optimizer.rules import (
     Rule as _Rule,
 )
 from palimpzest.query.optimizer.rules import (
@@ -64,6 +70,7 @@ ALL_RULES = [
     _AddContextsBeforeComputeRule,
     _AggregateRule,
     _BasicSubstitutionRule,
+    _BatchedFilterRule,
     _CritiqueAndRefineRule,
     _EmbeddingJoinRule,
     _ImplementationRule,
@@ -77,6 +84,7 @@ ALL_RULES = [
     _RAGRule,
     _RelationalJoinRule,
     _ReorderConverts,
+    _RescaledImageFilterRule,
     _TopKRule,
     _Rule,
     _SemanticAggregateRule,
