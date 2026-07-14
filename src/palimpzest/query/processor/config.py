@@ -44,7 +44,11 @@ class QueryProcessorConfig(BaseModel):
     allow_split_merge: bool = Field(default=False)
     use_final_op_quality: bool = Field(default=False)
 
-    # sentinel optimization flags
+    # TODO make it more robust than string type for optimizer selection
+    optimizer: str = Field(default="abacus")  # "abacus" or "cluster"
+    
+    # TODO consider whether to wrap these in a separate config class for the optimizer
+    # sentinel optimization flags (abacus)
     k: int = Field(default=6)
     j: int = Field(default=4)
     sample_budget: int = Field(default=100)

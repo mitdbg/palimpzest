@@ -43,7 +43,7 @@ class BaseCostModel:
         raise NotImplementedError("Calling __call__ from abstract method")
 
 
-class SampleBasedCostModel:
+class SampleBasedCostModel(BaseCostModel):
     """
     """
     def __init__(

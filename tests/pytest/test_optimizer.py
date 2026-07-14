@@ -13,10 +13,11 @@ from palimpzest.query.operators.filter import LLMFilter, NonLLMFilter
 from palimpzest.query.operators.logical import ConvertScan, FilteredScan
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.scan import MarshalAndScanDataOp, ScanPhysicalOp
+from palimpzest.query.optimizer.abacus.abacus_optimizer import AbacusOptimizer
 from palimpzest.query.optimizer.cost_model import SampleBasedCostModel
 from palimpzest.query.optimizer.optimizer import Optimizer
 from palimpzest.query.optimizer.optimizer_strategy_type import OptimizationStrategyType
-from palimpzest.query.optimizer.primitives import Group, LogicalExpression
+from palimpzest.query.optimizer.abacus.primitives import Group, LogicalExpression
 
 
 class TestPrimitives:
@@ -107,7 +108,7 @@ class TestOptimizer:
         plan = enron_eval_tiny
         policy = MaxQuality()
         cost_model = SampleBasedCostModel()
-        optimizer = Optimizer(
+        optimizer = AbacusOptimizer(
             policy=policy,
             cost_model=cost_model,
             verbose=True,
@@ -125,7 +126,7 @@ class TestOptimizer:
         plan = plan.sem_add_columns(email_schema)
         policy = MaxQuality()
         cost_model = SampleBasedCostModel()
-        optimizer = Optimizer(
+        optimizer = AbacusOptimizer(
             policy=policy,
             cost_model=cost_model,
             verbose=True,
@@ -149,7 +150,7 @@ class TestOptimizer:
         plan = plan.sem_add_columns(email_schema)
         policy = MinCost()
         cost_model = SampleBasedCostModel()
-        optimizer = Optimizer(
+        optimizer = AbacusOptimizer(
             policy=policy,
             cost_model=cost_model,
             verbose=True,
@@ -168,7 +169,7 @@ class TestOptimizer:
         plan = plan.sem_add_columns(email_schema)
         policy = MinTime()
         cost_model = SampleBasedCostModel()
-        optimizer = Optimizer(
+        optimizer = AbacusOptimizer(
             policy=policy,
             cost_model=cost_model,
             verbose=True,
@@ -188,7 +189,7 @@ class TestOptimizer:
         plan = plan.sem_add_columns(email_schema)
         policy = MinTime()
         cost_model = SampleBasedCostModel()
-        optimizer = Optimizer(
+        optimizer = AbacusOptimizer(
             policy=policy,
             cost_model=cost_model,
             verbose=True,
@@ -208,7 +209,7 @@ class TestOptimizer:
         plan = plan.sem_filter("some text filter", depends_on=["contents"])
         policy = MinCost()
         cost_model = SampleBasedCostModel()
-        optimizer = Optimizer(
+        optimizer = AbacusOptimizer(
             policy=policy,
             cost_model=cost_model,
             verbose=True,
@@ -230,7 +231,7 @@ class TestOptimizer:
         plan = plan.sem_filter("another text filter", depends_on=["contents"])
         policy = MinCost()
         cost_model = SampleBasedCostModel()
-        optimizer = Optimizer(
+        optimizer = AbacusOptimizer(
             policy=policy,
             cost_model=cost_model,
             verbose=True,
@@ -249,7 +250,7 @@ class TestOptimizer:
     def test_small_real_estate_logical_reorder(self, small_real_estate_workload, opt_strategy):
         policy = MinCost()
         cost_model = SampleBasedCostModel()
-        optimizer = Optimizer(
+        optimizer = AbacusOptimizer(
             policy=policy,
             cost_model=cost_model,
             verbose=True,
@@ -272,7 +273,7 @@ class TestOptimizer:
     def test_real_estate_logical_reorder(self, real_estate_workload, opt_strategy):
         policy = MinCost()
         cost_model = SampleBasedCostModel()
-        optimizer = Optimizer(
+        optimizer = AbacusOptimizer(
             policy=policy,
             cost_model=cost_model,
             verbose=True,
@@ -308,7 +309,7 @@ class TestOptimizer:
         plan = plan.sem_filter("filter7", depends_on=["contents"])
         policy = MinCost()
         cost_model = SampleBasedCostModel()
-        optimizer = Optimizer(
+        optimizer = AbacusOptimizer(
             policy=policy,
             cost_model=cost_model,
             verbose=True,
@@ -454,7 +455,7 @@ class TestParetoOptimizer:
         cost_model = MockSampleBasedCostModel(operator_to_stats)
 
         # run optimizer using the cost model and the given policy
-        optimizer = Optimizer(
+        optimizer = AbacusOptimizer(
             policy=policy,
             cost_model=cost_model,
             verbose=True,

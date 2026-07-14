@@ -5,10 +5,11 @@ from abc import ABC, abstractmethod
 
 from palimpzest.policy import Policy
 from palimpzest.query.optimizer.plan import PhysicalPlan, SentinelPlan
-from palimpzest.query.optimizer.primitives import Group
+from palimpzest.query.optimizer.abacus.primitives import Group
 
 logger = logging.getLogger(__name__)
 
+# TODO Reason about whether the optimizerStrategy are something Abacus-specific or should they be more general? If they are Abacus-specific, we should move them to the abacus submodule. For now, we will keep them here.
 
 class OptimizationStrategy(ABC):
     @abstractmethod

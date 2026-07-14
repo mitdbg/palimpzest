@@ -9,8 +9,8 @@ from palimpzest.query.execution.execution_strategy_type import ExecutionStrategy
 from palimpzest.query.operators.join import JoinOp
 from palimpzest.query.optimizer.cost_model import BaseCostModel
 from palimpzest.query.optimizer.optimizer_strategy_type import OptimizationStrategyType
-from palimpzest.query.optimizer.primitives import Expression, Group
-from palimpzest.query.optimizer.rules import ImplementationRule, Rule, TransformationRule
+from palimpzest.query.optimizer.abacus.primitives import Expression, Group
+from palimpzest.query.optimizer.abacus.rules import ImplementationRule, Rule, TransformationRule
 
 logger = logging.getLogger(__name__)
 

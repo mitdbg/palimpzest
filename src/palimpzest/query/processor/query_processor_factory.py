@@ -9,9 +9,13 @@ from palimpzest.core.data.dataset import Dataset
 from palimpzest.core.elements.records import DataRecordCollection
 from palimpzest.query.execution.execution_strategy import ExecutionStrategy, SentinelExecutionStrategy
 from palimpzest.query.execution.execution_strategy_type import ExecutionStrategyType, SentinelExecutionStrategyType
-from palimpzest.query.optimizer.cost_model import SampleBasedCostModel
-from palimpzest.query.optimizer.optimizer import Optimizer
-from palimpzest.query.optimizer.optimizer_strategy_type import OptimizationStrategyType
+from palimpzest.query.optimizer import (
+    Optimizer,
+    AbacusOptimizer,
+    ClusterOptimizer,
+    OptimizationStrategyType,
+    SampleBasedCostModel,
+)
 from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.query.processor.query_processor import QueryProcessor
 from palimpzest.utils.model_helpers import get_optimal_models
@@ -55,7 +59,7 @@ class QueryProcessorFactory:
             logger.debug(f"Normalized {strategy}: {strategy_enum}")
 
         return config
-    
+
     @classmethod
     def _normalize_models(cls, config: QueryProcessorConfig) -> QueryProcessorConfig:
         """
@@ -109,7 +113,7 @@ class QueryProcessorFactory:
     def _config_validation_and_normalization(cls, config: QueryProcessorConfig, train_dataset: dict[str, Dataset] | None, validator : Validator | None):
         if config.policy is None:
             raise ValueError("Policy is required for optimizer")
-        
+
         # only one of progress or verbose can be set; we will default to progress=True
         if config.progress and config.verbose:
             print("WARNING: Both `progress` and `verbose` are set to True, but only one can be True at a time; defaulting to `progress=True`")
@@ -165,7 +169,16 @@ class QueryProcessorFactory:
 
     @classmethod
     def _create_optimizer(cls, config: QueryProcessorConfig) -> Optimizer:
-        return Optimizer(cost_model=SampleBasedCostModel(), **config.to_dict())
+        if config.optimizer == "abacus":
+            return AbacusOptimizer(
+                cost_model=SampleBasedCostModel(), **config.to_dict()
+            )
+        elif config.optimizer == "cluster":
+            return ClusterOptimizer(
+                cost_model=SampleBasedCostModel(), **config.to_dict()
+            )
+        else:
+            raise ValueError(f"Unsupported optimizer: {config.optimizer}")
 
     @classmethod
     def _create_execution_strategy(cls, dataset: Dataset, config: QueryProcessorConfig) -> ExecutionStrategy:

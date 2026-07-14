@@ -17,6 +17,7 @@ plots/
 paper-imgs/
 
 # testdata folders and archive files
+tests/sembench_q11.py
 testdata/enron-tiny.csv
 testdata/*/
 testdata/*.tar.gz

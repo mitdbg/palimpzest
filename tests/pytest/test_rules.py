@@ -4,8 +4,8 @@ from pydantic.fields import FieldInfo
 
 from palimpzest.core.data.iter_dataset import MemoryDataset
 from palimpzest.query.operators.logical import BaseScan
-from palimpzest.query.optimizer.primitives import LogicalExpression
-from palimpzest.query.optimizer.rules import BasicSubstitutionRule
+from palimpzest.query.optimizer.abacus.primitives import LogicalExpression
+from palimpzest.query.optimizer.abacus.rules import BasicSubstitutionRule
 
 
 @pytest.fixture

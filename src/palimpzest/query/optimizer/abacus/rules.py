@@ -55,7 +55,7 @@ from palimpzest.query.operators.search import (
 )
 from palimpzest.query.operators.split import SplitConvert, SplitFilter
 from palimpzest.query.operators.topk import TopKOp
-from palimpzest.query.optimizer.primitives import Expression, Group, LogicalExpression, PhysicalExpression
+from palimpzest.query.optimizer.abacus.primitives import Expression, Group, LogicalExpression, PhysicalExpression
 from palimpzest.utils.model_helpers import use_reasoning_prompt
 
 logger = logging.getLogger(__name__)
