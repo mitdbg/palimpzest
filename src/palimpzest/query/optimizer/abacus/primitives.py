@@ -5,7 +5,7 @@ from pydantic.fields import FieldInfo
 from palimpzest.query.operators.logical import LogicalOperator
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.optimizer.abacus import rules
-from palimpzest.query.optimizer.plan import PlanCost
+from palimpzest.query.plan import PlanCost
 from palimpzest.utils.hash_helpers import hash_for_id
 
 

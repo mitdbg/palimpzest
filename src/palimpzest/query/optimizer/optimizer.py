@@ -9,7 +9,7 @@ from palimpzest.policy import Policy
 from palimpzest.query.execution.execution_strategy_type import ExecutionStrategyType
 from palimpzest.query.optimizer.cost_model import BaseCostModel, SampleBasedCostModel
 from palimpzest.query.optimizer.optimizer_strategy_type import OptimizationStrategyType
-from palimpzest.query.optimizer.plan import PhysicalPlan
+from palimpzest.query.plan import PhysicalPlan
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +76,15 @@ class Optimizer:
     def update_cost_model(self, cost_model: BaseCostModel):
         self.cost_model = cost_model
 
+    def update_strategy(self, optimizer_strategy: OptimizationStrategyType):
+        # TODO check if this should be here or in Abacus only? 
+        # set the optimizer_strategy
+        self.optimizer_strategy = optimizer_strategy
+
+        # get the strategy class associated with the optimizer strategy
+        optimizer_strategy_cls = optimizer_strategy.value
+        self.strategy = optimizer_strategy_cls()
+
     def get_physical_op_params(self):
         return {
             "verbose": self.verbose,
@@ -88,7 +97,7 @@ class Optimizer:
 
     def deepcopy_clean(self):
         # TODO should this be part of the generic Optimizer or the AbacusOptimizer?
-        optimizer = Optimizer(
+        optimizer = self.__class__(
             policy=self.policy,
             cost_model=SampleBasedCostModel(),
             verbose=self.verbose,

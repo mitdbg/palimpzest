@@ -17,7 +17,7 @@ from palimpzest.query.operators.join import JoinOp
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.scan import ContextScanOp, ScanPhysicalOp
 from palimpzest.query.operators.topk import TopKOp
-from palimpzest.query.optimizer.plan import PhysicalPlan, SentinelPlan
+from palimpzest.query.plan import PhysicalPlan, SentinelPlan
 from palimpzest.utils.progress import PZSentinelProgressManager
 from palimpzest.validator.validator import Validator
 

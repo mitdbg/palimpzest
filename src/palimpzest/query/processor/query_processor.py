@@ -9,7 +9,7 @@ from palimpzest.query.execution.execution_strategy import ExecutionStrategy, Sen
 from palimpzest.query.optimizer.cost_model import SampleBasedCostModel
 from palimpzest.query.optimizer.optimizer import Optimizer
 from palimpzest.query.optimizer.optimizer_strategy_type import OptimizationStrategyType
-from palimpzest.query.optimizer.plan import SentinelPlan
+from palimpzest.query.plan import SentinelPlan
 from palimpzest.utils.hash_helpers import hash_for_id
 from palimpzest.validator.validator import Validator
 
@@ -97,17 +97,6 @@ class QueryProcessor:
 
         return sentinel_plan
 
-    def _execute_best_plan(self, dataset: Dataset, optimizer: Optimizer) -> tuple[list[DataRecord], list[PlanStats]]:
-        # get the optimal plan according to the optimizer
-        plans = optimizer.optimize(dataset)
-        final_plan = plans[0]
-
-        # execute the plan
-        records, plan_stats = self.execution_strategy.execute_plan(plan=final_plan)
-
-        # return the output records and plan stats
-        return records, [plan_stats]
-
     def execute(self) -> DataRecordCollection:
         logger.info(f"Executing {self.__class__.__name__}")
 
@@ -137,13 +126,16 @@ class QueryProcessor:
 
             # construct the CostModel with any sample execution data we've gathered
             cost_model = SampleBasedCostModel(sentinel_plan_stats, self.verbose)
-            self.optimizer.update_cost_model(cost_model)
+            self.optimizer.cost_model = cost_model 
+            # update_cost_model(cost_model)
 
-        # execute plan(s) according to the optimization strategy
-        records, plan_stats = self._execute_best_plan(self.dataset, self.optimizer)
+        # get the optimal plan according to the optimizer
+        plans = self.optimizer.optimize(self.dataset)
+        final_plan = plans[0]
+        records, plan_stats = self.execution_strategy.execute_plan(plan=final_plan)
 
         # update the execution stats to account for the work to execute the final plan
-        execution_stats.add_plan_stats(plan_stats)
+        execution_stats.add_plan_stats([plan_stats])
         execution_stats.finish()
 
         # construct and return the DataRecordCollection

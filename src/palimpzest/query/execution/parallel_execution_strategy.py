@@ -11,7 +11,7 @@ from palimpzest.query.operators.distinct import DistinctOp
 from palimpzest.query.operators.join import JoinOp
 from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.operators.scan import ContextScanOp, ScanPhysicalOp
-from palimpzest.query.optimizer.plan import PhysicalPlan
+from palimpzest.query.plan import PhysicalPlan
 from palimpzest.utils.progress import create_progress_manager
 
 logger = logging.getLogger(__name__)

@@ -242,11 +242,24 @@ class QueryProcessorFactory:
                 for _, ds in train_dataset.items():
                     ds.relax_types()
 
-        # create the optimizer, execution strateg(ies), and processor
         optimizer = cls._create_optimizer(config)
-        config.execution_strategy = cls._create_execution_strategy(dataset, config)
-        config.sentinel_execution_strategy = cls._create_sentinel_execution_strategy(config)
-        processor = QueryProcessor(dataset, optimizer, train_dataset=train_dataset, validator=validator, **config.to_dict())
+        execution_strategy = cls._create_execution_strategy(dataset, config)
+        sentinel_execution_strategy = cls._create_sentinel_execution_strategy(config)
+
+        processor_kwargs = config.to_dict()
+        processor_kwargs.pop("optimizer", None)
+        processor_kwargs.pop("execution_strategy", None)
+        processor_kwargs.pop("sentinel_execution_strategy", None)
+
+        # create the optimizer, execution strateg(ies), and processor
+        processor = QueryProcessor(
+            dataset=dataset, 
+            optimizer=optimizer, 
+            execution_strategy=execution_strategy, sentinel_execution_strategy=sentinel_execution_strategy,
+            train_dataset=train_dataset, 
+            validator=validator, 
+            **processor_kwargs
+        )
 
         return processor
 

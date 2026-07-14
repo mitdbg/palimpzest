@@ -4,7 +4,7 @@ import logging
 from abc import ABC, abstractmethod
 
 from palimpzest.policy import Policy
-from palimpzest.query.optimizer.plan import PhysicalPlan, SentinelPlan
+from palimpzest.query.plan import PhysicalPlan, SentinelPlan
 from palimpzest.query.optimizer.abacus.primitives import Group
 
 logger = logging.getLogger(__name__)

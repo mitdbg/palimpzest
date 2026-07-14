@@ -26,7 +26,7 @@ from palimpzest.query.optimizer.abacus import (
 )
 from palimpzest.query.optimizer.cost_model import BaseCostModel, SampleBasedCostModel
 from palimpzest.query.optimizer.optimizer_strategy_type import OptimizationStrategyType
-from palimpzest.query.optimizer.plan import PhysicalPlan
+from palimpzest.query.plan import PhysicalPlan
 from palimpzest.query.optimizer.abacus.primitives import Group, LogicalExpression
 from palimpzest.query.optimizer.abacus.rules import (
     CritiqueAndRefineRule,
@@ -120,13 +120,7 @@ class AbacusOptimizer(Optimizer):
         logger.debug(f"Initialized Optimizer with params: {self.__dict__}")
 
     def update_strategy(self, optimizer_strategy: OptimizationStrategyType):
-        # set the optimizer_strategy
-        self.optimizer_strategy = optimizer_strategy
-
-        # get the strategy class associated with the optimizer strategy
-        optimizer_strategy_cls = optimizer_strategy.value
-        self.strategy = optimizer_strategy_cls()
-
+        super().update_strategy(optimizer_strategy)
         # remove transformation rules for optimization strategies which do not require them
         if optimizer_strategy.no_transformation():
             self.transformation_rules = []

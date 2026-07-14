@@ -10,7 +10,7 @@ from palimpzest.query.operators.convert import LLMConvertBonded
 from palimpzest.query.operators.filter import LLMFilter
 from palimpzest.query.operators.logical import BaseScan, ConvertScan, FilteredScan
 from palimpzest.query.operators.scan import MarshalAndScanDataOp
-from palimpzest.query.optimizer.plan import PhysicalPlan
+from palimpzest.query.plan import PhysicalPlan
 
 
 ### THREE CONVERTS PHYSICAL PLANS ###

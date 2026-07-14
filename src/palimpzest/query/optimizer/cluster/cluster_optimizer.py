@@ -10,7 +10,9 @@ from palimpzest.core.data.dataset import Dataset
 from palimpzest.core.lib.schemas import get_schema_field_names
 from palimpzest.policy import Policy
 from palimpzest.query.execution.execution_strategy_type import ExecutionStrategyType
+from palimpzest.query.optimizer.cluster.logical_optimizer import LogicalOptimizer, LogicalPlan
 from palimpzest.query.optimizer.optimizer import Optimizer
+from palimpzest.query.plan import PhysicalPlan
 logger = logging.getLogger(__name__)
 
 
@@ -25,61 +27,10 @@ class ClusterOptimizer(Optimizer):
 
     """
 
-    def __init__(
-        self,
-        policy: Policy,
-        cost_model: BaseCostModel,
-        available_models: list[Model],
-        join_parallelism: int = 64,
-        reasoning_effort: str = "default",
-        verbose: bool = False,
-        allow_bonded_query: bool = True,
-        allow_rag_reduction: bool = False,
-        allow_mixtures: bool = True,
-        allow_critic: bool = False,
-        allow_split_merge: bool = False,
-        optimizer_strategy: OptimizationStrategyType = OptimizationStrategyType.PARETO,
-        execution_strategy: ExecutionStrategyType = ExecutionStrategyType.PARALLEL,
-        use_final_op_quality: bool = False,
-        **kwargs,
-    ):
-        # store the policy
-        self.policy = policy
-        # store the cost model
-        self.cost_model = cost_model
-        self.available_models = available_models
-        self.join_parallelism = join_parallelism
-        self.reasoning_effort = reasoning_effort
-        self.verbose = verbose
-
-        # TODO look at optimizer strategy ? 
-        # if we are not performing optimization, set available models to be single model
-        # and remove all optimizations (except for bonded queries)
-        # if we are not performing optimization, set available models to be single model
-        # and remove all optimizations (except for bonded queries)
-        if optimizer_strategy == OptimizationStrategyType.NONE:
-            self.allow_bonded_query = True
-            self.allow_rag_reduction = False
-            self.allow_mixtures = False
-            self.allow_critic = False
-            self.allow_split_merge = False
-            self.available_models = [available_models[0]]
-        else:
-            self.allow_bonded_query = allow_bonded_query
-            self.allow_rag_reduction = allow_rag_reduction
-            self.allow_mixtures = allow_mixtures
-            self.allow_critic = allow_critic
-            self.allow_split_merge = allow_split_merge
-            self.available_models = available_models
-
-        # store optimization hyperparameters
-        self.verbose = verbose
-        self.optimizer_strategy = optimizer_strategy
-        self.execution_strategy = execution_strategy
-        self.use_final_op_quality = use_final_op_quality
-
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.logical_optimizer = LogicalOptimizer()
-        self.physical_optimizer = PhysicalOptimizer()
+        # self.physical_optimizer = PhysicalOptimizer()
 
         # prune implementation rules based on boolean flags
         # TODO disable phsical implementation rules based on boolean flags
@@ -91,6 +42,8 @@ class ClusterOptimizer(Optimizer):
         """
         The optimize function takes in an initial query plan and searches the space of
         logical and physical plans in order to cost and produce a (near) optimal physical plan.
+        
+        Output of clusteroptimizer is a list whose first element will be the optimal plan and the rest will be suboptimal plans. The user can choose to execute any of these plans based on their preference for quality vs. latency.
         """
         logger.info(f"Optimizing query plan: {dataset}")
         # compute the initial group tree for the user plan
@@ -100,6 +53,9 @@ class ClusterOptimizer(Optimizer):
         # self.heuristic_optimization(final_group_id)
 
         # search the optimization space by applying logical and physical transformations to the initial group tree
+        initial_plan = LogicalPlan.from_dataset(dataset_copy)
+        logger.info(f"Initial logical plan: {initial_plan}")
+        raise NotImplementedError("Logical plan optimization is not yet implemented.")
         self.logical_optimizer.optimize(dataset_copy)
         logger.info(f"Getting optimal plans for final group id: {final_group_id}")
 

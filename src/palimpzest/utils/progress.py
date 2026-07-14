@@ -25,7 +25,7 @@ from palimpzest.query.operators.join import JoinOp
 from palimpzest.query.operators.limit import LimitScanOp
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.topk import TopKOp
-from palimpzest.query.optimizer.plan import PhysicalPlan, SentinelPlan
+from palimpzest.query.plan import PhysicalPlan, SentinelPlan
 
 
 @dataclass

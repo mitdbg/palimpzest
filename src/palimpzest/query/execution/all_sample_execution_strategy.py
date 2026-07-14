@@ -11,7 +11,7 @@ from palimpzest.query.operators.filter import FilterOp
 from palimpzest.query.operators.join import JoinOp
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.scan import ContextScanOp, ScanPhysicalOp
-from palimpzest.query.optimizer.plan import SentinelPlan
+from palimpzest.query.plan import SentinelPlan
 from palimpzest.utils.progress import create_progress_manager
 from palimpzest.validator.validator import Validator
 
