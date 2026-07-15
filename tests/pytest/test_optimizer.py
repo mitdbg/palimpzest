@@ -13,7 +13,7 @@ from palimpzest.query.operators.filter import LLMFilter, NonLLMFilter
 from palimpzest.query.operators.logical import ConvertScan, FilteredScan
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.scan import MarshalAndScanDataOp, ScanPhysicalOp
-from palimpzest.query.optimizer.abacus.cascades_optimizer import NaiveOptimizer
+from palimpzest.query.optimizer.abacus.cascades_optimizer import AbacusOptimizer, NaiveOptimizer
 from palimpzest.query.optimizer.cost_model import SampleBasedCostModel
 from palimpzest.query.optimizer_config import OptimizerConfig
 from palimpzest.query.optimizer.optimizer_strategy_type import OptimizationStrategyType
@@ -355,6 +355,7 @@ class TestOptimizer:
         assert isinstance(physical_plan[8], LLMConvertBonded)
 
         if not os.getenv("CI"):  # only enforce time constraint when not running in CI
+            print(f"Optimizer completed test in {time.time() - start_time:.2f} seconds")
             assert time.time() - start_time < 6, (
                 "Optimizer should complete this test within 2 to 6 seconds; if it's failed, something has caused a regression, and you should ping Matthew Russo (mdrusso@mit.edu)"
             )

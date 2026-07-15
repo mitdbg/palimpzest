@@ -38,7 +38,7 @@ class ClusterOptimizer(Optimizer):
         logger.info(f"Initialized Optimizer with verbose={self.verbose}")
         logger.debug(f"Initialized Optimizer with params: {self.__dict__}")
 
-    def optimize(self, dataset: Dataset) -> list[PhysicalPlan]:
+    def optimize(self, dataset: Dataset, *args, **kwargs) -> list[PhysicalPlan]:
         """
         The optimize function takes in an initial query plan and searches the space of
         logical and physical plans in order to cost and produce a (near) optimal physical plan.

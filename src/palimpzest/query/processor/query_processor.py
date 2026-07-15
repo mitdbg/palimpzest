@@ -6,7 +6,6 @@ from palimpzest.core.models import ExecutionStats
 from palimpzest.query.execution.execution_strategy import ExecutionStrategy
 from palimpzest.query.optimizer.optimizer import Optimizer
 from palimpzest.utils.hash_helpers import hash_for_id
-from palimpzest.validator.validator import Validator
 
 logger = logging.getLogger(__name__)
 
@@ -25,8 +24,6 @@ class QueryProcessor:
         optimizer: Optimizer,
         execution_strategy: ExecutionStrategy,
         num_samples: int | None = None,
-        train_dataset: dict[str, Dataset] | None = None,
-        validator: Validator | None = None,
         scan_start_idx: int = 0,
         verbose: bool = False,
         progress: bool = True,
@@ -43,8 +40,6 @@ class QueryProcessor:
         self.optimizer = optimizer
         self.execution_strategy = execution_strategy
         self.num_samples = num_samples
-        self.train_dataset = train_dataset
-        self.validator = validator
         self.scan_start_idx = scan_start_idx
         self.verbose = verbose
         self.progress = progress
@@ -74,8 +69,6 @@ class QueryProcessor:
         # get the optimal plan according to the optimizer
         plans = self.optimizer.optimize(
             dataset=self.dataset,
-            validator=self.validator,
-            train_dataset=self.train_dataset,
             execution_stats=execution_stats,
         )
         final_plan = plans[0]

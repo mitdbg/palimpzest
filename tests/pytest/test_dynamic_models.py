@@ -506,7 +506,7 @@ class TestEndToEndIntegration:
         # Configure and run
         config = QueryProcessorConfig(
             policy=MinCost(),
-            available_models=[Model.GPT_4o_MINI],
+            available_models=[Model.GPT_5_NANO],
             execution_strategy="sequential",
             progress=False,
             verbose=False,

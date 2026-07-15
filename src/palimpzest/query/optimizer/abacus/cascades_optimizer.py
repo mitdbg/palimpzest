@@ -397,7 +397,7 @@ class NaiveOptimizer(CascadesOptimizer):
     This optimizer uses still the same Cascades group-style optimization framework as the AbacusOptimizer, but it does not perform sampling to update the cost model.
     """
 
-    def optimize(self, dataset: Dataset) -> list[PhysicalPlan]:
+    def optimize(self, dataset: Dataset, *args, **kwargs) -> list[PhysicalPlan]:
         """
         The optimize function takes in an initial query plan and searches the space of
         logical and physical plans in order to cost and produce a (near) optimal physical plan.
@@ -427,13 +427,22 @@ class AbacusOptimizer(CascadesOptimizer):
     """
 
     def __init__(
-        self, sentinel_execution_strategy: SentinelExecutionStrategy, *args, **kwargs
+        self,
+        sentinel_execution_strategy: SentinelExecutionStrategy,
+        validator: Validator | None,
+        train_dataset: dict[str, Dataset] | None = None,
+        *args,
+        **kwargs,
     ):
         super().__init__(*args, **kwargs)
         self.sentinel_execution_strategy = sentinel_execution_strategy
+        assert validator is not None, "Validator must be provided for AbacusOptimizer to generate sample execution data."
+        self.validator = validator
+
+        self.train_dataset = train_dataset
 
     def _create_sentinel_plan(
-        self, dataset: Dataset, train_dataset: dict[str, Dataset] | None
+        self, dataset: Dataset
     ) -> SentinelPlan:
         """
         Generates and returns a SentinelPlan for the given dataset.
@@ -448,8 +457,8 @@ class AbacusOptimizer(CascadesOptimizer):
 
         # create copy of dataset, but change its root Dataset(s) to the validation Dataset(s)
         dataset = dataset.copy()
-        if train_dataset is not None:
-            dataset._set_root_datasets(train_dataset)
+        if self.train_dataset is not None:
+            dataset._set_root_datasets(self.train_dataset)
             dataset._generate_unique_logical_op_ids()
 
         # get the sentinel plan for the given dataset
@@ -461,9 +470,7 @@ class AbacusOptimizer(CascadesOptimizer):
     def optimize(
         self,
         dataset: Dataset,
-        validator: Validator,
-        execution_stats: ExecutionStats,
-        train_dataset: dict[str, Dataset] | None,
+        execution_stats: ExecutionStats | None = None,
     ) -> list[PhysicalPlan]:
         """
         The optimize function takes in an initial query plan and searches the space of
@@ -472,17 +479,17 @@ class AbacusOptimizer(CascadesOptimizer):
         logger.info(f"Optimizing query plan: {dataset}")
 
         assert (
-            validator is not None
-        ), "Validator must be provided for AbacusOptimizer to generate sample execution data."
+            execution_stats is not None
+        ), "ExecutionStats must be provided for AbacusOptimizer to record optimization work."
 
         # create sentinel plan
-        sentinel_plan = self._create_sentinel_plan(dataset, train_dataset)
+        sentinel_plan = self._create_sentinel_plan(dataset)
 
         # generate sample execution data
-        if train_dataset is not None:
+        if self.train_dataset is not None:
             sentinel_plan_stats = (
                 self.sentinel_execution_strategy.execute_sentinel_plan(
-                    sentinel_plan, train_dataset, validator
+                    sentinel_plan, self.train_dataset, self.validator
                 )
             )
 
@@ -490,7 +497,7 @@ class AbacusOptimizer(CascadesOptimizer):
             train_dataset = dataset._get_root_datasets()
             sentinel_plan_stats = (
                 self.sentinel_execution_strategy.execute_sentinel_plan(
-                    sentinel_plan, train_dataset, validator
+                    sentinel_plan, train_dataset, self.validator
                 )
             )
 

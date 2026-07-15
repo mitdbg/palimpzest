@@ -179,11 +179,18 @@ class QueryProcessorFactory:
         return config, validator
 
     @classmethod
-    def _create_optimizer(cls, config: QueryProcessorConfig) -> Optimizer:
+    def _create_optimizer(
+        cls,
+        config: QueryProcessorConfig,
+        train_dataset: dict[str, Dataset] | None,
+        validator: Validator | None,
+    ) -> Optimizer:
         if config.optimizer == "abacus":
             sentinel_strategy = cls._create_sentinel_execution_strategy(config)
             return AbacusOptimizer(
                 sentinel_execution_strategy=sentinel_strategy,
+                validator=validator,
+                train_dataset=train_dataset,
                 cost_model=SampleBasedCostModel(),
                 optimizer_config=config.optimizer_config,
             )
@@ -279,7 +286,7 @@ class QueryProcessorFactory:
                 for _, ds in train_dataset.items():
                     ds.relax_types()
 
-        optimizer = cls._create_optimizer(config)
+        optimizer = cls._create_optimizer(config, train_dataset, validator)
         execution_strategy = cls._create_execution_strategy(dataset, config)
 
         # create the optimizer, execution strateg(ies), and processor
@@ -287,8 +294,6 @@ class QueryProcessorFactory:
             dataset=dataset,
             optimizer=optimizer,
             execution_strategy=execution_strategy,
-            train_dataset=train_dataset,
-            validator=validator,
             num_samples=config.num_samples,
             scan_start_idx=config.scan_start_idx,
             verbose=config.verbose,
