@@ -1,17 +1,57 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass, replace
 
 
 from palimpzest.constants import Model
 from palimpzest.core.data.dataset import Dataset
 from palimpzest.policy import Policy
 from palimpzest.query.execution.execution_strategy_type import ExecutionStrategyType
-from palimpzest.query.optimizer.cost_model import BaseCostModel, SampleBasedCostModel
+from palimpzest.query.optimizer.cost_model import BaseCostModel
 from palimpzest.query.optimizer.optimizer_strategy_type import OptimizationStrategyType
 from palimpzest.query.plan import PhysicalPlan
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class OptimizerConfig:
+    policy: Policy
+    available_models: tuple[Model, ...]
+    join_parallelism: int = 64
+    reasoning_effort: str = "default"
+    verbose: bool = False
+    allow_bonded_query: bool = True
+    allow_rag_reduction: bool = False
+    allow_mixtures: bool = True
+    allow_critic: bool = False
+    allow_split_merge: bool = False
+    optimizer_strategy: OptimizationStrategyType = OptimizationStrategyType.PARETO
+    execution_strategy: ExecutionStrategyType = ExecutionStrategyType.PARALLEL
+    use_final_op_quality: bool = False
+
+    def to_optimizer_kwargs(
+        self, optimizer_strategy: OptimizationStrategyType | None = None
+    ) -> dict:
+        config = self if optimizer_strategy is None else replace(
+            self, optimizer_strategy=optimizer_strategy
+        )
+        return {
+            "policy": config.policy,
+            "available_models": list(config.available_models),
+            "join_parallelism": config.join_parallelism,
+            "reasoning_effort": config.reasoning_effort,
+            "verbose": config.verbose,
+            "allow_bonded_query": config.allow_bonded_query,
+            "allow_rag_reduction": config.allow_rag_reduction,
+            "allow_mixtures": config.allow_mixtures,
+            "allow_critic": config.allow_critic,
+            "allow_split_merge": config.allow_split_merge,
+            "optimizer_strategy": config.optimizer_strategy,
+            "execution_strategy": config.execution_strategy,
+            "use_final_op_quality": config.use_final_op_quality,
+        }
 
 
 class Optimizer:
@@ -72,6 +112,21 @@ class Optimizer:
         self.optimizer_strategy = optimizer_strategy
         self.execution_strategy = execution_strategy
         self.use_final_op_quality = use_final_op_quality
+        self.optimizer_config = OptimizerConfig(
+            policy=self.policy,
+            available_models=tuple(self.available_models),
+            join_parallelism=self.join_parallelism,
+            reasoning_effort=self.reasoning_effort,
+            verbose=self.verbose,
+            allow_bonded_query=self.allow_bonded_query,
+            allow_rag_reduction=self.allow_rag_reduction,
+            allow_mixtures=self.allow_mixtures,
+            allow_critic=self.allow_critic,
+            allow_split_merge=self.allow_split_merge,
+            optimizer_strategy=self.optimizer_strategy,
+            execution_strategy=self.execution_strategy,
+            use_final_op_quality=self.use_final_op_quality,
+        )
 
     def update_cost_model(self, cost_model: BaseCostModel):
         self.cost_model = cost_model
@@ -80,6 +135,9 @@ class Optimizer:
         # TODO check if this should be here or in Abacus only? 
         # set the optimizer_strategy
         self.optimizer_strategy = optimizer_strategy
+        self.optimizer_config = replace(
+            self.optimizer_config, optimizer_strategy=optimizer_strategy
+        )
 
         # get the strategy class associated with the optimizer strategy
         optimizer_strategy_cls = optimizer_strategy.value
@@ -95,26 +153,6 @@ class Optimizer:
             == OptimizationStrategyType.SENTINEL,
         }
 
-    def deepcopy_clean(self):
-        # TODO should this be part of the generic Optimizer or the AbacusOptimizer?
-        optimizer = self.__class__(
-            policy=self.policy,
-            cost_model=SampleBasedCostModel(),
-            verbose=self.verbose,
-            available_models=self.available_models,
-            join_parallelism=self.join_parallelism,
-            reasoning_effort=self.reasoning_effort,
-            allow_bonded_query=self.allow_bonded_query,
-            allow_rag_reduction=self.allow_rag_reduction,
-            allow_mixtures=self.allow_mixtures,
-            allow_critic=self.allow_critic,
-            allow_split_merge=self.allow_split_merge,
-            optimizer_strategy=self.optimizer_strategy,
-            execution_strategy=self.execution_strategy,
-            use_final_op_quality=self.use_final_op_quality,
-        )
-        return optimizer
 
-
-    def optimize(self, dataset: Dataset) -> list[PhysicalPlan]:
+    def optimize(self, dataset: Dataset, *args, **kwargs) -> list[PhysicalPlan]:
         raise NotImplementedError("The optimize method must be implemented by subclasses of Optimizer.")

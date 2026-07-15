@@ -286,7 +286,6 @@ class PhysicalPlan(Plan):
         return cls(operator=ops[-1], subplans=[subplan], plan_cost=plan_cost)
 
 
-# TODO(?): take list[PhysicalOperator] as input, but then store OpFrontier
 class SentinelPlan(Plan):
     def __init__(self, operator_set: list[PhysicalOperator], subplans: list[SentinelPlan] | None):
         # store operator_set and logical_op_id; sort operator_set internally by full_op_id

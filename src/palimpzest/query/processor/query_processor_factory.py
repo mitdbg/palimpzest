@@ -11,6 +11,7 @@ from palimpzest.query.execution.execution_strategy import ExecutionStrategy, Sen
 from palimpzest.query.execution.execution_strategy_type import ExecutionStrategyType, SentinelExecutionStrategyType
 from palimpzest.query.optimizer import (
     Optimizer,
+    NaiveOptimizer,
     AbacusOptimizer,
     ClusterOptimizer,
     OptimizationStrategyType,
@@ -170,13 +171,20 @@ class QueryProcessorFactory:
     @classmethod
     def _create_optimizer(cls, config: QueryProcessorConfig) -> Optimizer:
         if config.optimizer == "abacus":
+            sentinel_strategy = cls._create_sentinel_execution_strategy(config)
+            kwargs = config.to_dict()
+            kwargs.pop('sentinel_execution_strategy', None)
             return AbacusOptimizer(
-                cost_model=SampleBasedCostModel(), **config.to_dict()
+                sentinel_execution_strategy=sentinel_strategy,
+                cost_model=SampleBasedCostModel(),
+                **kwargs,
             )
         elif config.optimizer == "cluster":
             return ClusterOptimizer(
                 cost_model=SampleBasedCostModel(), **config.to_dict()
             )
+        elif config.optimizer == "naive":
+            return NaiveOptimizer(cost_model=SampleBasedCostModel(), **config.to_dict())
         else:
             raise ValueError(f"Unsupported optimizer: {config.optimizer}")
 
@@ -244,7 +252,6 @@ class QueryProcessorFactory:
 
         optimizer = cls._create_optimizer(config)
         execution_strategy = cls._create_execution_strategy(dataset, config)
-        sentinel_execution_strategy = cls._create_sentinel_execution_strategy(config)
 
         processor_kwargs = config.to_dict()
         processor_kwargs.pop("optimizer", None)
@@ -253,12 +260,12 @@ class QueryProcessorFactory:
 
         # create the optimizer, execution strateg(ies), and processor
         processor = QueryProcessor(
-            dataset=dataset, 
-            optimizer=optimizer, 
-            execution_strategy=execution_strategy, sentinel_execution_strategy=sentinel_execution_strategy,
-            train_dataset=train_dataset, 
-            validator=validator, 
-            **processor_kwargs
+            dataset=dataset,
+            optimizer=optimizer,
+            execution_strategy=execution_strategy,
+            train_dataset=train_dataset,
+            validator=validator,
+            **processor_kwargs,
         )
 
         return processor

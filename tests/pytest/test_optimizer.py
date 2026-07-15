@@ -13,7 +13,7 @@ from palimpzest.query.operators.filter import LLMFilter, NonLLMFilter
 from palimpzest.query.operators.logical import ConvertScan, FilteredScan
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.scan import MarshalAndScanDataOp, ScanPhysicalOp
-from palimpzest.query.optimizer.abacus.abacus_optimizer import AbacusOptimizer
+from palimpzest.query.optimizer.abacus.cascades_optimizer import AbacusOptimizer
 from palimpzest.query.optimizer.cost_model import SampleBasedCostModel
 from palimpzest.query.optimizer.optimizer import Optimizer
 from palimpzest.query.optimizer.optimizer_strategy_type import OptimizationStrategyType

@@ -676,7 +676,7 @@ class Dataset:
 
         # construct unique logical op ids for all operators in this dataset
         self._generate_unique_logical_op_ids()
-
+        config.optimizer = "naive"
         return QueryProcessorFactory.create_and_run_processor(self, config)
 
     def optimize_and_run(self, config: QueryProcessorConfig | None = None, train_dataset: dict[str, Dataset] | Dataset | None = None, validator: Validator | None = None, **kwargs):

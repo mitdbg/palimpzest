@@ -13,7 +13,6 @@ class QueryProcessorConfig(BaseModel):
 
     # execution and optimization flags
     execution_strategy: str = Field(default="parallel")              # substituted with ExecutionStrategyType
-    sentinel_execution_strategy: str | None = Field(default="auto")  # substituted with SentinelExecutionStrategyType
     optimizer_strategy: str = Field(default="pareto")                # substituted with OptimizationStrategyType
 
     # general execution flags
@@ -45,8 +44,9 @@ class QueryProcessorConfig(BaseModel):
     use_final_op_quality: bool = Field(default=False)
 
     # TODO make it more robust than string type for optimizer selection
+    # if only run() is used, then optimizer will be changed to "naive"
     optimizer: str = Field(default="abacus")  # "abacus" or "cluster"
-    
+
     # TODO consider whether to wrap these in a separate config class for the optimizer
     # sentinel optimization flags (abacus)
     k: int = Field(default=6)
@@ -57,6 +57,7 @@ class QueryProcessorConfig(BaseModel):
     exp_name: str | None = Field(default=None)
     priors: dict | None = Field(default=None)
     dont_use_priors: bool = Field(default=False)
+    sentinel_execution_strategy: str | None = Field(default="auto")  # substituted with SentinelExecutionStrategyType
 
     def to_dict(self) -> dict:
         """Convert the config to a dict representation."""
