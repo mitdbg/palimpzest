@@ -2,21 +2,28 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from palimpzest.constants import Model
 from palimpzest.policy import MaxQuality, Policy
 
 
 class OptimizerConfig(BaseModel):
-    """Configuration owned by the optimizer layer."""
+    """
+    Configuration owned by the optimizer layer.
+
+    OptimizerConfig is the single internal home for policy, normalized model
+    selection, optimizer strategy, logical/physical operator toggles, and
+    sentinel/MAB sampling knobs. Users may provide model identifiers as strings,
+    but OptimizerConfig stores them as Model objects after validation.
+    """
 
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
 
     optimizer_strategy: Any = Field(default="pareto")
     policy: Policy = Field(default_factory=MaxQuality)
-    available_models: list[Model | str] | None = Field(default=None)
-    remove_models: list[Model | str] | None = Field(default=None)
+    available_models: list[Model] = Field(default_factory=list)
+    remove_models: list[Model] = Field(default_factory=list)
 
     verbose: bool = Field(default=False)
     join_parallelism: int = Field(default=64)
@@ -40,6 +47,16 @@ class OptimizerConfig(BaseModel):
     exp_name: str | None = Field(default=None)
     priors: dict | None = Field(default=None)
     dont_use_priors: bool = Field(default=False)
+
+    @field_validator("available_models", "remove_models", mode="before")
+    @classmethod
+    def _coerce_models(cls, models):
+        if models is None:
+            return []
+        return [
+            Model(model) if isinstance(model, str) else model
+            for model in models
+        ]
 
     def with_strategy(self, optimizer_strategy: Any) -> OptimizerConfig:
         return self.model_copy(

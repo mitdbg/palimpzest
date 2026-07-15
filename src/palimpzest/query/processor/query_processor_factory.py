@@ -4,7 +4,6 @@ from enum import Enum
 
 from dotenv import load_dotenv
 
-from palimpzest.constants import Model
 from palimpzest.core.data.dataset import Dataset
 from palimpzest.core.elements.records import DataRecordCollection
 from palimpzest.query.execution.execution_strategy import ExecutionStrategy, SentinelExecutionStrategy
@@ -85,23 +84,14 @@ class QueryProcessorFactory:
     @classmethod
     def _normalize_models(cls, config: QueryProcessorConfig) -> QueryProcessorConfig:
         """
-        Validate and normalize available_models and remove_models; converts all model strings to Model objects.
+        Fill in automatic model selection and apply remove_models.
         """
         # get the current set of available_models (if provided by the user's config)
         optimizer_config = config.optimizer_config
-        current_available_models = getattr(optimizer_config, 'available_models', [])
-
-        # normalize all models to be pz.Model objects
-        if current_available_models is not None and len(current_available_models) > 0:
-            assert all(
-                isinstance(model, (Model, str)) for model in current_available_models
-            ), "Must provide pz.Model or the model's full string identifier for each element in `available_models`"
-            current_available_models = [
-                Model(model) if isinstance(model, str) else model for model in current_available_models
-            ]
+        current_available_models = optimizer_config.available_models
 
         # if the user does not explicitly set the available models, select the optimal models based on policy
-        if current_available_models is None or len(current_available_models) == 0:
+        if len(current_available_models) == 0:
             current_available_models = get_optimal_models(
                 policy = optimizer_config.policy,
                 use_vertex = config.use_vertex,
@@ -111,18 +101,9 @@ class QueryProcessorFactory:
                 azure_api_version = config.azure_api_version,
             )
 
-        # get the list of models to remove (if provided by the user's config)
-        remove_models = getattr(optimizer_config, 'remove_models', [])
-
-        # remove any models specified in the config
-        if remove_models is not None and len(remove_models) > 0:
-            assert all(
-                isinstance(model, (Model, str)) for model in remove_models
-            ), "Must provide pz.Model or the model's full string identifier for each element in `remove_models`"
-            remove_models = [
-                Model(model) if isinstance(model, str) else model for model in remove_models
-            ]
-
+        # remove any models specified in the config (if provided by users)
+        remove_models = optimizer_config.remove_models
+        if len(remove_models) > 0:
             # filter remove_models out of current_available_models
             current_available_models = [model for model in current_available_models if model not in remove_models]
 
@@ -134,6 +115,11 @@ class QueryProcessorFactory:
 
     @classmethod
     def _config_validation_and_normalization(cls, config: QueryProcessorConfig, train_dataset: dict[str, Dataset] | None, validator : Validator | None):
+        if validator is not None and config.validator is not None and validator is not config.validator:
+            raise ValueError("Specify `validator` either in QueryProcessorConfig or as an argument, not both.")
+        if validator is None:
+            validator = config.validator
+
         optimizer_config = config.optimizer_config
         if optimizer_config.policy is None:
             raise ValueError("Policy is required for optimizer")

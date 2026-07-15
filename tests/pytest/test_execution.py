@@ -4,7 +4,6 @@ from palimpzest.policy import MaxQuality
 from palimpzest.query.operators.convert import LLMConvertBonded
 from palimpzest.query.operators.filter import LLMFilter
 from palimpzest.query.operators.rag import RAGConvert
-from palimpzest.query.optimizer_config import OptimizerConfig
 from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.query.processor.query_processor_factory import QueryProcessorFactory
 
@@ -59,7 +58,7 @@ class TestExecution:
         # create processor
         config = QueryProcessorConfig(
             execution_strategy=execution_strategy,
-            optimizer_config=OptimizerConfig(policy=MaxQuality()),
+            policy=MaxQuality(),
         )
         processor = QueryProcessorFactory.create_processor(dataset, config)
 

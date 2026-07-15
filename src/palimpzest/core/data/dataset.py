@@ -686,8 +686,9 @@ class Dataset:
         # TODO: this import currently needs to be here to avoid a circular import; we should fix this in a subsequent PR
         from palimpzest.query.processor.query_processor_factory import QueryProcessorFactory
 
+        config_validator = None if config is None else config.validator
         # confirm that either train_dataset or validator is provided
-        assert train_dataset is not None or validator is not None, "Must provide at least one of train_dataset or validator to use optimize_and_run()"
+        assert train_dataset is not None or validator is not None or config_validator is not None, "Must provide at least one of train_dataset or validator to use optimize_and_run()"
 
         # validate the train_dataset has one input for each source dataset and normalize its type to be a dict
         if train_dataset is not None:

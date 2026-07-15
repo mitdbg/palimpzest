@@ -6,7 +6,6 @@ from palimpzest.core.lib.schemas import TextFile
 from palimpzest.policy import MinCost
 from palimpzest.query.operators.convert import LLMConvertBonded
 from palimpzest.query.operators.filter import LLMFilter
-from palimpzest.query.optimizer_config import OptimizerConfig
 from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.schemabuilder.schema_builder import SchemaBuilder
 
@@ -36,18 +35,16 @@ def test_dynamicschema_json(mocker, enron_workload, enron_convert, enron_filter,
     mocker.patch.object(LLMConvertBonded, "convert", side_effect=enron_convert)
 
     config = QueryProcessorConfig(
+        policy=MinCost(),
+        available_models=[Model.GPT_4o_MINI],
         num_samples=3,
+        allow_bonded_query=True,
+        allow_rag_reduction=False,
+        allow_mixtures=False,
+        allow_critic=False,
+        allow_split_merge=False,
         execution_strategy="sequential",
-        optimizer_config=OptimizerConfig(
-            policy=MinCost(),
-            available_models=[Model.GPT_4o_MINI],
-            allow_bonded_query=True,
-            allow_rag_reduction=False,
-            allow_mixtures=False,
-            allow_critic=False,
-            allow_split_merge=False,
-            optimizer_strategy="pareto",
-        ),
+        optimizer_strategy="pareto",
     )
     data_record_collection = enron_workload.run(config=config)
 
@@ -67,18 +64,16 @@ def test_dynamicschema_yml(mocker, enron_workload, enron_convert, enron_filter, 
     mocker.patch.object(LLMConvertBonded, "convert", side_effect=enron_convert)
 
     config = QueryProcessorConfig(
+        policy=MinCost(),
+        available_models=[Model.GPT_4o_MINI],
         num_samples=3,
+        allow_bonded_query=True,
+        allow_rag_reduction=False,
+        allow_mixtures=False,
+        allow_critic=False,
+        allow_split_merge=False,
         execution_strategy="sequential",
-        optimizer_config=OptimizerConfig(
-            policy=MinCost(),
-            available_models=[Model.GPT_4o_MINI],
-            allow_bonded_query=True,
-            allow_rag_reduction=False,
-            allow_mixtures=False,
-            allow_critic=False,
-            allow_split_merge=False,
-            optimizer_strategy="pareto",
-        ),
+        optimizer_strategy="pareto",
     )
     data_record_collection = enron_workload.run(config=config)
 

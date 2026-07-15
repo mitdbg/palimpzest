@@ -45,10 +45,10 @@ ds = ds.sem_map(cols)
 # optimize and execute the PZ program
 validator = pz.Validator()
 config = pz.QueryProcessorConfig(
+    policy=pz.MaxQuality(),
     execution_strategy="parallel",
     max_workers=20,
     progress=True,
-    optimizer_config=pz.OptimizerConfig(policy=pz.MaxQuality()),
 )
 output = ds.optimize_and_run(config=config, validator=validator)
 
@@ -95,12 +95,12 @@ ds = ds.sem_map([{"name": "summary", "type": str, "description": "A summary of t
 # optimize and execute the PZ program
 validator = pz.Validator()
 config = pz.QueryProcessorConfig(
+    policy=pz.MaxQuality(),
     execution_strategy="parallel",
     max_workers=20,
     progress=True,
-    optimizer_config=pz.OptimizerConfig(policy=pz.MaxQuality()),
 )
-output = ds.optimize_and_run(config=config, validator=validator)
+output = ds.optimize_`and_run(config=config, validator=validator)
 
 # write the execution stats to json
 output.execution_stats.to_json("pz_program_stats.json")
