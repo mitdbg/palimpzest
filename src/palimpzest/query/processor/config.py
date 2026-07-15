@@ -43,7 +43,7 @@ class QueryProcessorConfig(BaseModel):
 
     # TODO make it more robust than string type for optimizer selection
     # if only run() is used, then optimizer will be changed to "naive"
-    optimizer: str = Field(default="abacus")  # "abacus" or "cluster"
+    optimizer: str = Field(default="naive")  # "naive", "abacus" or "cluster"
 
     @model_validator(mode="before")
     @classmethod

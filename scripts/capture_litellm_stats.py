@@ -17,7 +17,7 @@ Supported providers:
 - Anthropic: claude-sonnet-4-5-20250929 (text, image, text+image)
 - Google/Gemini: gemini-2.5-flash (all seven modality combinations)
 - OpenAI: gpt-4o-2024-08-06 (text, image, text+image)
-- OpenAI: gpt-4o-audio-preview (text+audio, audio)
+- OpenAI: gpt-audio-1.5 (text+audio, audio)
 - Azure: gpt-4o via Azure OpenAI (text, image, text+image)
 
 Output files are saved to: scripts/litellm_stats/
@@ -142,7 +142,7 @@ PROVIDER_MODALITY_SUPPORT = {
         "supported_modalities": ["text-only", "image-only", "text-image"],
     },
     "openai-audio": {
-        "model": Model.GPT_4o_AUDIO_PREVIEW,
+        "model": Model.GPT_AUDIO_1_5,
         "supported_modalities": ["audio-only", "text-audio"],
     },
     "gemini": {

@@ -228,7 +228,7 @@ PROVIDER_CONFIGS = {
         "supported_modalities": ["text-only", "image-only", "text-image"],
     },
     "openai-audio": {
-        "model": Model.GPT_4o_AUDIO_PREVIEW,
+        "model": Model.GPT_AUDIO_1_5,
         "supported_modalities": ["audio-only", "text-audio"],
     },
     "gemini": {
