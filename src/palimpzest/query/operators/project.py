@@ -10,6 +10,10 @@ class ProjectOp(PhysicalOperator):
         super().__init__(*args, **kwargs)
         self.project_cols = sorted(project_cols)
 
+    @property
+    def is_semantic(self) -> bool:
+        return False
+
     def __str__(self):
         op = super().__str__()
         op += f"    Project Columns: {self.project_cols}\n"

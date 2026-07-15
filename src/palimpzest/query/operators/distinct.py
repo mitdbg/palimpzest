@@ -11,6 +11,10 @@ class DistinctOp(PhysicalOperator):
         self.distinct_cols = distinct_cols
         self._distinct_seen = set() if distinct_seen is None else distinct_seen
 
+    @property
+    def is_semantic(self) -> bool:
+        return False
+
     def __str__(self):
         op = super().__str__()
         op += f"    Distinct Cols: {self.distinct_cols}\n"

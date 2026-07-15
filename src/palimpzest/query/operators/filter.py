@@ -124,6 +124,10 @@ class FilterOp(PhysicalOperator, ABC):
 
 class NonLLMFilter(FilterOp):
 
+    @property
+    def is_semantic(self) -> bool:
+        return False
+
     def naive_cost_estimates(self, source_op_cost_estimates: OperatorCostEstimates):
         # estimate output cardinality using a constant assumption of the filter selectivity
         selectivity = NAIVE_EST_FILTER_SELECTIVITY

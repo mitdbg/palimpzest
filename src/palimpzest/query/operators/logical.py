@@ -71,6 +71,10 @@ class LogicalOperator:
         """Name of the logical operator."""
         return str(self.__class__.__name__)
 
+    @property
+    def is_semantic(self) -> bool:
+        return True
+
     def get_unique_logical_op_id(self) -> str:
         """
         Get the unique logical operator id for this logical operator.
@@ -177,6 +181,10 @@ class Aggregate(LogicalOperator):
         desc = f"function: {str(self.agg_func.value)}" if self.agg_func else f"agg: {self.agg_str}"
         return f"{self.__class__.__name__}({desc})"
 
+    @property
+    def is_semantic(self) -> bool:
+        return self.agg_str is not None
+
     def get_logical_id_params(self) -> dict:
         logical_id_params = super().get_logical_id_params()
         logical_id_params = {
@@ -207,6 +215,10 @@ class BaseScan(LogicalOperator):
 
     def __str__(self):
         return f"BaseScan({self.datasource},{self.output_schema})"
+
+    @property
+    def is_semantic(self) -> bool:
+        return False
 
     def __eq__(self, other) -> bool:
         return (
@@ -241,6 +253,10 @@ class ContextScan(LogicalOperator):
 
     def __str__(self):
         return f"ContextScan({self.context},{self.output_schema})"
+
+    @property
+    def is_semantic(self) -> bool:
+        return False
 
     def __eq__(self, other) -> bool:
         return (
@@ -283,6 +299,10 @@ class ConvertScan(LogicalOperator):
     def __str__(self):
         return f"ConvertScan({self.input_schema} -> {str(self.output_schema)})"
 
+    @property
+    def is_semantic(self) -> bool:
+        return self.udf is None
+
     def get_logical_id_params(self) -> dict:
         logical_id_params = super().get_logical_id_params()
         logical_id_params = {
@@ -324,6 +344,10 @@ class Distinct(LogicalOperator):
     def __str__(self):
         return f"Distinct({self.distinct_cols})"
 
+    @property
+    def is_semantic(self) -> bool:
+        return False
+
     def get_logical_id_params(self) -> dict:
         logical_id_params = super().get_logical_id_params()
         logical_id_params = {"distinct_cols": self.distinct_cols, **logical_id_params}
@@ -356,6 +380,10 @@ class FilteredScan(LogicalOperator):
 
     def __str__(self):
         return f"FilteredScan({str(self.output_schema)}, {str(self.filter)})"
+
+    @property
+    def is_semantic(self) -> bool:
+        return self.filter.filter_fn is None
 
     def get_logical_id_params(self) -> dict:
         logical_id_params = super().get_logical_id_params()
@@ -396,6 +424,10 @@ class GroupByAggregate(LogicalOperator):
     def __str__(self):
         return f"GroupBy({self.group_by_sig.serialize()})"
 
+    @property
+    def is_semantic(self) -> bool:
+        return False
+
     def get_logical_id_params(self) -> dict:
         logical_id_params = super().get_logical_id_params()
         logical_id_params = {"group_by_sig": self.group_by_sig, **logical_id_params}
@@ -422,6 +454,10 @@ class JoinOp(LogicalOperator):
 
     def __str__(self):
         return f"Join(condition={self.condition})" if self.on is None else f"Join(on={self.on}, how={self.how})"
+
+    @property
+    def is_semantic(self) -> bool:
+        return self.condition != ""
 
     def get_logical_id_params(self) -> dict:
         logical_id_params = super().get_logical_id_params()
@@ -456,6 +492,10 @@ class LimitScan(LogicalOperator):
     def __str__(self):
         return f"LimitScan({str(self.input_schema)}, {str(self.output_schema)})"
 
+    @property
+    def is_semantic(self) -> bool:
+        return False
+
     def get_logical_id_params(self) -> dict:
         logical_id_params = super().get_logical_id_params()
         logical_id_params = {"limit": self.limit, **logical_id_params}
@@ -479,6 +519,10 @@ class Project(LogicalOperator):
 
     def __str__(self):
         return f"Project({self.input_schema}, {self.project_cols})"
+
+    @property
+    def is_semantic(self) -> bool:
+        return False
 
     def get_logical_id_params(self) -> dict:
         logical_id_params = super().get_logical_id_params()
@@ -518,6 +562,10 @@ class TopKScan(LogicalOperator):
 
     def __str__(self):
         return f"TopKScan({self.input_schema} -> {str(self.output_schema)})"
+
+    @property
+    def is_semantic(self) -> bool:
+        return False
 
     def get_logical_id_params(self) -> dict:
         # NOTE: if we allow optimization over index, then we will need to include it in the id params

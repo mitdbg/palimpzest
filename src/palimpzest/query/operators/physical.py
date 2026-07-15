@@ -89,6 +89,10 @@ class PhysicalOperator:
         """Name of the physical operator."""
         return str(self.__class__.__name__)
 
+    @property
+    def is_semantic(self) -> bool:
+        return True
+
     def get_id_params(self) -> dict:
         """
         Returns a dictionary mapping of physical operator parameters which are relevant

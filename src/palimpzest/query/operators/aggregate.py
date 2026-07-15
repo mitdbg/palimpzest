@@ -26,6 +26,10 @@ class AggregateOp(PhysicalOperator):
     __call__ methods. Thus, we use a slightly modified abstract base class for
     these operators.
     """
+    @property
+    def is_semantic(self) -> bool:
+        return False
+
     def __call__(self, candidates: list[DataRecord]) -> DataRecordSet:
         raise NotImplementedError("Using __call__ from abstract method")
 
@@ -546,6 +550,10 @@ class SemanticAggregate(AggregateOp):
         op += f"    Reasoning Effort: {self.reasoning_effort}\n"
         op += f"    Agg: {str(self.agg_str)}\n"
         return op
+
+    @property
+    def is_semantic(self) -> bool:
+        return True
 
     def get_id_params(self):
         id_params = super().get_id_params()

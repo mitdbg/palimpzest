@@ -77,6 +77,10 @@ class TopKOp(PhysicalOperator):
         self.k = k
         self.clip_model = ClipModel()
 
+    @property
+    def is_semantic(self) -> bool:
+        return False
+
     def __str__(self):
         op = super().__str__()
         op += f"    Top-K: {self.index.__class__.__name__} with k={self.k}\n"

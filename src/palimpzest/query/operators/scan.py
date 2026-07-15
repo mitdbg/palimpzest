@@ -22,6 +22,10 @@ class ScanPhysicalOp(PhysicalOperator, ABC):
         super().__init__(*args, **kwargs)
         self.datasource = datasource
 
+    @property
+    def is_semantic(self) -> bool:
+        return False
+
     def __str__(self):
         op = f"{self.op_name()}({self.datasource}) -> {self.output_schema}\n"
         op += f"    ({', '.join(list(self.output_schema.model_fields))[:30]})\n"
@@ -132,6 +136,10 @@ class ContextScanOp(PhysicalOperator):
     def __init__(self, context: context.Context, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.context = context
+
+    @property
+    def is_semantic(self) -> bool:
+        return False
 
     def __str__(self):
         op = f"{self.op_name()}({self.context}) -> {self.output_schema}\n"

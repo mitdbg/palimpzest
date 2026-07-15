@@ -180,6 +180,10 @@ class JoinOp(PhysicalOperator, ABC):
 
 class RelationalJoin(JoinOp):
 
+    @property
+    def is_semantic(self) -> bool:
+        return False
+
     def get_model_name(self):
         return None
     

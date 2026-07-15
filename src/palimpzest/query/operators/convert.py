@@ -196,6 +196,10 @@ class ConvertOp(PhysicalOperator, ABC):
 
 
 class NonLLMConvert(ConvertOp):
+    @property
+    def is_semantic(self) -> bool:
+        return False
+
     def __str__(self):
         op = super().__str__()
         op += f"    UDF: {self.udf.__name__}\n"

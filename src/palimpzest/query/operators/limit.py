@@ -10,6 +10,10 @@ class LimitScanOp(PhysicalOperator):
         super().__init__(*args, **kwargs)
         self.limit = limit
 
+    @property
+    def is_semantic(self) -> bool:
+        return False
+
     def __str__(self):
         op = super().__str__()
         op += f"    Limit: {self.limit}\n"
