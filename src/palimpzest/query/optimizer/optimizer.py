@@ -1,57 +1,16 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, replace
 
 
-from palimpzest.constants import Model
 from palimpzest.core.data.dataset import Dataset
-from palimpzest.policy import Policy
 from palimpzest.query.execution.execution_strategy_type import ExecutionStrategyType
+from palimpzest.query.optimizer_config import OptimizerConfig
 from palimpzest.query.optimizer.cost_model import BaseCostModel
 from palimpzest.query.optimizer.optimizer_strategy_type import OptimizationStrategyType
 from palimpzest.query.plan import PhysicalPlan
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass(frozen=True)
-class OptimizerConfig:
-    policy: Policy
-    available_models: tuple[Model, ...]
-    join_parallelism: int = 64
-    reasoning_effort: str = "default"
-    verbose: bool = False
-    allow_bonded_query: bool = True
-    allow_rag_reduction: bool = False
-    allow_mixtures: bool = True
-    allow_critic: bool = False
-    allow_split_merge: bool = False
-    optimizer_strategy: OptimizationStrategyType = OptimizationStrategyType.PARETO
-    execution_strategy: ExecutionStrategyType = ExecutionStrategyType.PARALLEL
-    use_final_op_quality: bool = False
-
-    def to_optimizer_kwargs(
-        self, optimizer_strategy: OptimizationStrategyType | None = None
-    ) -> dict:
-        config = self if optimizer_strategy is None else replace(
-            self, optimizer_strategy=optimizer_strategy
-        )
-        return {
-            "policy": config.policy,
-            "available_models": list(config.available_models),
-            "join_parallelism": config.join_parallelism,
-            "reasoning_effort": config.reasoning_effort,
-            "verbose": config.verbose,
-            "allow_bonded_query": config.allow_bonded_query,
-            "allow_rag_reduction": config.allow_rag_reduction,
-            "allow_mixtures": config.allow_mixtures,
-            "allow_critic": config.allow_critic,
-            "allow_split_merge": config.allow_split_merge,
-            "optimizer_strategy": config.optimizer_strategy,
-            "execution_strategy": config.execution_strategy,
-            "use_final_op_quality": config.use_final_op_quality,
-        }
 
 
 class Optimizer:
@@ -64,30 +23,39 @@ class Optimizer:
 
     def __init__(
         self,
-        policy: Policy,
         cost_model: BaseCostModel,
-        available_models: list[Model],
-        join_parallelism: int = 64,
-        reasoning_effort: str = "default",
-        verbose: bool = False,
-        allow_bonded_query: bool = True,
-        allow_rag_reduction: bool = False,
-        allow_mixtures: bool = True,
-        allow_critic: bool = False,
-        allow_split_merge: bool = False,
-        optimizer_strategy: OptimizationStrategyType = OptimizationStrategyType.PARETO,
-        execution_strategy: ExecutionStrategyType = ExecutionStrategyType.PARALLEL,
-        use_final_op_quality: bool = False,
-        **kwargs,
+        optimizer_config: OptimizerConfig,
     ):
+        optimizer_strategy = optimizer_config.optimizer_strategy
+        execution_strategy = optimizer_config.execution_strategy
+        if not isinstance(optimizer_strategy, OptimizationStrategyType):
+            try:
+                optimizer_strategy = OptimizationStrategyType[str(optimizer_strategy).upper().replace("-", "_")]
+            except KeyError as e:
+                raise ValueError(f"Unsupported optimizer_strategy: {optimizer_config.optimizer_strategy}") from e
+        if not isinstance(execution_strategy, ExecutionStrategyType):
+            try:
+                execution_strategy = ExecutionStrategyType[str(execution_strategy).upper().replace("-", "_")]
+            except KeyError as e:
+                raise ValueError(f"Unsupported execution_strategy: {optimizer_config.execution_strategy}") from e
 
-        self.policy = policy
+        optimizer_config = optimizer_config.model_copy(
+            update={
+                "optimizer_strategy": optimizer_strategy,
+                "execution_strategy": execution_strategy,
+            },
+        )
+
+        self.optimizer_config = optimizer_config
+        self.policy = optimizer_config.policy
         self.cost_model = cost_model
+        available_models = list(optimizer_config.available_models or [])
 
         # get the strategy class associated with the optimizer strategy
         optimizer_strategy_cls = optimizer_strategy.value
         self.strategy = optimizer_strategy_cls()
 
+        self.allow_model_selection = optimizer_config.allow_model_selection
         # if we are not performing optimization, set available models to be single model
         # and remove all optimizations (except for bonded queries)
         if optimizer_strategy == OptimizationStrategyType.NONE:
@@ -98,35 +66,20 @@ class Optimizer:
             self.allow_split_merge = False
             self.available_models = [available_models[0]]
         else:
-            self.allow_bonded_query = allow_bonded_query
-            self.allow_rag_reduction = allow_rag_reduction
-            self.allow_mixtures = allow_mixtures
-            self.allow_critic = allow_critic
-            self.allow_split_merge = allow_split_merge
+            self.allow_bonded_query = optimizer_config.allow_bonded_query
+            self.allow_rag_reduction = optimizer_config.allow_rag_reduction
+            self.allow_mixtures = optimizer_config.allow_mixtures
+            self.allow_critic = optimizer_config.allow_critic
+            self.allow_split_merge = optimizer_config.allow_split_merge
             self.available_models = available_models
 
         # store optimization hyperparameters
-        self.verbose = verbose
-        self.join_parallelism = join_parallelism
-        self.reasoning_effort = reasoning_effort
+        self.verbose = optimizer_config.verbose
+        self.join_parallelism = optimizer_config.join_parallelism
+        self.reasoning_effort = optimizer_config.reasoning_effort
         self.optimizer_strategy = optimizer_strategy
         self.execution_strategy = execution_strategy
-        self.use_final_op_quality = use_final_op_quality
-        self.optimizer_config = OptimizerConfig(
-            policy=self.policy,
-            available_models=tuple(self.available_models),
-            join_parallelism=self.join_parallelism,
-            reasoning_effort=self.reasoning_effort,
-            verbose=self.verbose,
-            allow_bonded_query=self.allow_bonded_query,
-            allow_rag_reduction=self.allow_rag_reduction,
-            allow_mixtures=self.allow_mixtures,
-            allow_critic=self.allow_critic,
-            allow_split_merge=self.allow_split_merge,
-            optimizer_strategy=self.optimizer_strategy,
-            execution_strategy=self.execution_strategy,
-            use_final_op_quality=self.use_final_op_quality,
-        )
+        self.use_final_op_quality = optimizer_config.use_final_op_quality
 
     def update_cost_model(self, cost_model: BaseCostModel):
         self.cost_model = cost_model
@@ -135,9 +88,7 @@ class Optimizer:
         # TODO check if this should be here or in Abacus only? 
         # set the optimizer_strategy
         self.optimizer_strategy = optimizer_strategy
-        self.optimizer_config = replace(
-            self.optimizer_config, optimizer_strategy=optimizer_strategy
-        )
+        self.optimizer_config = self.optimizer_config.with_strategy(optimizer_strategy)
 
         # get the strategy class associated with the optimizer strategy
         optimizer_strategy_cls = optimizer_strategy.value

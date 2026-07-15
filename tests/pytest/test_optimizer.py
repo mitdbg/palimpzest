@@ -13,9 +13,9 @@ from palimpzest.query.operators.filter import LLMFilter, NonLLMFilter
 from palimpzest.query.operators.logical import ConvertScan, FilteredScan
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.operators.scan import MarshalAndScanDataOp, ScanPhysicalOp
-from palimpzest.query.optimizer.abacus.cascades_optimizer import AbacusOptimizer
+from palimpzest.query.optimizer.abacus.cascades_optimizer import NaiveOptimizer
 from palimpzest.query.optimizer.cost_model import SampleBasedCostModel
-from palimpzest.query.optimizer.optimizer import Optimizer
+from palimpzest.query.optimizer_config import OptimizerConfig
 from palimpzest.query.optimizer.optimizer_strategy_type import OptimizationStrategyType
 from palimpzest.query.optimizer.abacus.primitives import Group, LogicalExpression
 
@@ -108,12 +108,14 @@ class TestOptimizer:
         plan = enron_eval_tiny
         policy = MaxQuality()
         cost_model = SampleBasedCostModel()
-        optimizer = AbacusOptimizer(
-            policy=policy,
+        optimizer = NaiveOptimizer(
             cost_model=cost_model,
-            verbose=True,
-            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B],
-            optimizer_strategy=opt_strategy,
+            optimizer_config=OptimizerConfig(
+                policy=policy,
+                verbose=True,
+                available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B],
+                optimizer_strategy=opt_strategy,
+            ),
         )
         physical_plans = optimizer.optimize(plan)
         physical_plan = physical_plans[0]
@@ -126,16 +128,18 @@ class TestOptimizer:
         plan = plan.sem_add_columns(email_schema)
         policy = MaxQuality()
         cost_model = SampleBasedCostModel()
-        optimizer = AbacusOptimizer(
-            policy=policy,
+        optimizer = NaiveOptimizer(
             cost_model=cost_model,
-            verbose=True,
-            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B],
-            optimizer_strategy=opt_strategy,
-            allow_rag_reduction=False,
-            allow_mixtures=False,
-            allow_critic=False,
-            allow_split_merge=False,
+            optimizer_config=OptimizerConfig(
+                policy=policy,
+                verbose=True,
+                available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B],
+                optimizer_strategy=opt_strategy,
+                allow_rag_reduction=False,
+                allow_mixtures=False,
+                allow_critic=False,
+                allow_split_merge=False,
+            ),
         )
         physical_plans = optimizer.optimize(plan)
         physical_plan = physical_plans[0]
@@ -150,12 +154,14 @@ class TestOptimizer:
         plan = plan.sem_add_columns(email_schema)
         policy = MinCost()
         cost_model = SampleBasedCostModel()
-        optimizer = AbacusOptimizer(
-            policy=policy,
+        optimizer = NaiveOptimizer(
             cost_model=cost_model,
-            verbose=True,
-            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B],
-            optimizer_strategy=opt_strategy,
+            optimizer_config=OptimizerConfig(
+                policy=policy,
+                verbose=True,
+                available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B],
+                optimizer_strategy=opt_strategy,
+            ),
         )
         physical_plans = optimizer.optimize(plan)
         physical_plan = physical_plans[0]
@@ -169,12 +175,14 @@ class TestOptimizer:
         plan = plan.sem_add_columns(email_schema)
         policy = MinTime()
         cost_model = SampleBasedCostModel()
-        optimizer = AbacusOptimizer(
-            policy=policy,
+        optimizer = NaiveOptimizer(
             cost_model=cost_model,
-            verbose=True,
-            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B],
-            optimizer_strategy=opt_strategy,
+            optimizer_config=OptimizerConfig(
+                policy=policy,
+                verbose=True,
+                available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B],
+                optimizer_strategy=opt_strategy,
+            ),
         )
         physical_plans = optimizer.optimize(plan)
         physical_plan = physical_plans[0]
@@ -189,12 +197,14 @@ class TestOptimizer:
         plan = plan.sem_add_columns(email_schema)
         policy = MinTime()
         cost_model = SampleBasedCostModel()
-        optimizer = AbacusOptimizer(
-            policy=policy,
+        optimizer = NaiveOptimizer(
             cost_model=cost_model,
-            verbose=True,
-            available_models=[vllm_model],
-            optimizer_strategy=opt_strategy,
+            optimizer_config=OptimizerConfig(
+                policy=policy,
+                verbose=True,
+                available_models=[vllm_model],
+                optimizer_strategy=opt_strategy,
+            ),
         )
         physical_plans = optimizer.optimize(plan)
         physical_plan = physical_plans[0]
@@ -209,12 +219,14 @@ class TestOptimizer:
         plan = plan.sem_filter("some text filter", depends_on=["contents"])
         policy = MinCost()
         cost_model = SampleBasedCostModel()
-        optimizer = AbacusOptimizer(
-            policy=policy,
+        optimizer = NaiveOptimizer(
             cost_model=cost_model,
-            verbose=True,
-            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B],
-            optimizer_strategy=opt_strategy,
+            optimizer_config=OptimizerConfig(
+                policy=policy,
+                verbose=True,
+                available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B],
+                optimizer_strategy=opt_strategy,
+            ),
         )
         physical_plans = optimizer.optimize(plan)
         physical_plan = physical_plans[0]
@@ -231,12 +243,14 @@ class TestOptimizer:
         plan = plan.sem_filter("another text filter", depends_on=["contents"])
         policy = MinCost()
         cost_model = SampleBasedCostModel()
-        optimizer = AbacusOptimizer(
-            policy=policy,
+        optimizer = NaiveOptimizer(
             cost_model=cost_model,
-            verbose=True,
-            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B],
-            optimizer_strategy=opt_strategy,
+            optimizer_config=OptimizerConfig(
+                policy=policy,
+                verbose=True,
+                available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B],
+                optimizer_strategy=opt_strategy,
+            ),
         )
         physical_plans = optimizer.optimize(plan)
         physical_plan = physical_plans[0]
@@ -250,16 +264,18 @@ class TestOptimizer:
     def test_small_real_estate_logical_reorder(self, small_real_estate_workload, opt_strategy):
         policy = MinCost()
         cost_model = SampleBasedCostModel()
-        optimizer = AbacusOptimizer(
-            policy=policy,
+        optimizer = NaiveOptimizer(
             cost_model=cost_model,
-            verbose=True,
-            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B],
-            allow_rag_reduction=False,
-            allow_mixtures=False,
-            allow_critic=False,
-            allow_split_merge=False,
-            optimizer_strategy=opt_strategy,
+            optimizer_config=OptimizerConfig(
+                policy=policy,
+                verbose=True,
+                available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B],
+                allow_rag_reduction=False,
+                allow_mixtures=False,
+                allow_critic=False,
+                allow_split_merge=False,
+                optimizer_strategy=opt_strategy,
+            ),
         )
         physical_plans = optimizer.optimize(small_real_estate_workload)
         physical_plan = physical_plans[0]
@@ -273,16 +289,18 @@ class TestOptimizer:
     def test_real_estate_logical_reorder(self, real_estate_workload, opt_strategy):
         policy = MinCost()
         cost_model = SampleBasedCostModel()
-        optimizer = AbacusOptimizer(
-            policy=policy,
+        optimizer = NaiveOptimizer(
             cost_model=cost_model,
-            verbose=True,
-            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B],
-            allow_rag_reduction=False,
-            allow_mixtures=False,
-            allow_critic=False,
-            allow_split_merge=False,
-            optimizer_strategy=opt_strategy,
+            optimizer_config=OptimizerConfig(
+                policy=policy,
+                verbose=True,
+                available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B],
+                allow_rag_reduction=False,
+                allow_mixtures=False,
+                allow_critic=False,
+                allow_split_merge=False,
+                optimizer_strategy=opt_strategy,
+            ),
         )
         physical_plans = optimizer.optimize(real_estate_workload)
         physical_plan = physical_plans[0]
@@ -309,16 +327,18 @@ class TestOptimizer:
         plan = plan.sem_filter("filter7", depends_on=["contents"])
         policy = MinCost()
         cost_model = SampleBasedCostModel()
-        optimizer = AbacusOptimizer(
-            policy=policy,
+        optimizer = NaiveOptimizer(
             cost_model=cost_model,
-            verbose=True,
-            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B],
-            allow_rag_reduction=False,
-            allow_mixtures=False,
-            allow_critic=False,
-            allow_split_merge=False,
-            optimizer_strategy=opt_strategy,
+            optimizer_config=OptimizerConfig(
+                policy=policy,
+                verbose=True,
+                available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_1_8B],
+                allow_rag_reduction=False,
+                allow_mixtures=False,
+                allow_critic=False,
+                allow_split_merge=False,
+                optimizer_strategy=opt_strategy,
+            ),
         )
         physical_plans = optimizer.optimize(plan)
         physical_plan = physical_plans[0]
@@ -455,16 +475,18 @@ class TestParetoOptimizer:
         cost_model = MockSampleBasedCostModel(operator_to_stats)
 
         # run optimizer using the cost model and the given policy
-        optimizer = AbacusOptimizer(
-            policy=policy,
+        optimizer = NaiveOptimizer(
             cost_model=cost_model,
-            verbose=True,
-            available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_3_70B],
-            optimizer_strategy=OptimizationStrategyType.PARETO,
-            allow_rag_reduction=False,
-            allow_mixtures=False,
-            allow_critic=False,
-            allow_split_merge=False,
+            optimizer_config=OptimizerConfig(
+                policy=policy,
+                verbose=True,
+                available_models=[Model.GPT_4o, Model.GPT_4o_MINI, Model.LLAMA3_3_70B],
+                optimizer_strategy=OptimizationStrategyType.PARETO,
+                allow_rag_reduction=False,
+                allow_mixtures=False,
+                allow_critic=False,
+                allow_split_merge=False,
+            ),
         )
         # run optimizer to get physical plan
         physical_plans = optimizer.optimize(workload)

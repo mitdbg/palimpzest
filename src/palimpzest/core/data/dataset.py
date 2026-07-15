@@ -669,10 +669,12 @@ class Dataset:
         # TODO: this import currently needs to be here to avoid a circular import; we should fix this in a subsequent PR
         from palimpzest.query.processor.query_processor_factory import QueryProcessorFactory
 
+        config = QueryProcessorConfig() if config is None else config
+
         # as syntactic sugar, we will allow some keyword arguments to parameterize our policies
         policy = construct_policy_from_kwargs(**kwargs)
         if policy is not None:
-            kwargs["policy"] = policy
+            config.optimizer_config.policy = policy
 
         # construct unique logical op ids for all operators in this dataset
         self._generate_unique_logical_op_ids()
@@ -715,8 +717,8 @@ class Dataset:
         # as syntactic sugar, we will allow some keyword arguments to parameterize our policies
         policy = construct_policy_from_kwargs(**kwargs)
         if policy is not None:
-            kwargs["policy"] = policy
-            config.policy = policy
+            config = QueryProcessorConfig() if config is None else config
+            config.optimizer_config.policy = policy
 
         # construct unique logical op ids for all operators in this dataset
         self._generate_unique_logical_op_ids()

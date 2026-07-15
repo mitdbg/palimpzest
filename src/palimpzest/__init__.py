@@ -27,6 +27,7 @@ from palimpzest.policy import (
     Policy,
 )
 from palimpzest.query.processor.config import QueryProcessorConfig
+from palimpzest.query.optimizer_config import OptimizerConfig
 from palimpzest.validator.validator import Validator
 
 # Initialize the root logger
@@ -67,6 +68,7 @@ __all__ = [
     "Policy",
     # query
     "QueryProcessorConfig",
+    "OptimizerConfig",
     # validator
     "Validator",
 ]

@@ -1,18 +1,10 @@
 import logging
 
-from palimpzest.constants import Model
 from palimpzest.core.data.dataset import Dataset
-from palimpzest.core.elements.records import DataRecord, DataRecordCollection
-from palimpzest.core.models import ExecutionStats, PlanStats
-from palimpzest.policy import Policy
-from palimpzest.query.execution.execution_strategy import (
-    ExecutionStrategy,
-    SentinelExecutionStrategy,
-)
-from palimpzest.query.optimizer.cost_model import SampleBasedCostModel
+from palimpzest.core.elements.records import DataRecordCollection
+from palimpzest.core.models import ExecutionStats
+from palimpzest.query.execution.execution_strategy import ExecutionStrategy
 from palimpzest.query.optimizer.optimizer import Optimizer
-from palimpzest.query.optimizer.optimizer_strategy_type import OptimizationStrategyType
-from palimpzest.query.plan import SentinelPlan
 from palimpzest.utils.hash_helpers import hash_for_id
 from palimpzest.validator.validator import Validator
 
@@ -39,9 +31,6 @@ class QueryProcessor:
         verbose: bool = False,
         progress: bool = True,
         max_workers: int | None = None,
-        policy: Policy | None = None,
-        available_models: list[Model] | None = None,
-        **kwargs,  # needed in order to provide compatibility with QueryProcessorConfig
     ):
         """
         Initialize QueryProcessor with optional custom components.
@@ -60,11 +49,6 @@ class QueryProcessor:
         self.verbose = verbose
         self.progress = progress
         self.max_workers = max_workers
-        self.policy = policy
-        self.available_models = available_models
-
-        if self.verbose:
-            print("Available models: ", self.available_models)
 
         logger.info(f"Initialized QueryProcessor {self.__class__.__name__}")
         logger.debug(f"QueryProcessor initialized with config: {self.__dict__}")

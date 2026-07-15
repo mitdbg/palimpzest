@@ -25,6 +25,7 @@ from palimpzest.core.data.dataset import Dataset
 from palimpzest.core.elements.records import DataRecord
 from palimpzest.policy import MaxQuality, MinCost, MinCostAtFixedQuality, MinTime
 from palimpzest.query.generators.generators import Generator
+from palimpzest.query.optimizer_config import OptimizerConfig
 from palimpzest.query.processor.config import QueryProcessorConfig
 from palimpzest.query.processor.query_processor_factory import QueryProcessorFactory
 from palimpzest.utils.model_helpers import (
@@ -392,9 +393,11 @@ class TestQueryProcessorIntegration:
         mock_dataset.get_limit.return_value = None
 
         config = QueryProcessorConfig(
-            policy=MinCost(),
-            available_models=[Model.GPT_4o, Model.CLAUDE_3_7_SONNET],
             verbose=True,
+            optimizer_config=OptimizerConfig(
+                policy=MinCost(),
+                available_models=[Model.GPT_4o, Model.CLAUDE_3_7_SONNET],
+            ),
         )
 
         with patch.dict(os.environ, {"OPENAI_API_KEY": "fake-key", "ANTHROPIC_API_KEY": "fake-key"}), \
@@ -413,9 +416,11 @@ class TestQueryProcessorIntegration:
         mock_dataset.get_limit.return_value = None
 
         config = QueryProcessorConfig(
-            policy=MinCost(),
-            available_models=[],  # Empty list
             verbose=True,
+            optimizer_config=OptimizerConfig(
+                policy=MinCost(),
+                available_models=[],  # Empty list
+            ),
         )
 
         # Mock get_optimal_models to return some models and verify it's called
@@ -430,7 +435,7 @@ class TestQueryProcessorIntegration:
             # Verify get_optimal_models was called with correct policy
             mock_get_optimal.assert_called_once()
             call_kwargs = mock_get_optimal.call_args
-            assert call_kwargs[1]["policy"] == config.policy
+            assert call_kwargs[1]["policy"] == config.optimizer_config.policy
 
 # =============================================================================
 # TEST CLASS: End-to-End Integration
@@ -463,11 +468,13 @@ class TestEndToEndIntegration:
 
         # Configure and run
         config = QueryProcessorConfig(
-            policy=MinCost(),
-            available_models=[Model.GPT_4o_MINI],
             execution_strategy="sequential",
             progress=False,
             verbose=False,
+            optimizer_config=OptimizerConfig(
+                policy=MinCost(),
+                available_models=[Model.GPT_4o_MINI],
+            ),
         )
 
         # Execute the pipeline
@@ -505,11 +512,13 @@ class TestEndToEndIntegration:
 
         # Configure and run
         config = QueryProcessorConfig(
-            policy=MinCost(),
-            available_models=[Model.GPT_4o_MINI],
             execution_strategy="sequential",
             progress=False,
             verbose=False,
+            optimizer_config=OptimizerConfig(
+                policy=MinCost(),
+                available_models=[Model.GPT_4o_MINI],
+            ),
         )
 
         results = filtered.run(config)
@@ -535,10 +544,10 @@ class TestEndToEndIntegration:
 
         # Don't specify available_models - let the system auto-select
         config = QueryProcessorConfig(
-            policy=MinCost(),
             execution_strategy="sequential",
             progress=False,
             verbose=False,
+            optimizer_config=OptimizerConfig(policy=MinCost()),
         )
 
         results = plan.run(config)
@@ -697,8 +706,10 @@ class TestVLLMModelSupport:
         model1 = Model("openai/model-a", api_base="http://localhost:8000/v1")
         model2 = Model("openai/model-b", api_base="http://localhost:8001/v1")
         config = QueryProcessorConfig(
-            policy=MinCost(),
-            available_models=[model1, model2],
+            optimizer_config=OptimizerConfig(
+                policy=MinCost(),
+                available_models=[model1, model2],
+            ),
         )
 
         with pytest.raises(ValueError, match="Only one vLLM model"):

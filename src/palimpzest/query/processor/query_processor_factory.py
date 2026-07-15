@@ -29,6 +29,8 @@ class QueryProcessorFactory:
 
     @classmethod
     def _convert_to_enum(cls, enum_type: type[Enum], value: str) -> Enum:
+        if isinstance(value, enum_type):
+            return value
         value = value.upper().replace('-', '_')
         try:
             return enum_type[value]
@@ -41,23 +43,42 @@ class QueryProcessorFactory:
         Convert the string representation of each strategy into its Enum equivalent and throw
         an exception if the conversion fails.
         """
-        strategy_types = {
-            "execution_strategy": ExecutionStrategyType,
-            "sentinel_execution_strategy": SentinelExecutionStrategyType,
-            "optimizer_strategy": OptimizationStrategyType,
-        }
-        for strategy in ["execution_strategy", "sentinel_execution_strategy", "optimizer_strategy"]:
-            strategy_str = getattr(config, strategy)
-            strategy_type = strategy_types[strategy]
-            strategy_enum = None
-            if strategy_str is not None:
-                try:
-                    strategy_enum = cls._convert_to_enum(strategy_type, strategy_str)
-                except ValueError as e:
-                    raise ValueError(f"""Unsupported {strategy}: {strategy_str}.
-                                        The supported strategies are: {strategy_type.__members__.keys()}""") from e
-            setattr(config, strategy, strategy_enum)
-            logger.debug(f"Normalized {strategy}: {strategy_enum}")
+        strategy_str = config.execution_strategy
+        if strategy_str is not None:
+            try:
+                config.execution_strategy = cls._convert_to_enum(
+                    ExecutionStrategyType, strategy_str
+                )
+            except ValueError as e:
+                raise ValueError(f"""Unsupported execution_strategy: {strategy_str}.
+                                    The supported strategies are: {ExecutionStrategyType.__members__.keys()}""") from e
+        logger.debug(f"Normalized execution_strategy: {config.execution_strategy}")
+
+        optimizer_config = config.optimizer_config
+        strategy_str = optimizer_config.optimizer_strategy
+        if strategy_str is not None:
+            try:
+                optimizer_config.optimizer_strategy = cls._convert_to_enum(
+                    OptimizationStrategyType, strategy_str
+                )
+            except ValueError as e:
+                raise ValueError(f"""Unsupported optimizer_strategy: {strategy_str}.
+                                    The supported strategies are: {OptimizationStrategyType.__members__.keys()}""") from e
+        logger.debug(f"Normalized optimizer_strategy: {optimizer_config.optimizer_strategy}")
+
+        strategy_str = optimizer_config.sentinel_execution_strategy
+        if strategy_str is not None:
+            try:
+                optimizer_config.sentinel_execution_strategy = cls._convert_to_enum(
+                    SentinelExecutionStrategyType, strategy_str
+                )
+            except ValueError as e:
+                raise ValueError(f"""Unsupported sentinel_execution_strategy: {strategy_str}.
+                                    The supported strategies are: {SentinelExecutionStrategyType.__members__.keys()}""") from e
+        logger.debug(f"Normalized sentinel_execution_strategy: {optimizer_config.sentinel_execution_strategy}")
+
+        optimizer_config.execution_strategy = config.execution_strategy
+        optimizer_config.verbose = config.verbose
 
         return config
 
@@ -67,7 +88,8 @@ class QueryProcessorFactory:
         Validate and normalize available_models and remove_models; converts all model strings to Model objects.
         """
         # get the current set of available_models (if provided by the user's config)
-        current_available_models = getattr(config, 'available_models', [])
+        optimizer_config = config.optimizer_config
+        current_available_models = getattr(optimizer_config, 'available_models', [])
 
         # normalize all models to be pz.Model objects
         if current_available_models is not None and len(current_available_models) > 0:
@@ -81,7 +103,7 @@ class QueryProcessorFactory:
         # if the user does not explicitly set the available models, select the optimal models based on policy
         if current_available_models is None or len(current_available_models) == 0:
             current_available_models = get_optimal_models(
-                policy = config.policy,
+                policy = optimizer_config.policy,
                 use_vertex = config.use_vertex,
                 use_azure = config.use_azure,
                 gemini_credentials_path = config.gemini_credentials_path,
@@ -90,7 +112,7 @@ class QueryProcessorFactory:
             )
 
         # get the list of models to remove (if provided by the user's config)
-        remove_models = getattr(config, 'remove_models', [])
+        remove_models = getattr(optimizer_config, 'remove_models', [])
 
         # remove any models specified in the config
         if remove_models is not None and len(remove_models) > 0:
@@ -105,14 +127,15 @@ class QueryProcessorFactory:
             current_available_models = [model for model in current_available_models if model not in remove_models]
 
         logger.info(f"Final set of available models: {current_available_models}")
-        config.available_models = current_available_models
-        config.remove_models = remove_models
+        optimizer_config.available_models = current_available_models
+        optimizer_config.remove_models = remove_models
 
         return config
 
     @classmethod
     def _config_validation_and_normalization(cls, config: QueryProcessorConfig, train_dataset: dict[str, Dataset] | None, validator : Validator | None):
-        if config.policy is None:
+        optimizer_config = config.optimizer_config
+        if optimizer_config.policy is None:
             raise ValueError("Policy is required for optimizer")
 
         # only one of progress or verbose can be set; we will default to progress=True
@@ -129,14 +152,15 @@ class QueryProcessorFactory:
         optimization = validator is not None
 
         # handle "auto" default for sentinel execution strategies
-        if config.sentinel_execution_strategy == "auto":
-            config.sentinel_execution_strategy = "mab" if optimization else None
+        if optimizer_config.sentinel_execution_strategy == "auto":
+            optimizer_config.sentinel_execution_strategy = "mab" if optimization else None
 
         # convert the config values for processing, execution, and optimization strategies to enums
         config = cls._normalize_strategies(config)
         config = cls._normalize_models(config)
+        optimizer_config = config.optimizer_config
 
-        if len(config.available_models) == 0:
+        if len(optimizer_config.available_models) == 0:
             raise ValueError("No available models found.")
 
         openai_key = os.getenv("OPENAI_API_KEY")
@@ -147,11 +171,11 @@ class QueryProcessorFactory:
         google_key = os.getenv("GOOGLE_API_KEY")
         openrouter_key = os.getenv("OPENROUTER_API_KEY")
 
-        vllm_models = [model for model in config.available_models if model.is_vllm_model()]
+        vllm_models = [model for model in optimizer_config.available_models if model.is_vllm_model()]
         if len(vllm_models) > 1:
             raise ValueError("Only one vLLM model can be used per run. Multiple vLLM models found in available_models.")
 
-        for model in config.available_models:
+        for model in optimizer_config.available_models:
             if model.is_provider_openai() and not openai_key:
                 raise ValueError("OPENAI_API_KEY must be set to use OpenAI models.")
             if model.is_provider_azure() and not azure_key:
@@ -172,19 +196,21 @@ class QueryProcessorFactory:
     def _create_optimizer(cls, config: QueryProcessorConfig) -> Optimizer:
         if config.optimizer == "abacus":
             sentinel_strategy = cls._create_sentinel_execution_strategy(config)
-            kwargs = config.to_dict()
-            kwargs.pop('sentinel_execution_strategy', None)
             return AbacusOptimizer(
                 sentinel_execution_strategy=sentinel_strategy,
                 cost_model=SampleBasedCostModel(),
-                **kwargs,
+                optimizer_config=config.optimizer_config,
             )
         elif config.optimizer == "cluster":
             return ClusterOptimizer(
-                cost_model=SampleBasedCostModel(), **config.to_dict()
+                cost_model=SampleBasedCostModel(),
+                optimizer_config=config.optimizer_config,
             )
         elif config.optimizer == "naive":
-            return NaiveOptimizer(cost_model=SampleBasedCostModel(), **config.to_dict())
+            return NaiveOptimizer(
+                cost_model=SampleBasedCostModel(),
+                optimizer_config=config.optimizer_config,
+            )
         else:
             raise ValueError(f"Unsupported optimizer: {config.optimizer}")
 
@@ -205,18 +231,35 @@ class QueryProcessorFactory:
 
         # create the execution strategy
         execution_strategy_cls = config.execution_strategy.value
-        return execution_strategy_cls(**config.to_dict())
+        return execution_strategy_cls(
+            scan_start_idx=config.scan_start_idx,
+            max_workers=config.max_workers,
+            batch_size=config.batch_size,
+            num_samples=config.num_samples,
+            verbose=config.verbose,
+            progress=config.progress,
+        )
 
     @classmethod
     def _create_sentinel_execution_strategy(cls, config: QueryProcessorConfig) -> SentinelExecutionStrategy:
         """
         Creates an execution strategy based on the configuration.
         """
-        if config.sentinel_execution_strategy is None:
+        optimizer_config = config.optimizer_config
+        if optimizer_config.sentinel_execution_strategy is None:
             return None
 
-        sentinel_execution_strategy_cls = config.sentinel_execution_strategy.value
-        return sentinel_execution_strategy_cls(**config.to_dict())
+        sentinel_execution_strategy_cls = optimizer_config.sentinel_execution_strategy.value
+        kwargs = {
+            "scan_start_idx": config.scan_start_idx,
+            "max_workers": config.max_workers,
+            "batch_size": config.batch_size,
+            "num_samples": config.num_samples,
+            "verbose": config.verbose,
+            "progress": config.progress,
+        }
+        kwargs.update(optimizer_config.to_sentinel_execution_kwargs())
+        return sentinel_execution_strategy_cls(**kwargs)
 
     @classmethod
     def create_processor(
@@ -253,11 +296,6 @@ class QueryProcessorFactory:
         optimizer = cls._create_optimizer(config)
         execution_strategy = cls._create_execution_strategy(dataset, config)
 
-        processor_kwargs = config.to_dict()
-        processor_kwargs.pop("optimizer", None)
-        processor_kwargs.pop("execution_strategy", None)
-        processor_kwargs.pop("sentinel_execution_strategy", None)
-
         # create the optimizer, execution strateg(ies), and processor
         processor = QueryProcessor(
             dataset=dataset,
@@ -265,7 +303,11 @@ class QueryProcessorFactory:
             execution_strategy=execution_strategy,
             train_dataset=train_dataset,
             validator=validator,
-            **processor_kwargs,
+            num_samples=config.num_samples,
+            scan_start_idx=config.scan_start_idx,
+            verbose=config.verbose,
+            progress=config.progress,
+            max_workers=config.max_workers,
         )
 
         return processor
