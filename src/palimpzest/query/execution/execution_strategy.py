@@ -325,7 +325,7 @@ class SentinelExecutionStrategy(BaseExecutionStrategy, ABC):
     def _execute_op_set(self, unique_logical_op_id: str, op_inputs: list[tuple[PhysicalOperator, str | tuple, int | DataRecord | list[DataRecord] | tuple[list[DataRecord]]]]) -> tuple[dict[int, list[tuple[DataRecordSet, PhysicalOperator, bool]]], dict[str, int]]:
         def execute_op_wrapper(operator: PhysicalOperator, source_indices: str | tuple, input: int | DataRecord | list[DataRecord] | tuple[list[DataRecord]]) -> tuple[DataRecordSet, PhysicalOperator, list[DataRecord] | list[int]]:
             # operator is a join
-            print("Sampling operator:", operator.__class__.__name__)
+            # print("Sampling operator:", operator.__class__.__name__)
             record_set = operator(input[0], input[1]) if isinstance(operator, JoinOp) else operator(input)
             return record_set, operator, source_indices, input
 

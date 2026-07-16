@@ -196,8 +196,11 @@ class QueryProcessorFactory:
             )
         elif config.optimizer == "cluster":
             return ClusterOptimizer(
+                validator=validator,
                 cost_model=SampleBasedCostModel(),
                 optimizer_config=config.optimizer_config,
+                max_workers=config.max_workers,
+                progress=config.progress,
             )
         elif config.optimizer == "naive":
             return NaiveOptimizer(

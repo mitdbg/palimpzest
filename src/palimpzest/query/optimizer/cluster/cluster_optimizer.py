@@ -8,11 +8,15 @@ from pydantic.fields import FieldInfo
 from palimpzest.constants import Model
 from palimpzest.core.data.dataset import Dataset
 from palimpzest.core.lib.schemas import get_schema_field_names
+from palimpzest.core.models import ExecutionStats, SentinelPlanStats
 from palimpzest.policy import Policy
 from palimpzest.query.execution.execution_strategy_type import ExecutionStrategyType
 from palimpzest.query.optimizer.cluster.logical_optimizer import LogicalOptimizer, LogicalPlan
+from palimpzest.query.optimizer.cluster.physical_optimizer import PhysicalOptimizer
 from palimpzest.query.optimizer.optimizer import Optimizer
 from palimpzest.query.plan import PhysicalPlan
+from palimpzest.validator.validator import Validator
+
 logger = logging.getLogger(__name__)
 
 
@@ -27,10 +31,24 @@ class ClusterOptimizer(Optimizer):
 
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(
+        self,
+        validator: Validator | None = None,
+        max_workers: int | None = 64,
+        progress: bool = True,
+        *args,
+        **kwargs,
+    ):
         super().__init__(*args, **kwargs)
-        self.logical_optimizer = LogicalOptimizer()
-        # self.physical_optimizer = PhysicalOptimizer()
+        self.validator = validator
+        self.max_workers = max_workers
+        self.progress = progress
+        self.logical_optimizer = LogicalOptimizer(policy=self.policy)
+        self.physical_optimizer = PhysicalOptimizer(
+            optimizer_config=self.optimizer_config,
+            max_workers=self.max_workers,
+            progress=self.progress,
+        )
 
         # prune implementation rules based on boolean flags
         # TODO disable phsical implementation rules based on boolean flags
@@ -38,7 +56,13 @@ class ClusterOptimizer(Optimizer):
         logger.info(f"Initialized Optimizer with verbose={self.verbose}")
         logger.debug(f"Initialized Optimizer with params: {self.__dict__}")
 
-    def optimize(self, dataset: Dataset, *args, **kwargs) -> list[PhysicalPlan]:
+    def optimize(
+        self,
+        dataset: Dataset,
+        execution_stats: ExecutionStats | None = None,
+        *args,
+        **kwargs,
+    ) -> list[PhysicalPlan]:
         """
         The optimize function takes in an initial query plan and searches the space of
         logical and physical plans in order to cost and produce a (near) optimal physical plan.
@@ -54,9 +78,23 @@ class ClusterOptimizer(Optimizer):
 
         # search the optimization space by applying logical and physical transformations to the initial group tree
         initial_plan = LogicalPlan.from_dataset(dataset_copy)
-        logger.info(f"Initial logical plan: {initial_plan}")
-        raise NotImplementedError("Logical plan optimization is not yet implemented.")
-        self.logical_optimizer.optimize(dataset_copy)
-        logger.info(f"Getting optimal plans for final group id: {final_group_id}")
-
-        return self.strategy.get_optimal_plans(self.groups, final_group_id, self.policy, self.use_final_op_quality)
+        logger.info(f"Initial logical plan \n {initial_plan}")
+        optimization_stats = SentinelPlanStats(
+            plan_id=f"cluster-optimization-{initial_plan.plan_id}",
+            plan_str=str(initial_plan),
+        )
+        optimization_stats.start()
+        best_logical = self.logical_optimizer.optimize(initial_plan)
+        optimization_stats.plan_id = f"cluster-optimization-{best_logical.plan_id}"
+        optimization_stats.plan_str = str(best_logical)
+        # logger.info(f"Getting optimal plans for final group id: {final_group_id}")
+        best_physical = self.physical_optimizer.optimize(
+            best_logical,
+            validator=self.validator,
+            optimization_stats=optimization_stats,
+        )
+        optimization_stats.finish()
+        if execution_stats is not None:
+            execution_stats.add_plan_stats(optimization_stats)
+            execution_stats.finish_optimization()
+        return [best_physical]

@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 
 from palimpzest.core.data.dataset import Dataset
+from palimpzest.core.lib.schemas import AUDIO_FIELD_TYPES, IMAGE_FIELD_TYPES
 from palimpzest.query.operators.logical import LogicalOperator
 from palimpzest.utils.hash_helpers import hash_for_id
 
@@ -79,29 +80,109 @@ class LogicalPlan:
 
     def __str__(self) -> str:
         """
-        Return a stable, human-readable representation of the logical plan DAG.
+        Return a stable, human-readable tree representation of the logical plan.
 
-        The output includes the root operator id, the plan id, each logical operator
-        keyed by operator id, and the graph edges as an adjacency list.
+        Edges point from source operators to their consumers, so the displayed
+        roots are the operators with no incoming edges.
         """
-        lines = [
-            f"LogicalPlan(root_op_id={self.root_op_id}, plan_id={self.plan_id})",
-            "Operators:",
-        ]
+        incoming_op_ids = set()
+        for downstream_op_ids in self.edges.values():
+            incoming_op_ids.update(downstream_op_ids)
 
-        for op_id in sorted(self.operators):
-            root_marker = " [ROOT]" if op_id == self.root_op_id else ""
-            lines.append(f"  {op_id}{root_marker}: {self.operators[op_id]}")
+        root_op_ids = sorted(
+            op_id for op_id in self.operators
+            if op_id not in incoming_op_ids
+        )
+        if len(root_op_ids) == 0:
+            root_op_ids = [self.root_op_id]
 
-        lines.append("Edges:")
-        for op_id in sorted(self.operators):
-            downstream_op_ids = self.edges.get(op_id, [])
-            if len(downstream_op_ids) == 0:
-                lines.append(f"  {op_id} -> []")
-            else:
-                lines.append(f"  {op_id} -> {downstream_op_ids}")
+        lines = []
+        for root_idx, op_id in enumerate(root_op_ids):
+            if root_idx > 0:
+                lines.append("")
+
+            lines.append(self._format_operator(self.operators[op_id]))
+
+            pending_nodes = [
+                (child_op_id, "   ", {op_id})
+                for child_op_id in reversed(sorted(self.edges.get(op_id, [])))
+            ]
+            while len(pending_nodes) > 0:
+                current_op_id, indent, ancestor_op_ids = pending_nodes.pop()
+                operator = self.operators[current_op_id]
+                lines.append(f"{indent}|-> {self._format_operator(operator)}")
+
+                if current_op_id in ancestor_op_ids:
+                    continue
+
+                child_op_ids = sorted(self.edges.get(current_op_id, []))
+                for child_op_id in reversed(child_op_ids):
+                    pending_nodes.append(
+                        (
+                            child_op_id,
+                            indent + "    ",
+                            ancestor_op_ids | {current_op_id},
+                        )
+                    )
 
         return "\n".join(lines)
+
+    def _format_operator(self, operator: LogicalOperator) -> str:
+        """
+        Return a compact operator label for LogicalPlan tree display.
+
+        The label includes concise dataset and context names, distinguishes
+        traditional and semantic filters by source modality, and falls back to
+        the operator string for unsupported logical operator types.
+        """
+        operator_name = operator.logical_op_name()
+
+        if operator_name == "BaseScan":
+            return f"Dataset({operator.datasource.id})"
+
+        if operator_name == "ContextScan":
+            return f"Context({operator.context.id})"
+
+        if operator_name == "FilteredScan":
+            filter_obj = operator.filter
+            if filter_obj.filter_fn is not None:
+                filter_name = filter_obj.filter_fn.__name__
+                filter_name = "traditional" if filter_name == "<lambda>" else filter_name
+            else:
+                depends_on_field_names = (
+                    [field_name.split(".")[-1] for field_name in operator.depends_on]
+                    if len(operator.depends_on) > 0
+                    else list(operator.input_schema.model_fields)
+                )
+                depends_on_field_names = set(depends_on_field_names)
+                depends_on_field_types = [
+                    field.annotation
+                    for field_name, field in operator.input_schema.model_fields.items()
+                    if field_name in depends_on_field_names
+                ]
+
+                if any(field_type in IMAGE_FIELD_TYPES for field_type in depends_on_field_types):
+                    filter_name = "semantic-image"
+                elif any(field_type in AUDIO_FIELD_TYPES for field_type in depends_on_field_types):
+                    filter_name = "semantic-audio"
+                else:
+                    filter_name = "semantic-text"
+            return f"Filter({filter_name})"
+
+        if operator_name == "ConvertScan":
+            convert_type = "function" if operator.udf is not None else "semantic"
+            return f"Convert({convert_type})"
+
+        if operator_name == "LimitScan":
+            return f"Limit({operator.limit})"
+
+        if operator_name == "Project":
+            return f"Project({operator.project_cols})"
+
+        if operator_name == "TopKScan":
+            return f"TopK(k={operator.k})"
+
+        return str(operator)
 
     def __len__(self) -> int:
         return len(self.operators)
@@ -186,10 +267,12 @@ class LogicalPlan:
 
 class LogicalOptimizer:
 
-    def optimize(self, logical_plan: LogicalPlan) -> list[LogicalPlan]:
+    def __init__(self, policy):
+        self.policy = policy
+
+    def optimize(self, logical_plan: LogicalPlan) -> LogicalPlan:
         """
         The optimize function takes in an initial query plan and searches the space of
         logical plans in order to cost and produce a (near) optimal logical plan.
         """
-        logger.info(f"Optimizing logical plan: {logical_plan}")
-        return [logical_plan]
+        return logical_plan
