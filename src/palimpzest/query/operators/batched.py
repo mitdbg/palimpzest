@@ -84,6 +84,10 @@ class BatchedFilter(LLMFilter, BatchedOperator):
 
         # estimate quality of output based on the strength of the model being used
         quality = (self.model.get_overall_score() / 100.0)
+        # discount quality based on the number of input records
+        discount_lambda = 0.01 # governs how quickly quality decays with more input records
+        discount_gamma = 2 # governs how much input quality decays compared to the overall quality, higher gamma, more decay    
+        quality = (quality**(discount_gamma+1))/(1 + discount_lambda * (self.batch_size-1))
 
         return OperatorCostEstimates(
             cardinality=cardinality,

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import io
+import math
 import os
 import tempfile
 from typing import Any
@@ -139,6 +140,10 @@ class RescaledImageFilter(LLMFilter):
         cardinality = selectivity * source_op_cost_estimates.cardinality
 
         quality = (self.model.get_overall_score() / 100.0)
+        # discount quality based on the scale factor
+        discount_lambda = 0.01 # governs how quickly quality decays with more compression
+        discount_gamma = 2 # governs how much input quality decays compared to the overall quality, higher gamma, more decay    
+        quality = (quality**(discount_gamma+1))/(quality**discount_gamma + discount_lambda * math.log2(self.rescale_factor))
 
         return OperatorCostEstimates(
             cardinality=cardinality,
