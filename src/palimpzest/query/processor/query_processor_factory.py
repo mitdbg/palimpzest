@@ -197,6 +197,7 @@ class QueryProcessorFactory:
         elif config.optimizer == "cluster":
             return ClusterOptimizer(
                 validator=validator,
+                train_dataset=train_dataset,
                 cost_model=SampleBasedCostModel(),
                 optimizer_config=config.optimizer_config,
                 max_workers=config.max_workers,

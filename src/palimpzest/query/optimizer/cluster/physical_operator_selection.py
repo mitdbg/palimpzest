@@ -6,7 +6,7 @@ import random
 from collections import defaultdict
 from dataclasses import dataclass
 
-from palimpzest.core.models import OperatorCostEstimates
+from palimpzest.core.models import OperatorCostEstimates, PlanCost
 from palimpzest.policy import MaxQuality, MinCost, MinTime, Policy
 from palimpzest.query.operators.physical import PhysicalOperator
 from palimpzest.query.optimizer.cluster.physical_operator_clustering import (
@@ -23,6 +23,77 @@ class PhysicalOperatorSelection:
     cluster_path: list[PhysicalOperatorCluster]
 
 
+class UncertaintyAwareFinalOperatorSelection:
+    """Score final physical operators with policy value and sampling uncertainty."""
+
+    def __init__(self, policy: Policy, uncertainty_weight: float = 0.0):
+        if not isinstance(policy, (MaxQuality, MinCost, MinTime)):
+            raise NotImplementedError(
+                f"Unsupported physical operator selection policy: {type(policy).__name__}"
+            )
+        self.policy = policy
+        self.uncertainty_weight = max(uncertainty_weight, 0.0)
+
+    def select(
+        self,
+        physical_op_cost_estimates: dict[str, OperatorCostEstimates],
+        physical_op_confidences: dict[str, float],
+    ) -> tuple[str, OperatorCostEstimates]:
+        """Return the physical operator id with the best final score."""
+        if len(physical_op_cost_estimates) == 0:
+            raise ValueError("Cannot select from an empty physical operator set")
+
+        metric_values = {}
+        for physical_op_id, cost_estimates in physical_op_cost_estimates.items():
+            if isinstance(self.policy, MaxQuality):
+                metric_values[physical_op_id] = cost_estimates.quality
+            elif isinstance(self.policy, MinCost):
+                metric_values[physical_op_id] = cost_estimates.cost_per_record
+            elif isinstance(self.policy, MinTime):
+                metric_values[physical_op_id] = cost_estimates.time_per_record
+
+        min_value = min(metric_values.values())
+        max_value = max(metric_values.values())
+
+        best_physical_op_id = None
+        best_cost_estimates = None
+        best_score = None
+        for physical_op_id, cost_estimates in physical_op_cost_estimates.items():
+            value = metric_values[physical_op_id]
+            if min_value == max_value:
+                policy_score = 1.0
+            elif isinstance(self.policy, MaxQuality):
+                policy_score = (value - min_value) / (max_value - min_value)
+            else:
+                policy_score = (max_value - value) / (max_value - min_value)
+
+            confidence = physical_op_confidences.get(physical_op_id, 0.0)
+            uncertainty = 1.0 - max(0.0, min(confidence, 1.0))
+            score = policy_score - (self.uncertainty_weight * uncertainty)
+            if best_score is None or score > best_score:
+                best_physical_op_id = physical_op_id
+                best_cost_estimates = cost_estimates
+                best_score = score
+            elif score == best_score:
+                plan_cost = PlanCost(
+                    cost=cost_estimates.cost_per_record,
+                    time=cost_estimates.time_per_record,
+                    quality=cost_estimates.quality,
+                )
+                assert best_cost_estimates is not None
+                best_plan_cost = PlanCost(
+                    cost=best_cost_estimates.cost_per_record,
+                    time=best_cost_estimates.time_per_record,
+                    quality=best_cost_estimates.quality,
+                )
+                if self.policy.choose(plan_cost, best_plan_cost):
+                    best_physical_op_id = physical_op_id
+                    best_cost_estimates = cost_estimates
+
+        assert best_physical_op_id is not None and best_cost_estimates is not None
+        return best_physical_op_id, best_cost_estimates
+
+
 class PhysicalOperatorSelector:
     """Stateful sampler for the clustered physical operator search space.
 
@@ -37,6 +108,7 @@ class PhysicalOperatorSelector:
         self,
         policy: Policy,
         total_sampling_rounds: int,
+        final_selection_strategy: UncertaintyAwareFinalOperatorSelection | None = None,
         max_input_records: int = 1,
         seed: int = 42,
     ):
@@ -50,7 +122,14 @@ class PhysicalOperatorSelector:
         self.max_input_records = max_input_records
         self.rng = random.Random(seed)
         self.cluster_sample_counts = defaultdict(int)
+        self.cluster_input_record_counts = defaultdict(lambda: self.max_input_records)
+        self.physical_op_sample_counts = defaultdict(int)
         self.executed_physical_op_ids_by_record = defaultdict(set)
+        self.final_selection_strategy = (
+            UncertaintyAwareFinalOperatorSelection(policy)
+            if final_selection_strategy is None
+            else final_selection_strategy
+        )
 
     def choose_input_record(self, input_record_ids: list[str | int]) -> str | int:
         """Choose one candidate input record uniformly at random."""
@@ -111,6 +190,8 @@ class PhysicalOperatorSelector:
             1,
         )
         alpha = max(0.0, min(1.0, alpha))
+        if max_input_records is not None:
+            self.cluster_input_record_counts[id(root_cluster)] = max_input_records
 
         cluster = root_cluster
         cluster_path = [root_cluster]
@@ -162,6 +243,7 @@ class PhysicalOperatorSelector:
         """
         physical_op_id = selection.physical_op.get_full_op_id()
         self.executed_physical_op_ids_by_record[selection.record_id].add(physical_op_id)
+        self.physical_op_sample_counts[physical_op_id] += 1
 
         leaf_cluster = selection.cluster_path[-1]
         if cost_estimates is None:
@@ -216,15 +298,19 @@ class PhysicalOperatorSelector:
         if len(physical_op_cost_estimates) == 0:
             raise ValueError(f"Cluster {root_cluster.name} has no physical operators")
 
-        best_physical_op_id = None
-        best_cost_estimates = None
-        for physical_op_id, cost_estimates in physical_op_cost_estimates.items():
-            if best_cost_estimates is None:
-                best_physical_op_id = physical_op_id
-                best_cost_estimates = cost_estimates
-            elif self._cost_estimates_better(cost_estimates, best_cost_estimates):
-                best_physical_op_id = physical_op_id
-                best_cost_estimates = cost_estimates
+        max_input_records = self.cluster_input_record_counts[id(root_cluster)]
+        physical_op_confidences = {
+            physical_op_id: min(
+                self.physical_op_sample_counts[physical_op_id]
+                / max(max_input_records, 1),
+                1.0,
+            )
+            for physical_op_id in physical_op_cost_estimates
+        }
+        best_physical_op_id, best_cost_estimates = self.final_selection_strategy.select(
+            physical_op_cost_estimates,
+            physical_op_confidences,
+        )
 
         return physical_op_by_id[best_physical_op_id], best_cost_estimates
 
@@ -298,22 +384,6 @@ class PhysicalOperatorSelector:
             cluster_id: (max_value - value) / (max_value - min_value)
             for cluster_id, value in cluster_values.items()
         }
-
-    def _cost_estimates_better(
-        self,
-        cost_estimates: OperatorCostEstimates,
-        other_cost_estimates: OperatorCostEstimates,
-    ) -> bool:
-        """Compare two operator estimates under the selector policy."""
-        if isinstance(self.policy, MaxQuality):
-            return cost_estimates.quality > other_cost_estimates.quality
-        if isinstance(self.policy, MinCost):
-            return cost_estimates.cost_per_record < other_cost_estimates.cost_per_record
-        if isinstance(self.policy, MinTime):
-            return cost_estimates.time_per_record < other_cost_estimates.time_per_record
-        raise NotImplementedError(
-            f"Unsupported physical operator selection policy: {type(self.policy).__name__}"
-        )
 
     def _weighted_choice(
         self,

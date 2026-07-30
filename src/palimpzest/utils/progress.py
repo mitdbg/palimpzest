@@ -313,7 +313,6 @@ class PZSentinelProgressManager(ProgressManager):
             TaskProgressColumn(),
             MofNCompleteColumn(),
             TextColumn("[green]Cost: ${task.fields[cost]:.4f}"),
-            TextColumn("\n[white]{task.fields[recent]}"),  # Recent text on new line
             refresh_per_second=10,
             expand=True,   # Use full width
         )

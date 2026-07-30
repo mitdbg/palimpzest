@@ -34,6 +34,7 @@ class ClusterOptimizer(Optimizer):
     def __init__(
         self,
         validator: Validator | None = None,
+        train_dataset: dict[str, Dataset] | None = None,
         max_workers: int | None = 64,
         progress: bool = True,
         *args,
@@ -49,7 +50,7 @@ class ClusterOptimizer(Optimizer):
             max_workers=self.max_workers,
             progress=self.progress,
         )
-
+    
         # prune implementation rules based on boolean flags
         # TODO disable phsical implementation rules based on boolean flags
 
