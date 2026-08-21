@@ -53,4 +53,10 @@ class EqualClusterSamplingBudgetAllocator(ClusterSamplingBudgetAllocator):
         for idx, logical_op_id in enumerate(semantic_logical_op_ids):
             budgets[logical_op_id] = per_operator_budget + (1 if idx < remainder else 0)
 
+
+        budgets =  {
+            logical_op_id: max(int(budgets.get(logical_op_id, 0)), 0)
+            for logical_op_id in topological_order
+        }
+
         return budgets

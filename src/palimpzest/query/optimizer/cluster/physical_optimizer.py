@@ -64,6 +64,21 @@ class PhysicalOptimizer:
         self.policy = optimizer_config.policy
         self.max_workers = max(max_workers or 64, 1)
         self.progress = progress
+        self.progress = False
+
+        if optimizer_config.final_selection_strategy is None:
+            self.final_selection_strategy = UncertaintyAwareFinalOperatorSelection(
+                self.policy,
+                uncertainty_weight=(self.optimizer_config.final_uncertainty_weight),
+            )
+        else:
+            self.final_selection_strategy = optimizer_config.final_selection_strategy
+
+        if optimizer_config.budget_allocator is None:
+            self.budget_allocator = EqualClusterSamplingBudgetAllocator()
+        else:
+            self.budget_allocator = optimizer_config.budget_allocator
+
         self.clustering_strategy = (
             ManualPhysicalOperatorClusteringStrategy()
             if clustering_strategy is None
@@ -227,9 +242,9 @@ class PhysicalOptimizer:
     ) -> None:
         """Sample each logical operator cluster for the configured budget.
 
-        This method drives the exploration/exploitation selector over every
-        logical operator cluster in source-to-sink order. Each selected physical
-        operator is executed on an actual sampled input record and the observed
+        This method perform exploration/exploitationor over every
+        logical operator cluster in topological order, from root logical operator to leaves. 
+        Each selected physical operator is executed on an actual sampled input record and the observed
         runtime/cost statistics are recorded back into the selected cluster path.
         """
         sampled_records_by_logical_op_id: dict[str, list[DataRecord]] = {}
@@ -359,7 +374,14 @@ class PhysicalOptimizer:
                             )
                         )
 
-                    for _, selection, record_set, input_count, elapsed_time, validation_gen_stats in sorted(
+                    for (
+                        _,
+                        selection,
+                        record_set,
+                        input_count,
+                        elapsed_time,
+                        validation_gen_stats,
+                    ) in sorted(
                         sample_results,
                         key=lambda result: result[0],
                     ):
@@ -396,11 +418,9 @@ class PhysicalOptimizer:
                                 )
 
                         physical_op_id = selection.physical_op.get_full_op_id()
-                        naive_cost_estimates = (
-                            selection.cluster_path[-1].physical_op_cost_estimates[
-                                physical_op_id
-                            ]
-                        )
+                        naive_cost_estimates = selection.cluster_path[
+                            -1
+                        ].physical_op_cost_estimates[physical_op_id]
                         estimate_cardinality_from_sample = isinstance(
                             selection.physical_op,
                             (
@@ -480,9 +500,7 @@ class PhysicalOptimizer:
         if task is not None:
             progress_manager.op_progress.update(task, total=samples_drawn)
 
-        adjusted_total = progress_total - (
-            op_sample_budget - samples_drawn
-        )
+        adjusted_total = progress_total - (op_sample_budget - samples_drawn)
         progress_manager.overall_progress.update(
             progress_manager.overall_task_id,
             total=max(adjusted_total, 0),
@@ -694,9 +712,7 @@ class PhysicalOptimizer:
                 for right_record in right_records:
                     data_record = record_set.data_records[record_idx]
                     output = data_record._passed_operator
-                    full_hash = (
-                        f"{condition}{hash(left_record)}{hash(right_record)}"
-                    )
+                    full_hash = f"{condition}{hash(left_record)}{hash(right_record)}"
                     score, sample_validation_gen_stats, _ = validator._score_join(
                         physical_op,
                         condition,
@@ -864,18 +880,11 @@ class PhysicalOptimizer:
         optimization_stats: SentinelPlanStats | None = None,
     ) -> PhysicalPlan:
         """Optimize a logical plan and return a physical plan."""
-        final_selection_strategy = self.optimizer_config.final_operator_selection_strategy
-        if final_selection_strategy is None:
-            final_selection_strategy = UncertaintyAwareFinalOperatorSelection(
-                self.policy,
-                uncertainty_weight=(
-                    self.optimizer_config.final_operator_uncertainty_weight
-                ),
-            )
+
         physical_operator_selector = PhysicalOperatorSelector(
             policy=self.policy,
             total_sampling_rounds=self.optimizer_config.sample_budget,
-            final_selection_strategy=final_selection_strategy,
+            final_selection_strategy=self.final_selection_strategy,
             seed=self.optimizer_config.seed,
         )
 
@@ -887,18 +896,11 @@ class PhysicalOptimizer:
             op_right_source_cost_estimates,
         ) = self.build_physical_operator_clusters(logical_plan)
 
-        budget_allocator = self.optimizer_config.cluster_sampling_budget_allocator
-        if budget_allocator is None:
-            budget_allocator = EqualClusterSamplingBudgetAllocator()
-        logical_op_sample_budgets = budget_allocator.allocate(
+        logical_op_sample_budgets = self.budget_allocator.allocate(
             topological_order,
             op_clusters,
             self.optimizer_config.sample_budget,
         )
-        logical_op_sample_budgets = {
-            logical_op_id: max(int(logical_op_sample_budgets.get(logical_op_id, 0)), 0)
-            for logical_op_id in topological_order
-        }
         allocated_sample_budget = sum(logical_op_sample_budgets.values())
 
         if optimization_stats is not None:
@@ -949,8 +951,8 @@ class PhysicalOptimizer:
                         total=logical_op_sample_budgets[logical_op_id],
                     )
 
-        if progress_manager is not None:
             progress_manager.start()
+
         try:
             self.sample_physical_operator_clusters(
                 logical_plan,

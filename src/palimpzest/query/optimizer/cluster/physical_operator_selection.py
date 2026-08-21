@@ -102,6 +102,9 @@ class PhysicalOperatorSelector:
     already been executed for each input record. It chooses a branch using the
     exploration/exploitation score, then records executions back into the
     affected cluster path.
+
+    The physical operator selector keeps a running state of the physical ops that have been sampled and their observed estimates/qualities.
+
     """
 
     def __init__(
@@ -125,6 +128,9 @@ class PhysicalOperatorSelector:
         self.cluster_input_record_counts = defaultdict(lambda: self.max_input_records)
         self.physical_op_sample_counts = defaultdict(int)
         self.executed_physical_op_ids_by_record = defaultdict(set)
+
+        self.physical_op_quality_samples = defaultdict(list)
+
         self.final_selection_strategy = (
             UncertaintyAwareFinalOperatorSelection(policy)
             if final_selection_strategy is None
@@ -159,6 +165,31 @@ class PhysicalOperatorSelector:
                 "been executed on every candidate input record"
             )
         record_id = self.choose_input_record(available_record_ids)
+        # If the root cluster only has one physical operator, skip selection but
+        # preserve the path to the leaf that owns the operator cost estimates.
+        if len(root_cluster.physical_ops) == 1:
+            physical_op = root_cluster.physical_ops[0]
+            physical_op_id = physical_op.get_full_op_id()
+            cluster = root_cluster
+            cluster_path = [root_cluster]
+            while len(cluster.children) > 0:
+                matching_children = [
+                    child
+                    for child in cluster.children
+                    if any(
+                        op.get_full_op_id() == physical_op_id
+                        for op in child.physical_ops
+                    )
+                ]
+                cluster = matching_children[0]
+                cluster_path.append(cluster)
+
+            return PhysicalOperatorSelection(
+                record_id=record_id,
+                physical_op=physical_op,
+                cluster_path=cluster_path,
+            )
+
         return self.select_physical_operator(
             root_cluster,
             record_id,
@@ -204,7 +235,7 @@ class PhysicalOperatorSelector:
             policy_scores = self._policy_scores(available_children)
             weights = []
             for child in available_children:
-                confidence = self.cluster_confidence(
+                confidence = self.cluster_confidence_entropy(
                     child,
                     max_input_records=max_input_records,
                 )
@@ -266,6 +297,8 @@ class PhysicalOperatorSelector:
                         if child.cost_estimates is not None
                     ]
                 )
+
+        self.physical_op_quality_samples[physical_op_id].append(cost_estimates.quality)
 
     def select_best_physical_operator(
         self,
@@ -331,6 +364,30 @@ class PhysicalOperatorSelector:
         max_possible_samples = max(input_record_count * len(cluster.physical_ops), 1)
         sample_count = self.cluster_sample_counts[id(cluster)]
         return min(sample_count / max_possible_samples, 1.0)
+
+    def cluster_confidence_entropy(
+        self,
+        cluster: PhysicalOperatorCluster,
+        max_input_records: int | None = None,
+    ) -> float:
+        """
+        Return a confidence score which is based on the entropy of results obtained from the cluster.
+        Clusters with a low entropy (i.e., more consistent results) will have a higher confidence score, while clusters with a high entropy (i.e., more varied results) will have a lower confidence score.
+        The normalizer is ``num_input_records * num_physical_ops_under_cluster``.
+        """
+
+        input_record_count = (
+            self.max_input_records
+            if max_input_records is None
+            else max_input_records
+        )
+        max_possible_samples = max(input_record_count * len(cluster.physical_ops), 1)
+        entropy = 0.0
+
+        breakpoint()
+        score = entropy
+
+        return score
 
     def _cluster_has_available_physical_op(
         self,
