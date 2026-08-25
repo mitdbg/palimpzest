@@ -31,10 +31,10 @@ from palimpzest.query.optimizer.cluster.physical_operator_clustering import (
 )
 from palimpzest.query.optimizer.cluster.physical_operator_selection import (
     PhysicalOperatorSelector,
-    UncertaintyAwareFinalOperatorSelection,
 )
+
 from palimpzest.query.optimizer.cluster.physical_operator_registry import (
-    build_physical_operator_candidates,
+    find_physical_candidates,
 )
 from palimpzest.query.optimizer.cluster.sampling_budget import (
     EqualClusterSamplingBudgetAllocator,
@@ -56,26 +56,20 @@ class PhysicalOptimizer:
         self,
         optimizer_config: OptimizerConfig,
         clustering_strategy: PhysicalOperatorClusteringStrategy | None = None,
-        max_workers: int | None = 64,
+        max_workers: int = 64,
         progress: bool = True,
     ):
         """Initialize optimizer state from runtime optimizer configuration."""
         self.optimizer_config = optimizer_config
         self.policy = optimizer_config.policy
-        self.max_workers = max(max_workers or 64, 1)
+        self.max_workers = max(max_workers, 1)
         self.progress = progress
         self.progress = False
 
-        if optimizer_config.final_selection_strategy is None:
-            self.final_selection_strategy = UncertaintyAwareFinalOperatorSelection(
-                self.policy,
-                uncertainty_weight=(self.optimizer_config.final_uncertainty_weight),
-            )
-        else:
-            self.final_selection_strategy = optimizer_config.final_selection_strategy
-
         if optimizer_config.budget_allocator is None:
-            self.budget_allocator = EqualClusterSamplingBudgetAllocator()
+            self.budget_allocator = EqualClusterSamplingBudgetAllocator(
+                optimizer_config.sample_budget
+            )
         else:
             self.budget_allocator = optimizer_config.budget_allocator
 
@@ -85,17 +79,15 @@ class PhysicalOptimizer:
             else clustering_strategy
         )
 
-    def build_physical_operator_clusters(
+    def initialize_clusters(
         self,
         logical_plan: LogicalPlan,
-    ) -> tuple[
-        dict[str, PhysicalOperatorCluster],
-        dict[str, list[str]],
-        list[str],
-        dict[str, OperatorCostEstimates],
-        dict[str, OperatorCostEstimates | None],
-    ]:
-        """Build physical clusters in source-to-sink logical plan order.
+    ) -> dict[str, PhysicalOperatorCluster]:
+        """This method is given a logical plan, which is a DAG of logical operators, and
+        has access to all implemented physical operators.
+        The method creates, for each of the logical operators, clusters of
+        physical operators that can implement the logical operator.
+        The method initializes the cost estimates for each physical operator within the clusters based on the cardinalities and cost estimates of its source operators.
 
         The method first instantiates flat candidates for every logical
         operator. It then topologically walks the logical plan from source scans
@@ -104,78 +96,73 @@ class PhysicalOptimizer:
         source estimate from ``len(datasource)``; context scans seed cardinality
         ``1.0``; joins receive left and right source estimates.
         """
-        op_candidates = build_physical_operator_candidates(
-            logical_plan,
-            self.optimizer_config,
-        )
-
-        source_op_ids = {op_id: [] for op_id in logical_plan.operators}
-        for upstream_op_id, downstream_op_ids in logical_plan.edges.items():
-            source_op_ids.setdefault(upstream_op_id, [])
-            for downstream_op_id in downstream_op_ids:
-                source_op_ids.setdefault(downstream_op_id, [])
-                source_op_ids[downstream_op_id].append(upstream_op_id)
-
-        remaining_source_counts = {
-            op_id: len(source_ids) for op_id, source_ids in source_op_ids.items()
+        op_candidates = {
+            op_id: find_physical_candidates(op, self.optimizer_config)
+            for op_id, op in logical_plan.operators.items()
         }
-        ready_op_ids = sorted(
+
+        # Store source information for each logical operator
+        operator_sources = {op_id: [] for op_id in logical_plan.operators}
+        for parent, children in logical_plan.edges.items():
+            for child in children:
+                operator_sources[child].append(parent)
+
+        # The goal of this block is to first obtain estimates for the scan operators and then propagate the estimates to the downstream operators.
+        remaining_source_counts = {
+            op_id: len(source_ids) for op_id, source_ids in operator_sources.items()
+        }
+        ready_operators = sorted(
             op_id for op_id, count in remaining_source_counts.items() if count == 0
         )
         op_clusters = {}
         op_cost_estimates = {}
-        topological_order = []
-        op_source_cost_estimates = {}
-        op_right_source_cost_estimates = {}
 
-        while len(ready_op_ids) > 0:
-            logical_op_id = ready_op_ids.pop(0)
+        while len(ready_operators) > 0:
+            logical_op_id = ready_operators.pop(0)
             logical_op = logical_plan.operators[logical_op_id]
-            logical_source_op_ids = sorted(source_op_ids[logical_op_id])
-            topological_order.append(logical_op_id)
+            logical_source_op_ids = sorted(operator_sources[logical_op_id])
 
             if isinstance(logical_op, BaseScan):
-                source_cost_estimates = OperatorCostEstimates(
-                    cardinality=len(logical_op.datasource),
-                    time_per_record=0.0,
-                    cost_per_record=0.0,
-                    quality=1.0,
-                )
-                right_source_cost_estimates = None
+                source_cost_estimates = [
+                    OperatorCostEstimates(
+                        cardinality=len(logical_op.datasource),
+                        time_per_record=0.0,
+                        cost_per_record=0.0,
+                        quality=1.0,
+                    )
+                ]
             elif isinstance(logical_op, ContextScan):
-                source_cost_estimates = OperatorCostEstimates(
-                    cardinality=1.0,
-                    time_per_record=0.0,
-                    cost_per_record=0.0,
-                    quality=1.0,
-                )
-                right_source_cost_estimates = None
+                source_cost_estimates = [
+                    OperatorCostEstimates(
+                        cardinality=1.0,
+                        time_per_record=0.0,
+                        cost_per_record=0.0,
+                        quality=1.0,
+                    )
+                ]
             elif isinstance(logical_op, LogicalJoinOp):
                 if len(logical_source_op_ids) != 2:
                     raise ValueError(
                         f"Join logical op {logical_op_id} expected 2 source operators, "
                         f"found {len(logical_source_op_ids)}"
                     )
-                source_cost_estimates = op_cost_estimates[logical_source_op_ids[0]]
-                right_source_cost_estimates = op_cost_estimates[
-                    logical_source_op_ids[1]
+                source_cost_estimates = [
+                    op_cost_estimates[logical_source_op_ids[0]],
+                    op_cost_estimates[logical_source_op_ids[1]],
                 ]
+
             else:
                 if len(logical_source_op_ids) != 1:
                     raise ValueError(
                         f"Logical op {logical_op_id} expected 1 source operator, "
                         f"found {len(logical_source_op_ids)}"
                     )
-                source_cost_estimates = op_cost_estimates[logical_source_op_ids[0]]
-                right_source_cost_estimates = None
+                source_cost_estimates = [op_cost_estimates[logical_source_op_ids[0]]]
 
-            op_source_cost_estimates[logical_op_id] = source_cost_estimates
-            op_right_source_cost_estimates[logical_op_id] = right_source_cost_estimates
             cluster = self.clustering_strategy.build_cluster(
                 logical_op,
                 op_candidates[logical_op_id],
                 source_op_cost_estimates=source_cost_estimates,
-                right_source_op_cost_estimates=right_source_cost_estimates,
             )
             if cluster.cost_estimates is None:
                 raise ValueError(
@@ -185,24 +172,18 @@ class PhysicalOptimizer:
             op_clusters[logical_op_id] = cluster
             op_cost_estimates[logical_op_id] = cluster.cost_estimates
 
-            for downstream_op_id in sorted(logical_plan.edges.get(logical_op_id, [])):
-                remaining_source_counts[downstream_op_id] -= 1
-                if remaining_source_counts[downstream_op_id] == 0:
-                    ready_op_ids.append(downstream_op_id)
-                    ready_op_ids.sort()
+            for child in sorted(logical_plan.edges.get(logical_op_id, [])):
+                remaining_source_counts[child] -= 1
+                if remaining_source_counts[child] == 0:
+                    ready_operators.append(child)
+                    ready_operators.sort()
 
         if len(op_clusters) != len(logical_plan.operators):
             raise ValueError(
                 "Unable to build physical operator clusters for cyclic logical plan"
             )
 
-        return (
-            op_clusters,
-            source_op_ids,
-            topological_order,
-            op_source_cost_estimates,
-            op_right_source_cost_estimates,
-        )
+        return op_clusters
 
     def build_sampling_progress_plan(
         self,
@@ -231,8 +212,6 @@ class PhysicalOptimizer:
         op_clusters: dict[str, PhysicalOperatorCluster],
         source_op_ids: dict[str, list[str]],
         topological_order: list[str],
-        op_source_cost_estimates: dict[str, OperatorCostEstimates],
-        op_right_source_cost_estimates: dict[str, OperatorCostEstimates | None],
         physical_operator_selector: PhysicalOperatorSelector,
         logical_op_sample_budgets: dict[str, int],
         validator: Validator | None = None,
@@ -243,7 +222,7 @@ class PhysicalOptimizer:
         """Sample each logical operator cluster for the configured budget.
 
         This method perform exploration/exploitationor over every
-        logical operator cluster in topological order, from root logical operator to leaves. 
+        logical operator cluster in topological order, from root logical operator to leaves.
         Each selected physical operator is executed on an actual sampled input record and the observed
         runtime/cost statistics are recorded back into the selected cluster path.
         """
@@ -398,24 +377,16 @@ class PhysicalOptimizer:
                                 validation_gen_stats,
                             )
 
-                        source_cost_estimates = op_source_cost_estimates[logical_op_id]
-                        right_source_cost_estimates = op_right_source_cost_estimates[
-                            logical_op_id
-                        ]
-                        if len(logical_source_op_ids) > 0:
-                            source_cluster_cost_estimates = op_clusters[
-                                logical_source_op_ids[0]
-                            ].cost_estimates
-                            if source_cluster_cost_estimates is not None:
-                                source_cost_estimates = source_cluster_cost_estimates
-                        if len(logical_source_op_ids) > 1:
-                            right_source_cluster_cost_estimates = op_clusters[
-                                logical_source_op_ids[1]
-                            ].cost_estimates
-                            if right_source_cluster_cost_estimates is not None:
-                                right_source_cost_estimates = (
-                                    right_source_cluster_cost_estimates
-                                )
+                        # If this is a source operator, the cardinality is found in the cost estimates of the first cluster path node. Otherwise, the source cost estimates are found in the cost estimates of the source operator clusters.
+                        if len(logical_source_op_ids) == 0:
+                            source_cost_estimates = [
+                                selection.cluster_path[0].cost_estimates
+                            ]
+                        else:
+                            source_cost_estimates = [
+                                op_clusters[op_id].cost_estimates
+                                for op_id in logical_source_op_ids
+                            ]
 
                         physical_op_id = selection.physical_op.get_full_op_id()
                         naive_cost_estimates = selection.cluster_path[
@@ -437,7 +408,6 @@ class PhysicalOptimizer:
                             source_cost_estimates,
                             naive_cost_estimates,
                             elapsed_time,
-                            right_source_cost_estimates=right_source_cost_estimates,
                             estimate_cardinality_from_sample=estimate_cardinality_from_sample,
                         )
                         physical_operator_selector.record_execution(
@@ -732,10 +702,9 @@ class PhysicalOptimizer:
         self,
         record_set: DataRecordSet,
         input_count: int,
-        source_cost_estimates: OperatorCostEstimates,
+        source_cost_estimates: list[OperatorCostEstimates],
         naive_cost_estimates: OperatorCostEstimates,
         elapsed_time: float,
-        right_source_cost_estimates: OperatorCostEstimates | None = None,
         estimate_cardinality_from_sample: bool = True,
     ) -> OperatorCostEstimates:
         """Convert sampled execution stats into operator cost estimates."""
@@ -747,8 +716,9 @@ class PhysicalOptimizer:
             record._passed_operator for record in record_set.data_records
         )
 
-        input_cardinality = source_cost_estimates.cardinality
-        if right_source_cost_estimates is not None:
+        input_cardinality = source_cost_estimates[0].cardinality
+        if len(source_cost_estimates) > 1:
+            right_source_cost_estimates = source_cost_estimates[1]
             input_cardinality *= right_source_cost_estimates.cardinality
 
         cardinality = naive_cost_estimates.cardinality
@@ -807,8 +777,6 @@ class PhysicalOptimizer:
         logical_plan: LogicalPlan,
         source_op_ids: dict[str, list[str]],
         topological_order: list[str],
-        op_source_cost_estimates: dict[str, OperatorCostEstimates],
-        op_right_source_cost_estimates: dict[str, OperatorCostEstimates | None],
         selected_physical_ops: dict[str, PhysicalOperator],
         selected_op_cost_estimates: dict[str, OperatorCostEstimates],
     ) -> PhysicalPlan:
@@ -819,6 +787,8 @@ class PhysicalOptimizer:
             subplans = [physical_plans[source_op_id] for source_op_id in source_ids]
             physical_op = selected_physical_ops[logical_op_id]
             op_cost_estimates = selected_op_cost_estimates[logical_op_id]
+            op_source_cost_estimates = []
+            op_right_source_cost_estimates = []
             if len(source_ids) == 0:
                 source_cost_estimates = op_source_cost_estimates[logical_op_id]
                 right_source_cost_estimates = op_right_source_cost_estimates[
@@ -879,27 +849,18 @@ class PhysicalOptimizer:
         validator: Validator | None = None,
         optimization_stats: SentinelPlanStats | None = None,
     ) -> PhysicalPlan:
-        """Optimize a logical plan and return a physical plan."""
+        """Optimize a logical plan and return a physical plan.\
 
-        physical_operator_selector = PhysicalOperatorSelector(
-            policy=self.policy,
-            total_sampling_rounds=self.optimizer_config.sample_budget,
-            final_selection_strategy=self.final_selection_strategy,
-            seed=self.optimizer_config.seed,
-        )
+        First, the logical plan is clustered into physical operator candidates, and the overall sampling budget is allocated to each logical operator cluster. 
+        Then, each cluster is sampled according to the allocated budget, and the observed execution statistics are used to select the best physical operator for each logical operator. Finally, a physical plan is constructed from the selected physical operators and their cost estimates.    
+            
+        """
 
-        (
-            op_clusters,
-            source_op_ids,
-            topological_order,
-            op_source_cost_estimates,
-            op_right_source_cost_estimates,
-        ) = self.build_physical_operator_clusters(logical_plan)
+        op_clusters = self.initialize_clusters(logical_plan)
 
         logical_op_sample_budgets = self.budget_allocator.allocate(
             topological_order,
             op_clusters,
-            self.optimizer_config.sample_budget,
         )
         allocated_sample_budget = sum(logical_op_sample_budgets.values())
 
@@ -938,9 +899,7 @@ class PhysicalOptimizer:
             )
             for topo_idx, (progress_logical_op_id, _) in enumerate(progress_plan):
                 logical_op_id = topological_order[topo_idx]
-                unique_progress_logical_op_id = (
-                    f"{topo_idx}-{progress_logical_op_id}"
-                )
+                unique_progress_logical_op_id = f"{topo_idx}-{progress_logical_op_id}"
                 progress_logical_op_ids[logical_op_id] = unique_progress_logical_op_id
                 task = progress_manager.unique_logical_op_id_to_task.get(
                     unique_progress_logical_op_id
@@ -954,13 +913,17 @@ class PhysicalOptimizer:
             progress_manager.start()
 
         try:
+            physical_operator_selector = PhysicalOperatorSelector(
+                policy=self.policy,
+                total_sampling_rounds=self.optimizer_config.sample_budget,
+                seed=self.optimizer_config.seed,
+            )
+
             self.sample_physical_operator_clusters(
                 logical_plan,
                 op_clusters,
                 source_op_ids,
                 topological_order,
-                op_source_cost_estimates,
-                op_right_source_cost_estimates,
                 physical_operator_selector,
                 logical_op_sample_budgets,
                 validator=validator,
@@ -984,8 +947,6 @@ class PhysicalOptimizer:
             logical_plan,
             source_op_ids,
             topological_order,
-            op_source_cost_estimates,
-            op_right_source_cost_estimates,
             selected_physical_ops,
             selected_op_cost_estimates,
         )

@@ -48,8 +48,8 @@ class PhysicalOperatorCluster:
 
     Every node represents the concrete physical operators in ``physical_ops``.
     Leaf nodes also keep the per-physical-operator naive cost estimates in
-    ``physical_op_cost_estimates``. Internal nodes keep an averaged
-    ``cost_estimates`` value computed from their children.
+    ``physical_op_cost_estimates``. 
+    Internal nodes keep an averaged ``cost_estimates`` value computed from their children.
     """
 
     name: str
@@ -163,8 +163,7 @@ class PhysicalOperatorClusteringStrategy:
         self,
         logical_op: LogicalOperator,
         physical_ops: list[PhysicalOperator],
-        source_op_cost_estimates: OperatorCostEstimates | None = None,
-        right_source_op_cost_estimates: OperatorCostEstimates | None = None,
+        source_op_cost_estimates: list[OperatorCostEstimates] | None = None,
     ) -> PhysicalOperatorCluster:
         """Build a cluster tree for one logical operator's physical candidates."""
         raise NotImplementedError
@@ -201,8 +200,7 @@ class ManualPhysicalOperatorClusteringStrategy(PhysicalOperatorClusteringStrateg
         self,
         logical_op: LogicalOperator,
         physical_ops: list[PhysicalOperator],
-        source_op_cost_estimates: OperatorCostEstimates | None = None,
-        right_source_op_cost_estimates: OperatorCostEstimates | None = None,
+        source_op_cost_estimates: list[OperatorCostEstimates] | None = None,
     ) -> PhysicalOperatorCluster:
         """Cluster concrete physical operators for a single logical operator.
 
@@ -212,30 +210,29 @@ class ManualPhysicalOperatorClusteringStrategy(PhysicalOperatorClusteringStrateg
         internal node receives averaged child estimates.
         """
         if source_op_cost_estimates is None:
-            source_op_cost_estimates = OperatorCostEstimates(
+            source_op_cost_estimates = [OperatorCostEstimates(
                 cardinality=100,
                 time_per_record=0.0,
                 cost_per_record=0.0,
                 quality=1.0,
-            )
-        if right_source_op_cost_estimates is None:
-            right_source_op_cost_estimates = source_op_cost_estimates
+            )]
 
         op_to_cost_estimates = {}
         for op in physical_ops:
             if isinstance(op, MarshalAndScanDataOp):
                 op_to_cost_estimates[op.get_full_op_id()] = op.naive_cost_estimates(
-                    source_op_cost_estimates,
+                    source_op_cost_estimates[0],
                     input_record_size_in_bytes=self.input_record_size_in_bytes,
                 )
             elif isinstance(op, JoinOp):
+                assert len(source_op_cost_estimates) == 2
+                left_cost, right_cost = source_op_cost_estimates
                 op_to_cost_estimates[op.get_full_op_id()] = op.naive_cost_estimates(
-                    source_op_cost_estimates,
-                    right_source_op_cost_estimates,
+                    left_cost, right_cost
                 )
             else:
                 op_to_cost_estimates[op.get_full_op_id()] = op.naive_cost_estimates(
-                    source_op_cost_estimates
+                    source_op_cost_estimates[0]
                 )
 
         class_to_ops = defaultdict(list)

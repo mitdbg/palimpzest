@@ -16,32 +16,96 @@ from palimpzest.query.optimizer.cluster.physical_operator_clustering import (
 
 @dataclass
 class PhysicalOperatorSelection:
-    """A sampled physical operator and the cluster branch that produced it."""
+    """A sampled physical operator and the cluster branch that produced it.
+
+    The cluster_path is a list of clusters from the root down to the leaf
+    that contains the selected physical operator. The leaf cluster is the last
+    element; internal clusters are its ancestors. The path is used during
+    record_execution() to update sample counts and propagate new cost
+    estimates up the tree.
+    """
 
     record_id: str | int
     physical_op: PhysicalOperator
     cluster_path: list[PhysicalOperatorCluster]
 
+class PhysicalOperatorSelector:
+    """Stateful sampler for the clustered physical operator search space.
 
-class UncertaintyAwareFinalOperatorSelection:
-    """Score final physical operators with policy value and sampling uncertainty."""
+    The selector owns sampling state that changes across rounds: how many times
+    each cluster branch has been sampled, and which physical operators have
+    already been executed for each input record. It chooses a branch using the
+    exploration/exploitation score, then records executions back into the
+    affected cluster path.
 
-    def __init__(self, policy: Policy, uncertainty_weight: float = 0.0):
-        if not isinstance(policy, (MaxQuality, MinCost, MinTime)):
-            raise NotImplementedError(
-                f"Unsupported physical operator selection policy: {type(policy).__name__}"
-            )
+    The physical operator selector keeps a running state of the physical ops that have been sampled and their observed estimates/qualities.
+
+    Key mutable state:
+      - cluster_sample_counts: total number of times each cluster (identified by id) has been visited during sampling.
+      - cluster_input_record_counts: number of input records considered for each cluster, used as a normalizer for confidence.
+      - physical_op_sample_counts: how many times each concrete physical operator (by full op id) has been sampled.
+      - executed_physical_op_ids_by_record: per-record set of physical operator ids already executed (to avoid re-selection).
+      - physical_op_quality_samples: list of observed quality values per physical operator (maintained during record_execution).
+
+    The selector uses a tree of PhysicalOperatorCluster nodes. Every cluster's
+    physical_ops lists the concrete operators under that subtree. A *leaf
+    cluster* owns physical_op_cost_estimates for its concrete operators; an
+    *internal cluster* aggregates child cost_estimates. The cluster_path
+    in a PhysicalOperatorSelection tracks the branch from root to leaf that
+    produced a chosen operator.
+
+    After all sampling rounds, select_best_physical_operator() performs a final
+    exploitation step by evaluating all leaf operators with uncertainty_aware_select.
+    """
+
+    def __init__(
+        self,
+        policy: Policy,
+        total_sampling_rounds: int,
+        max_input_records: int = 1,
+        seed: int = 42,
+    ):
+        """Create a selector for a fixed policy and sampling budget.
+
+        max_input_records is used as the default confidence normalizer when
+        a caller selects a physical operator for an already-chosen record.
+        """
         self.policy = policy
-        self.uncertainty_weight = max(uncertainty_weight, 0.0)
+        self.total_sampling_rounds = total_sampling_rounds
+        self.max_input_records = max_input_records
+        self.rng = random.Random(seed)
+        self.cluster_sample_counts = defaultdict(int)
+        self.cluster_input_record_counts = defaultdict(lambda: self.max_input_records)
+        self.physical_op_sample_counts = defaultdict(int)
+        self.executed_physical_op_ids_by_record = defaultdict(set)
 
-    def select(
+        self.physical_op_quality_samples = defaultdict(list)
+
+    def uncertainty_aware_select(
         self,
         physical_op_cost_estimates: dict[str, OperatorCostEstimates],
         physical_op_confidences: dict[str, float],
+        uncertainty_weight: float = 0.0,
     ) -> tuple[str, OperatorCostEstimates]:
-        """Return the physical operator id with the best final score."""
+        """Return the physical operator id with the best final score.
+        The score for each operator is 
+            policy_score - uncertainty_weight * (1 - confidence)
+        Policy scores are normalized to [0,1] based on the best and worst metric
+        among the candidates. In case of a tie, the policy's choose() method
+        breaks it.
+
+        This strategy is used by PhysicalOperatorSelector.select_best_physical_operator()
+        after all sampling rounds are complete. It combines the raw policy score
+        (based on quality, cost, or time) with an uncertainty penalty derived from
+        the confidence (fraction of samples collected) for each operator. The final
+        selection picks the operator with the highest composite score.
+
+        Supported policies: MaxQuality, MinCost, MinTime.
+        """
+
         if len(physical_op_cost_estimates) == 0:
             raise ValueError("Cannot select from an empty physical operator set")
+        weight = max(uncertainty_weight, 0.0)
 
         metric_values = {}
         for physical_op_id, cost_estimates in physical_op_cost_estimates.items():
@@ -69,7 +133,7 @@ class UncertaintyAwareFinalOperatorSelection:
 
             confidence = physical_op_confidences.get(physical_op_id, 0.0)
             uncertainty = 1.0 - max(0.0, min(confidence, 1.0))
-            score = policy_score - (self.uncertainty_weight * uncertainty)
+            score = policy_score - (weight * uncertainty)
             if best_score is None or score > best_score:
                 best_physical_op_id = physical_op_id
                 best_cost_estimates = cost_estimates
@@ -93,56 +157,6 @@ class UncertaintyAwareFinalOperatorSelection:
         assert best_physical_op_id is not None and best_cost_estimates is not None
         return best_physical_op_id, best_cost_estimates
 
-
-class PhysicalOperatorSelector:
-    """Stateful sampler for the clustered physical operator search space.
-
-    The selector owns sampling state that changes across rounds: how many times
-    each cluster branch has been sampled, and which physical operators have
-    already been executed for each input record. It chooses a branch using the
-    exploration/exploitation score, then records executions back into the
-    affected cluster path.
-
-    The physical operator selector keeps a running state of the physical ops that have been sampled and their observed estimates/qualities.
-
-    """
-
-    def __init__(
-        self,
-        policy: Policy,
-        total_sampling_rounds: int,
-        final_selection_strategy: UncertaintyAwareFinalOperatorSelection | None = None,
-        max_input_records: int = 1,
-        seed: int = 42,
-    ):
-        """Create a selector for a fixed policy and sampling budget.
-
-        ``max_input_records`` is used as the default confidence normalizer when
-        a caller selects a physical operator for an already-chosen record.
-        """
-        self.policy = policy
-        self.total_sampling_rounds = total_sampling_rounds
-        self.max_input_records = max_input_records
-        self.rng = random.Random(seed)
-        self.cluster_sample_counts = defaultdict(int)
-        self.cluster_input_record_counts = defaultdict(lambda: self.max_input_records)
-        self.physical_op_sample_counts = defaultdict(int)
-        self.executed_physical_op_ids_by_record = defaultdict(set)
-
-        self.physical_op_quality_samples = defaultdict(list)
-
-        self.final_selection_strategy = (
-            UncertaintyAwareFinalOperatorSelection(policy)
-            if final_selection_strategy is None
-            else final_selection_strategy
-        )
-
-    def choose_input_record(self, input_record_ids: list[str | int]) -> str | int:
-        """Choose one candidate input record uniformly at random."""
-        if len(input_record_ids) == 0:
-            raise ValueError("Cannot sample from an empty input record list")
-        return self.rng.choice(input_record_ids)
-
     def select_next_sample(
         self,
         root_cluster: PhysicalOperatorCluster,
@@ -152,7 +166,10 @@ class PhysicalOperatorSelector:
         """Choose both a random input record and a physical operator for it.
 
         Records for which every physical operator has already been executed are
-        excluded before sampling the record.
+        excluded before sampling the record.  If the root cluster contains
+        exactly one physical operator, that operator is returned directly with a
+        cluster_path that walks down to its leaf (following children that contain
+        the same operator id).
         """
         available_record_ids = [
             record_id
@@ -164,7 +181,8 @@ class PhysicalOperatorSelector:
                 f"All physical operators in cluster {root_cluster.name} have already "
                 "been executed on every candidate input record"
             )
-        record_id = self.choose_input_record(available_record_ids)
+        record_id = self.rng.choice(input_record_ids)
+
         # If the root cluster only has one physical operator, skip selection but
         # preserve the path to the leaf that owns the operator cost estimates.
         if len(root_cluster.physical_ops) == 1:
@@ -207,8 +225,12 @@ class PhysicalOperatorSelector:
         """Choose a physical operator by walking from root cluster to leaf.
 
         At each internal node, child weights combine uncertainty and policy
-        score: ``alpha * (1 - confidence) + (1 - alpha) * predicted_score``.
-        ``alpha`` decreases as the sampling budget is consumed.
+        score: alpha * (1 - confidence) + (1 - alpha) * predicted_score.
+        alpha decreases as the sampling budget is consumed.
+
+        The walking stops when a leaf cluster is reached (no children). Among
+        the leaf's available physical operators (those not yet executed for this
+        record), one is chosen uniformly at random.
         """
         if not self._cluster_has_available_physical_op(root_cluster, record_id):
             raise ValueError(
@@ -271,6 +293,11 @@ class PhysicalOperatorSelector:
         The selected physical operator is blacklisted for the selected record,
         every cluster on the selected path gets one additional sample, and the
         path's cost estimates are recomputed from leaf to root.
+
+        If cost_estimates is None, the leaf cluster's stored estimates for
+        that operator are used.  The observed quality value is appended to
+        physical_op_quality_samples for later entropy-based confidence
+        calculations.
         """
         physical_op_id = selection.physical_op.get_full_op_id()
         self.executed_physical_op_ids_by_record[selection.record_id].add(physical_op_id)
@@ -284,6 +311,8 @@ class PhysicalOperatorSelector:
         for cluster in selection.cluster_path:
             self.cluster_sample_counts[id(cluster)] += 1
 
+        # Propagate new aggregated cost estimates up the tree: leaves average
+        # their own operator estimates, internal clusters average children's.
         for cluster in reversed(selection.cluster_path):
             if len(cluster.children) == 0:
                 cluster.cost_estimates = self._average_cost_estimates(
@@ -307,8 +336,12 @@ class PhysicalOperatorSelector:
         """Return the best concrete physical operator under a cluster.
 
         This is the final exploitation step after sampling has updated the
-        cluster tree. Only the currently supported single-objective policies are
-        meaningful here.
+        cluster tree.  It collects all leaf operators' cost estimates,
+        computes confidences as the fraction of maximum possible samples
+        collected per operator, and delegates to uncertainty_aware_select() to pick the best operator.
+
+        Only single-objective policies (MaxQuality, MinCost, MinTime)
+        are currently supported.
         """
         if not isinstance(self.policy, (MaxQuality, MinCost, MinTime)):
             raise NotImplementedError(
@@ -340,7 +373,7 @@ class PhysicalOperatorSelector:
             )
             for physical_op_id in physical_op_cost_estimates
         }
-        best_physical_op_id, best_cost_estimates = self.final_selection_strategy.select(
+        best_physical_op_id, best_cost_estimates = self.uncertainty_aware_select(
             physical_op_cost_estimates,
             physical_op_confidences,
         )
@@ -352,9 +385,11 @@ class PhysicalOperatorSelector:
         cluster: PhysicalOperatorCluster,
         max_input_records: int | None = None,
     ) -> float:
-        """Return normalized confidence for a cluster in ``[0, 1]``.
+        """Return normalized confidence for a cluster in [0, 1].
 
-        The normalizer is ``num_input_records * num_physical_ops_under_cluster``.
+        The normalizer is num_input_records * num_physical_ops_under_cluster.
+        Confidence is based on the ratio of samples taken to the maximum
+        possible (assuming all operators could be sampled for every record).
         """
         input_record_count = (
             self.max_input_records
@@ -373,7 +408,11 @@ class PhysicalOperatorSelector:
         """
         Return a confidence score which is based on the entropy of results obtained from the cluster.
         Clusters with a low entropy (i.e., more consistent results) will have a higher confidence score, while clusters with a high entropy (i.e., more varied results) will have a lower confidence score.
-        The normalizer is ``num_input_records * num_physical_ops_under_cluster``.
+        The normalizer is num_input_records * num_physical_ops_under_cluster.
+
+        NOTE: This method is not fully implemented. The breakpoint below marks
+        the point where entropy calculation should be added. Currently it
+        returns 0.0.
         """
 
         input_record_count = (
@@ -407,8 +446,10 @@ class PhysicalOperatorSelector:
     ) -> dict[int, float]:
         """Normalize sibling cluster predictions according to the active policy.
 
-        ``MaxQuality`` treats higher quality as better. ``MinCost`` and
-        ``MinTime`` invert their metric so lower values receive higher scores.
+        MaxQuality treats higher quality as better. MinCost and
+        MinTime invert their metric so lower values receive higher scores.
+        Normalization maps the best sibling to 1.0 and the worst to 0.0; if all
+        siblings have the same value, all receive 1.0.
         """
         if not isinstance(self.policy, (MaxQuality, MinCost, MinTime)):
             raise NotImplementedError(
@@ -465,7 +506,11 @@ class PhysicalOperatorSelector:
         self,
         cost_estimates: list[OperatorCostEstimates],
     ) -> OperatorCostEstimates | None:
-        """Average every populated ``OperatorCostEstimates`` field independently."""
+        """Average every populated OperatorCostEstimates field independently.
+
+        Fields that are None in all estimates are left as None in the
+        result.  If the list is empty, returns None.
+        """
         if len(cost_estimates) == 0:
             return None
 

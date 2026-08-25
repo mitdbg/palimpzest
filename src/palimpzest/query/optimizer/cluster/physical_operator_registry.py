@@ -174,12 +174,17 @@ def _is_text_operation(logical_op: LogicalOperator) -> bool:
         for field_type in _dependent_field_annotations(logical_op)
     )
 
+
 def _model_matches_input(model: Model, logical_op: LogicalOperator) -> bool:
     num_image_fields = len(_get_fields_with_annotations(logical_op, IMAGE_FIELD_TYPES))
-    num_list_image_field = len(_get_fields_with_annotations(logical_op, IMAGE_LIST_FIELD_TYPES))
+    num_list_image_field = len(
+        _get_fields_with_annotations(logical_op, IMAGE_LIST_FIELD_TYPES)
+    )
 
     num_audio_fields = len(_get_fields_with_annotations(logical_op, AUDIO_FIELD_TYPES))
-    num_list_audio_fields = len(_get_fields_with_annotations(logical_op, AUDIO_LIST_FIELD_TYPES))
+    num_list_audio_fields = len(
+        _get_fields_with_annotations(logical_op, AUDIO_LIST_FIELD_TYPES)
+    )
 
     if model.is_embedding_model():
         return False
@@ -208,13 +213,15 @@ def _model_matches_input(model: Model, logical_op: LogicalOperator) -> bool:
         return True
 
     if (
-        _is_image_operation(logical_op) and _is_text_operation(logical_op)
+        _is_image_operation(logical_op)
+        and _is_text_operation(logical_op)
         and model.is_text_image_multimodal_model()
     ):
         return True
 
     if (
-        _is_audio_operation(logical_op) and _is_text_operation(logical_op)
+        _is_audio_operation(logical_op)
+        and _is_text_operation(logical_op)
         and model.is_text_audio_multimodal_model()
     ):
         return True
@@ -224,7 +231,8 @@ def _model_matches_input(model: Model, logical_op: LogicalOperator) -> bool:
 
 def _embedding_model_matches_input(model: Model, logical_op: LogicalOperator) -> bool:
     if (
-        _is_text_operation(logical_op) and _is_image_operation(logical_op)
+        _is_text_operation(logical_op)
+        and _is_image_operation(logical_op)
         and model.is_text_image_multimodal_embedding_model()
     ):
         return True
@@ -237,7 +245,6 @@ def _embedding_model_matches_input(model: Model, logical_op: LogicalOperator) ->
 
 
 def _get_fixed_op_kwargs(
-    logical_op_id: str,
     logical_op: LogicalOperator,
     optimizer_config: OptimizerConfig,
 ) -> dict:
@@ -247,8 +254,7 @@ def _get_fixed_op_kwargs(
             "depends_on": sorted(_get_depends_on_field_names(logical_op)),
             "verbose": optimizer_config.verbose,
             "logical_op_id": logical_op.get_logical_op_id(),
-            "unique_logical_op_id": logical_op.get_unique_logical_op_id()
-            or logical_op_id,
+            "unique_logical_op_id": logical_op.unique_logical_op_id,
             "logical_op_name": logical_op.logical_op_name(),
         }
     )
@@ -256,15 +262,12 @@ def _get_fixed_op_kwargs(
 
 
 def _instantiate_physical_ops(
-    logical_op_id: str,
     logical_op: LogicalOperator,
     physical_op_class: type[PhysicalOperator],
     optimizer_config: OptimizerConfig,
     variable_op_kwargs: list[dict] | dict | None = None,
 ) -> list[PhysicalOperator]:
-    fixed_op_kwargs = _get_fixed_op_kwargs(
-        logical_op_id, logical_op, optimizer_config
-    )
+    fixed_op_kwargs = _get_fixed_op_kwargs(logical_op, optimizer_config)
     if variable_op_kwargs is None:
         variable_op_kwargs = [{}]
     elif isinstance(variable_op_kwargs, dict):
@@ -316,7 +319,6 @@ def _agg_prompt_strategy(optimizer_config: OptimizerConfig) -> PromptStrategy:
 
 
 def _semantic_filter_ops(
-    logical_op_id: str,
     logical_op: FilteredScan,
     optimizer_config: OptimizerConfig,
 ) -> list[PhysicalOperator]:
@@ -329,7 +331,6 @@ def _semantic_filter_ops(
     prompt_strategy = _filter_prompt_strategy(optimizer_config)
 
     physical_ops = _instantiate_physical_ops(
-        logical_op_id,
         logical_op,
         LLMFilter,
         optimizer_config,
@@ -345,7 +346,6 @@ def _semantic_filter_ops(
 
     physical_ops.extend(
         _instantiate_physical_ops(
-            logical_op_id,
             logical_op,
             BatchedFilter,
             optimizer_config,
@@ -365,7 +365,6 @@ def _semantic_filter_ops(
     if _is_image_operation(logical_op):
         physical_ops.extend(
             _instantiate_physical_ops(
-                logical_op_id,
                 logical_op,
                 RescaledImageFilter,
                 optimizer_config,
@@ -382,9 +381,7 @@ def _semantic_filter_ops(
             )
         )
 
-    if optimizer_config.allow_rag_reduction and _is_text_only_operation(
-        logical_op
-    ):
+    if optimizer_config.allow_rag_reduction and _is_text_only_operation(logical_op):
         embedding_models = [
             model
             for model in optimizer_config.available_models
@@ -392,7 +389,6 @@ def _semantic_filter_ops(
         ]
         physical_ops.extend(
             _instantiate_physical_ops(
-                logical_op_id,
                 logical_op,
                 RAGFilter,
                 optimizer_config,
@@ -412,12 +408,9 @@ def _semantic_filter_ops(
             )
         )
 
-    if optimizer_config.allow_split_merge and _is_text_only_operation(
-        logical_op
-    ):
+    if optimizer_config.allow_split_merge and _is_text_only_operation(logical_op):
         physical_ops.extend(
             _instantiate_physical_ops(
-                logical_op_id,
                 logical_op,
                 SplitFilter,
                 optimizer_config,
@@ -443,7 +436,6 @@ def _semantic_filter_ops(
         ]
         physical_ops.extend(
             _instantiate_physical_ops(
-                logical_op_id,
                 logical_op,
                 MixtureOfAgentsFilter,
                 optimizer_config,
@@ -465,7 +457,6 @@ def _semantic_filter_ops(
     if optimizer_config.allow_critic:
         physical_ops.extend(
             _instantiate_physical_ops(
-                logical_op_id,
                 logical_op,
                 CritiqueAndRefineFilter,
                 optimizer_config,
@@ -488,7 +479,6 @@ def _semantic_filter_ops(
 
 
 def _semantic_convert_ops(
-    logical_op_id: str,
     logical_op: ConvertScan,
     optimizer_config: OptimizerConfig,
 ) -> list[PhysicalOperator]:
@@ -504,7 +494,6 @@ def _semantic_convert_ops(
     if optimizer_config.allow_bonded_query:
         physical_ops.extend(
             _instantiate_physical_ops(
-                logical_op_id,
                 logical_op,
                 LLMConvertBonded,
                 optimizer_config,
@@ -519,9 +508,7 @@ def _semantic_convert_ops(
             )
         )
 
-    if optimizer_config.allow_rag_reduction and _is_text_only_operation(
-        logical_op
-    ):
+    if optimizer_config.allow_rag_reduction and _is_text_only_operation(logical_op):
         embedding_models = [
             model
             for model in optimizer_config.available_models
@@ -529,7 +516,6 @@ def _semantic_convert_ops(
         ]
         physical_ops.extend(
             _instantiate_physical_ops(
-                logical_op_id,
                 logical_op,
                 RAGConvert,
                 optimizer_config,
@@ -549,12 +535,9 @@ def _semantic_convert_ops(
             )
         )
 
-    if optimizer_config.allow_split_merge and _is_text_only_operation(
-        logical_op
-    ):
+    if optimizer_config.allow_split_merge and _is_text_only_operation(logical_op):
         physical_ops.extend(
             _instantiate_physical_ops(
-                logical_op_id,
                 logical_op,
                 SplitConvert,
                 optimizer_config,
@@ -580,7 +563,6 @@ def _semantic_convert_ops(
         ]
         physical_ops.extend(
             _instantiate_physical_ops(
-                logical_op_id,
                 logical_op,
                 MixtureOfAgentsConvert,
                 optimizer_config,
@@ -602,7 +584,6 @@ def _semantic_convert_ops(
     if optimizer_config.allow_critic:
         physical_ops.extend(
             _instantiate_physical_ops(
-                logical_op_id,
                 logical_op,
                 CritiqueAndRefineConvert,
                 optimizer_config,
@@ -625,7 +606,6 @@ def _semantic_convert_ops(
 
 
 def _join_ops(
-    logical_op_id: str,
     logical_op: JoinOp,
     optimizer_config: OptimizerConfig,
 ) -> list[PhysicalOperator]:
@@ -651,7 +631,6 @@ def _join_ops(
         for model in models
     ]
     physical_ops = _instantiate_physical_ops(
-        logical_op_id,
         logical_op,
         NestedLoopsJoin,
         optimizer_config,
@@ -666,7 +645,6 @@ def _join_ops(
         ]
         physical_ops.extend(
             _instantiate_physical_ops(
-                logical_op_id,
                 logical_op,
                 EmbeddingJoin,
                 optimizer_config,
@@ -689,7 +667,6 @@ def _join_ops(
 
 
 def _aggregate_ops(
-    logical_op_id: str,
     logical_op: Aggregate,
     optimizer_config: OptimizerConfig,
 ) -> list[PhysicalOperator]:
@@ -702,7 +679,6 @@ def _aggregate_ops(
         prompt_strategy = _agg_prompt_strategy(optimizer_config)
         reasoning_effort = optimizer_config.reasoning_effort
         return _instantiate_physical_ops(
-            logical_op_id,
             logical_op,
             SemanticAggregate,
             optimizer_config,
@@ -726,79 +702,55 @@ def _aggregate_ops(
     if aggregate_op_class is None:
         raise ValueError(f"Unsupported aggregate function: {logical_op.agg_func}")
 
-    return _instantiate_physical_ops(
-        logical_op_id, logical_op, aggregate_op_class, optimizer_config
-    )
+    return _instantiate_physical_ops(logical_op, aggregate_op_class, optimizer_config)
 
 
-def build_physical_operator_candidates(
-    logical_plan: LogicalPlan,
+def find_physical_candidates(
+    op: LogicalOperator,
     optimizer_config: OptimizerConfig,
-) -> dict[str, list[PhysicalOperator]]:
+) -> list[PhysicalOperator]:
     """
-    Instantiate all concrete physical operators that can implement each logical
+    Instantiate all concrete physical operators that can implement a given logical
     operator in a Cluster logical plan.
     """
-    candidates = {}
-    for logical_op_id, logical_op in logical_plan.operators.items():
-        if not logical_op.is_semantic:
-            op_class = NON_SEMANTIC_LOGICAL_OP_TO_PHYSICAL_OP.get(type(logical_op))
-            if op_class is None:
-                raise NotImplementedError(f"No physical op exists for {logical_op}")
+    if not op.is_semantic:
+        op_class = NON_SEMANTIC_LOGICAL_OP_TO_PHYSICAL_OP.get(type(op))
+        if op_class is None:
+            raise NotImplementedError(f"No physical op exists for {op}")
 
-            candidates[logical_op_id] = _instantiate_physical_ops(
-                logical_op_id,
-                logical_op,
-                op_class,
+        return _instantiate_physical_ops(
+            op,
+            op_class,
+            optimizer_config,
+        )
+
+    else:
+        if isinstance(op, FilteredScan):
+            return _semantic_filter_ops(op, optimizer_config)
+
+        elif isinstance(op, ConvertScan):
+            return _semantic_convert_ops(op, optimizer_config)
+
+        elif isinstance(op, TopKScan):
+            ks = TOPK_K_BUDGETS if op.k == -1 else [op.k]
+            return _instantiate_physical_ops(
+                op,
+                TopKOp,
                 optimizer_config,
+                [{"k": k} for k in ks],
             )
 
+        elif isinstance(op, JoinOp):
+            return _join_ops(op, optimizer_config)
+
+        elif isinstance(op, Aggregate):
+            return _aggregate_ops(op, optimizer_config)
+
+        elif isinstance(op, ComputeOperator):
+            return _instantiate_physical_ops(op, SmolAgentsCompute, optimizer_config)
+
+        elif isinstance(op, SearchOperator):
+            return _instantiate_physical_ops(op, SmolAgentsSearch, optimizer_config)
+
         else:
-            physical_ops = []
-
-            if isinstance(logical_op, FilteredScan):
-                physical_ops = _semantic_filter_ops(
-                    logical_op_id, logical_op, optimizer_config
-                )
-
-            elif isinstance(logical_op, ConvertScan):
-                physical_ops = _semantic_convert_ops(
-                    logical_op_id, logical_op, optimizer_config
-                )
-
-            elif isinstance(logical_op, TopKScan):
-                ks = TOPK_K_BUDGETS if logical_op.k == -1 else [logical_op.k]
-                physical_ops = _instantiate_physical_ops(
-                    logical_op_id,
-                    logical_op,
-                    TopKOp,
-                    optimizer_config,
-                    [{"k": k} for k in ks],
-                )
-
-            elif isinstance(logical_op, JoinOp):
-                physical_ops = _join_ops(logical_op_id, logical_op, optimizer_config)
-
-            elif isinstance(logical_op, Aggregate):
-                physical_ops = _aggregate_ops(
-                    logical_op_id, logical_op, optimizer_config
-                )
-
-            elif isinstance(logical_op, ComputeOperator):
-                physical_ops = _instantiate_physical_ops(
-                    logical_op_id, logical_op, SmolAgentsCompute, optimizer_config
-                )
-
-            elif isinstance(logical_op, SearchOperator):
-                physical_ops = _instantiate_physical_ops(
-                    logical_op_id, logical_op, SmolAgentsSearch, optimizer_config
-                )
-
-            else:
-                raise NotImplementedError(
-                    f"No physical operator templates registered for {logical_op}"
-                )
-
-            candidates[logical_op_id] = physical_ops
-
-    return candidates
+            raise NotImplementedError("No physical operator registered for", op)

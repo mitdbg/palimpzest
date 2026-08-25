@@ -12,12 +12,14 @@ from palimpzest.query.optimizer.cluster.physical_operator_clustering import (
 class ClusterSamplingBudgetAllocator(ABC):
     """Assign an overall cluster optimizer sampling budget to logical operators."""
 
+    def __init__(self, budget: int, *args, **kwargs):
+        self.budget = budget
+
     @abstractmethod
     def allocate(
         self,
         topological_order: list[str],
         op_clusters: dict[str, PhysicalOperatorCluster],
-        total_budget: int,
     ) -> dict[str, int]:
         """Return a per-logical-operator sampling budget."""
         raise NotImplementedError("Calling this method from an abstract base class.")
@@ -26,14 +28,16 @@ class ClusterSamplingBudgetAllocator(ABC):
 class EqualClusterSamplingBudgetAllocator(ClusterSamplingBudgetAllocator):
     """Give traditional operators the full budget and split semantic operator budget."""
 
+    def __init__(self, budget: int, *args, **kwargs):
+        super().__init__(budget, *args, **kwargs)
+
     def allocate(
         self,
         topological_order: list[str],
         op_clusters: dict[str, PhysicalOperatorCluster],
-        total_budget: int,
     ) -> dict[str, int]:
         budgets = {logical_op_id: 0 for logical_op_id in topological_order}
-        if len(topological_order) == 0 or total_budget <= 0:
+        if len(topological_order) == 0 or self.budget <= 0:
             return budgets
 
         semantic_logical_op_ids = [
@@ -43,13 +47,13 @@ class EqualClusterSamplingBudgetAllocator(ClusterSamplingBudgetAllocator):
         ]
         for logical_op_id in topological_order:
             if logical_op_id not in semantic_logical_op_ids:
-                budgets[logical_op_id] = total_budget
+                budgets[logical_op_id] = self.budget
 
         if len(semantic_logical_op_ids) == 0:
             return budgets
 
-        per_operator_budget = total_budget // len(semantic_logical_op_ids)
-        remainder = total_budget % len(semantic_logical_op_ids)
+        per_operator_budget = self.budget // len(semantic_logical_op_ids)
+        remainder = self.budget % len(semantic_logical_op_ids)
         for idx, logical_op_id in enumerate(semantic_logical_op_ids):
             budgets[logical_op_id] = per_operator_budget + (1 if idx < remainder else 0)
 
