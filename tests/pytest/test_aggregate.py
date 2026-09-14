@@ -109,3 +109,42 @@ def test_aggregate(mocker, input_schema, physical_op_class):
 
     assert list(output_record.schema.model_fields) == ["num_elephants"]
     assert output_record.num_elephants == 3
+
+
+def mock_generator_call_none_answers(candidate, fields, right_candidate=None, json_output=True, **kwargs):
+    field_answers = {field: None for field in fields}
+    generation_stats = GenerationStats(llm_call_duration_secs=0.1, total_llm_calls=1)
+    return field_answers, None, generation_stats, []
+
+
+def mock_generator_call_empty_answers(candidate, fields, right_candidate=None, json_output=True, **kwargs):
+    field_answers = {field: [] for field in fields}
+    generation_stats = GenerationStats(llm_call_duration_secs=0.1, total_llm_calls=1)
+    return field_answers, None, generation_stats, []
+
+
+@pytest.mark.parametrize(
+    "mock_generator_call",
+    [mock_generator_call_none_answers, mock_generator_call_empty_answers],
+    ids=["none-answers", "empty-answers"],
+)
+def test_aggregate_failed_generation(mocker, mock_generator_call):
+    """Test aggregate operator returns an empty DataRecordSet when generation fails"""
+    agg_op = SemanticAggregate(
+        input_schema=TextInputSchema,
+        output_schema=OutputSchema,
+        agg_str="The number of (possibly duplicate) elephants in the input",
+        logical_op_id="test-aggregate",
+        model=Model.GPT_5_MINI,
+    )
+
+    # create input records
+    input_records = [create_input_record(TextInputSchema, idx) for idx in range(3)]
+
+    mocker.patch.object(Generator, "__call__", side_effect=mock_generator_call)
+
+    # apply aggregate operator to the input
+    data_record_set = agg_op(input_records)
+
+    # check for no output records
+    assert len(data_record_set) == 0

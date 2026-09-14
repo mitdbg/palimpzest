@@ -629,6 +629,13 @@ class SemanticAggregate(AggregateOp):
         field_answers, _, generation_stats, _ = self.generator(candidates, fields, **gen_kwargs)
         assert all([field in field_answers for field in fields]), "Not all fields were generated!"
 
+        # replace any None values with an empty list, as in ConvertOp.__call__
+        field_answers = {field: [] if answers is None else answers for field, answers in field_answers.items()}
+
+        # if the generation failed, return an empty DataRecordSet (see issue #300)
+        if len(field_answers[fields_to_generate[0]]) == 0:
+            return DataRecordSet([], [])
+
         # construct data record for the output
         field, value = fields_to_generate[0], field_answers[fields_to_generate[0]][0]
         data_item = self.output_schema(**{field: value})
